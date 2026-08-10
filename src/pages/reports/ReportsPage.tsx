@@ -3,11 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
 import { Badge } from '../../components/common/Badge';
 import { StatCard } from '../../components/common/StatCard';
-import { 
-  BarChart3, FileSpreadsheet, Printer, Search, Filter, 
-  GraduationCap, BookOpen, Users, IndianRupee, Clock, CheckCircle2, ShieldAlert,
-  FileText
-} from 'lucide-react';
+import { ChartBar as BarChart3, FileSpreadsheet, Printer, Search, ListFilter as Filter, GraduationCap, BookOpen, Users, IndianRupee, Clock, CircleCheck as CheckCircle2, ShieldAlert, FileText } from 'lucide-react';
 
 export const ReportsPage: React.FC = () => {
   const { user, role } = useAuth();
@@ -102,7 +98,7 @@ export const ReportsPage: React.FC = () => {
         {/* Overview Stats for Student */}
         <div className="grid-4">
           <StatCard title="Overall Attendance" value={`${attStats.percentage}%`} subtitle={`${attStats.presentClasses} / ${attStats.totalClasses} Conducted`} icon={Clock} colorScheme={attStats.percentage >= 75 ? 'green' : 'orange'} />
-          <StatCard title="Coursework Marks" value="18 / 20" subtitle="DBMS Average Score" icon={GraduationCap} colorScheme="navy" />
+          <StatCard title="Coursework Submissions" value={mySubmissions.length} subtitle="Assignments submitted" icon={GraduationCap} colorScheme="navy" />
           <StatCard title="Pending Fees Dues" value={`₹${myFee?.pendingAmount.toLocaleString()}`} subtitle={`Due: ${myFee?.dueDate}`} icon={IndianRupee} colorScheme={myFee?.pendingAmount === 0 ? 'green' : 'orange'} />
           <StatCard title="Admission status" value={myApp?.status || 'CONVERTED'} subtitle="Admission Application Verified" icon={CheckCircle2} colorScheme="green" />
         </div>
@@ -184,7 +180,7 @@ export const ReportsPage: React.FC = () => {
         s.code,
         s.name,
         'Division A',
-        '88%'
+        `${(() => { const subSessions = db.getAttendanceSessions().filter(a => a.subjectId === s.id); const total = subSessions.reduce((sum, a) => sum + a.records.length, 0); const present = subSessions.reduce((sum, a) => sum + a.records.filter(r => r.status === 'PRESENT').length, 0); return total > 0 ? Math.round((present / total) * 100) : 0; })()}%`
       ]);
       handleExportCSV(`faculty-subject-report-${faculty.employeeId}`, headers, rows);
     };
@@ -223,7 +219,7 @@ export const ReportsPage: React.FC = () => {
               </h3>
               <div style={{ display: 'flex', gap: '2rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
                 <div>Lectures/Week: <strong>{sub.theoryHoursPerWeek} Hrs</strong></div>
-                <div>Class Average Attendance: <strong style={{ color: '#10B981' }}>88%</strong></div>
+                <div>Class Average Attendance: <strong style={{ color: '#10B981' }}>{(() => { const subSessions = db.getAttendanceSessions().filter(a => a.subjectId === sub.id); const total = subSessions.reduce((sum, a) => sum + a.records.length, 0); const present = subSessions.reduce((sum, a) => sum + a.records.filter(r => r.status === 'PRESENT').length, 0); return total > 0 ? Math.round((present / total) * 100) : 0; })()}%</strong></div>
                 <div>Course Credits: <strong>{sub.credits} Credits</strong></div>
               </div>
             </div>
@@ -254,7 +250,7 @@ export const ReportsPage: React.FC = () => {
                       <td style={{ fontWeight: 700, color: 'var(--brand-orange)' }}>{stu.enrollmentNo}</td>
                       <td style={{ fontWeight: 700 }}>{stu.name}</td>
                       <td>{att.percentage}%</td>
-                      <td>18 / 20</td>
+                      <td>{submissions.filter(sub => sub.studentId === stu.id).length} submitted</td>
                       <td><Badge variant={att.percentage >= 75 ? 'active' : 'inactive'}>{att.percentage >= 75 ? 'Eligible' : 'Warning'}</Badge></td>
                     </tr>
                   );
@@ -389,7 +385,7 @@ export const ReportsPage: React.FC = () => {
           <div className="grid-4">
             <StatCard title="Active Enrolled" value={studentsList.length} subtitle="Registered students" icon={Users} colorScheme="orange" />
             <StatCard title="Teaching Workload" value={`${subjects.length} Subjects`} subtitle="Class hours distributed" icon={BookOpen} colorScheme="navy" />
-            <StatCard title="Daily Attendance Avg" value="84%" subtitle="Average across semesters" icon={CheckCircle2} colorScheme="green" />
+            <StatCard title="Daily Attendance Avg" value={`${(() => { const sessions = db.getAttendanceSessions(); const total = sessions.reduce((sum, s) => sum + s.records.length, 0); const present = sessions.reduce((sum, s) => sum + s.records.filter(r => r.status === 'PRESENT').length, 0); return total > 0 ? Math.round((present / total) * 100) : 0; })()}%`} subtitle="Average across semesters" icon={CheckCircle2} colorScheme="green" />
             <StatCard title="Assignments Load" value={`${assignments.length} Courseworks`} subtitle="Assignments created" icon={FileText} colorScheme="gold" />
           </div>
 
@@ -420,7 +416,7 @@ export const ReportsPage: React.FC = () => {
                         <td style={{ fontWeight: 700 }}>{s.name}</td>
                         <td>{dept?.code}</td>
                         <td style={{ fontWeight: 800 }}>{att.percentage}%</td>
-                        <td>80%</td>
+                        <td>{(() => { const deptSubjects = subjects.filter(sub => sub.departmentId === s.departmentId); const deptTopics = db.getSessionPlanTopics().filter(t => deptSubjects.some(sub => sub.id === t.subjectId)); return deptTopics.length > 0 ? Math.round((deptTopics.filter(t => t.status === 'COMPLETED').length / deptTopics.length) * 100) : 0; })()}%</td>
                         <td><Badge variant={att.percentage >= 75 ? 'active' : 'inactive'}>{att.percentage >= 75 ? 'ELIGIBLE' : 'WARNING'}</Badge></td>
                       </tr>
                     );

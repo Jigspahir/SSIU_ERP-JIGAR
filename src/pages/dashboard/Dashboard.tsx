@@ -4,11 +4,7 @@ import { db } from '../../services/db';
 import { StatCard } from '../../components/common/StatCard';
 import { Badge } from '../../components/common/Badge';
 import { PieChart } from '../../components/common/Charts';
-import { 
-  Building2, GitFork, GraduationCap, Users2, UserCheck, 
-  BookOpen, Calendar, ArrowRight, ShieldCheck, 
-  Layers, CheckCircle2, Award, UserPlus, Clock, FileText, FileCheck, CalendarDays, Check, IndianRupee, BarChart3, Settings
-} from 'lucide-react';
+import { Building2, GitFork, GraduationCap, Users as Users2, UserCheck, BookOpen, Calendar, ArrowRight, ShieldCheck, Layers, CircleCheck as CheckCircle2, Award, UserPlus, Clock, FileText, FileCheck, CalendarDays, Check, IndianRupee, ChartBar as BarChart3, Settings } from 'lucide-react';
 
 interface DashboardProps {
   setActiveTab: (tab: string) => void;
@@ -222,28 +218,40 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
 
   // 2. Faculty Dashboard View
   const renderFacultyDashboard = () => {
-    const facultyId = user?.id || 'fac-1';
-    const myClasses = timetableEntries.filter(t => t.facultyId === facultyId || t.facultyId === 'fac-1');
-    const myAssignments = assignments.filter(a => a.createdByFacultyId === facultyId || a.createdByFacultyId === 'fac-1');
-    const myTopics = sessionPlanTopics.filter(t => t.facultyId === facultyId || t.facultyId === 'fac-1');
+    const facultyId = user?.id || '';
+    const myClasses = timetableEntries.filter(t => t.facultyId === facultyId);
+    const myAssignments = assignments.filter(a => a.createdByFacultyId === facultyId);
+    const myTopics = sessionPlanTopics.filter(t => t.facultyId === facultyId);
+
+    const allSessions = db.getAttendanceSessions();
+    const allRecords = allSessions.flatMap(s => s.records);
+    const presentCount = allRecords.filter(r => r.status === 'PRESENT').length;
+    const lateCount = allRecords.filter(r => r.status === 'LATE').length;
+    const absentCount = allRecords.filter(r => r.status === 'ABSENT').length;
+
+    const allMarks = db.getStudentMarks();
+    const distinctionCount = allMarks.filter(m => m.totalMarks / (m.maxInternalMarks + m.maxExternalMarks) >= 0.8).length;
+    const firstClassCount = allMarks.filter(m => { const p = m.totalMarks / (m.maxInternalMarks + m.maxExternalMarks); return p >= 0.6 && p < 0.8; }).length;
+    const passClassCount = allMarks.filter(m => { const p = m.totalMarks / (m.maxInternalMarks + m.maxExternalMarks); return p >= 0.4 && p < 0.6; }).length;
+    const reevalCount = allMarks.filter(m => m.totalMarks / (m.maxInternalMarks + m.maxExternalMarks) < 0.4).length;
 
     const syllabusStatusData = [
-      { label: 'Completed Topics', value: myTopics.filter(t => t.status === 'COMPLETED').length || 18, color: '#34A853' },
-      { label: 'In Progress Topics', value: myTopics.filter(t => t.status === 'IN_PROGRESS').length || 4, color: '#FBBC05' },
-      { label: 'Pending Topics', value: myTopics.filter(t => t.status === 'PENDING').length || 3, color: '#EA4335' }
+      { label: 'Completed Topics', value: myTopics.filter(t => t.status === 'COMPLETED').length, color: '#34A853' },
+      { label: 'In Progress Topics', value: myTopics.filter(t => t.status === 'IN_PROGRESS').length, color: '#FBBC05' },
+      { label: 'Pending Topics', value: myTopics.filter(t => t.status === 'PENDING').length, color: '#EA4335' }
     ];
 
     const lectureAttendancePie = [
-      { label: 'Present Students', value: 54, color: '#34A853' },
-      { label: 'Late Arrival', value: 4, color: '#FBBC05' },
-      { label: 'Absent Students', value: 2, color: '#EA4335' }
+      { label: 'Present Students', value: presentCount, color: '#34A853' },
+      { label: 'Late Arrival', value: lateCount, color: '#FBBC05' },
+      { label: 'Absent Students', value: absentCount, color: '#EA4335' }
     ];
 
     const gradeDistributionPie = [
-      { label: 'Distinction (>80%)', value: 42, color: '#34A853' },
-      { label: 'First Class (60-80%)', value: 44, color: '#4285F4' },
-      { label: 'Pass Class (40-60%)', value: 11, color: '#FBBC05' },
-      { label: 'Re-evaluation (<40%)', value: 3, color: '#EA4335' }
+      { label: 'Distinction (>80%)', value: distinctionCount, color: '#34A853' },
+      { label: 'First Class (60-80%)', value: firstClassCount, color: '#4285F4' },
+      { label: 'Pass Class (40-60%)', value: passClassCount, color: '#FBBC05' },
+      { label: 'Re-evaluation (<40%)', value: reevalCount, color: '#EA4335' }
     ];
 
     return (

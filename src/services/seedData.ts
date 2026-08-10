@@ -1336,7 +1336,7 @@ export const initialExamTimetables: ExamTimetable[] = [
   {
     id: 'et-1',
     examId: 'exam-1',
-    subjectId: 'sub-cse-101',
+    subjectId: 'sub-dsa',
     date: '2024-03-10',
     startTime: '10:00 AM',
     endTime: '12:00 PM',
@@ -1356,7 +1356,7 @@ export const initialExamForms: ExamForm[] = [
     appliedDate: '2024-03-01',
     status: 'HALL_TICKET_ISSUED',
     paymentStatus: 'PAID',
-    regularSubjects: ['sub-cse-101', 'sub-cse-102'],
+    regularSubjects: ['sub-dsa', 'sub-dbms'],
     baseFee: 300,
     subjectFee: 200,
     lateFee: 0,
@@ -1370,8 +1370,31 @@ export const initialExamForms: ExamForm[] = [
   }
 ];
 
-export const initialStudentMarks: StudentMarks[] = [];
-export const initialStudentResults: StudentResult[] = [];
+export const initialStudentMarks: StudentMarks[] = [
+  { id: 'mk-1', examId: 'exam-1', studentId: 'stu-1', subjectId: 'sub-dsa', internalMarks: 18, externalMarks: 72, totalMarks: 90, maxInternalMarks: 20, maxExternalMarks: 80, grade: 'AA', isPass: true, enteredBy: 'fac-1', enteredAt: '2024-03-15' },
+  { id: 'mk-2', examId: 'exam-1', studentId: 'stu-1', subjectId: 'sub-dbms', internalMarks: 16, externalMarks: 64, totalMarks: 80, maxInternalMarks: 20, maxExternalMarks: 80, grade: 'AB', isPass: true, enteredBy: 'fac-1', enteredAt: '2024-03-15' },
+  { id: 'mk-3', examId: 'exam-1', studentId: 'stu-1', subjectId: 'sub-webtech', internalMarks: 17, externalMarks: 58, totalMarks: 75, maxInternalMarks: 20, maxExternalMarks: 80, grade: 'BB', isPass: true, enteredBy: 'fac-1', enteredAt: '2024-03-15' },
+  { id: 'mk-4', examId: 'exam-1', studentId: 'stu-1', subjectId: 'sub-ai', internalMarks: 15, externalMarks: 50, totalMarks: 65, maxInternalMarks: 20, maxExternalMarks: 80, grade: 'BC', isPass: true, enteredBy: 'fac-1', enteredAt: '2024-03-15' },
+  { id: 'mk-5', examId: 'exam-1', studentId: 'stu-2', subjectId: 'sub-dsa', internalMarks: 19, externalMarks: 78, totalMarks: 97, maxInternalMarks: 20, maxExternalMarks: 80, grade: 'AA', isPass: true, enteredBy: 'fac-1', enteredAt: '2024-03-15' },
+  { id: 'mk-6', examId: 'exam-1', studentId: 'stu-2', subjectId: 'sub-dbms', internalMarks: 18, externalMarks: 70, totalMarks: 88, maxInternalMarks: 20, maxExternalMarks: 80, grade: 'AA', isPass: true, enteredBy: 'fac-1', enteredAt: '2024-03-15' },
+  { id: 'mk-7', examId: 'exam-1', studentId: 'stu-2', subjectId: 'sub-webtech', internalMarks: 14, externalMarks: 45, totalMarks: 59, maxInternalMarks: 20, maxExternalMarks: 80, grade: 'CC', isPass: true, enteredBy: 'fac-1', enteredAt: '2024-03-15' },
+  { id: 'mk-8', examId: 'exam-1', studentId: 'stu-2', subjectId: 'sub-ai', internalMarks: 12, externalMarks: 30, totalMarks: 42, maxInternalMarks: 20, maxExternalMarks: 80, grade: 'FF', isPass: false, enteredBy: 'fac-1', enteredAt: '2024-03-15' },
+  { id: 'mk-9', examId: 'exam-1', studentId: 'stu-3', subjectId: 'sub-dsa', internalMarks: 16, externalMarks: 62, totalMarks: 78, maxInternalMarks: 20, maxExternalMarks: 80, grade: 'AB', isPass: true, enteredBy: 'fac-1', enteredAt: '2024-03-15' },
+  { id: 'mk-10', examId: 'exam-1', studentId: 'stu-3', subjectId: 'sub-dbms', internalMarks: 15, externalMarks: 55, totalMarks: 70, maxInternalMarks: 20, maxExternalMarks: 80, grade: 'BB', isPass: true, enteredBy: 'fac-1', enteredAt: '2024-03-15' },
+  { id: 'mk-11', examId: 'exam-1', studentId: 'stu-3', subjectId: 'sub-webtech', internalMarks: 18, externalMarks: 68, totalMarks: 86, maxInternalMarks: 20, maxExternalMarks: 80, grade: 'AA', isPass: true, enteredBy: 'fac-1', enteredAt: '2024-03-15' },
+  { id: 'mk-12', examId: 'exam-1', studentId: 'stu-3', subjectId: 'sub-ai', internalMarks: 17, externalMarks: 60, totalMarks: 77, maxInternalMarks: 20, maxExternalMarks: 80, grade: 'AB', isPass: true, enteredBy: 'fac-1', enteredAt: '2024-03-15' },
+  { id: 'mk-13', examId: 'exam-1', studentId: 'stu-4', subjectId: 'sub-dsa', internalMarks: 13, externalMarks: 40, totalMarks: 53, maxInternalMarks: 20, maxExternalMarks: 80, grade: 'CC', isPass: true, enteredBy: 'fac-1', enteredAt: '2024-03-15' },
+  { id: 'mk-14', examId: 'exam-1', studentId: 'stu-4', subjectId: 'sub-dbms', internalMarks: 11, externalMarks: 28, totalMarks: 39, maxInternalMarks: 20, maxExternalMarks: 80, grade: 'FF', isPass: false, enteredBy: 'fac-1', enteredAt: '2024-03-15' },
+  { id: 'mk-15', examId: 'exam-1', studentId: 'stu-4', subjectId: 'sub-webtech', internalMarks: 16, externalMarks: 58, totalMarks: 74, maxInternalMarks: 20, maxExternalMarks: 80, grade: 'BB', isPass: true, enteredBy: 'fac-1', enteredAt: '2024-03-15' },
+  { id: 'mk-16', examId: 'exam-1', studentId: 'stu-4', subjectId: 'sub-ai', internalMarks: 15, externalMarks: 52, totalMarks: 67, maxInternalMarks: 20, maxExternalMarks: 80, grade: 'BC', isPass: true, enteredBy: 'fac-1', enteredAt: '2024-03-15' }
+];
+
+export const initialStudentResults: StudentResult[] = [
+  { id: 'res-1', examId: 'exam-1', studentId: 'stu-1', studentName: 'Demo Student', enrollmentNo: '230101001', programId: 'prog-1', semesterId: 'sem-cse-4', totalMarksObtained: 310, totalMaxMarks: 400, sgpa: 8.75, cgpa: 8.50, status: 'PASS', publishedDate: '2024-03-20' },
+  { id: 'res-2', examId: 'exam-1', studentId: 'stu-2', studentName: 'Demo Student Two', enrollmentNo: '230101002', programId: 'prog-1', semesterId: 'sem-cse-4', totalMarksObtained: 286, totalMaxMarks: 400, sgpa: 7.85, cgpa: 8.10, status: 'PASS', publishedDate: '2024-03-20' },
+  { id: 'res-3', examId: 'exam-1', studentId: 'stu-3', studentName: 'Demo Student Three', enrollmentNo: '230101003', programId: 'prog-1', semesterId: 'sem-cse-4', totalMarksObtained: 311, totalMaxMarks: 400, sgpa: 8.80, cgpa: 8.65, status: 'PASS', publishedDate: '2024-03-20' },
+  { id: 'res-4', examId: 'exam-1', studentId: 'stu-4', studentName: 'Demo Student Four', enrollmentNo: '240101001', programId: 'prog-1', semesterId: 'sem-cse-4', totalMarksObtained: 233, totalMaxMarks: 400, sgpa: 6.20, cgpa: 7.45, status: 'WITHHELD', publishedDate: '2024-03-20', remarks: 'Withheld due to failed subject - DBMS re-examination required.' }
+];
 
 export const initialStudentFeedbacks: StudentFeedback[] = [
   {
@@ -1384,7 +1407,7 @@ export const initialStudentFeedbacks: StudentFeedback[] = [
     semesterId: 'sem-cse-4',
     facultyId: 'fac-1',
     facultyName: 'Prof. Rajesh Sharma',
-    subjectId: 'sub-cse-101',
+    subjectId: 'sub-dsa',
     subjectName: 'Data Structures & Algorithms',
     teachingQualityRating: 5,
     communicationRating: 5,
