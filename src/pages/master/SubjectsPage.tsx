@@ -1,0 +1,208 @@
+import React, { useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
+import { db } from '../../services/db';
+import { Subject } from '../../types';
+import { DataTable, Column } from '../../components/common/DataTable';
+import { Modal } from '../../components/common/Modal';
+import { ConfirmDialog } from '../../components/common/ConfirmDialog';
+import { Badge } from '../../components/common/Badge';
+
+export const SubjectsPage: React.FC = () => {
+  const { canMutate } = useAuth();
+  const [subjects, setSubjects] = useState<Subject[]>(() => db.getSubjects());
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<Subject | null>(null);
+  const [deletingItem, setDeletingItem] = useState<Subject | null>(null);
+
+  // Form state
+  const [code, setCode] = useState('');
+  const [name, setName] = useState('');
+  const [semesterId, setSemesterId] = useState('');
+  const [programId, setProgramId] = useState('');
+  const [departmentId, setDepartmentId] = useState('');
+  const [type, setType] = useState<Subject['type']>('THEORY');
+  const [credits, setCredits] = useState(4);
+  const [theoryHoursPerWeek, setTheoryHoursPerWeek] = useState(3);
+  const [labHoursPerWeek, setLabHoursPerWeek] = useState(2);
+  const [status, setStatus] = useState<'ACTIVE' | 'INACTIVE'>('ACTIVE');
+
+  const semesters = db.getSemesters();
+  const programs = db.getPrograms();
+  const departments = db.getDepartments();
+
+  const refreshData = () => {
+    setSubjects([...db.getSubjects()]);
+  };
+
+  const handleOpenAddModal = () => {
+    setEditingItem(null);
+    setCode('CSE-405');
+    setName('Cloud Computing & DevOps');
+    setSemesterId(semesters[0]?.id || '');
+    setProgramId(programs[0]?.id || '');
+    setDepartmentId(departments[0]?.id || '');
+    setType('THEORY');
+    setCredits(4);
+    setTheoryHoursPerWeek(3);
+    setLabHoursPerWeek(2);
+    setStatus('ACTIVE');
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (item: Subject) => {
+    setEditingItem(item);
+    setCode(item.code);
+    setName(item.name);
+    setSemesterId(item.semesterId);
+    setProgramId(item.programId);
+    setDepartmentId(item.departmentId);
+    setType(item.type);
+    setCredits(item.credits);
+    setTheoryHoursPerWeek(item.theoryHoursPerWeek);
+    setLabHoursPerWeek(item.labHoursPerWeek);
+    setStatus(item.status);
+    setIsModalOpen(true);
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingItem) {
+      db.updateEntity<Subject>('subjects', editingItem.id, {
+        code, name, semesterId, programId, departmentId, type, credits, theoryHoursPerWeek, labHoursPerWeek, status
+      }, `Updated Subject ${name}`);
+    } else {
+      db.addEntity<Subject>('subjects', {
+        code, name, semesterId, programId, departmentId, type, credits, theoryHoursPerWeek, labHoursPerWeek, status
+      }, `Created Subject ${name}`);
+    }
+    refreshData();
+    setIsModalOpen(false);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (deletingItem) {
+      db.deleteEntity('subjects', deletingItem.id, `Deleted Subject ${deletingItem.name}`);
+      refreshData();
+      setDeletingItem(null);
+    }
+  };
+
+  const columns: Column<Subject>[] = [
+    { key: 'code', header: 'Subject Code', sortable: true, width: '130px', accessor: s => <strong>{s.code}</strong> },
+    { key: 'name', header: 'Subject Name', sortable: true },
+    {
+      key: 'type',
+      header: 'Subject Type',
+      sortable: true,
+      accessor: s => <Badge variant={s.type === 'THEORY' ? 'navy' : (s.type === 'PRACTICAL' ? 'orange' : 'warning')}>{s.type}</Badge>
+    },
+    { key: 'credits', header: 'Credits', sortable: true, accessor: s => <strong>{s.credits} Credits</strong> },
+    { key: 'hours', header: 'Weekly Hours', accessor: s => `${s.theoryHoursPerWeek} Th / ${s.labHoursPerWeek} Lab` },
+    { key: 'status', header: 'Status', sortable: true }
+  ];
+
+  return (
+    <div>
+      <DataTable
+        title="Subjects Master Data"
+        subtitle="Manage academic curriculum subjects, credits, theory/lab load"
+        data={subjects}
+        columns={columns}
+        searchPlaceholder="Search subject by code, name, type..."
+        searchFields={['code', 'name', 'type']}
+        onAddClick={handleOpenAddModal}
+        addLabel="Add Subject"
+        onEditClick={handleOpenEditModal}
+        onDeleteClick={item => setDeletingItem(item)}
+        canMutate={canMutate()}
+        exportFilename="swarrnim-subjects"
+      />
+
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={editingItem ? 'Edit Subject' : 'Add Subject'}
+        subtitle="Configure course subject curriculum & credits"
+      >
+        <form onSubmit={handleSave}>
+          <div className="grid-2">
+            <div className="form-group">
+              <label className="form-label">Subject Code *</label>
+              <input type="text" className="form-input" placeholder="e.g. CSE-401" value={code} onChange={e => setCode(e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Subject Type *</label>
+              <select className="form-select" value={type} onChange={e => setType(e.target.value as any)}>
+                <option value="THEORY">THEORY</option>
+                <option value="PRACTICAL">PRACTICAL</option>
+                <option value="ELECTIVE">ELECTIVE</option>
+                <option value="LAB">LAB</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Full Subject Name *</label>
+            <input type="text" className="form-input" placeholder="e.g. Data Structures & Algorithms" value={name} onChange={e => setName(e.target.value)} required />
+          </div>
+
+          <div className="grid-2">
+            <div className="form-group">
+              <label className="form-label">Program *</label>
+              <select className="form-select" value={programId} onChange={e => setProgramId(e.target.value)} required>
+                {programs.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} ({p.code})</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Department *</label>
+              <select className="form-select" value={departmentId} onChange={e => setDepartmentId(e.target.value)} required>
+                {departments.map(d => (
+                  <option key={d.id} value={d.id}>{d.name} ({d.code})</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid-3">
+            <div className="form-group">
+              <label className="form-label">Course Credits *</label>
+              <input type="number" className="form-input" min={1} max={10} value={credits} onChange={e => setCredits(Number(e.target.value))} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Theory Hours/Wk</label>
+              <input type="number" className="form-input" min={0} max={10} value={theoryHoursPerWeek} onChange={e => setTheoryHoursPerWeek(Number(e.target.value))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Lab Hours/Wk</label>
+              <input type="number" className="form-input" min={0} max={10} value={labHoursPerWeek} onChange={e => setLabHoursPerWeek(Number(e.target.value))} />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Status</label>
+            <select className="form-select" value={status} onChange={e => setStatus(e.target.value as any)}>
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="INACTIVE">INACTIVE</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+            <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary">{editingItem ? 'Update Subject' : 'Save Subject'}</button>
+          </div>
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        isOpen={!!deletingItem}
+        onClose={() => setDeletingItem(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Subject"
+        message={`Are you sure you want to delete "${deletingItem?.name}"?`}
+      />
+    </div>
+  );
+};

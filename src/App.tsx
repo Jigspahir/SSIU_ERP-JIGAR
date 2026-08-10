@@ -1,0 +1,225 @@
+import React, { useState } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { Sidebar } from './components/layout/Sidebar';
+import { Topbar } from './components/layout/Topbar';
+import { LoginPage } from './pages/auth/LoginPage';
+import { Dashboard } from './pages/dashboard/Dashboard';
+import { InstitutesPage } from './pages/master/InstitutesPage';
+import { DepartmentsPage } from './pages/master/DepartmentsPage';
+import { ProgramsPage } from './pages/master/ProgramsPage';
+import { AcademicYearsPage } from './pages/master/AcademicYearsPage';
+import { BatchesPage } from './pages/master/BatchesPage';
+import { SemestersPage } from './pages/master/SemestersPage';
+import { DivisionsPage } from './pages/master/DivisionsPage';
+import { SubjectsPage } from './pages/master/SubjectsPage';
+import { FacultyPage } from './pages/master/FacultyPage';
+import { StudentsPage } from './pages/master/StudentsPage';
+import { ProfilePage } from './pages/profile/ProfilePage';
+
+// Academic Module Pages
+import { AttendancePage } from './pages/academic/AttendancePage';
+import { TimetablePage } from './pages/academic/TimetablePage';
+import { SessionPlanPage } from './pages/academic/SessionPlanPage';
+import { UnitMaterialPage } from './pages/academic/UnitMaterialPage';
+import { AssignmentsPage } from './pages/academic/AssignmentsPage';
+import { AcademicCalendarPage } from './pages/academic/AcademicCalendarPage';
+import { FeedbackPage } from './pages/feedback/FeedbackPage';
+import { SupportTicketsPage } from './pages/support/SupportTicketsPage';
+
+// Campus & Support Pages
+import { CertificatesPage } from './pages/campus/CertificatesPage';
+import { MentorPage } from './pages/campus/MentorPage';
+import { NoticesPage } from './pages/campus/NoticesPage';
+import { EventsPage } from './pages/campus/EventsPage';
+import { LibraryPage } from './pages/campus/LibraryPage';
+import { NotificationsPage } from './pages/campus/NotificationsPage';
+import { RequestsPage } from './pages/campus/RequestsPage';
+
+// Fees & Finance Module Page
+import { FeesFinancePage } from './pages/finance/FeesFinancePage';
+
+// CRM & Admissions Module Page
+import { CRMPage } from './pages/crm/CRMPage';
+
+// Reports & Analytics Module Page
+import { ReportsPage } from './pages/reports/ReportsPage';
+
+// System Settings Module Page
+import { SystemSettingsPage } from './pages/settings/SystemSettingsPage';
+
+// Examination Management Module Pages
+import { ExamDashboardPage } from './pages/exams/ExamDashboardPage';
+import { ExamsListPage } from './pages/exams/ExamsListPage';
+import { ExamSchedulePage } from './pages/exams/ExamSchedulePage';
+import { ExamFormsPage } from './pages/exams/ExamFormsPage';
+import { ExamFeesPage } from './pages/exams/ExamFeesPage';
+import { HallTicketPage } from './pages/exams/HallTicketPage';
+import { MarksManagementPage } from './pages/exams/MarksManagementPage';
+import { ResultManagementPage } from './pages/exams/ResultManagementPage';
+import { MarksheetPage } from './pages/exams/MarksheetPage';
+
+import './styles/index.css';
+
+const MainAppContent: React.FC = () => {
+  const { user, role } = useAuth();
+  const [activeTab, setActiveTab] = useState<string>('dashboard');
+  const [collapsed, setCollapsed] = useState<boolean>(false);
+
+  // If not logged in, enforce login page screen
+  if (!user) {
+    return <LoginPage />;
+  }
+
+  // Define allowed tabs per role
+  const getIsTabAllowed = (tab: string) => {
+    if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') return true;
+    if (tab === 'dashboard' || tab === 'profile') return true;
+
+    // Academic & Campus module tabs are accessible by all authenticated roles
+    const academicTabs = [
+      'attendance', 'timetable', 'session-plan', 'materials', 'assignments', 'calendar',
+      'feedback', 'tickets', 'certificates', 'mentor', 'notices', 'events', 'library', 'notifications', 'requests'
+    ];
+    if (academicTabs.includes(tab)) return true;
+
+    // Fees & Finance tab is accessible by Admin and Student, but restricted for Faculty
+    if (tab === 'fees' || tab === 'crm' || tab === 'reports') {
+      return true;
+    }
+
+    // Examination Management tabs
+    const examTabs = ['exam-dashboard', 'exams', 'exam-forms', 'exam-fees', 'exam-schedule', 'exam-hallticket', 'exam-marks', 'exam-results', 'exam-marksheet'];
+    if (examTabs.includes(tab)) return true;
+
+    if (role === 'PRINCIPAL') {
+      return ['departments', 'programs', 'academic-years', 'batches', 'semesters', 'divisions', 'subjects', 'faculty', 'students'].includes(tab);
+    }
+    if (role === 'HOD') {
+      return ['programs', 'batches', 'semesters', 'divisions', 'subjects', 'faculty', 'students'].includes(tab);
+    }
+    if (role === 'FACULTY') {
+      return ['divisions', 'subjects', 'students', 'faculty'].includes(tab);
+    }
+    if (role === 'STUDENT') {
+      return ['subjects', 'students'].includes(tab);
+    }
+    return false;
+  };
+
+  const renderActivePage = () => {
+    // Route guard check: fallback to dashboard if tab is unauthorized for active role
+    const currentTab = getIsTabAllowed(activeTab) ? activeTab : 'dashboard';
+
+    switch (currentTab) {
+      case 'dashboard':
+        return <Dashboard setActiveTab={setActiveTab} />;
+      case 'fees':
+        return <FeesFinancePage />;
+      case 'crm':
+        return <CRMPage />;
+      case 'reports':
+        return <ReportsPage />;
+      case 'settings':
+        return <SystemSettingsPage />;
+      case 'attendance':
+        return <AttendancePage />;
+      case 'timetable':
+        return <TimetablePage />;
+      case 'session-plan':
+        return <SessionPlanPage />;
+      case 'materials':
+        return <UnitMaterialPage />;
+      case 'assignments':
+        return <AssignmentsPage />;
+      case 'calendar':
+        return <AcademicCalendarPage />;
+      case 'feedback':
+        return <FeedbackPage />;
+      case 'tickets':
+        return <SupportTicketsPage />;
+      case 'certificates':
+        return <CertificatesPage />;
+      case 'mentor':
+        return <MentorPage />;
+      case 'notices':
+        return <NoticesPage />;
+      case 'events':
+        return <EventsPage />;
+      case 'library':
+        return <LibraryPage />;
+      case 'notifications':
+        return <NotificationsPage />;
+      case 'requests':
+        return <RequestsPage />;
+      case 'exam-dashboard':
+        return <ExamDashboardPage setActiveTab={setActiveTab} />;
+      case 'exams':
+        return <ExamsListPage />;
+      case 'exam-schedule':
+        return <ExamSchedulePage />;
+      case 'exam-forms':
+        return <ExamFormsPage />;
+      case 'exam-fees':
+        return <ExamFeesPage />;
+      case 'exam-hallticket':
+        return <HallTicketPage />;
+      case 'exam-marks':
+        return <MarksManagementPage />;
+      case 'exam-results':
+        return <ResultManagementPage />;
+      case 'exam-marksheet':
+        return <MarksheetPage />;
+      case 'institutes':
+        return <InstitutesPage />;
+      case 'departments':
+        return <DepartmentsPage />;
+      case 'programs':
+        return <ProgramsPage />;
+      case 'academic-years':
+        return <AcademicYearsPage />;
+      case 'batches':
+        return <BatchesPage />;
+      case 'semesters':
+        return <SemestersPage />;
+      case 'divisions':
+        return <DivisionsPage />;
+      case 'subjects':
+        return <SubjectsPage />;
+      case 'faculty':
+        return <FacultyPage />;
+      case 'students':
+        return <StudentsPage />;
+      case 'profile':
+        return <ProfilePage />;
+      default:
+        return <Dashboard setActiveTab={setActiveTab} />;
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-main)' }}>
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        collapsed={collapsed}
+        setCollapsed={setCollapsed}
+      />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: '100vh' }}>
+        <Topbar activeTab={activeTab} setActiveTab={setActiveTab} />
+        <main style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
+          {renderActivePage()}
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export function App() {
+  return (
+    <AuthProvider>
+      <MainAppContent />
+    </AuthProvider>
+  );
+}
+
+export default App;
