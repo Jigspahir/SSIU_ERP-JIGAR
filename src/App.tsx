@@ -44,6 +44,16 @@ import { CRMPage } from './pages/crm/CRMPage';
 // Reports & Analytics Module Page
 import { ReportsPage } from './pages/reports/ReportsPage';
 
+// Administrative Offices Workspaces
+import { RegistrarWorkspacePage } from './pages/admin-offices/RegistrarWorkspacePage';
+import { IQACWorkspacePage } from './pages/admin-offices/IQACWorkspacePage';
+import { ExamCellWorkspacePage } from './pages/admin-offices/ExamCellWorkspacePage';
+import { StudentSectionWorkspacePage } from './pages/admin-offices/StudentSectionWorkspacePage';
+import { HostelWorkspacePage } from './pages/admin-offices/HostelWorkspacePage';
+import { LibraryWorkspacePage } from './pages/admin-offices/LibraryWorkspacePage';
+import { TransportWorkspacePage } from './pages/admin-offices/TransportWorkspacePage';
+import { MaintenanceWorkspacePage } from './pages/admin-offices/MaintenanceWorkspacePage';
+
 // System Settings Module Page
 import { SystemSettingsPage } from './pages/settings/SystemSettingsPage';
 
@@ -105,8 +115,29 @@ const MainAppContent: React.FC = () => {
     if (role === 'FACULTY') {
       return ['divisions', 'subjects', 'students', 'faculty'].includes(tab);
     }
-    if (role === 'STUDENT') {
-      return ['subjects', 'students'].includes(tab);
+    if (role === 'REGISTRAR') {
+      return ['registrar', 'students', 'faculty', 'departments', 'programs', 'notices', 'reports'].includes(tab);
+    }
+    if (role === 'IQAC') {
+      return ['iqac', 'faculty', 'feedback', 'reports'].includes(tab);
+    }
+    if (role === 'EXAM_CELL') {
+      return ['exam-cell', 'exam-dashboard', 'exams', 'exam-forms', 'exam-schedule', 'exam-hallticket', 'exam-marks', 'exam-results', 'exam-marksheet', 'students', 'reports'].includes(tab);
+    }
+    if (role === 'STUDENT_SECTION') {
+      return ['student-section', 'students', 'certificates', 'notifications'].includes(tab);
+    }
+    if (role === 'HOSTEL_ADMIN') {
+      return ['hostel-admin', 'students', 'tickets', 'notifications'].includes(tab);
+    }
+    if (role === 'LIBRARY_ADMIN') {
+      return ['library-admin', 'library', 'students'].includes(tab);
+    }
+    if (role === 'TRANSPORT_ADMIN') {
+      return ['transport-admin', 'students'].includes(tab);
+    }
+    if (role === 'MAINTENANCE_ADMIN') {
+      return ['maintenance-admin', 'tickets'].includes(tab);
     }
     return false;
   };
@@ -174,6 +205,22 @@ const MainAppContent: React.FC = () => {
         return <ResultManagementPage />;
       case 'exam-marksheet':
         return <MarksheetPage />;
+      case 'registrar':
+        return <RegistrarWorkspacePage />;
+      case 'iqac':
+        return <IQACWorkspacePage />;
+      case 'exam-cell':
+        return <ExamCellWorkspacePage />;
+      case 'student-section':
+        return <StudentSectionWorkspacePage />;
+      case 'hostel-admin':
+        return <HostelWorkspacePage />;
+      case 'library-admin':
+        return <LibraryWorkspacePage />;
+      case 'transport-admin':
+        return <TransportWorkspacePage />;
+      case 'maintenance-admin':
+        return <MaintenanceWorkspacePage />;
       case 'institutes':
         return <InstitutesPage />;
       case 'departments':

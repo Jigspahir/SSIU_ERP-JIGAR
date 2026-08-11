@@ -146,7 +146,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const canMutate = (): boolean => {
     if (!user) return false;
-    return ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD'].includes(user.role);
+    return [
+      'SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD',
+      'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION',
+      'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN'
+    ].includes(user.role);
   };
 
   const resetSystemDatabase = () => {

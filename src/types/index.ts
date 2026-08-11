@@ -4,7 +4,16 @@ export type UserRole =
   | 'PRINCIPAL' 
   | 'HOD' 
   | 'FACULTY' 
-  | 'STUDENT';
+  | 'STUDENT'
+  | 'REGISTRAR'
+  | 'IQAC'
+  | 'EXAM_CELL'
+  | 'STUDENT_SECTION'
+  | 'HOSTEL_ADMIN'
+  | 'LIBRARY_ADMIN'
+  | 'TRANSPORT_ADMIN'
+  | 'MAINTENANCE_ADMIN';
+
 
 export interface User {
   id: string;

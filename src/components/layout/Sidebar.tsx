@@ -67,17 +67,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
     // Campus Services
     'notices': { id: 'notices', label: 'Notices', icon: Bell, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Campus' },
     'events': { id: 'events', label: 'Events', icon: CalendarCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Campus' },
-    'library': { id: 'library', label: 'Library', icon: Library, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Campus' },
-    'notifications': { id: 'notifications', label: 'Notifications', icon: Bell, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Campus' },
+    'library': { id: 'library', label: 'Library', icon: Library, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'LIBRARY_ADMIN'], category: 'Campus' },
+    'notifications': { id: 'notifications', label: 'Notifications', icon: Bell, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN'], category: 'Campus' },
+
+    // Administration Offices Workspaces
+    'registrar': { id: 'registrar', label: 'Registrar Office', icon: FileCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR'], category: 'Administration' },
+    'iqac': { id: 'iqac', label: 'IQAC Cell', icon: Award, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'IQAC'], category: 'Administration' },
+    'exam-cell': { id: 'exam-cell', label: 'Exam Controller', icon: ShieldCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'EXAM_CELL'], category: 'Administration' },
+    'student-section': { id: 'student-section', label: 'Student Section', icon: FolderCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'STUDENT_SECTION'], category: 'Administration' },
+    'hostel-admin': { id: 'hostel-admin', label: 'Hostel Office', icon: Building2, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'HOSTEL_ADMIN'], category: 'Administration' },
+    'library-admin': { id: 'library-admin', label: 'Library Office', icon: Library, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'LIBRARY_ADMIN'], category: 'Administration' },
+    'transport-admin': { id: 'transport-admin', label: 'Transport Fleet', icon: Clock, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'TRANSPORT_ADMIN'], category: 'Administration' },
+    'maintenance-admin': { id: 'maintenance-admin', label: 'Maintenance Office', icon: Settings, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'MAINTENANCE_ADMIN'], category: 'Administration' },
 
     // Master Hierarchy & User Directory for Admin
-    'students': { id: 'students', label: 'Students', icon: Users2, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY'], category: 'Master' },
-    'faculty': { id: 'faculty', label: 'Faculty', icon: UserCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD'], category: 'Master' },
-    'departments': { id: 'departments', label: 'Departments', icon: Building2, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL'], category: 'Master' },
-    'programs': { id: 'programs', label: 'Programs', icon: GraduationCap, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD'], category: 'Master' },
-    'reports': { id: 'reports', label: 'Reports', icon: BarChart3, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'System' },
+    'students': { id: 'students', label: 'Students', icon: Users2, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'REGISTRAR', 'STUDENT_SECTION'], category: 'Master' },
+    'faculty': { id: 'faculty', label: 'Faculty', icon: UserCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'REGISTRAR', 'IQAC'], category: 'Master' },
+    'departments': { id: 'departments', label: 'Departments', icon: Building2, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'REGISTRAR'], category: 'Master' },
+    'programs': { id: 'programs', label: 'Programs', icon: GraduationCap, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'REGISTRAR'], category: 'Master' },
+    'reports': { id: 'reports', label: 'Reports', icon: BarChart3, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC', 'EXAM_CELL'], category: 'System' },
     'settings': { id: 'settings', label: 'Settings', icon: Settings, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN'], category: 'System' },
-    'profile': { id: 'profile', label: 'My Profile', icon: User, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'System' }
+    'profile': { id: 'profile', label: 'My Profile', icon: User, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN'], category: 'System' }
   };
 
   // Exact Structure Definitions per Prompt
@@ -93,7 +103,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const adminOrderKeys = [
-    'dashboard', 'students', 'faculty', 'departments', 'programs', 'subjects',
+    'dashboard', 'registrar', 'iqac', 'exam-cell', 'student-section', 'hostel-admin', 'library-admin', 'transport-admin', 'maintenance-admin',
+    'students', 'faculty', 'departments', 'programs', 'subjects',
     'calendar', 'attendance', 'exam-dashboard', 'fees', 'crm', 'certificates',
     'requests', 'tickets', 'feedback', 'notices', 'events', 'reports', 'settings', 'profile'
   ];
@@ -103,6 +114,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
     orderKeys = studentOrderKeys;
   } else if (role === 'FACULTY') {
     orderKeys = facultyOrderKeys;
+  } else if (role === 'REGISTRAR') {
+    orderKeys = ['dashboard', 'registrar', 'students', 'faculty', 'departments', 'programs', 'notices', 'reports', 'profile'];
+  } else if (role === 'IQAC') {
+    orderKeys = ['dashboard', 'iqac', 'faculty', 'feedback', 'reports', 'profile'];
+  } else if (role === 'EXAM_CELL') {
+    orderKeys = ['dashboard', 'exam-cell', 'exam-dashboard', 'students', 'reports', 'profile'];
+  } else if (role === 'STUDENT_SECTION') {
+    orderKeys = ['dashboard', 'student-section', 'students', 'certificates', 'notifications', 'profile'];
+  } else if (role === 'HOSTEL_ADMIN') {
+    orderKeys = ['dashboard', 'hostel-admin', 'students', 'tickets', 'notifications', 'profile'];
+  } else if (role === 'LIBRARY_ADMIN') {
+    orderKeys = ['dashboard', 'library-admin', 'library', 'students', 'profile'];
+  } else if (role === 'TRANSPORT_ADMIN') {
+    orderKeys = ['dashboard', 'transport-admin', 'students', 'profile'];
+  } else if (role === 'MAINTENANCE_ADMIN') {
+    orderKeys = ['dashboard', 'maintenance-admin', 'tickets', 'profile'];
   }
 
   const visibleItems: NavItem[] = orderKeys
