@@ -247,6 +247,89 @@ class ERPDatabaseService {
     return (this.state.studentDocuments || []).filter(d => d.studentId === studentId);
   }
 
+  // --- ROLE-BASED SCOPED GETTERS ---
+  public getScopedStudents(user: User | null, role: UserRole | null): Student[] {
+    const students = this.getStudents();
+    if (!user || !role) return students;
+
+    if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') {
+      return students;
+    }
+    if (role === 'PRINCIPAL') {
+      return user.instituteId ? students.filter(s => s.instituteId === user.instituteId) : students;
+    }
+    if (role === 'HOD') {
+      return user.departmentId ? students.filter(s => s.departmentId === user.departmentId) : students;
+    }
+    if (role === 'FACULTY') {
+      return students.filter(s => 
+        (user.departmentId && s.departmentId === user.departmentId) ||
+        (user.id && s.mentorId === user.id)
+      );
+    }
+    if (role === 'STUDENT') {
+      return students.filter(s => 
+        s.id === user.id || 
+        s.email === user.email || 
+        s.enrollmentNo === user.enrollmentNo
+      );
+    }
+    return students;
+  }
+
+  public getScopedFaculty(user: User | null, role: UserRole | null): Faculty[] {
+    const faculty = this.getFaculty();
+    if (!user || !role) return faculty;
+
+    if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') {
+      return faculty;
+    }
+    if (role === 'PRINCIPAL') {
+      return user.instituteId ? faculty.filter(f => f.instituteId === user.instituteId) : faculty;
+    }
+    if (role === 'HOD') {
+      return user.departmentId ? faculty.filter(f => f.departmentId === user.departmentId) : faculty;
+    }
+    if (role === 'FACULTY') {
+      return faculty.filter(f => f.id === user.id || f.email === user.email);
+    }
+    return faculty;
+  }
+
+  public getScopedExamForms(user: User | null, role: UserRole | null): ExamForm[] {
+    const forms = this.getExamForms();
+    if (!user || !role) return forms;
+
+    if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') {
+      return forms;
+    }
+    if (role === 'PRINCIPAL' || role === 'HOD') {
+      const allowedStudentIds = new Set(this.getScopedStudents(user, role).map(s => s.id));
+      return forms.filter(f => allowedStudentIds.has(f.studentId));
+    }
+    if (role === 'STUDENT') {
+      return forms.filter(f => f.studentId === user.id || f.enrollmentNo === user.enrollmentNo);
+    }
+    return forms;
+  }
+
+  public getScopedFeeRecords(user: User | null, role: UserRole | null): StudentFeeRecord[] {
+    const records = this.getStudentFeeRecords();
+    if (!user || !role) return records;
+
+    if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') {
+      return records;
+    }
+    if (role === 'PRINCIPAL' || role === 'HOD') {
+      const allowedStudentIds = new Set(this.getScopedStudents(user, role).map(s => s.id));
+      return records.filter(r => allowedStudentIds.has(r.studentId));
+    }
+    if (role === 'STUDENT') {
+      return records.filter(r => r.studentId === user.id || r.enrollmentNo === user.enrollmentNo);
+    }
+    return records;
+  }
+
   // Generic Save / Add / Update / Delete
   public addEntity<T extends { id: string }>(collectionKey: keyof DatabaseState, item: Omit<T, 'id'>, auditMsg?: string): T {
     const newItem = { ...item, id: `${String(collectionKey)}-${Date.now()}` } as unknown as T;
