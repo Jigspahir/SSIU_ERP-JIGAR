@@ -36,13 +36,49 @@ export const initialInstitutes: Institute[] = [
   {
     id: 'inst-3',
     code: 'SSB',
-    name: 'Swarrnim School of Business',
+    name: 'Swarrnim School of Business & Management',
     type: 'Management',
     establishedYear: 2017,
     principalName: 'Demo Principal Three',
     email: 'demo.principal3@university.edu',
     phone: '+91 79 2328 1003',
     location: 'Management Block, Swarrnim Campus, Gandhinagar',
+    status: 'ACTIVE'
+  },
+  {
+    id: 'inst-4',
+    code: 'SIHSP',
+    name: 'Swarrnim Institute of Health Sciences & Pharmacy',
+    type: 'Pharmacy',
+    establishedYear: 2019,
+    principalName: 'Dr. R. K. Sharma',
+    email: 'principal.pharmacy@swarrnim.edu.in',
+    phone: '+91 79 2328 1004',
+    location: 'Health Sciences Wing, Swarrnim Campus, Gandhinagar',
+    status: 'ACTIVE'
+  },
+  {
+    id: 'inst-5',
+    code: 'SISA',
+    name: 'Swarrnim Institute of Science & Agriculture',
+    type: 'Science',
+    establishedYear: 2020,
+    principalName: 'Dr. V. P. Patel',
+    email: 'principal.agri@swarrnim.edu.in',
+    phone: '+91 79 2328 1005',
+    location: 'Agri-Tech Park, Swarrnim Campus, Gandhinagar',
+    status: 'ACTIVE'
+  },
+  {
+    id: 'inst-6',
+    code: 'SSAP',
+    name: 'Swarrnim School of Architecture & Planning',
+    type: 'Architecture',
+    establishedYear: 2019,
+    principalName: 'Prof. Ananya Mehta',
+    email: 'principal.arch@swarrnim.edu.in',
+    phone: '+91 79 2328 1006',
+    location: 'Architecture Studio, Swarrnim Campus, Gandhinagar',
     status: 'ACTIVE'
   }
 ];
@@ -96,6 +132,46 @@ export const initialDepartments: Department[] = [
     hodName: 'Demo HOD Five',
     email: 'demo.hod5@university.edu',
     phone: '+91 79 2328 1030',
+    status: 'ACTIVE'
+  },
+  {
+    id: 'dept-6',
+    code: 'PHARM',
+    name: 'Pharmaceutical Sciences & Research',
+    instituteId: 'inst-4',
+    hodName: 'Dr. Suresh Joshi',
+    email: 'hod.pharmacy@swarrnim.edu.in',
+    phone: '+91 79 2328 1040',
+    status: 'ACTIVE'
+  },
+  {
+    id: 'dept-7',
+    code: 'NUR',
+    name: 'Nursing & Allied Health Care',
+    instituteId: 'inst-4',
+    hodName: 'Prof. Mary Thomas',
+    email: 'hod.nursing@swarrnim.edu.in',
+    phone: '+91 79 2328 1045',
+    status: 'ACTIVE'
+  },
+  {
+    id: 'dept-8',
+    code: 'AGRI',
+    name: 'Agronomy & Plant Biotechnology',
+    instituteId: 'inst-5',
+    hodName: 'Dr. H. K. Chaudhary',
+    email: 'hod.agri@swarrnim.edu.in',
+    phone: '+91 79 2328 1050',
+    status: 'ACTIVE'
+  },
+  {
+    id: 'dept-9',
+    code: 'ARCH',
+    name: 'Architecture & Environmental Design',
+    instituteId: 'inst-6',
+    hodName: 'Ar. Rajesh Shah',
+    email: 'hod.arch@swarrnim.edu.in',
+    phone: '+91 79 2328 1060',
     status: 'ACTIVE'
   }
 ];
@@ -175,6 +251,42 @@ export const initialPrograms: Program[] = [
   },
   {
     id: 'prog-7',
+    code: 'B-PHARM',
+    name: 'Bachelor of Pharmacy (B.Pharm)',
+    degreeType: 'B.Pharm',
+    durationYears: 4,
+    totalSemesters: 8,
+    intakeCapacity: 100,
+    departmentId: 'dept-6',
+    instituteId: 'inst-4',
+    status: 'ACTIVE'
+  },
+  {
+    id: 'prog-8',
+    code: 'BSC-AGRI',
+    name: 'B.Sc (Hons.) in Agriculture & Bio-Tech',
+    degreeType: 'B.Tech',
+    durationYears: 4,
+    totalSemesters: 8,
+    intakeCapacity: 60,
+    departmentId: 'dept-8',
+    instituteId: 'inst-5',
+    status: 'ACTIVE'
+  },
+  {
+    id: 'prog-9',
+    code: 'B-ARCH',
+    name: 'Bachelor of Architecture (B.Arch)',
+    degreeType: 'B.Arch',
+    durationYears: 5,
+    totalSemesters: 10,
+    intakeCapacity: 40,
+    departmentId: 'dept-9',
+    instituteId: 'inst-6',
+    status: 'ACTIVE'
+  },
+  {
+    id: 'prog-10',
     code: 'PHD-CS',
     name: 'Doctor of Philosophy in Computer Science',
     degreeType: 'Ph.D',
