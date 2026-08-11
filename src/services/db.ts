@@ -613,7 +613,14 @@ class ERPDatabaseService {
   getNotifications(user: User | null, role?: UserRole): ERPNotification[] {
     const userRole = role || user?.role || 'STUDENT';
     const userId = user?.id;
-    const userDeptId = user?.departmentId;
+
+    // Look up student record if logged-in user is a student
+    const student = userRole === 'STUDENT' ? this.getStudents().find(s => s.id === userId || s.email === user?.email || s.enrollmentNo === user?.enrollmentNo) : null;
+    const userInstId = user?.instituteId || student?.instituteId;
+    const userDeptId = user?.departmentId || student?.departmentId;
+    const userProgId = student?.programId;
+    const userSemId = student?.semesterId;
+    const userDivId = student?.divisionId;
 
     return (this.state.notifications || []).filter(n => {
       // 1. Target Role Match
@@ -630,8 +637,28 @@ class ERPDatabaseService {
         return false;
       }
 
-      // 3. Target Department Match
+      // 3. Target Institute Match
+      if (n.targetInstituteId && userInstId && n.targetInstituteId !== userInstId) {
+        return false;
+      }
+
+      // 4. Target Department Match
       if (n.targetDepartmentId && userDeptId && n.targetDepartmentId !== userDeptId) {
+        return false;
+      }
+
+      // 5. Target Program Match
+      if (n.targetProgramId && userProgId && n.targetProgramId !== userProgId) {
+        return false;
+      }
+
+      // 6. Target Semester Match
+      if (n.targetSemesterId && userSemId && n.targetSemesterId !== userSemId) {
+        return false;
+      }
+
+      // 7. Target Division Match
+      if (n.targetDivisionId && userDivId && n.targetDivisionId !== userDivId) {
         return false;
       }
 

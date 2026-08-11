@@ -649,9 +649,13 @@ export interface ERPNotification {
   createdAt: string;
   isReadByUsers: string[];
   targetRole?: UserRole | 'ALL';
+  targetInstituteId?: string;
   targetDepartmentId?: string;
+  targetProgramId?: string;
   targetSemesterId?: string;
+  targetDivisionId?: string;
   targetUserId?: string;
   linkTab?: string;
 }
+
 
