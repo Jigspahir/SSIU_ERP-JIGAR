@@ -2,11 +2,11 @@ import React from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { HeaderLogo } from './HeaderLogo';
 import { 
-  LayoutDashboard, Building2, GitFork, GraduationCap, Calendar, 
+  LayoutDashboard, Building2, GraduationCap, Calendar, 
   Layers, Bookmark, Users2, UserCheck, ShieldCheck, 
   ChevronLeft, ChevronRight, User, BookOpen, Clock, FileText, FileCheck, CalendarDays,
-  IndianRupee, UserPlus, BarChart3, Settings, FileSignature, Award, MessageSquare, HelpCircle,
-  Bell, Library, CheckSquare, Send, Sparkles, FileSpreadsheet
+  IndianRupee, FolderCheck, BarChart3, Settings, FileSignature, Award, MessageSquare, HelpCircle,
+  Bell, Library, CheckSquare, Send, CalendarCheck, FileSpreadsheet
 } from 'lucide-react';
 import { UserRole } from '../../types';
 
@@ -15,6 +15,8 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   collapsed: boolean;
   setCollapsed: (collapsed: boolean) => void;
+  mobileOpen?: boolean;
+  setMobileOpen?: (open: boolean) => void;
 }
 
 interface NavItem {
@@ -29,7 +31,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   setActiveTab,
   collapsed,
-  setCollapsed
+  setCollapsed,
+  mobileOpen = false,
+  setMobileOpen
 }) => {
   const { user, role } = useAuth();
 
@@ -51,7 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     // Finance & Documents
     'fees': { id: 'fees', label: 'Fees', icon: IndianRupee, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'STUDENT'], category: 'Finance & Admin' },
-    'crm': { id: 'crm', label: 'Documents', icon: UserPlus, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Finance & Admin' },
+    'crm': { id: 'crm', label: 'Documents', icon: FolderCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Finance & Admin' },
     'certificates': { id: 'certificates', label: 'Certificates', icon: Award, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'STUDENT'], category: 'Finance & Admin' },
     'requests': { id: 'requests', label: 'Requests', icon: CheckSquare, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD'], category: 'Finance & Admin' },
 
@@ -62,14 +66,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     // Campus Services
     'notices': { id: 'notices', label: 'Notices', icon: Bell, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Campus' },
-    'events': { id: 'events', label: 'Events', icon: Sparkles, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Campus' },
+    'events': { id: 'events', label: 'Events', icon: CalendarCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Campus' },
     'library': { id: 'library', label: 'Library', icon: Library, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Campus' },
     'notifications': { id: 'notifications', label: 'Notifications', icon: Bell, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Campus' },
 
     // Master Hierarchy & User Directory for Admin
     'students': { id: 'students', label: 'Students', icon: Users2, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY'], category: 'Master' },
     'faculty': { id: 'faculty', label: 'Faculty', icon: UserCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD'], category: 'Master' },
-    'departments': { id: 'departments', label: 'Departments', icon: GitFork, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL'], category: 'Master' },
+    'departments': { id: 'departments', label: 'Departments', icon: Building2, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL'], category: 'Master' },
     'programs': { id: 'programs', label: 'Programs', icon: GraduationCap, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD'], category: 'Master' },
     'reports': { id: 'reports', label: 'Reports', icon: BarChart3, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'System' },
     'settings': { id: 'settings', label: 'Settings', icon: Settings, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN'], category: 'System' },
@@ -107,97 +111,112 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const categories = Array.from(new Set(visibleItems.map(i => i.category || 'General')));
 
+  const handleNavClick = (id: string) => {
+    setActiveTab(id);
+    if (setMobileOpen) {
+      setMobileOpen(false);
+    }
+  };
+
   return (
-    <aside
-      style={{
-        width: collapsed ? 'var(--sidebar-collapsed-width)' : 'var(--sidebar-width)',
-        backgroundColor: 'var(--bg-sidebar)',
-        color: 'var(--text-on-navy)',
-        height: '100vh',
-        maxHeight: '100vh',
-        position: 'sticky',
-        top: 0,
-        alignSelf: 'flex-start',
-        display: 'flex',
-        flexDirection: 'column',
-        transition: 'width var(--transition-normal)',
-        zIndex: 90,
-        boxShadow: '4px 0 20px rgba(0,0,0,0.15)',
-        flexShrink: 0
-      }}
-    >
-      <div
+    <>
+      {mobileOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setMobileOpen?.(false)}
+        />
+      )}
+      <aside
+        className={`sidebar-mobile-drawer ${mobileOpen ? 'mobile-open' : ''}`}
         style={{
-          padding: collapsed ? '1.25rem 0.5rem' : '1.25rem 1.5rem',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          width: collapsed ? 'var(--sidebar-collapsed-width)' : 'var(--sidebar-width)',
+          backgroundColor: 'var(--bg-sidebar)',
+          color: 'var(--text-on-navy)',
+          height: '100vh',
+          maxHeight: '100vh',
+          position: 'sticky',
+          top: 0,
+          alignSelf: 'flex-start',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          minHeight: 'var(--topbar-height)'
+          flexDirection: 'column',
+          transition: 'width var(--transition-normal)',
+          zIndex: 90,
+          boxShadow: '4px 0 20px rgba(0,0,0,0.15)',
+          flexShrink: 0
         }}
       >
-        <HeaderLogo collapsed={collapsed} />
-
-        <button
-          onClick={() => setCollapsed(!collapsed)}
+        <div
           style={{
-            background: 'rgba(255,255,255,0.08)',
-            border: 'none',
-            color: 'var(--brand-orange)',
-            width: '28px',
-            height: '28px',
-            borderRadius: '6px',
+            padding: collapsed ? '1.25rem 0.5rem' : '1.25rem 1.5rem',
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            transition: 'background var(--transition-fast)'
+            justifyContent: 'space-between',
+            minHeight: 'var(--topbar-height)'
           }}
-          title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
         >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-        </button>
-      </div>
+          <HeaderLogo collapsed={collapsed} />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '1rem 0.5rem' : '1.25rem 1rem' }}>
-        {categories.map(cat => {
-          const itemsInCat = visibleItems.filter(i => (i.category || 'General') === cat);
-          if (itemsInCat.length === 0) return null;
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            style={{
+              background: 'rgba(255,255,255,0.08)',
+              border: 'none',
+              color: 'var(--brand-orange)',
+              width: '28px',
+              height: '28px',
+              borderRadius: '6px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'background var(--transition-fast)'
+            }}
+            title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+          >
+            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          </button>
+        </div>
 
-          return (
-            <div key={cat} style={{ marginBottom: '1.5rem' }}>
-              {!collapsed && cat !== 'Main' && (
-                <div
-                  style={{
-                    fontSize: '0.6875rem',
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                    letterSpacing: '1.2px',
-                    color: 'var(--brand-gold)',
-                    marginBottom: '0.5rem',
-                    paddingLeft: '0.75rem',
-                    opacity: 0.9
-                  }}
-                >
-                  {cat}
-                </div>
-              )}
+        <div style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '1rem 0.5rem' : '1.25rem 1rem' }}>
+          {categories.map(cat => {
+            const itemsInCat = visibleItems.filter(i => (i.category || 'General') === cat);
+            if (itemsInCat.length === 0) return null;
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                {itemsInCat.map(item => {
-                  const Icon = item.icon;
-                  const isActive = activeTab === item.id;
+            return (
+              <div key={cat} style={{ marginBottom: '1.5rem' }}>
+                {!collapsed && cat !== 'Main' && (
+                  <div
+                    style={{
+                      fontSize: '0.6875rem',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '1.2px',
+                      color: 'var(--brand-gold)',
+                      marginBottom: '0.5rem',
+                      paddingLeft: '0.75rem',
+                      opacity: 0.9
+                    }}
+                  >
+                    {cat}
+                  </div>
+                )}
 
-                  return (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveTab(item.id)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.75rem',
-                        padding: collapsed ? '0.75rem' : '0.625rem 0.75rem',
-                        justifyContent: collapsed ? 'center' : 'flex-start',
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  {itemsInCat.map(item => {
+                    const Icon = item.icon;
+                    const isActive = activeTab === item.id;
+
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => handleNavClick(item.id)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          padding: collapsed ? '0.75rem' : '0.625rem 0.75rem',
+                          justifyContent: collapsed ? 'center' : 'flex-start',
                         borderRadius: 'var(--radius-md)',
                         border: 'none',
                         background: isActive
@@ -262,5 +281,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
     </aside>
+  </>
   );
 };

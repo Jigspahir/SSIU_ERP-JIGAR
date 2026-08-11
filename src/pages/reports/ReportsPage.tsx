@@ -3,7 +3,11 @@ import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
 import { Badge } from '../../components/common/Badge';
 import { StatCard } from '../../components/common/StatCard';
-import { ChartBar as BarChart3, FileSpreadsheet, Printer, Search, ListFilter as Filter, GraduationCap, BookOpen, Users, IndianRupee, Clock, CircleCheck as CheckCircle2, ShieldAlert, FileText } from 'lucide-react';
+import { 
+  ChartBar as BarChart3, FileSpreadsheet, Printer, Search, ListFilter as Filter, 
+  GraduationCap, BookOpen, Users, IndianRupee, Clock, CircleCheck as CheckCircle2, ShieldAlert,
+  FileText, ClipboardCheck, ClipboardList
+} from 'lucide-react';
 
 export const ReportsPage: React.FC = () => {
   const { user, role } = useAuth();
@@ -97,7 +101,7 @@ export const ReportsPage: React.FC = () => {
 
         {/* Overview Stats for Student */}
         <div className="grid-4">
-          <StatCard title="Overall Attendance" value={`${attStats.percentage}%`} subtitle={`${attStats.presentClasses} / ${attStats.totalClasses} Conducted`} icon={Clock} colorScheme={attStats.percentage >= 75 ? 'green' : 'orange'} />
+          <StatCard title="Overall Attendance" value={`${attStats.percentage}%`} subtitle={`${attStats.presentClasses} / ${attStats.totalClasses} Conducted`} icon={ClipboardCheck} colorScheme={attStats.percentage >= 75 ? 'green' : 'orange'} />
           <StatCard title="Coursework Submissions" value={mySubmissions.length} subtitle="Assignments submitted" icon={GraduationCap} colorScheme="navy" />
           <StatCard title="Pending Fees Dues" value={`₹${myFee?.pendingAmount.toLocaleString()}`} subtitle={`Due: ${myFee?.dueDate}`} icon={IndianRupee} colorScheme={myFee?.pendingAmount === 0 ? 'green' : 'orange'} />
           <StatCard title="Admission status" value={myApp?.status || 'CONVERTED'} subtitle="Admission Application Verified" icon={CheckCircle2} colorScheme="green" />
@@ -385,8 +389,8 @@ export const ReportsPage: React.FC = () => {
           <div className="grid-4">
             <StatCard title="Active Enrolled" value={studentsList.length} subtitle="Registered students" icon={Users} colorScheme="orange" />
             <StatCard title="Teaching Workload" value={`${subjects.length} Subjects`} subtitle="Class hours distributed" icon={BookOpen} colorScheme="navy" />
-            <StatCard title="Daily Attendance Avg" value={`${(() => { const sessions = db.getAttendanceSessions(); const total = sessions.reduce((sum, s) => sum + s.records.length, 0); const present = sessions.reduce((sum, s) => sum + s.records.filter(r => r.status === 'PRESENT').length, 0); return total > 0 ? Math.round((present / total) * 100) : 0; })()}%`} subtitle="Average across semesters" icon={CheckCircle2} colorScheme="green" />
-            <StatCard title="Assignments Load" value={`${assignments.length} Courseworks`} subtitle="Assignments created" icon={FileText} colorScheme="gold" />
+            <StatCard title="Daily Attendance Avg" value={`${(() => { const sessions = db.getAttendanceSessions(); const total = sessions.reduce((sum, s) => sum + s.records.length, 0); const present = sessions.reduce((sum, s) => sum + s.records.filter(r => r.status === 'PRESENT').length, 0); return total > 0 ? Math.round((present / total) * 100) : 0; })()}%`} subtitle="Average across semesters" icon={ClipboardCheck} colorScheme="green" />
+            <StatCard title="Assignments Load" value={`${assignments.length} Courseworks`} subtitle="Assignments created" icon={ClipboardList} colorScheme="gold" />
           </div>
 
           {/* Student Academic Status Table */}
@@ -434,7 +438,7 @@ export const ReportsPage: React.FC = () => {
           {/* Stat Cards */}
           <div className="grid-4">
             <StatCard title="Collected Dues" value={`₹${(financeStats.totalCollected / 100000).toFixed(2)} L`} subtitle={`${financeStats.collectionPercentage}% Collected`} icon={CheckCircle2} colorScheme="green" />
-            <StatCard title="Outstanding Balance" value={`₹${(financeStats.totalPending / 100000).toFixed(2)} L`} subtitle="Outstanding dues" icon={Clock} colorScheme="orange" />
+            <StatCard title="Outstanding Balance" value={`₹${(financeStats.totalPending / 100000).toFixed(2)} L`} subtitle="Outstanding dues" icon={IndianRupee} colorScheme="orange" />
             <StatCard title="Overdue Accounts" value={financeStats.overdueCount} subtitle="Past payment deadline" icon={ShieldAlert} colorScheme="gold" />
             <StatCard title="Active Billing demand" value={`₹${(financeStats.totalDemand / 100000).toFixed(2)} L`} subtitle="Semester Total" icon={IndianRupee} colorScheme="navy" />
           </div>

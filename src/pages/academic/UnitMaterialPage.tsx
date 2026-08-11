@@ -62,6 +62,14 @@ export const UnitMaterialPage: React.FC = () => {
       };
 
       db.addEntity<UnitMaterial>('unitMaterials', newMaterial, `Uploaded study material: ${title}`);
+      db.addNotification({
+        title: `New Study Material: ${title}`,
+        message: `Unit ${unitNo}: ${unitTitle} study reference material published by ${user?.name || 'Faculty'}.`,
+        module: 'MATERIAL',
+        timestamp: 'Just now',
+        targetRole: 'STUDENT',
+        linkTab: 'materials'
+      });
       setIsUploadModalOpen(false);
       setTitle('');
       setDescription('');

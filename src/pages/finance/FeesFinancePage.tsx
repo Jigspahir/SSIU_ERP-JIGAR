@@ -11,7 +11,7 @@ import {
 import { 
   IndianRupee, CreditCard, FileText, CheckCircle2, Clock, 
   AlertTriangle, Plus, Search, Download, Printer, Trash2, ShieldAlert,
-  Calendar, RotateCcw, ShieldCheck, Check, Sparkles, RefreshCw
+  Calendar, RotateCcw, ShieldCheck, Check, RefreshCw
 } from 'lucide-react';
 
 export const FeesFinancePage: React.FC = () => {
@@ -707,7 +707,7 @@ export const FeesFinancePage: React.FC = () => {
           title="Pending Dues"
           value={`₹${(financeStats.totalPending / 100000).toFixed(2)} L`}
           subtitle="Outstanding balance"
-          icon={Clock}
+          icon={IndianRupee}
           colorScheme="orange"
         />
         <StatCard

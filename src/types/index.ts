@@ -627,3 +627,31 @@ export interface SupportTicket {
   createdAt: string;
   updatedAt: string;
 }
+
+export type NotificationModule = 
+  | 'NOTICE' 
+  | 'TIMETABLE' 
+  | 'ASSIGNMENT' 
+  | 'MATERIAL' 
+  | 'EXAM' 
+  | 'FEES' 
+  | 'REQUEST' 
+  | 'APPROVAL' 
+  | 'EVENT' 
+  | 'SYSTEM';
+
+export interface ERPNotification {
+  id: string;
+  title: string;
+  message: string;
+  module: NotificationModule;
+  timestamp: string;
+  createdAt: string;
+  isReadByUsers: string[];
+  targetRole?: UserRole | 'ALL';
+  targetDepartmentId?: string;
+  targetSemesterId?: string;
+  targetUserId?: string;
+  linkTab?: string;
+}
+

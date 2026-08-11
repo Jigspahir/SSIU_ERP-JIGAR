@@ -4,7 +4,12 @@ import { db } from '../../services/db';
 import { StatCard } from '../../components/common/StatCard';
 import { Badge } from '../../components/common/Badge';
 import { PieChart } from '../../components/common/Charts';
-import { Building2, GitFork, GraduationCap, Users as Users2, UserCheck, BookOpen, Calendar, ArrowRight, ShieldCheck, Layers, CircleCheck as CheckCircle2, Award, UserPlus, Clock, FileText, FileCheck, CalendarDays, Check, IndianRupee, ChartBar as BarChart3, Settings } from 'lucide-react';
+import { 
+  Building2, GitFork, GraduationCap, Users as Users2, UserCheck, 
+  BookOpen, Calendar, ArrowRight, ShieldCheck, 
+  Layers, CircleCheck as CheckCircle2, Award, UserPlus, Clock, FileText, FileCheck, CalendarDays, Check, IndianRupee, ChartBar as BarChart3, Settings,
+  ClipboardCheck, ClipboardList
+} from 'lucide-react';
 
 interface DashboardProps {
   setActiveTab: (tab: string) => void;
@@ -124,7 +129,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
             title="Pending Fee Dues"
             value={`₹${(financeStats.totalPending / 100000).toFixed(2)} L`}
             subtitle={`${financeStats.overdueCount} overdue accounts`}
-            icon={Clock}
+            icon={IndianRupee}
             colorScheme="gold"
             onClick={() => setActiveTab('fees')}
           />
@@ -269,7 +274,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
         <div className="grid-4">
           <StatCard title="Weekly Lectures" value={myClasses.length} subtitle="Assigned timetable slots" icon={Clock} colorScheme="navy" onClick={() => setActiveTab('timetable')} />
           <StatCard title="Session Topics" value={myTopics.length} subtitle={`${myTopics.filter(t => t.status === 'COMPLETED').length} topics completed`} icon={BookOpen} colorScheme="green" onClick={() => setActiveTab('session-plan')} />
-          <StatCard title="Assignments" value={myAssignments.length} subtitle="Created coursework" icon={FileCheck} colorScheme="gold" onClick={() => setActiveTab('assignments')} />
+          <StatCard title="Assignments" value={myAssignments.length} subtitle="Created coursework" icon={ClipboardList} colorScheme="gold" onClick={() => setActiveTab('assignments')} />
           <StatCard title="Class Students" value={stats.totalStudents} subtitle="Enrolled in division" icon={Users2} colorScheme="orange" onClick={() => setActiveTab('students')} />
         </div>
 
@@ -389,9 +394,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
 
         {/* Academic & Fee Stat Cards for Student */}
         <div className="grid-4">
-          <StatCard title="Attendance %" value={`${stats.percentage}%`} subtitle={`${stats.presentClasses} / ${stats.totalClasses} Present`} icon={UserCheck} colorScheme={stats.percentage >= 75 ? 'green' : 'orange'} onClick={() => setActiveTab('attendance')} />
+          <StatCard title="Attendance %" value={`${stats.percentage}%`} subtitle={`${stats.presentClasses} / ${stats.totalClasses} Present`} icon={ClipboardCheck} colorScheme={stats.percentage >= 75 ? 'green' : 'orange'} onClick={() => setActiveTab('attendance')} />
           <StatCard title="Pending Fee Dues" value={`₹${(studentFee?.pendingAmount || 0).toLocaleString()}`} subtitle={`Due: ${studentFee?.dueDate || 'N/A'}`} icon={IndianRupee} colorScheme={studentFee?.pendingAmount === 0 ? 'green' : 'orange'} onClick={() => setActiveTab('fees')} />
-          <StatCard title="Active Assignments" value={studentAssignments.length} subtitle="Pending coursework" icon={FileCheck} colorScheme="gold" onClick={() => setActiveTab('assignments')} />
+          <StatCard title="Active Assignments" value={studentAssignments.length} subtitle="Pending coursework" icon={ClipboardList} colorScheme="gold" onClick={() => setActiveTab('assignments')} />
           <StatCard title="Upcoming Events" value={calendarEvents.length} subtitle="Exams &amp; Holidays" icon={CalendarDays} colorScheme="navy" onClick={() => setActiveTab('calendar')} />
         </div>
 

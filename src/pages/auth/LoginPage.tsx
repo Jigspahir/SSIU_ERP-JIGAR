@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { HeaderLogo } from '../../components/layout/HeaderLogo';
 import { ForgotPasswordModal } from './ForgotPasswordModal';
-import { Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, Sparkles, AlertTriangle, UserCheck, Key, GraduationCap } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, AlertTriangle, UserCheck, Key, GraduationCap } from 'lucide-react';
 import { UserRole } from '../../types';
 
 export const LoginPage: React.FC = () => {
@@ -69,9 +69,10 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', width: '100vw', display: 'flex', backgroundColor: 'var(--brand-navy-dark)' }}>
+    <div className="login-container">
       {/* Left Hero Panel */}
       <div
+        className="login-hero-panel"
         style={{
           flex: '1.1',
           background: 'linear-gradient(135deg, #071325 0%, #0F2C59 60%, #183B70 100%)',
@@ -107,6 +108,7 @@ export const LoginPage: React.FC = () => {
 
       {/* Right Login Form & Demo Cards Panel */}
       <div
+        className="login-form-panel"
         style={{
           flex: '1',
           background: 'var(--bg-main)',

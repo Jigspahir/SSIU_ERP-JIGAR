@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Download, Plus, ChevronLeft, ChevronRight, Edit3, Trash2, Eye, ArrowUpDown } from 'lucide-react';
+import { Search, Download, Printer, Plus, ChevronLeft, ChevronRight, Edit3, Trash2, Eye, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet } from 'lucide-react';
 import { Badge } from './Badge';
 
 export interface Column<T> {
@@ -47,7 +47,7 @@ export function DataTable<T extends { id: string }>({
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 8;
+  const [pageSize, setPageSize] = useState(8);
 
   // Filtered & Searched Data
   const filteredData = useMemo(() => {
@@ -99,12 +99,14 @@ export function DataTable<T extends { id: string }>({
 
   const handleExportCSV = () => {
     if (data.length === 0) return;
-    const headers = columns.map(c => c.header).join(',');
-    const rows = data.map(item => {
-      return columns.map(c => {
+    const exportCols = columns.filter(c => c.header !== 'Actions');
+    const headers = exportCols.map(c => c.header).join(',');
+    const rows = sortedData.map(item => {
+      return exportCols.map(c => {
         let val = (item as any)[c.key];
+        if (val === undefined || val === null) val = '';
         if (typeof val === 'string') val = `"${val.replace(/"/g, '""')}"`;
-        return val ?? '';
+        return val;
       }).join(',');
     });
 
@@ -116,6 +118,83 @@ export function DataTable<T extends { id: string }>({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleExportPDF = () => {
+    if (data.length === 0) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const printableColumns = columns.filter(c => c.header !== 'Actions');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${title} - Swarrnim University ERP</title>
+        <style>
+          @page { size: A4 landscape; margin: 15mm; }
+          body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 20px; color: #0F2C59; }
+          .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #F37023; padding-bottom: 12px; margin-bottom: 20px; }
+          .logo-title { display: flex; align-items: center; gap: 12px; }
+          .title-area h1 { font-size: 20px; color: #0F2C59; margin: 0; font-weight: 800; }
+          .title-area p { font-size: 12px; color: #F37023; margin: 3px 0 0 0; font-weight: 600; }
+          .meta-info { font-size: 11px; color: #64748B; text-align: right; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+          th, td { border: 1px solid #CBD5E1; padding: 8px 10px; text-align: left; }
+          th { background-color: #0F2C59; color: #FFFFFF; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+          tr:nth-child(even) { background-color: #F8FAFC; }
+          .footer { margin-top: 25px; padding-top: 10px; border-top: 1px solid #E2E8F0; font-size: 10px; color: #94A3B8; display: flex; justify-content: space-between; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="logo-title">
+            <div class="title-area">
+              <h1>Swarrnim Startup & Innovation University</h1>
+              <p>${title} ${subtitle ? `• ${subtitle}` : ''}</p>
+            </div>
+          </div>
+          <div class="meta-info">
+            <div><strong>SSCIT ERP Master Record</strong></div>
+            <div>Generated: ${new Date().toLocaleString()}</div>
+            <div>Total Records: ${sortedData.length}</div>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              ${printableColumns.map(c => `<th>${c.header}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${sortedData.map(item => `
+              <tr>
+                ${printableColumns.map(c => {
+                  let val = (item as any)[c.key];
+                  if (val === undefined || val === null) val = '-';
+                  return `<td>${String(val).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>`;
+                }).join('')}
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div class="footer">
+          <div>Swarrnim University Academic ERP Management</div>
+          <div>Official Record • Confidential</div>
+        </div>
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 250);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   return (
@@ -134,9 +213,12 @@ export function DataTable<T extends { id: string }>({
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <button className="btn btn-secondary btn-sm" onClick={handleExportCSV} title="Export CSV">
-              <Download size={16} /> Export
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-secondary btn-sm" onClick={handleExportCSV} title="Export to Excel / CSV">
+              <FileSpreadsheet size={15} color="#10B981" /> Excel
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={handleExportPDF} title="Export to PDF / Print">
+              <Printer size={15} color="#EF4444" /> PDF
             </button>
             {onAddClick && canMutate && (
               <button className="btn btn-primary btn-sm" onClick={onAddClick}>
@@ -164,31 +246,38 @@ export function DataTable<T extends { id: string }>({
       </div>
 
       {/* Table Body */}
-      <div style={{ overflowX: 'auto' }}>
+      <div className="table-responsive">
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
           <thead>
             <tr style={{ background: 'var(--bg-surface-hover)', borderBottom: '1px solid var(--border-color)' }}>
-              {columns.map(col => (
-                <th
-                  key={col.key}
-                  style={{
-                    padding: '0.875rem 1.25rem',
-                    fontWeight: 700,
-                    color: 'var(--brand-navy-medium)',
-                    width: col.width,
-                    cursor: col.sortable ? 'pointer' : 'default',
-                    userSelect: 'none'
-                  }}
-                  onClick={() => col.sortable && handleSort(col.key)}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>{col.header}</span>
-                    {col.sortable && (
-                      <ArrowUpDown size={14} style={{ opacity: sortKey === col.key ? 1 : 0.4 }} />
-                    )}
-                  </div>
-                </th>
-              ))}
+              {columns.map(col => {
+                const isSorted = sortKey === col.key;
+                return (
+                  <th
+                    key={col.key}
+                    style={{
+                      padding: '0.875rem 1.25rem',
+                      fontWeight: 700,
+                      color: isSorted ? 'var(--brand-orange)' : 'var(--brand-navy-medium)',
+                      width: col.width,
+                      cursor: col.sortable ? 'pointer' : 'default',
+                      userSelect: 'none'
+                    }}
+                    onClick={() => col.sortable && handleSort(col.key)}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span>{col.header}</span>
+                      {col.sortable && (
+                        isSorted ? (
+                          sortOrder === 'asc' ? <ArrowUp size={14} color="var(--brand-orange)" /> : <ArrowDown size={14} color="var(--brand-orange)" />
+                        ) : (
+                          <ArrowUpDown size={14} style={{ opacity: 0.4 }} />
+                        )
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
               {(onEditClick || onDeleteClick || onViewClick) && (
                 <th style={{ padding: '0.875rem 1.25rem', fontWeight: 700, color: 'var(--brand-navy-medium)', textAlign: 'right', width: '140px' }}>
                   Actions
@@ -278,8 +367,10 @@ export function DataTable<T extends { id: string }>({
           borderTop: '1px solid var(--border-color)',
           background: 'var(--bg-surface-hover)',
           display: 'flex',
+          flexWrap: 'wrap',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: '0.75rem',
           fontSize: '0.8125rem',
           color: 'var(--text-muted)'
         }}
@@ -289,26 +380,45 @@ export function DataTable<T extends { id: string }>({
           {Math.min(currentPage * pageSize, sortedData.length)} of {sortedData.length} records
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            className="btn btn-secondary btn-sm btn-icon"
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <span style={{ fontWeight: 600, color: 'var(--text-main)', padding: '0 0.5rem' }}>
-            Page {currentPage} of {totalPages}
-          </span>
-          <button
-            className="btn btn-secondary btn-sm btn-icon"
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-          >
-            <ChevronRight size={16} />
-          </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <span>Rows per page:</span>
+            <select
+              className="form-select"
+              style={{ width: 'auto', padding: '0.2rem 0.5rem', fontSize: '0.8125rem' }}
+              value={pageSize}
+              onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+            >
+              <option value={8}>8</option>
+              <option value={15}>15</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              className="btn btn-secondary btn-sm btn-icon"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span style={{ fontWeight: 600, color: 'var(--text-main)', padding: '0 0.5rem' }}>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              className="btn btn-secondary btn-sm btn-icon"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
+

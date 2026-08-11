@@ -58,12 +58,17 @@ import { MarksManagementPage } from './pages/exams/MarksManagementPage';
 import { ResultManagementPage } from './pages/exams/ResultManagementPage';
 import { MarksheetPage } from './pages/exams/MarksheetPage';
 
+import { WhatsNewModal } from './components/common/WhatsNewModal';
+import { db } from './services/db';
+
 import './styles/index.css';
 
 const MainAppContent: React.FC = () => {
   const { user, role } = useAuth();
   const [activeTab, setActiveTab] = useState<string>('dashboard');
   const [collapsed, setCollapsed] = useState<boolean>(false);
+  const [mobileOpen, setMobileOpen] = useState<boolean>(false);
+  const [showWhatsNew, setShowWhatsNew] = useState<boolean>(true);
 
   // If not logged in, enforce login page screen
   if (!user) {
@@ -196,16 +201,32 @@ const MainAppContent: React.FC = () => {
     }
   };
 
+  const unreadNotifs = user ? db.getNotifications(user, role).filter(n => !(n.isReadByUsers || []).includes(user.id)) : [];
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-main)' }}>
+      {showWhatsNew && unreadNotifs.length > 0 && (
+        <WhatsNewModal
+          notifications={unreadNotifs}
+          onClose={() => setShowWhatsNew(false)}
+          onNavigateTab={setActiveTab}
+        />
+      )}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         collapsed={collapsed}
         setCollapsed={setCollapsed}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
       />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: '100vh' }}>
-        <Topbar activeTab={activeTab} setActiveTab={setActiveTab} />
+        <Topbar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          mobileOpen={mobileOpen}
+          setMobileOpen={setMobileOpen}
+        />
         <main style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
           {renderActivePage()}
         </main>

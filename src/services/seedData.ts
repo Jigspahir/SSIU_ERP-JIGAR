@@ -4,7 +4,8 @@ import {
   SessionPlanTopic, UnitMaterial, Assignment, AssignmentSubmission, AcademicCalendarEvent,
   FeeStructure, StudentFeeRecord, FeePaymentTransaction,
   CRMLead, AdmissionApplication,
-  Exam, ExamTimetable, ExamForm, StudentMarks, StudentResult, StudentFeedback, SupportTicket, StudentDocument
+  Exam, ExamTimetable, ExamForm, StudentMarks, StudentResult, StudentFeedback, SupportTicket, StudentDocument,
+  ERPNotification
 } from '../types';
 
 export const initialInstitutes: Institute[] = [
@@ -1707,5 +1708,104 @@ export const initialStudentDocuments: StudentDocument[] = [
     remarks: 'Bank account details verified for scholarship disbursements.'
   }
 ];
+
+export const initialERPNotifications: ERPNotification[] = [
+  {
+    id: 'notif-1',
+    title: 'Mid-Sem Examination Registration & Form Open',
+    message: 'Regular & Remedial Examination forms for B.Tech CSE Semester 4 are now live. Verify eligibility and submit by 25th March.',
+    module: 'EXAM',
+    timestamp: 'Today, 10:15 AM',
+    createdAt: '2026-08-11T10:15:00.000Z',
+    isReadByUsers: [],
+    targetRole: 'STUDENT',
+    targetDepartmentId: 'dept-1',
+    linkTab: 'exam-forms'
+  },
+  {
+    id: 'notif-2',
+    title: 'Mid-Sem Examination Hall Ticket Issued',
+    message: 'Your exam hall ticket HT-2024-001 has been verified and issued by Controller of Examinations. Click to view/download.',
+    module: 'APPROVAL',
+    timestamp: 'Today, 09:30 AM',
+    createdAt: '2026-08-11T09:30:00.000Z',
+    isReadByUsers: [],
+    targetRole: 'STUDENT',
+    targetUserId: 'stu-1',
+    linkTab: 'exam-hallticket'
+  },
+  {
+    id: 'notif-3',
+    title: 'New Unit Study Material Uploaded: Operating Systems',
+    message: 'Unit 3: Process Scheduling Algorithms & Memory Management study notes published by Prof. Demo Faculty.',
+    module: 'MATERIAL',
+    timestamp: 'Yesterday, 04:20 PM',
+    createdAt: '2026-08-10T16:20:00.000Z',
+    isReadByUsers: [],
+    targetRole: 'STUDENT',
+    targetDepartmentId: 'dept-1',
+    linkTab: 'materials'
+  },
+  {
+    id: 'notif-4',
+    title: 'Assignment Deadline Reminder: DBMS Lab Practical',
+    message: 'DBMS SQL Indexing & Query Optimization assignment submission deadline is 28th August. Ensure submission before 11:59 PM.',
+    module: 'ASSIGNMENT',
+    timestamp: 'Yesterday, 02:00 PM',
+    createdAt: '2026-08-10T14:00:00.000Z',
+    isReadByUsers: [],
+    targetRole: 'STUDENT',
+    targetDepartmentId: 'dept-1',
+    linkTab: 'assignments'
+  },
+  {
+    id: 'notif-5',
+    title: 'Swarrnim National Hackathon 2024 Event Registered',
+    message: 'Swarrnim Startup & Innovation Incubation Center Hackathon event schedule released. Innovation Hall, Main Campus Block.',
+    module: 'EVENT',
+    timestamp: '10 Aug 2026',
+    createdAt: '2026-08-10T11:00:00.000Z',
+    isReadByUsers: [],
+    targetRole: 'ALL',
+    linkTab: 'events'
+  },
+  {
+    id: 'notif-6',
+    title: 'Fee Payment Settlement Confirmation',
+    message: 'Tuition & Semester fee payment of ₹65,000 processed successfully. Receipt REC-2024-8841 generated.',
+    module: 'FEES',
+    timestamp: '09 Aug 2026',
+    createdAt: '2026-08-09T15:30:00.000Z',
+    isReadByUsers: [],
+    targetRole: 'STUDENT',
+    targetUserId: 'stu-1',
+    linkTab: 'fees'
+  },
+  {
+    id: 'notif-7',
+    title: 'Exam Marks Verification Required',
+    message: 'Faculty marks submissions for DBMS Practical (CS403-P) pending HOD verification and approval.',
+    module: 'EXAM',
+    timestamp: 'Today, 08:45 AM',
+    createdAt: '2026-08-11T08:45:00.000Z',
+    isReadByUsers: [],
+    targetRole: 'HOD',
+    targetDepartmentId: 'dept-1',
+    linkTab: 'exam-marks'
+  },
+  {
+    id: 'notif-8',
+    title: 'Updated Teaching Timetable Published',
+    message: 'Revised classroom timetable for CSE Division A Semester 4 updated for Room Lab 3.',
+    module: 'TIMETABLE',
+    timestamp: 'Yesterday, 06:15 PM',
+    createdAt: '2026-08-10T18:15:00.000Z',
+    isReadByUsers: [],
+    targetRole: 'FACULTY',
+    targetDepartmentId: 'dept-1',
+    linkTab: 'timetable'
+  }
+];
+
 
 

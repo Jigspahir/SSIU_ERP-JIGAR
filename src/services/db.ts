@@ -5,7 +5,8 @@ import type {
   Assignment, AssignmentSubmission, AcademicCalendarEvent,
   FeeStructure, StudentFeeRecord, FeePaymentTransaction,
   CRMLead, AdmissionApplication, AdmissionDocument,
-  Exam, ExamTimetable, ExamForm, StudentMarks, StudentResult, StudentFeedback, SupportTicket, StudentDocument
+  Exam, ExamTimetable, ExamForm, StudentMarks, StudentResult, StudentFeedback, SupportTicket, StudentDocument,
+  ERPNotification, UserRole
 } from '../types';
 import { 
   initialInstitutes, initialDepartments, initialPrograms, initialAcademicYears, 
@@ -15,7 +16,8 @@ import {
   initialUnitMaterials, initialAssignments, initialAssignmentSubmissions,
   initialAcademicCalendarEvents, initialFeeStructures, initialStudentFeeRecords,
   initialFeePaymentTransactions, initialCRMLeads, initialAdmissionApplications,
-  initialExams, initialExamTimetables, initialExamForms, initialStudentMarks, initialStudentResults, initialStudentFeedbacks, initialSupportTickets, initialStudentDocuments
+  initialExams, initialExamTimetables, initialExamForms, initialStudentMarks, initialStudentResults, initialStudentFeedbacks, initialSupportTickets, initialStudentDocuments,
+  initialERPNotifications
 } from './seedData';
 
 const STORAGE_KEY = 'SWARRNIM_ERP_DB_V5';
@@ -53,6 +55,7 @@ export interface DatabaseState {
   studentFeedbacks: StudentFeedback[];
   supportTickets: SupportTicket[];
   studentDocuments: StudentDocument[];
+  notifications: ERPNotification[];
 }
 
 class ERPDatabaseService {
@@ -93,7 +96,8 @@ class ERPDatabaseService {
           studentResults: parsed.studentResults || initialStudentResults,
           studentFeedbacks: parsed.studentFeedbacks || initialStudentFeedbacks,
           supportTickets: parsed.supportTickets || initialSupportTickets,
-          studentDocuments: parsed.studentDocuments || initialStudentDocuments
+          studentDocuments: parsed.studentDocuments || initialStudentDocuments,
+          notifications: parsed.notifications || initialERPNotifications
         };
       }
     } catch (e) {
@@ -133,7 +137,8 @@ class ERPDatabaseService {
       studentResults: initialStudentResults,
       studentFeedbacks: initialStudentFeedbacks,
       supportTickets: initialSupportTickets,
-      studentDocuments: initialStudentDocuments
+      studentDocuments: initialStudentDocuments,
+      notifications: initialERPNotifications
     };
     
     this.saveState(defaultState);
@@ -519,6 +524,82 @@ class ERPDatabaseService {
 
     this.saveState();
     return newStudent;
+  }
+
+  // --- NOTIFICATION MANAGEMENT ---
+  getNotifications(user: User | null, role?: UserRole): ERPNotification[] {
+    const userRole = role || user?.role || 'STUDENT';
+    const userId = user?.id;
+    const userDeptId = user?.departmentId;
+
+    return (this.state.notifications || []).filter(n => {
+      // 1. Target Role Match
+      if (n.targetRole && n.targetRole !== 'ALL' && n.targetRole !== userRole) {
+        if (n.targetRole === 'SUPER_ADMIN' || n.targetRole === 'UNIVERSITY_ADMIN') {
+          if (userRole !== 'SUPER_ADMIN' && userRole !== 'UNIVERSITY_ADMIN') return false;
+        } else {
+          return false;
+        }
+      }
+
+      // 2. Target User Match
+      if (n.targetUserId && n.targetUserId !== userId) {
+        return false;
+      }
+
+      // 3. Target Department Match
+      if (n.targetDepartmentId && userDeptId && n.targetDepartmentId !== userDeptId) {
+        return false;
+      }
+
+      return true;
+    });
+  }
+
+  getUnreadNotificationCount(user: User | null, role?: UserRole): number {
+    const userId = user?.id || 'guest';
+    const userNotifications = this.getNotifications(user, role);
+    return userNotifications.filter(n => !(n.isReadByUsers || []).includes(userId)).length;
+  }
+
+  addNotification(data: Omit<ERPNotification, 'id' | 'createdAt' | 'isReadByUsers'>): ERPNotification {
+    const newNotification: ERPNotification = {
+      ...data,
+      id: `notif-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      createdAt: new Date().toISOString(),
+      isReadByUsers: []
+    };
+    if (!this.state.notifications) {
+      this.state.notifications = [];
+    }
+    this.state.notifications.unshift(newNotification);
+    this.saveState();
+    return newNotification;
+  }
+
+  markNotificationAsRead(notificationId: string, userId: string): void {
+    if (!this.state.notifications) return;
+    const notif = this.state.notifications.find(n => n.id === notificationId);
+    if (notif) {
+      if (!notif.isReadByUsers) notif.isReadByUsers = [];
+      if (!notif.isReadByUsers.includes(userId)) {
+        notif.isReadByUsers.push(userId);
+        this.saveState();
+      }
+    }
+  }
+
+  markAllNotificationsAsRead(user: User | null, role?: UserRole): void {
+    if (!this.state.notifications) return;
+    const userId = user?.id || 'guest';
+    const relevant = this.getNotifications(user, role);
+    relevant.forEach(n => {
+      if (!n.isReadByUsers) n.isReadByUsers = [];
+      if (!n.isReadByUsers.includes(userId)) {
+        n.isReadByUsers.push(userId);
+      }
+    });
+    this.saveState();
   }
 }
 

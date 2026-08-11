@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { 
   Bell, LogOut, User, RefreshCw, 
-  CheckCircle2, ChevronDown
+  CheckCircle2, ChevronDown, Menu
 } from 'lucide-react';
 import { UserRole } from '../../types';
 import { db } from '../../services/db';
@@ -10,9 +10,11 @@ import { db } from '../../services/db';
 interface TopbarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  mobileOpen?: boolean;
+  setMobileOpen?: (open: boolean) => void;
 }
 
-export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab }) => {
+export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab, mobileOpen = false, setMobileOpen }) => {
   const { user, role, logout, resetSystemDatabase } = useAuth();
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -55,7 +57,7 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab }) => {
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
         borderBottom: '1px solid var(--border-color)',
-        padding: '0 2rem',
+        padding: '0 1.25rem',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -64,18 +66,30 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab }) => {
         zIndex: 80
       }}
     >
-      <div>
-        <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--brand-orange)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-          Swarrnim ERP • {role?.replace('_', ' ')} Scope
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <button
+          className="btn btn-secondary btn-icon topbar-mobile-btn"
+          onClick={() => setMobileOpen?.(!mobileOpen)}
+          title="Toggle Mobile Navigation"
+          style={{ padding: '0.4rem', border: 'none', background: 'rgba(15,44,89,0.08)', color: 'var(--brand-navy)' }}
+        >
+          <Menu size={20} />
+        </button>
+
+        <div className="topbar-header-text">
+          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--brand-orange)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+            Swarrnim ERP • {role?.replace('_', ' ')} Scope
+          </div>
+          <h1 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
+            {getBreadcrumbTitle(activeTab)}
+          </h1>
         </div>
-        <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
-          {getBreadcrumbTitle(activeTab)}
-        </h1>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        {/* Static Read-Only Active Role Indicator (NO Dropdown / NO Switcher) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {/* Static Read-Only Active Role Indicator */}
         <div
+          className="topbar-role-badge"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -95,7 +109,7 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab }) => {
         </div>
 
         <button
-          className="btn btn-secondary btn-sm"
+          className="btn btn-secondary btn-sm btn-hide-mobile"
           style={{ borderRadius: 'var(--radius-full)' }}
           onClick={() => {
             if (window.confirm('Reset database back to original Swarrnim University seed data?')) {
@@ -108,16 +122,37 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab }) => {
           <RefreshCw size={14} /> Reset Seed Data
         </button>
 
-        {/* Audit Notifications */}
+        {/* Centralized ERP Notifications */}
         <div style={{ position: 'relative' }}>
           <button
             onClick={() => { setShowNotifications(!showNotifications); setShowUserDropdown(false); }}
             className="btn btn-secondary btn-icon"
             style={{ borderRadius: '50%', position: 'relative' }}
-            title="System Audit Notifications"
+            title="System & Academic Notifications"
           >
             <Bell size={18} />
-            <span style={{ position: 'absolute', top: '2px', right: '2px', width: '8px', height: '8px', backgroundColor: 'var(--brand-orange)', borderRadius: '50%' }}></span>
+            {db.getUnreadNotificationCount(user, role) > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '-3px',
+                  right: '-3px',
+                  backgroundColor: 'var(--brand-orange)',
+                  color: '#FFFFFF',
+                  fontSize: '0.6875rem',
+                  fontWeight: 800,
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 6px rgba(243, 112, 35, 0.4)'
+                }}
+              >
+                {db.getUnreadNotificationCount(user, role)}
+              </span>
+            )}
           </button>
 
           {showNotifications && (
@@ -127,26 +162,81 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab }) => {
                 position: 'absolute',
                 right: 0,
                 top: 'calc(100% + 8px)',
-                width: '320px',
-                padding: '0.75rem',
+                width: '340px',
+                padding: '0.85rem',
                 zIndex: 100,
                 boxShadow: 'var(--shadow-lg)'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', padding: '0 0.25rem' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--brand-navy)' }}>Recent Audit Activity</span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Real-time</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', padding: '0 0.25rem' }}>
+                <span style={{ fontWeight: 800, fontSize: '0.875rem', color: 'var(--brand-navy)' }}>
+                  Notifications ({db.getUnreadNotificationCount(user, role)} Unread)
+                </span>
+                {db.getUnreadNotificationCount(user, role) > 0 && (
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    style={{ fontSize: '0.72rem', padding: '0.15rem 0.4rem', color: 'var(--brand-orange)' }}
+                    onClick={() => {
+                      db.markAllNotificationsAsRead(user, role);
+                      setShowNotifications(false);
+                    }}
+                  >
+                    Mark All Read
+                  </button>
+                )}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '280px', overflowY: 'auto' }}>
-                {auditLogs.map(log => (
-                  <div key={log.id} style={{ padding: '0.5rem', borderRadius: 'var(--radius-sm)', background: 'var(--bg-surface-hover)', fontSize: '0.78125rem' }}>
-                    <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{log.userName} • {log.action}</div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{log.details}</div>
-                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-light)', marginTop: '2px' }}>
-                      {new Date(log.timestamp).toLocaleTimeString()}
-                    </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '310px', overflowY: 'auto' }}>
+                {db.getNotifications(user, role).length === 0 ? (
+                  <div style={{ padding: '1.5rem 0.5rem', textAlign: 'center', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                    No notifications for your account.
                   </div>
-                ))}
+                ) : (
+                  db.getNotifications(user, role).slice(0, 5).map(notif => {
+                    const isRead = (notif.isReadByUsers || []).includes(user?.id || 'guest');
+                    return (
+                      <div
+                        key={notif.id}
+                        style={{
+                          padding: '0.65rem 0.75rem',
+                          borderRadius: 'var(--radius-sm)',
+                          background: isRead ? 'var(--bg-surface-hover)' : '#FFF9E6',
+                          borderLeft: isRead ? '3px solid var(--brand-navy)' : '3px solid var(--brand-orange)',
+                          fontSize: '0.78125rem',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => {
+                          if (user?.id) db.markNotificationAsRead(notif.id, user.id);
+                          if (notif.linkTab) {
+                            setActiveTab(notif.linkTab);
+                            setShowNotifications(false);
+                          }
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '2px' }}>
+                          <span style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>{notif.title}</span>
+                          <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>{notif.timestamp}</span>
+                        </div>
+                        <div style={{ color: 'var(--text-main)', fontSize: '0.75rem', lineHeight: 1.35 }}>
+                          {notif.message}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div style={{ marginTop: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  style={{ width: '100%', fontSize: '0.8125rem', justifyContent: 'center' }}
+                  onClick={() => {
+                    setActiveTab('notifications');
+                    setShowNotifications(false);
+                  }}
+                >
+                  View All Notifications Log
+                </button>
               </div>
             </div>
           )}

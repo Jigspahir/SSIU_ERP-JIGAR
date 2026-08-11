@@ -18,10 +18,10 @@ export interface PieChartProps {
 const GOOGLE_FORMS_PALETTE = [
   '#4285F4', // Blue
   '#EA4335', // Red
-  '#FBBC05', // Yellow
+  '#F59E0B', // Gold
   '#34A853', // Green
   '#8E24AA', // Purple
-  '#00ACC1', // Cyan
+  '#06B6D4', // teal
   '#FF6D00', // Orange
   '#46BDC6'  // Teal
 ];
@@ -143,19 +143,19 @@ export const PieChart: React.FC<PieChartProps> = ({
           </svg>
 
           {/* Center Total Count Label (Strictly bounded inside inner circle) */}
-          <div 
-            style={{ 
-              position: 'absolute', 
-              top: '50%', 
-              left: '50%', 
-              transform: 'translate(-50%, -50%)', 
-              width: '78px', 
-              height: '78px', 
-              borderRadius: '50%', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
+          <div
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: '78px',
+              height: '78px',
+              borderRadius: '50%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
               textAlign: 'center',
               pointerEvents: 'none',
               boxSizing: 'border-box',
@@ -163,11 +163,11 @@ export const PieChart: React.FC<PieChartProps> = ({
               overflow: 'hidden'
             }}
           >
-            <span 
-              style={{ 
-                fontSize: getScaledFontSize(totalFormatted), 
-                fontWeight: 900, 
-                color: 'var(--brand-navy)', 
+            <span
+              style={{
+                fontSize: getScaledFontSize(totalFormatted),
+                fontWeight: 900,
+                color: 'var(--brand-navy)',
                 lineHeight: 1.1,
                 maxWidth: '100%',
                 whiteSpace: 'nowrap',
@@ -177,13 +177,13 @@ export const PieChart: React.FC<PieChartProps> = ({
             >
               {totalFormatted}
             </span>
-            <span 
-              style={{ 
-                fontSize: '0.625rem', 
-                fontWeight: 700, 
-                color: 'var(--text-muted)', 
-                marginTop: '0.15rem', 
-                textTransform: 'uppercase', 
+            <span
+              style={{
+                fontSize: '0.625rem',
+                fontWeight: 700,
+                color: 'var(--text-muted)',
+                marginTop: '0.15rem',
+                textTransform: 'uppercase',
                 letterSpacing: '0.5px',
                 whiteSpace: 'nowrap'
               }}
