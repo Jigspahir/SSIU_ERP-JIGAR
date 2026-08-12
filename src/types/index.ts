@@ -763,13 +763,17 @@ export type ApprovalRequestCategory =
   | 'GENERAL_ADMINISTRATIVE';
 
 export type ApprovalStatus = 
+  | 'DRAFT'
+  | 'SUBMITTED'
   | 'PENDING'
   | 'UNDER_REVIEW'
+  | 'RETURNED'
   | 'APPROVED'
   | 'REJECTED'
   | 'CHANGES_REQUESTED'
   | 'FORWARDED'
-  | 'WITHDRAWN';
+  | 'WITHDRAWN'
+  | 'LOCKED';
 
 export type ApprovalPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 
@@ -888,6 +892,114 @@ export interface EdpDuty {
   
   createdAt: string;
   updatedAt: string;
+}
+
+// ─── NAAC & IQAC FRAMEWORK TYPES ───────────────────────────────────────────
+
+export interface NaacCriterion {
+  id: string;
+  code: string; // e.g. "C1", "C2" ... "C7"
+  number: number; // 1 to 7
+  title: string;
+  description: string;
+  weightage: number;
+  keyIndicatorsCount: number;
+}
+
+export interface NaacKeyIndicator {
+  id: string;
+  criterionId: string;
+  code: string; // e.g. "1.1", "2.4"
+  title: string;
+  weightage: number;
+}
+
+export type NaacMetricType = 'QnM' | 'QlM'; // QnM = Quantitative Metric, QlM = Qualitative Metric
+
+export interface NaacMetric {
+  id: string;
+  keyIndicatorId: string;
+  criterionId: string;
+  code: string; // e.g. "1.1.1", "2.4.2"
+  title: string;
+  type: NaacMetricType;
+  weightage: number;
+  formulaDescription?: string;
+  autoErpSource?: 'STUDENTS_COUNT' | 'FACULTY_COUNT' | 'FACULTY_PHD_COUNT' | 'PASS_PERCENTAGE' | 'RESEARCH_PAPERS' | 'EDP_DUTIES' | 'FEEDBACK_RATING';
+  requiredEvidence: string[];
+}
+
+export interface NaacDataSubmission {
+  id: string;
+  metricId: string;
+  metricCode: string;
+  criterionId: string;
+  departmentId?: string;
+  instituteId?: string;
+  academicYearId: string;
+  
+  // Data values
+  quantitativeValue?: number;
+  qualitativeText?: string;
+  dataFields?: Record<string, any>;
+  
+  // Evidence
+  evidenceUrls: string[];
+  geoTaggedPhotoUrls?: string[];
+  websiteLinks?: string[];
+  
+  // Multi-Stage Approval Workflow: Dept -> HOD -> IQAC -> Registrar -> Locked
+  status: ApprovalStatus;
+  currentApproverRole: UserRole;
+  submittedByUserId: string;
+  submittedByUserName: string;
+  submittedAt: string;
+  
+  remarksHistory: ApprovalRemarkHistory[];
+  updatedAt: string;
+  lockedAt?: string;
+}
+
+// ─── RESEARCH & INNOVATION TYPES ──────────────────────────────────────────
+
+export interface ResearchProject {
+  id: string;
+  projectCode: string;
+  title: string;
+  principalInvestigatorId: string;
+  principalInvestigatorName: string;
+  departmentId: string;
+  instituteId: string;
+  fundingAgency: string; // e.g. GUJCOST, DST, SERB, UGC, Industry Sponsored
+  sanctionedAmount: number;
+  sanctionYear: number;
+  durationYears: number;
+  status: 'PROPOSED' | 'SANCTIONED' | 'ONGOING' | 'COMPLETED';
+}
+
+export interface PublicationRecord {
+  id: string;
+  title: string;
+  authors: string;
+  facultyId: string;
+  departmentId: string;
+  journalOrConferenceName: string;
+  indexing: 'Scopus' | 'Web of Science' | 'UGC CARE' | 'IEEE' | 'Other';
+  issnIsbn?: string;
+  publicationYear: number;
+  doiUrl?: string;
+}
+
+export interface PatentRecord {
+  id: string;
+  applicationNo: string;
+  title: string;
+  inventors: string;
+  facultyId: string;
+  departmentId: string;
+  status: 'FILED' | 'PUBLISHED' | 'GRANTED';
+  filedDate: string;
+  grantedDate?: string;
 }
 
 

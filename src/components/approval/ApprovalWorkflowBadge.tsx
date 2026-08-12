@@ -40,8 +40,12 @@ export const StatusBadge: React.FC<{ status: ApprovalStatus }> = ({ status }) =>
   switch (status) {
     case 'APPROVED':
       return <Badge variant="active">APPROVED</Badge>;
+    case 'LOCKED':
+      return <Badge variant="navy">APPROVED &amp; LOCKED</Badge>;
     case 'REJECTED':
       return <Badge variant="danger">REJECTED</Badge>;
+    case 'RETURNED':
+      return <Badge variant="orange">RETURNED</Badge>;
     case 'UNDER_REVIEW':
       return <Badge variant="navy">UNDER REVIEW</Badge>;
     case 'FORWARDED':
@@ -50,6 +54,10 @@ export const StatusBadge: React.FC<{ status: ApprovalStatus }> = ({ status }) =>
       return <Badge variant="warning">CHANGES REQUIRED</Badge>;
     case 'WITHDRAWN':
       return <Badge variant="inactive">WITHDRAWN</Badge>;
+    case 'DRAFT':
+      return <Badge variant="inactive">DRAFT</Badge>;
+    case 'SUBMITTED':
+      return <Badge variant="gold">SUBMITTED</Badge>;
     case 'PENDING':
     default:
       return <Badge variant="gold">PENDING</Badge>;

@@ -5,7 +5,8 @@ import {
   FeeStructure, StudentFeeRecord, FeePaymentTransaction,
   CRMLead, AdmissionApplication,
   Exam, ExamTimetable, ExamForm, StudentMarks, StudentResult, StudentFeedback, SupportTicket, StudentDocument,
-  ERPNotification, InwardOutwardRecord, RegistrarFileMovement, ApprovalRequest, EdpDuty
+  ERPNotification, InwardOutwardRecord, RegistrarFileMovement, ApprovalRequest, EdpDuty,
+  NaacCriterion, NaacKeyIndicator, NaacMetric, NaacDataSubmission, ResearchProject, PublicationRecord, PatentRecord
 } from '../types';
 
 export const initialUniversity: University = {
@@ -2598,6 +2599,235 @@ export const initialEdpDuties: EdpDuty[] = [
     evidenceList: [],
     createdAt: '2026-08-12T08:30:00Z',
     updatedAt: '2026-08-12T08:30:00Z'
+  }
+];
+
+// ─── NAAC & IQAC FRAMEWORK SEED DATA ────────────────────────────────────────
+
+export const initialNaacCriteria: NaacCriterion[] = [
+  { id: 'c1', number: 1, code: 'C1', title: 'Curricular Aspects', description: 'Curriculum design, academic flexibility, feedback system', weightage: 100, keyIndicatorsCount: 3 },
+  { id: 'c2', number: 2, code: 'C2', title: 'Teaching-Learning & Evaluation', description: 'Student enrollment, teacher profile, evaluation process & learning outcomes', weightage: 350, keyIndicatorsCount: 7 },
+  { id: 'c3', number: 3, code: 'C3', title: 'Research, Innovations & Extension', description: 'Resource mobilization for research, innovation ecosystem, publications & awards', weightage: 250, keyIndicatorsCount: 7 },
+  { id: 'c4', number: 4, code: 'C4', title: 'Infrastructure & Learning Resources', description: 'Physical facilities, library resources, IT infrastructure & campus maintenance', weightage: 100, keyIndicatorsCount: 4 },
+  { id: 'c5', number: 5, code: 'C5', title: 'Student Support & Progression', description: 'Student support, scholarships, placement, alumni engagement & activities', weightage: 100, keyIndicatorsCount: 4 },
+  { id: 'c6', number: 6, code: 'C6', title: 'Governance, Leadership & Management', description: 'Institutional vision, strategy, faculty empowerment, financial management & IQAC', weightage: 100, keyIndicatorsCount: 5 },
+  { id: 'c7', number: 7, code: 'C7', title: 'Institutional Values & Best Practices', description: 'Gender equity, environmental sustainability, best practices & distinctiveness', weightage: 100, keyIndicatorsCount: 3 }
+];
+
+export const initialNaacKeyIndicators: NaacKeyIndicator[] = [
+  { id: 'ki-1-1', criterionId: 'c1', code: '1.1', title: 'Curriculum Design & Development', weightage: 50 },
+  { id: 'ki-1-2', criterionId: 'c1', code: '1.2', title: 'Academic Flexibility', weightage: 30 },
+  { id: 'ki-1-3', criterionId: 'c1', code: '1.3', title: 'Curriculum Enrichment', weightage: 20 },
+  { id: 'ki-2-4', criterionId: 'c2', code: '2.4', title: 'Teacher Profile & Quality', weightage: 80 },
+  { id: 'ki-2-6', criterionId: 'c2', code: '2.6', title: 'Student Performance & Learning Outcomes', weightage: 90 },
+  { id: 'ki-3-2', criterionId: 'c3', code: '3.2', title: 'Resource Mobilization for Research', weightage: 50 },
+  { id: 'ki-3-4', criterionId: 'c3', code: '3.4', title: 'Research Publications & Awards', weightage: 100 },
+  { id: 'ki-5-1', criterionId: 'c5', code: '5.1', title: 'Student Support & Scholarships', weightage: 40 }
+];
+
+export const initialNaacMetrics: NaacMetric[] = [
+  {
+    id: 'm-1-1-1',
+    keyIndicatorId: 'ki-1-1',
+    criterionId: 'c1',
+    code: '1.1.1',
+    title: 'Curricula developed & implemented for all programs with focus on employability & entrepreneurship',
+    type: 'QlM',
+    weightage: 20,
+    requiredEvidence: ['Syllabus Copies', 'Board of Studies Minutes', 'Academic Council Approval']
+  },
+  {
+    id: 'm-2-4-1',
+    keyIndicatorId: 'ki-2-4',
+    criterionId: 'c2',
+    code: '2.4.1',
+    title: 'Percentage of full-time teachers appointed against sanctioned posts during the academic year',
+    type: 'QnM',
+    weightage: 20,
+    formulaDescription: '(Full-Time Appointed Faculty / Sanctioned Posts) * 100',
+    autoErpSource: 'FACULTY_COUNT',
+    requiredEvidence: ['Sanctioned Post Orders', 'Faculty Appointment Letters', 'Joined Roster']
+  },
+  {
+    id: 'm-2-4-2',
+    keyIndicatorId: 'ki-2-4',
+    criterionId: 'c2',
+    code: '2.4.2',
+    title: 'Percentage of full-time teachers with NET/SET/SLET/Ph.D / D.Sc. degree qualifications',
+    type: 'QnM',
+    weightage: 30,
+    formulaDescription: '(Faculty with Ph.D or NET / Total Faculty) * 100',
+    autoErpSource: 'FACULTY_PHD_COUNT',
+    requiredEvidence: ['Ph.D Degree Certificates', 'NET/SLET Qualification Certificates']
+  },
+  {
+    id: 'm-2-6-3',
+    keyIndicatorId: 'ki-2-6',
+    criterionId: 'c2',
+    code: '2.6.3',
+    title: 'Pass percentage of final year students in university semester examinations',
+    type: 'QnM',
+    weightage: 30,
+    formulaDescription: '(Passed Final Year Students / Appeared Students) * 100',
+    autoErpSource: 'PASS_PERCENTAGE',
+    requiredEvidence: ['Controller of Examinations Gazette', 'Semester Tabulation Sheets']
+  },
+  {
+    id: 'm-3-2-1',
+    keyIndicatorId: 'ki-3-2',
+    criterionId: 'c3',
+    code: '3.2.1',
+    title: 'Extramural research grants sanctioned by government and non-government agencies',
+    type: 'QnM',
+    weightage: 25,
+    formulaDescription: 'Total Research Grant Amount Sanctioned (in Lakhs INR)',
+    autoErpSource: 'RESEARCH_PAPERS',
+    requiredEvidence: ['Government Sanction Letters', 'Fund Utilization Certificates']
+  },
+  {
+    id: 'm-3-4-3',
+    keyIndicatorId: 'ki-3-4',
+    criterionId: 'c3',
+    code: '3.4.3',
+    title: 'Number of research papers published per teacher in UGC CARE / Scopus / Web of Science journals',
+    type: 'QnM',
+    weightage: 50,
+    formulaDescription: 'Total Scopus/UGC CARE Journal Papers / Total Faculty Count',
+    autoErpSource: 'RESEARCH_PAPERS',
+    requiredEvidence: ['Journal Publication Copies', 'DOI Web Links', 'Scopus Indexing Proof']
+  },
+  {
+    id: 'm-5-1-1',
+    keyIndicatorId: 'ki-5-1',
+    criterionId: 'c5',
+    code: '5.1.1',
+    title: 'Percentage of students benefited by scholarships, freeships & fee waivers provided by institution',
+    type: 'QnM',
+    weightage: 20,
+    formulaDescription: '(Benefited Scholarship Students / Total Students) * 100',
+    autoErpSource: 'STUDENTS_COUNT',
+    requiredEvidence: ['Scholarship Sanction Lists', 'Student Bank Fee Receipts']
+  }
+];
+
+export const initialResearchProjects: ResearchProject[] = [
+  {
+    id: 'res-proj-1',
+    projectCode: 'RES-GUJCOST-2024-01',
+    title: 'High-Performance Generative AI Architectures for Smart Agriculture & Crop Disease Detection',
+    principalInvestigatorId: 'fac-1',
+    principalInvestigatorName: 'Demo Faculty 1',
+    departmentId: 'dept-1',
+    instituteId: 'inst-1',
+    fundingAgency: 'GUJCOST, Department of Science & Technology, Govt. of Gujarat',
+    sanctionedAmount: 1250000,
+    sanctionYear: 2024,
+    durationYears: 2,
+    status: 'ONGOING'
+  },
+  {
+    id: 'res-proj-2',
+    projectCode: 'RES-DST-2023-04',
+    title: 'Quantum Key Distribution & Cyber Security Defense Mechanisms for Cloud Infrastructures',
+    principalInvestigatorId: 'user-hod-1',
+    principalInvestigatorName: 'Demo HOD 1',
+    departmentId: 'dept-1',
+    instituteId: 'inst-1',
+    fundingAgency: 'DST SERB, New Delhi',
+    sanctionedAmount: 1800000,
+    sanctionYear: 2023,
+    durationYears: 3,
+    status: 'ONGOING'
+  }
+];
+
+export const initialPublicationRecords: PublicationRecord[] = [
+  {
+    id: 'pub-1',
+    title: 'Distributed Generative AI Models for Real-Time Academic ERP Optimization',
+    authors: 'Demo Faculty 1, Demo HOD 1',
+    facultyId: 'fac-1',
+    departmentId: 'dept-1',
+    journalOrConferenceName: 'IEEE Transactions on Cloud & Educational Computing',
+    indexing: 'Scopus',
+    issnIsbn: 'ISSN: 1941-0123',
+    publicationYear: 2024,
+    doiUrl: 'https://doi.org/10.1109/TETC.2024.3391024'
+  },
+  {
+    id: 'pub-2',
+    title: 'Secure Blockchain-Based Academic Credentials & Degree Certificate Verification System',
+    authors: 'Demo HOD 1, Demo Faculty 2',
+    facultyId: 'user-hod-1',
+    departmentId: 'dept-1',
+    journalOrConferenceName: 'Journal of Network and Computer Applications',
+    indexing: 'Web of Science',
+    issnIsbn: 'ISSN: 1084-8045',
+    publicationYear: 2024,
+    doiUrl: 'https://doi.org/10.1016/j.jnca.2024.103980'
+  }
+];
+
+export const initialPatentRecords: PatentRecord[] = [
+  {
+    id: 'pat-1',
+    applicationNo: '202441098412-A',
+    title: 'IoT-Enabled Geo-Tagged Duty Verification & Real-Time Attendance Badge Apparatus',
+    inventors: 'Demo Faculty 1, Demo HOD 1, Demo Principal 1',
+    facultyId: 'fac-1',
+    departmentId: 'dept-1',
+    status: 'PUBLISHED',
+    filedDate: '2024-01-15'
+  }
+];
+
+export const initialNaacDataSubmissions: NaacDataSubmission[] = [
+  {
+    id: 'naac-sub-101',
+    metricId: 'm-2-4-1',
+    metricCode: '2.4.1',
+    criterionId: 'c2',
+    departmentId: 'dept-1',
+    instituteId: 'inst-1',
+    academicYearId: 'ay-2024',
+    quantitativeValue: 94.5,
+    dataFields: { totalFaculty: 45, sanctionedPosts: 48, percentage: '93.75%' },
+    evidenceUrls: ['https://swarrnim.edu.in/naac/Sanctioned_Post_Roster_2024.pdf'],
+    geoTaggedPhotoUrls: ['https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=600&q=80'],
+    websiteLinks: ['https://swarrnim.edu.in/faculty-directory'],
+    status: 'APPROVED',
+    currentApproverRole: 'REGISTRAR',
+    submittedByUserId: 'user-hod-1',
+    submittedByUserName: 'Demo HOD 1',
+    submittedAt: '2024-03-01',
+    remarksHistory: [
+      { id: 'r-1', actionByUserId: 'user-hod-1', actionByUserName: 'Demo HOD 1', actionByUserRole: 'HOD', office: 'HOD_ACADEMIC', action: 'APPROVED', remarks: 'Submitted with verified appointment letters.', timestamp: '2024-03-01' },
+      { id: 'r-2', actionByUserId: 'user-iqac', actionByUserName: 'Demo IQAC Director 1', actionByUserRole: 'IQAC', office: 'IQAC', action: 'APPROVED', remarks: 'IQAC Audit completed. Metric benchmark verified.', timestamp: '2024-03-05' }
+    ],
+    updatedAt: '2024-03-05',
+    lockedAt: '2024-03-05'
+  },
+  {
+    id: 'naac-sub-102',
+    metricId: 'm-3-4-3',
+    metricCode: '3.4.3',
+    criterionId: 'c3',
+    departmentId: 'dept-1',
+    instituteId: 'inst-1',
+    academicYearId: 'ay-2024',
+    quantitativeValue: 2.4,
+    dataFields: { totalPublications: 108, totalFaculty: 45, averagePerTeacher: '2.40' },
+    evidenceUrls: ['https://swarrnim.edu.in/naac/Scopus_Publication_List_2024.pdf'],
+    websiteLinks: ['https://scopus.com/affil/swarrnim'],
+    status: 'UNDER_REVIEW',
+    currentApproverRole: 'IQAC',
+    submittedByUserId: 'fac-1',
+    submittedByUserName: 'Demo Faculty 1',
+    submittedAt: '2024-03-10',
+    remarksHistory: [
+      { id: 'r-3', actionByUserId: 'fac-1', actionByUserName: 'Demo Faculty 1', actionByUserRole: 'FACULTY', office: 'HOD_ACADEMIC', action: 'SUBMITTED', remarks: 'Submitted Scopus & Web of Science indexed publication records.', timestamp: '2024-03-10' }
+    ],
+    updatedAt: '2024-03-10'
   }
 ];
 
