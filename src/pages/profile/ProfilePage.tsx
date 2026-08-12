@@ -17,8 +17,8 @@ export const ProfilePage: React.FC = () => {
   const [savedSuccess, setSavedSuccess] = useState('');
   const [error, setError] = useState('');
 
-  // ABC ID & Student Record State
-  const studentRecord = db.getStudents().find(s => s.id === user?.id || s.enrollmentNo === user?.enrollmentNo) || db.getStudents()[0];
+  // ABC ID & Student Record State (only for STUDENT role)
+  const studentRecord = role === 'STUDENT' ? (db.getStudents().find(s => s.id === user?.id || s.enrollmentNo === user?.enrollmentNo) || null) : null;
   
   const [abcIdInput, setAbcIdInput] = useState(studentRecord?.abcId || '');
   const [abcDocName, setAbcDocName] = useState(studentRecord?.abcIdDocUrl ? 'DigiLocker_ABC_Proof.pdf' : '');
@@ -75,17 +75,20 @@ export const ProfilePage: React.FC = () => {
 
     const formatted = `${cleaned.slice(0, 4)}-${cleaned.slice(4, 8)}-${cleaned.slice(8, 12)}`;
 
-    db.updateEntity<Student>('students', studentRecord.id, {
-      abcId: formatted,
-      abcIdStatus: 'PENDING_VERIFICATION',
-      abcIdDocUrl: abcDocName || 'DigiLocker_ABC_Proof.pdf',
-      abcIdRemarks: 'Submitted by student via profile portal'
-    }, `Student updated ABC ID ${formatted}`);
+    if (studentRecord) {
+      db.updateEntity<Student>('students', studentRecord.id, {
+        abcId: formatted,
+        abcIdStatus: 'PENDING_VERIFICATION',
+        abcIdDocUrl: abcDocName || 'DigiLocker_ABC_Proof.pdf',
+        abcIdRemarks: 'Submitted by student via profile portal'
+      }, `Student updated ABC ID ${formatted}`);
+    }
 
     setSavedSuccess(`ABC ID ${formatted} submitted successfully for Admin Verification.`);
   };
 
   const handleAdminVerifyAbcId = () => {
+    if (!studentRecord) return;
     db.updateEntity<Student>('students', studentRecord.id, {
       abcIdStatus: 'VERIFIED',
       abcIdRemarks: `Verified by ${user.name} on ${new Date().toISOString().split('T')[0]}`
@@ -96,7 +99,7 @@ export const ProfilePage: React.FC = () => {
 
   const handleAdminRejectAbcIdConfirm = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rejectReason) return;
+    if (!rejectReason || !studentRecord) return;
 
     db.updateEntity<Student>('students', studentRecord.id, {
       abcIdStatus: 'REJECTED',
@@ -158,19 +161,21 @@ export const ProfilePage: React.FC = () => {
 
       {/* Main Profile Tabs */}
       <div style={{ display: 'flex', gap: '0.75rem', borderBottom: '2px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-        <button
-          className={`btn ${activeTab === 'DOCUMENTS' ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => setActiveTab('DOCUMENTS')}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
-        >
-          <FolderCheck size={18} /> Student Verification Documents Vault (13 Documents)
-        </button>
+        {(role === 'STUDENT' || role === 'STUDENT_SECTION' || role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') && (
+          <button
+            className={`btn ${activeTab === 'DOCUMENTS' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('DOCUMENTS')}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
+          >
+            <FolderCheck size={18} /> Student Verification Vault
+          </button>
+        )}
         <button
           className={`btn ${activeTab === 'ACCOUNT' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveTab('ACCOUNT')}
           style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
         >
-          <User size={18} /> Personal Details &amp; Credentials
+          <User size={18} /> Personal Details &amp; Account Credentials
         </button>
       </div>
 
@@ -187,7 +192,7 @@ export const ProfilePage: React.FC = () => {
       )}
 
       {/* TAB CONTENT: STUDENT DOCUMENTS VAULT */}
-      {activeTab === 'DOCUMENTS' && (
+      {activeTab === 'DOCUMENTS' && studentRecord && (
         <StudentDocumentsSection student={studentRecord} />
       )}
 
@@ -415,7 +420,7 @@ export const ProfilePage: React.FC = () => {
               Reject Student ABC ID Submission
             </h3>
             <p style={{ fontSize: '0.84375rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              Specify rejection reason for {studentRecord.name} ({studentRecord.abcId})
+              Specify rejection reason for {studentRecord?.name} ({studentRecord?.abcId})
             </p>
 
             <form onSubmit={handleAdminRejectAbcIdConfirm} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

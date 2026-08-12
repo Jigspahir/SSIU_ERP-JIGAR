@@ -5,7 +5,7 @@ import {
   FeeStructure, StudentFeeRecord, FeePaymentTransaction,
   CRMLead, AdmissionApplication,
   Exam, ExamTimetable, ExamForm, StudentMarks, StudentResult, StudentFeedback, SupportTicket, StudentDocument,
-  ERPNotification
+  ERPNotification, InwardOutwardRecord, RegistrarFileMovement, ApprovalRequest
 } from '../types';
 
 export const initialInstitutes: Institute[] = [
@@ -1925,6 +1925,77 @@ export const initialStudentDocuments: StudentDocument[] = [
   }
 ];
 
+export const initialInwardOutwardRecords: InwardOutwardRecord[] = [
+  {
+    id: 'in-1',
+    type: 'INWARD',
+    dispatchNo: 'INW/2024/0481',
+    senderOrRecipient: 'University Grants Commission (UGC), New Delhi',
+    subject: 'Mandatory Implementation of Academic Bank of Credits (ABC) & NEP 2020 Guidelines',
+    category: 'UGC_AICTE',
+    mode: 'SPEED_POST',
+    trackingNo: 'SP984210452IN',
+    assignedSection: 'Academic Affairs Section',
+    receivedOrDispatchedDate: '2024-02-10',
+    status: 'PROCESSING',
+    remarks: 'Forwarded to Deans & IQAC for compliance report.'
+  },
+  {
+    id: 'in-2',
+    type: 'INWARD',
+    dispatchNo: 'INW/2024/0512',
+    senderOrRecipient: 'Department of Higher Education, Govt. of Gujarat',
+    subject: 'State Scholarship Portal Verification & Freeship Card Approvals 2024',
+    category: 'GOVT_DIRECTIVE',
+    mode: 'EMAIL',
+    trackingNo: 'GUJ/EDU/2024/781',
+    assignedSection: 'Student Welfare & Scholarship Section',
+    receivedOrDispatchedDate: '2024-02-18',
+    status: 'DISPOSED',
+    remarks: 'Action completed and portal updated.'
+  },
+  {
+    id: 'out-1',
+    type: 'OUTWARD',
+    dispatchNo: 'OUT/2024/0210',
+    senderOrRecipient: 'All Constituent Institute Directors & Principals',
+    subject: 'Notification for End Semester Examination Series & Approval Schedule',
+    category: 'GENERAL',
+    mode: 'EMAIL',
+    trackingNo: 'EML-SSIU-REG-0982',
+    assignedSection: 'Examination Section',
+    receivedOrDispatchedDate: '2024-03-01',
+    status: 'DISPOSED',
+    remarks: 'Circulated electronically to all institute heads.'
+  }
+];
+
+export const initialRegistrarFileMovements: RegistrarFileMovement[] = [
+  {
+    id: 'fm-1',
+    fileNo: 'SSIU/FILE/2024/ACAD-01',
+    fileTitle: 'Proposal for New B.Tech Artificial Intelligence & Data Science Program Sanction',
+    initiatingSection: 'Swarrnim School of Computer & IT',
+    currentCustodian: 'Registrar Office',
+    movementDate: '2024-03-05',
+    priority: 'HIGH',
+    status: 'UNDER_REVIEW',
+    remarks: 'Pending Academic Council ratification.'
+  },
+  {
+    id: 'fm-2',
+    fileNo: 'SSIU/FILE/2024/ESTATE-04',
+    fileTitle: 'Annual Campus Infrastructure Renewal & Solar Power Installation Contract',
+    initiatingSection: 'Estate & Maintenance Department',
+    currentCustodian: 'Finance Office',
+    movementDate: '2024-03-08',
+    priority: 'MEDIUM',
+    status: 'IN_MOVEMENT',
+    remarks: 'Sent for financial sanction.'
+  }
+];
+
+
 export const initialERPNotifications: ERPNotification[] = [
   {
     id: 'notif-1',
@@ -2022,6 +2093,208 @@ export const initialERPNotifications: ERPNotification[] = [
     linkTab: 'timetable'
   }
 ];
+
+export const initialApprovalRequests: ApprovalRequest[] = [
+  {
+    id: 'app-req-101',
+    requestNo: 'SSIU-REQ-2024-001',
+    applicantId: 'stu-1',
+    applicantName: 'Aarav Patel',
+    applicantRole: 'STUDENT',
+    applicantEmail: 'aarav.patel@swarrnim.edu.in',
+    applicantPhone: '+91 98765 43210',
+    applicantEnrollmentOrEmpId: '230101001',
+    departmentId: 'dept-1',
+    instituteId: 'inst-1',
+    category: 'BONAFIDE_CERTIFICATE',
+    title: 'Urgent Bonafide Certificate Request for Higher Education Loan',
+    description: 'Require an official signed Bonafide Certificate for Nationalised Bank Student Education Loan disbursement.',
+    priority: 'HIGH',
+    targetOffice: 'STUDENT_SECTION',
+    currentOffice: 'STUDENT_SECTION',
+    status: 'PENDING',
+    deadlineDate: '2026-08-15',
+    attachments: [
+      {
+        id: 'att-1',
+        fileName: 'Bank_Loan_Requirement_Letter.pdf',
+        fileSize: '1.2 MB',
+        fileType: 'PDF',
+        fileUrl: '#',
+        uploadedAt: '2026-08-11T10:00:00.000Z'
+      }
+    ],
+    remarksHistory: [
+      {
+        id: 'rem-1',
+        actionByUserId: 'stu-1',
+        actionByUserName: 'Aarav Patel',
+        actionByUserRole: 'STUDENT',
+        office: 'STUDENT_SECTION',
+        action: 'PENDING',
+        remarks: 'Application submitted along with bank loan requirement letter.',
+        timestamp: '2026-08-11 10:00 AM'
+      }
+    ],
+    createdAt: '2026-08-11T10:00:00.000Z',
+    updatedAt: '2026-08-11T10:00:00.000Z'
+  },
+  {
+    id: 'app-req-102',
+    requestNo: 'SSIU-REQ-2024-002',
+    applicantId: 'stu-2',
+    applicantName: 'Ananya Roy',
+    applicantRole: 'STUDENT',
+    applicantEmail: 'ananya.roy@swarrnim.edu.in',
+    applicantPhone: '+91 98123 45678',
+    applicantEnrollmentOrEmpId: '230101002',
+    departmentId: 'dept-1',
+    instituteId: 'inst-1',
+    category: 'RE_EVALUATION',
+    title: 'Re-evaluation & Verification of Mid-Sem Examination Answer Sheet',
+    description: 'Requesting answer script re-checking for Subject CSE-101 Data Structures Mid-Sem Exam.',
+    priority: 'MEDIUM',
+    targetOffice: 'EXAM_CELL',
+    currentOffice: 'EXAM_CELL',
+    status: 'UNDER_REVIEW',
+    deadlineDate: '2026-08-18',
+    attachments: [
+      {
+        id: 'att-2',
+        fileName: 'Fee_Receipt_Rechecking.pdf',
+        fileSize: '450 KB',
+        fileType: 'PDF',
+        fileUrl: '#',
+        uploadedAt: '2026-08-10T14:30:00.000Z'
+      }
+    ],
+    remarksHistory: [
+      {
+        id: 'rem-2a',
+        actionByUserId: 'stu-2',
+        actionByUserName: 'Ananya Roy',
+        actionByUserRole: 'STUDENT',
+        office: 'EXAM_CELL',
+        action: 'PENDING',
+        remarks: 'Submitted re-evaluation form with paid receipt fee.',
+        timestamp: '2026-08-10 02:30 PM'
+      },
+      {
+        id: 'rem-2b',
+        actionByUserId: 'usr-exam-1',
+        actionByUserName: 'Exam Controller Officer',
+        actionByUserRole: 'EXAM_CELL',
+        office: 'EXAM_CELL',
+        action: 'UNDER_REVIEW',
+        remarks: 'Forwarded answer script copy to Subject Expert Evaluator.',
+        timestamp: '2026-08-11 11:15 AM'
+      }
+    ],
+    createdAt: '2026-08-10T14:30:00.000Z',
+    updatedAt: '2026-08-11T11:15:00.000Z'
+  },
+  {
+    id: 'app-req-103',
+    requestNo: 'SSIU-REQ-2024-003',
+    applicantId: 'fac-1',
+    applicantName: 'Dr. Rajesh Mehta',
+    applicantRole: 'FACULTY',
+    applicantEmail: 'rajesh.mehta@swarrnim.edu.in',
+    applicantPhone: '+91 99001 12233',
+    applicantEnrollmentOrEmpId: 'EMP-CSE-01',
+    departmentId: 'dept-1',
+    instituteId: 'inst-1',
+    category: 'RESEARCH_GRANT',
+    title: 'GUJCOST Sponsored AI & Cyber Security Workshop Grant Sanction',
+    description: 'Proposing 3-day state level technical workshop on Generative AI & Quantum Cryptography with GUJCOST funding.',
+    priority: 'HIGH',
+    targetOffice: 'IQAC',
+    currentOffice: 'REGISTRAR',
+    status: 'FORWARDED',
+    deadlineDate: '2026-08-20',
+    attachments: [
+      {
+        id: 'att-3',
+        fileName: 'GUJCOST_Proposal_Budget.pdf',
+        fileSize: '3.4 MB',
+        fileType: 'PDF',
+        fileUrl: '#',
+        uploadedAt: '2026-08-08T09:00:00.000Z'
+      }
+    ],
+    remarksHistory: [
+      {
+        id: 'rem-3a',
+        actionByUserId: 'fac-1',
+        actionByUserName: 'Dr. Rajesh Mehta',
+        actionByUserRole: 'FACULTY',
+        office: 'IQAC',
+        action: 'PENDING',
+        remarks: 'Proposal submitted for IQAC Quality Assessment & Clearance.',
+        timestamp: '2026-08-08 09:00 AM'
+      },
+      {
+        id: 'rem-3b',
+        actionByUserId: 'usr-iqac-1',
+        actionByUserName: 'IQAC Coordinator',
+        actionByUserRole: 'IQAC',
+        office: 'IQAC',
+        action: 'FORWARDED',
+        remarks: 'IQAC quality criteria verified and benchmarked. Forwarded to Registrar Office for statutory approval and fund release.',
+        timestamp: '2026-08-09 04:00 PM'
+      }
+    ],
+    createdAt: '2026-08-08T09:00:00.000Z',
+    updatedAt: '2026-08-09T16:00:00.000Z'
+  },
+  {
+    id: 'app-req-104',
+    requestNo: 'SSIU-REQ-2024-004',
+    applicantId: 'stu-3',
+    applicantName: 'Rohan Sharma',
+    applicantRole: 'STUDENT',
+    applicantEmail: 'rohan.sharma@swarrnim.edu.in',
+    applicantPhone: '+91 97234 56789',
+    applicantEnrollmentOrEmpId: '230101003',
+    departmentId: 'dept-1',
+    instituteId: 'inst-1',
+    category: 'HOSTEL_NO_DUES',
+    title: 'Hostel No-Dues Clearance for Semester End Certificate Release',
+    description: 'Requesting Hostel Clearance Certificate after clearing all mess and accommodation dues for Block B Room 204.',
+    priority: 'LOW',
+    targetOffice: 'HOSTEL_ADMIN',
+    currentOffice: 'HOSTEL_ADMIN',
+    status: 'APPROVED',
+    deadlineDate: '2026-08-14',
+    attachments: [],
+    remarksHistory: [
+      {
+        id: 'rem-4a',
+        actionByUserId: 'stu-3',
+        actionByUserName: 'Rohan Sharma',
+        actionByUserRole: 'STUDENT',
+        office: 'HOSTEL_ADMIN',
+        action: 'PENDING',
+        remarks: 'Submitted hostel clearance request.',
+        timestamp: '2026-08-07 11:30 AM'
+      },
+      {
+        id: 'rem-4b',
+        actionByUserId: 'usr-hostel-1',
+        actionByUserName: 'Hostel Warden',
+        actionByUserRole: 'HOSTEL_ADMIN',
+        office: 'HOSTEL_ADMIN',
+        action: 'APPROVED',
+        remarks: 'All mess dues and room inventory verified. No dues certificate issued.',
+        timestamp: '2026-08-08 10:15 AM'
+      }
+    ],
+    createdAt: '2026-08-07T11:30:00.000Z',
+    updatedAt: '2026-08-08T10:15:00.000Z',
+    completedAt: '2026-08-08T10:15:00.000Z'
+  }
+];
+
 
 
 

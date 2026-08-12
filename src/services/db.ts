@@ -4,9 +4,9 @@ import type {
   AttendanceSession, TimetableEntry, SessionPlanTopic, UnitMaterial,
   Assignment, AssignmentSubmission, AcademicCalendarEvent,
   FeeStructure, StudentFeeRecord, FeePaymentTransaction,
-  CRMLead, AdmissionApplication, AdmissionDocument,
+  CRMLead, AdmissionApplication,
   Exam, ExamTimetable, ExamForm, StudentMarks, StudentResult, StudentFeedback, SupportTicket, StudentDocument,
-  ERPNotification, UserRole
+  ERPNotification, UserRole, InwardOutwardRecord, RegistrarFileMovement, ApprovalRequest, ApprovalOfficeType, ApprovalStatus
 } from '../types';
 import { 
   initialInstitutes, initialDepartments, initialPrograms, initialAcademicYears, 
@@ -16,11 +16,11 @@ import {
   initialUnitMaterials, initialAssignments, initialAssignmentSubmissions,
   initialAcademicCalendarEvents, initialFeeStructures, initialStudentFeeRecords,
   initialFeePaymentTransactions, initialCRMLeads, initialAdmissionApplications,
-  initialExams, initialExamTimetables, initialExamForms, initialStudentMarks, initialStudentResults, initialStudentFeedbacks, initialSupportTickets, initialStudentDocuments,
-  initialERPNotifications
+  initialExams, initialExamTimetables, initialExamForms, initialStudentMarks,
+  initialStudentResults, initialStudentFeedbacks, initialSupportTickets, initialStudentDocuments,
+  initialERPNotifications, initialInwardOutwardRecords, initialRegistrarFileMovements, initialApprovalRequests
 } from './seedData';
-
-const STORAGE_KEY = 'SWARRNIM_ERP_DB_V5';
+import { DB_STORAGE_KEY } from '../constants';
 
 export interface DatabaseState {
   institutes: Institute[];
@@ -56,6 +56,9 @@ export interface DatabaseState {
   supportTickets: SupportTicket[];
   studentDocuments: StudentDocument[];
   notifications: ERPNotification[];
+  inwardOutwardRecords: InwardOutwardRecord[];
+  registrarFileMovements: RegistrarFileMovement[];
+  approvalRequests: ApprovalRequest[];
 }
 
 class ERPDatabaseService {
@@ -65,47 +68,9 @@ class ERPDatabaseService {
     this.state = this.loadState();
   }
 
-  private loadState(): DatabaseState {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return {
-          ...parsed,
-          institutes: initialInstitutes,
-          departments: initialDepartments,
-          faculty: initialFaculty,
-          students: parsed.students || initialStudents,
-          users: initialUsers,
-          attendanceSessions: parsed.attendanceSessions || initialAttendanceSessions,
-          timetableEntries: parsed.timetableEntries || initialTimetableEntries,
-          sessionPlanTopics: parsed.sessionPlanTopics || initialSessionPlanTopics,
-          unitMaterials: parsed.unitMaterials || initialUnitMaterials,
-          assignments: parsed.assignments || initialAssignments,
-          assignmentSubmissions: parsed.assignmentSubmissions || initialAssignmentSubmissions,
-          academicCalendarEvents: parsed.academicCalendarEvents || initialAcademicCalendarEvents,
-          feeStructures: parsed.feeStructures || initialFeeStructures,
-          studentFeeRecords: parsed.studentFeeRecords || initialStudentFeeRecords,
-          feePaymentTransactions: parsed.feePaymentTransactions || initialFeePaymentTransactions,
-          crmLeads: parsed.crmLeads || initialCRMLeads,
-          admissionApplications: parsed.admissionApplications || initialAdmissionApplications,
-          exams: parsed.exams || initialExams,
-          examTimetables: parsed.examTimetables || initialExamTimetables,
-          examForms: parsed.examForms || initialExamForms,
-          studentMarks: parsed.studentMarks || initialStudentMarks,
-          studentResults: parsed.studentResults || initialStudentResults,
-          studentFeedbacks: parsed.studentFeedbacks || initialStudentFeedbacks,
-          supportTickets: parsed.supportTickets || initialSupportTickets,
-          studentDocuments: parsed.studentDocuments || initialStudentDocuments,
-          notifications: parsed.notifications || initialERPNotifications
-        };
-      }
-    } catch (e) {
-      console.error('Error loading database state from LocalStorage:', e);
-    }
-
-    // Default Seed State
-    const defaultState: DatabaseState = {
+  // ─── Internal: default seed state ────────────────────────────────────────
+  private buildDefaultState(): DatabaseState {
+    return {
       institutes: initialInstitutes,
       departments: initialDepartments,
       programs: initialPrograms,
@@ -138,66 +103,86 @@ class ERPDatabaseService {
       studentFeedbacks: initialStudentFeedbacks,
       supportTickets: initialSupportTickets,
       studentDocuments: initialStudentDocuments,
-      notifications: initialERPNotifications
+      notifications: initialERPNotifications,
+      inwardOutwardRecords: initialInwardOutwardRecords,
+      registrarFileMovements: initialRegistrarFileMovements,
+      approvalRequests: initialApprovalRequests,
     };
-    
-    this.saveState(defaultState);
-    return defaultState;
+  }
+
+  private loadState(): DatabaseState {
+    try {
+      const saved = localStorage.getItem(DB_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const defaults = this.buildDefaultState();
+        // Merge: static master data always uses seed; mutable collections use saved or seed fallback
+        return {
+          ...parsed,
+          institutes: defaults.institutes,
+          departments: defaults.departments,
+          faculty: defaults.faculty,
+          users: defaults.users,
+          students: parsed.students || defaults.students,
+          attendanceSessions: parsed.attendanceSessions || defaults.attendanceSessions,
+          timetableEntries: parsed.timetableEntries || defaults.timetableEntries,
+          sessionPlanTopics: parsed.sessionPlanTopics || defaults.sessionPlanTopics,
+          unitMaterials: parsed.unitMaterials || defaults.unitMaterials,
+          assignments: parsed.assignments || defaults.assignments,
+          assignmentSubmissions: parsed.assignmentSubmissions || defaults.assignmentSubmissions,
+          academicCalendarEvents: parsed.academicCalendarEvents || defaults.academicCalendarEvents,
+          feeStructures: parsed.feeStructures || defaults.feeStructures,
+          studentFeeRecords: parsed.studentFeeRecords || defaults.studentFeeRecords,
+          feePaymentTransactions: parsed.feePaymentTransactions || defaults.feePaymentTransactions,
+          crmLeads: parsed.crmLeads || defaults.crmLeads,
+          admissionApplications: parsed.admissionApplications || defaults.admissionApplications,
+          exams: parsed.exams || defaults.exams,
+          examTimetables: parsed.examTimetables || defaults.examTimetables,
+          examForms: parsed.examForms || defaults.examForms,
+          studentMarks: parsed.studentMarks || defaults.studentMarks,
+          studentResults: parsed.studentResults || defaults.studentResults,
+          studentFeedbacks: parsed.studentFeedbacks || defaults.studentFeedbacks,
+          supportTickets: parsed.supportTickets || defaults.supportTickets,
+          studentDocuments: parsed.studentDocuments || defaults.studentDocuments,
+          notifications: parsed.notifications || defaults.notifications,
+          inwardOutwardRecords: parsed.inwardOutwardRecords || defaults.inwardOutwardRecords,
+          registrarFileMovements: parsed.registrarFileMovements || defaults.registrarFileMovements,
+          approvalRequests: parsed.approvalRequests || defaults.approvalRequests,
+        };
+      }
+    } catch (e) {
+      console.error('Error loading ERP database from localStorage:', e);
+    }
+
+    const freshState = this.buildDefaultState();
+    this.saveState(freshState);
+    return freshState;
   }
 
   private saveState(newState?: DatabaseState): void {
     if (newState) this.state = newState;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state));
+      localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(this.state));
     } catch (e) {
-      console.error('Error saving state to LocalStorage:', e);
+      console.error('Error saving ERP database to localStorage:', e);
     }
   }
 
   public resetToDefaultSeed(): DatabaseState {
-    const defaultState: DatabaseState = {
-      institutes: initialInstitutes,
-      departments: initialDepartments,
-      programs: initialPrograms,
-      academicYears: initialAcademicYears,
-      batches: initialBatches,
-      semesters: initialSemesters,
-      divisions: initialDivisions,
-      subjects: initialSubjects,
-      faculty: initialFaculty,
-      students: initialStudents,
-      users: initialUsers,
-      auditLogs: [...initialAuditLogs, {
+    const freshState = this.buildDefaultState();
+    freshState.auditLogs = [
+      ...initialAuditLogs,
+      {
         id: `log-${Date.now()}`,
         timestamp: new Date().toISOString(),
         userName: 'Demo Admin',
-        userRole: 'SUPER_ADMIN',
+        userRole: 'SUPER_ADMIN' as UserRole,
         action: 'RESET_SEED',
         entity: 'Database',
-        details: 'Database was reset to default Swarrnim University seed state.'
-      }],
-      attendanceSessions: initialAttendanceSessions,
-      timetableEntries: initialTimetableEntries,
-      sessionPlanTopics: initialSessionPlanTopics,
-      unitMaterials: initialUnitMaterials,
-      assignments: initialAssignments,
-      assignmentSubmissions: initialAssignmentSubmissions,
-      academicCalendarEvents: initialAcademicCalendarEvents,
-      feeStructures: initialFeeStructures,
-      studentFeeRecords: initialStudentFeeRecords,
-      feePaymentTransactions: initialFeePaymentTransactions,
-      crmLeads: initialCRMLeads,
-      admissionApplications: initialAdmissionApplications,
-      exams: initialExams,
-      examTimetables: initialExamTimetables,
-      examForms: initialExamForms,
-      studentMarks: initialStudentMarks,
-      studentResults: initialStudentResults,
-      studentFeedbacks: initialStudentFeedbacks,
-      supportTickets: initialSupportTickets,
-      studentDocuments: initialStudentDocuments
-    };
-    this.state = defaultState;
+        details: 'Database was reset to default seed state.',
+      },
+    ];
+    this.state = freshState;
     this.saveState();
     return this.state;
   }
@@ -245,6 +230,141 @@ class ERPDatabaseService {
   public getStudentDocuments(): StudentDocument[] { return this.state.studentDocuments || []; }
   public getStudentDocumentsByStudentId(studentId: string): StudentDocument[] {
     return (this.state.studentDocuments || []).filter(d => d.studentId === studentId);
+  }
+  public getInwardOutwardRecords(): InwardOutwardRecord[] {
+    return this.state.inwardOutwardRecords || [];
+  }
+  public getRegistrarFileMovements(): RegistrarFileMovement[] {
+    return this.state.registrarFileMovements || [];
+  }
+
+  public getApprovalRequests(): ApprovalRequest[] {
+    return this.state.approvalRequests || [];
+  }
+
+  public getScopedApprovalRequests(user: User | null, role: UserRole | null): ApprovalRequest[] {
+    const requests = this.getApprovalRequests();
+    if (!user || !role) return requests;
+
+    if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') {
+      return requests;
+    }
+
+    const roleOfficeMap: Partial<Record<UserRole, ApprovalOfficeType>> = {
+      REGISTRAR: 'REGISTRAR',
+      IQAC: 'IQAC',
+      EXAM_CELL: 'EXAM_CELL',
+      STUDENT_SECTION: 'STUDENT_SECTION',
+      HOSTEL_ADMIN: 'HOSTEL_ADMIN',
+      LIBRARY_ADMIN: 'LIBRARY_ADMIN',
+      TRANSPORT_ADMIN: 'TRANSPORT_ADMIN',
+      MAINTENANCE_ADMIN: 'MAINTENANCE_ADMIN',
+      HOD: 'HOD_ACADEMIC',
+    };
+
+    const userOffice = roleOfficeMap[role];
+
+    return requests.filter(r => {
+      if (r.applicantId === user.id || r.applicantEmail === user.email) return true;
+      if (userOffice && (r.currentOffice === userOffice || r.targetOffice === userOffice)) return true;
+      if (role === 'HOD' && user.departmentId && r.departmentId === user.departmentId) return true;
+      if (role === 'PRINCIPAL' && user.instituteId && r.instituteId === user.instituteId) return true;
+      return false;
+    });
+  }
+
+  public addApprovalRequest(
+    data: Omit<ApprovalRequest, 'id' | 'requestNo' | 'createdAt' | 'updatedAt' | 'remarksHistory'>,
+    initialRemarks?: string
+  ): ApprovalRequest {
+    const reqCount = (this.state.approvalRequests || []).length + 1;
+    const reqNo = `SSIU-REQ-${new Date().getFullYear()}-${String(reqCount).padStart(3, '0')}`;
+    const timestamp = new Date().toISOString();
+
+    const newRequest: ApprovalRequest = {
+      ...data,
+      id: `app-req-${Date.now()}`,
+      requestNo: reqNo,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      remarksHistory: initialRemarks ? [
+        {
+          id: `rem-${Date.now()}`,
+          actionByUserId: data.applicantId,
+          actionByUserName: data.applicantName,
+          actionByUserRole: data.applicantRole,
+          office: data.targetOffice,
+          action: 'PENDING',
+          remarks: initialRemarks,
+          timestamp: new Date().toLocaleString(),
+        }
+      ] : []
+    };
+
+    if (!this.state.approvalRequests) {
+      this.state.approvalRequests = [];
+    }
+    this.state.approvalRequests.unshift(newRequest);
+
+    this.addNotification({
+      title: `New Approval Request (${reqNo}): ${data.title}`,
+      message: `Submitted by ${data.applicantName} (${data.applicantRole}) to ${data.targetOffice}. Priority: ${data.priority}.`,
+      module: 'REQUEST',
+      timestamp: 'Just Now',
+      targetRole: 'ALL',
+      linkTab: 'requests'
+    });
+
+    this.logAudit('CREATE', 'Approval Request', `Submitted request ${reqNo} - ${data.title} to ${data.targetOffice}`, data.applicantName, data.applicantRole);
+    this.saveState();
+    return newRequest;
+  }
+
+  public updateApprovalRequestStatus(
+    requestId: string,
+    newStatus: ApprovalStatus,
+    remarks: string,
+    currentUser: User,
+    forwardToOffice?: ApprovalOfficeType
+  ): ApprovalRequest | null {
+    const list = this.state.approvalRequests || [];
+    const req = list.find(r => r.id === requestId);
+    if (!req) return null;
+
+    const timestamp = new Date().toISOString();
+    req.status = newStatus;
+    req.updatedAt = timestamp;
+    if (newStatus === 'APPROVED' || newStatus === 'REJECTED') {
+      req.completedAt = timestamp;
+    }
+
+    if (forwardToOffice && newStatus === 'FORWARDED') {
+      req.currentOffice = forwardToOffice;
+    }
+
+    req.remarksHistory.push({
+      id: `rem-${Date.now()}`,
+      actionByUserId: currentUser.id,
+      actionByUserName: currentUser.name,
+      actionByUserRole: currentUser.role,
+      office: req.currentOffice,
+      action: newStatus,
+      remarks: remarks || `Request status updated to ${newStatus}`,
+      timestamp: new Date().toLocaleString(),
+    });
+
+    this.addNotification({
+      title: `Request ${req.requestNo} Update: ${newStatus}`,
+      message: `Your request "${req.title}" has been updated to ${newStatus} by ${currentUser.name} (${req.currentOffice}).`,
+      module: 'REQUEST',
+      timestamp: 'Just Now',
+      targetUserId: req.applicantId,
+      linkTab: 'requests'
+    });
+
+    this.logAudit('UPDATE', 'Approval Request', `Updated request ${req.requestNo} status to ${newStatus} with remarks: ${remarks}`, currentUser.name, currentUser.role);
+    this.saveState();
+    return req;
   }
 
   // --- ROLE-BASED SCOPED GETTERS ---
@@ -373,15 +493,15 @@ class ERPDatabaseService {
     return false;
   }
 
-  public logAudit(action: string, entity: string, details: string, userName = 'Demo User', userRole = 'SUPER_ADMIN'): void {
+  public logAudit(action: string, entity: string, details: string, userName = 'Demo User', userRole: UserRole = 'SUPER_ADMIN'): void {
     const log: AuditLog = {
-      id: `log-${Date.now()}-${Math.floor(Math.random()*1000)}`,
+      id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       timestamp: new Date().toISOString(),
       userName,
-      userRole: userRole as any,
+      userRole,
       action,
       entity,
-      details
+      details,
     };
     this.state.auditLogs.unshift(log);
     if (this.state.auditLogs.length > 100) {
@@ -610,7 +730,7 @@ class ERPDatabaseService {
   }
 
   // --- NOTIFICATION MANAGEMENT ---
-  getNotifications(user: User | null, role?: UserRole): ERPNotification[] {
+  getNotifications(user: User | null, role?: UserRole | null): ERPNotification[] {
     const userRole = role || user?.role || 'STUDENT';
     const userId = user?.id;
 
@@ -666,7 +786,7 @@ class ERPDatabaseService {
     });
   }
 
-  getUnreadNotificationCount(user: User | null, role?: UserRole): number {
+  getUnreadNotificationCount(user: User | null, role?: UserRole | null): number {
     const userId = user?.id || 'guest';
     const userNotifications = this.getNotifications(user, role);
     return userNotifications.filter(n => !(n.isReadByUsers || []).includes(userId)).length;
@@ -699,7 +819,7 @@ class ERPDatabaseService {
     }
   }
 
-  markAllNotificationsAsRead(user: User | null, role?: UserRole): void {
+  markAllNotificationsAsRead(user: User | null, role?: UserRole | null): void {
     if (!this.state.notifications) return;
     const userId = user?.id || 'guest';
     const relevant = this.getNotifications(user, role);

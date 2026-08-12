@@ -57,7 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     'fees': { id: 'fees', label: 'Fees', icon: IndianRupee, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'STUDENT'], category: 'Finance & Admin' },
     'crm': { id: 'crm', label: 'Documents', icon: FolderCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Finance & Admin' },
     'certificates': { id: 'certificates', label: 'Certificates', icon: Award, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'STUDENT'], category: 'Finance & Admin' },
-    'requests': { id: 'requests', label: 'Requests', icon: CheckSquare, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD'], category: 'Finance & Admin' },
+    'requests': { id: 'requests', label: 'Requests Desk', icon: CheckSquare, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN'], category: 'Finance & Admin' },
 
     // Mentorship & Support
     'mentor': { id: 'mentor', label: 'Mentor', icon: UserCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Support & Campus' },
@@ -93,13 +93,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Exact Structure Definitions per Prompt
   const studentOrderKeys = [
     'dashboard', 'calendar', 'attendance', 'subjects', 'timetable', 'materials',
-    'assignments', 'exam-dashboard', 'fees', 'crm', 'certificates', 'mentor',
+    'assignments', 'exam-dashboard', 'fees', 'crm', 'certificates', 'requests', 'mentor',
     'tickets', 'feedback', 'notices', 'events', 'library', 'notifications', 'profile'
   ];
 
   const facultyOrderKeys = [
     'dashboard', 'subjects', 'timetable', 'attendance', 'session-plan', 'materials',
-    'assignments', 'exam-marks', 'exam-dashboard', 'tickets', 'mentor', 'feedback', 'profile'
+    'assignments', 'exam-marks', 'exam-dashboard', 'requests', 'tickets', 'mentor', 'feedback', 'profile'
   ];
 
   const adminOrderKeys = [
@@ -115,21 +115,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   } else if (role === 'FACULTY') {
     orderKeys = facultyOrderKeys;
   } else if (role === 'REGISTRAR') {
-    orderKeys = ['dashboard', 'registrar', 'students', 'faculty', 'departments', 'programs', 'notices', 'reports', 'profile'];
+    orderKeys = ['dashboard', 'registrar', 'requests', 'students', 'faculty', 'departments', 'programs', 'notices', 'reports', 'profile'];
   } else if (role === 'IQAC') {
-    orderKeys = ['dashboard', 'iqac', 'faculty', 'feedback', 'reports', 'profile'];
+    orderKeys = ['dashboard', 'iqac', 'requests', 'faculty', 'feedback', 'reports', 'profile'];
   } else if (role === 'EXAM_CELL') {
-    orderKeys = ['dashboard', 'exam-cell', 'exam-dashboard', 'students', 'reports', 'profile'];
+    orderKeys = ['dashboard', 'exam-cell', 'exam-dashboard', 'requests', 'students', 'reports', 'profile'];
   } else if (role === 'STUDENT_SECTION') {
-    orderKeys = ['dashboard', 'student-section', 'students', 'certificates', 'notifications', 'profile'];
+    orderKeys = ['dashboard', 'student-section', 'requests', 'students', 'certificates', 'notifications', 'profile'];
   } else if (role === 'HOSTEL_ADMIN') {
-    orderKeys = ['dashboard', 'hostel-admin', 'students', 'tickets', 'notifications', 'profile'];
+    orderKeys = ['dashboard', 'hostel-admin', 'requests', 'students', 'tickets', 'notifications', 'profile'];
   } else if (role === 'LIBRARY_ADMIN') {
-    orderKeys = ['dashboard', 'library-admin', 'library', 'students', 'profile'];
+    orderKeys = ['dashboard', 'library-admin', 'requests', 'library', 'students', 'profile'];
   } else if (role === 'TRANSPORT_ADMIN') {
-    orderKeys = ['dashboard', 'transport-admin', 'students', 'profile'];
+    orderKeys = ['dashboard', 'transport-admin', 'requests', 'students', 'profile'];
   } else if (role === 'MAINTENANCE_ADMIN') {
-    orderKeys = ['dashboard', 'maintenance-admin', 'tickets', 'profile'];
+    orderKeys = ['dashboard', 'maintenance-admin', 'requests', 'tickets', 'profile'];
   }
 
   const visibleItems: NavItem[] = orderKeys

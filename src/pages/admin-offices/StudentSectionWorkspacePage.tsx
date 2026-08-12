@@ -20,7 +20,7 @@ export const StudentSectionWorkspacePage: React.FC = () => {
       status: 'VERIFIED',
       isLocked: true,
       verifiedBy: user?.name || 'Student Section Officer',
-      verifiedDate: new Date().toISOString().split('T')[0]
+      verifiedAt: new Date().toISOString().split('T')[0]
     }, `Verified document ${docId}`);
   };
 

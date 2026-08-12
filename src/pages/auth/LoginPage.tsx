@@ -31,31 +31,91 @@ export const LoginPage: React.FC = () => {
   const demoAccounts = [
     {
       role: 'STUDENT',
-      title: 'Student Login',
+      title: 'Student Candidate',
       userId: 'student',
       pass: 'Student@123',
-      desc: 'Access enrolled courses, division timetable, and student profile',
+      desc: 'Aarav Patel — B.Tech CSE Sem 4',
       icon: GraduationCap,
       color: '#F5A623',
       bg: 'rgba(245, 166, 35, 0.08)'
     },
     {
       role: 'FACULTY',
-      title: 'Faculty Login',
+      title: 'Faculty / Mentor',
       userId: 'faculty',
       pass: 'Faculty@123',
-      desc: 'Access teaching subjects, department peers, and student directory',
+      desc: 'Prof. Vikram Trivedi — Associate Professor',
       icon: UserCheck,
       color: '#0097D7',
       bg: 'rgba(0, 151, 215, 0.08)'
     },
     {
+      role: 'HOD',
+      title: 'Department HOD',
+      userId: 'hod',
+      pass: 'Faculty@123',
+      desc: 'Dr. Amit Shah — HOD Computer Science',
+      icon: UserCheck,
+      color: '#10B981',
+      bg: 'rgba(16, 185, 129, 0.08)'
+    },
+    {
+      role: 'REGISTRAR',
+      title: 'Registrar Office',
+      userId: 'registrar',
+      pass: 'Admin@123',
+      desc: 'Dr. S. K. Mehta — University Registrar',
+      icon: ShieldCheck,
+      color: '#F37023',
+      bg: 'rgba(243, 112, 35, 0.08)'
+    },
+    {
+      role: 'EXAM_CELL',
+      title: 'Exam Controller',
+      userId: 'examcell',
+      pass: 'Admin@123',
+      desc: 'Prof. V. K. Patel — Controller of Exams',
+      icon: ShieldCheck,
+      color: '#183B70',
+      bg: 'rgba(24, 59, 112, 0.08)'
+    },
+    {
+      role: 'STUDENT_SECTION',
+      title: 'Student Section',
+      userId: 'studentsection',
+      pass: 'Admin@123',
+      desc: 'Mrs. Rekha Joshi — Student Affairs Officer',
+      icon: UserCheck,
+      color: '#0097D7',
+      bg: 'rgba(0, 151, 215, 0.08)'
+    },
+    {
+      role: 'HOSTEL_ADMIN',
+      title: 'Hostel Warden',
+      userId: 'hosteladmin',
+      pass: 'Admin@123',
+      desc: 'Mr. Arvind Trivedi — Chief Hostel Warden',
+      icon: UserCheck,
+      color: '#F5A623',
+      bg: 'rgba(245, 166, 35, 0.08)'
+    },
+    {
+      role: 'IQAC',
+      title: 'IQAC Director',
+      userId: 'iqac',
+      pass: 'Admin@123',
+      desc: 'Dr. N. P. Sharma — Director, IQAC Cell',
+      icon: ShieldCheck,
+      color: '#7CB342',
+      bg: 'rgba(124, 179, 66, 0.08)'
+    },
+    {
       role: 'SUPER_ADMIN',
-      title: 'Admin Login',
+      title: 'University Super Admin',
       userId: 'admin',
       pass: 'Admin@123',
-      desc: 'Full access to manage the entire University ERP system & master data',
-      icon: ShieldCheck,
+      desc: 'Dr. Devang Patel — Full System Admin',
+      icon: Key,
       color: '#0F2C59',
       bg: 'rgba(15, 44, 89, 0.08)'
     }

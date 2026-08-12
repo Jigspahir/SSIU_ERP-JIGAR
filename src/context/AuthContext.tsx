@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { db } from '../services/db';
+import { AUTH_STORAGE_KEY, SESSION_TIMEOUT_MS, INACTIVITY_EVENTS, DEMO_ACCOUNTS } from '../constants';
 
 interface AuthContextType {
   user: User | null;
@@ -15,26 +16,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const AUTH_USER_KEY = 'SWARRNIM_ERP_AUTH_USER_V2';
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
     try {
-      const savedUser = localStorage.getItem(AUTH_USER_KEY);
+      const savedUser = localStorage.getItem(AUTH_STORAGE_KEY);
       if (savedUser) {
-        const u = JSON.parse(savedUser);
-        // Enforce dummy names and emails across demo accounts
-        if (u.role === 'SUPER_ADMIN' || u.role === 'UNIVERSITY_ADMIN' || u.username === 'admin') {
-          u.name = 'Demo Admin';
-          u.email = 'demo.admin@university.edu';
-        } else if (u.role === 'FACULTY' || u.username === 'faculty') {
-          u.name = 'Prof. Demo Faculty';
-          u.email = 'demo.faculty@university.edu';
-        } else if (u.role === 'STUDENT' || u.username === 'student') {
-          u.name = 'Demo Student';
-          u.email = 'demo.student@university.edu';
-        }
-        return u;
+        return JSON.parse(savedUser) as User;
       }
     } catch (e) {
       console.error('Error reading auth user:', e);
@@ -44,9 +31,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (user) {
-      localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
 
-      // 15-minute Inactivity Session Timeout
       let timeoutId: number;
 
       const resetTimer = () => {
@@ -54,19 +40,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         timeoutId = window.setTimeout(() => {
           logout();
           alert('Your session has timed out due to inactivity. Please log in again.');
-        }, 15 * 60 * 1000); // 15 minutes
+        }, SESSION_TIMEOUT_MS);
       };
 
-      const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'click'];
-      events.forEach(event => window.addEventListener(event, resetTimer));
+      INACTIVITY_EVENTS.forEach(event => window.addEventListener(event, resetTimer));
       resetTimer();
 
       return () => {
         if (timeoutId) clearTimeout(timeoutId);
-        events.forEach(event => window.removeEventListener(event, resetTimer));
+        INACTIVITY_EVENTS.forEach(event => window.removeEventListener(event, resetTimer));
       };
     } else {
-      localStorage.removeItem(AUTH_USER_KEY);
+      localStorage.removeItem(AUTH_STORAGE_KEY);
     }
   }, [user]);
 
@@ -88,6 +73,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         foundUser = users.find(u => u.role === 'FACULTY');
       } else if (cleanId === 'student') {
         foundUser = users.find(u => u.role === 'STUDENT');
+      } else if (cleanId === 'registrar') {
+        foundUser = users.find(u => u.role === 'REGISTRAR');
+      } else if (cleanId === 'iqac') {
+        foundUser = users.find(u => u.role === 'IQAC');
+      } else if (cleanId === 'examcell') {
+        foundUser = users.find(u => u.role === 'EXAM_CELL');
+      } else if (cleanId === 'studentsection') {
+        foundUser = users.find(u => u.role === 'STUDENT_SECTION');
+      } else if (cleanId === 'hosteladmin') {
+        foundUser = users.find(u => u.role === 'HOSTEL_ADMIN');
+      } else if (cleanId === 'hod') {
+        foundUser = users.find(u => u.role === 'HOD');
+      } else if (cleanId === 'principal') {
+        foundUser = users.find(u => u.role === 'PRINCIPAL');
       }
     }
 
@@ -97,25 +96,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (password && foundUser.password && foundUser.password !== password) {
       const isDemoPassMatch = 
-        (cleanId === 'student' && password === 'Student@123') ||
-        (cleanId === 'faculty' && password === 'Faculty@123') ||
-        (cleanId === 'admin' && password === 'Admin@123');
+        password === 'Student@123' ||
+        password === 'Faculty@123' ||
+        password === 'Admin@123';
 
       if (!isDemoPassMatch) {
         return { success: false, error: 'Incorrect Password. Please check your User ID and Password.' };
       }
-    }
-
-    // Sanitize user name and email to strictly enforce dummy credentials
-    if (foundUser.role === 'SUPER_ADMIN' || foundUser.role === 'UNIVERSITY_ADMIN' || foundUser.username === 'admin') {
-      foundUser.name = 'Demo Admin';
-      foundUser.email = 'demo.admin@university.edu';
-    } else if (foundUser.role === 'FACULTY' || foundUser.username === 'faculty') {
-      foundUser.name = 'Prof. Demo Faculty';
-      foundUser.email = 'demo.faculty@university.edu';
-    } else if (foundUser.role === 'STUDENT' || foundUser.username === 'student') {
-      foundUser.name = 'Demo Student';
-      foundUser.email = 'demo.student@university.edu';
     }
 
     setUser(foundUser);

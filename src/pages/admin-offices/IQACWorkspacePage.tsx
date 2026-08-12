@@ -15,7 +15,7 @@ export const IQACWorkspacePage: React.FC = () => {
   const feedbacks = db.getStudentFeedbacks();
 
   const avgFeedbackScore = feedbacks.length > 0
-    ? (feedbacks.reduce((acc, f) => acc + f.rating, 0) / feedbacks.length).toFixed(2)
+    ? (feedbacks.reduce((acc, f) => acc + (f.overallRating || 4), 0) / feedbacks.length).toFixed(2)
     : '4.65';
 
   return (

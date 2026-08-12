@@ -168,6 +168,7 @@ export interface Student {
   divisionId: string;
   guardianName: string;
   guardianPhone: string;
+  mentorId?: string;
   abcId?: string; // 12-digit Academic Bank of Credits ID e.g. "9842-1056-7890"
   abcIdStatus?: 'NOT_SUBMITTED' | 'PENDING_VERIFICATION' | 'VERIFIED' | 'REJECTED';
   abcIdDocUrl?: string;
@@ -666,5 +667,124 @@ export interface ERPNotification {
   targetUserId?: string;
   linkTab?: string;
 }
+
+export interface InwardOutwardRecord {
+  id: string;
+  type: 'INWARD' | 'OUTWARD';
+  dispatchNo: string;
+  senderOrRecipient: string;
+  subject: string;
+  category: 'GOVT_DIRECTIVE' | 'UGC_AICTE' | 'AFFILIATION' | 'LEGAL' | 'GENERAL';
+  mode: 'REGISTERED_POST' | 'SPEED_POST' | 'EMAIL' | 'HAND_DELIVERY' | 'COURIER';
+  trackingNo?: string;
+  assignedSection?: string;
+  receivedOrDispatchedDate: string;
+  status: 'PENDING' | 'PROCESSING' | 'DISPOSED';
+  remarks?: string;
+}
+
+export interface RegistrarFileMovement {
+  id: string;
+  fileNo: string;
+  fileTitle: string;
+  initiatingSection: string;
+  currentCustodian: string;
+  movementDate: string;
+  priority: 'HIGH' | 'MEDIUM' | 'LOW';
+  status: 'IN_MOVEMENT' | 'UNDER_REVIEW' | 'APPROVED' | 'ARCHIVED';
+  remarks?: string;
+}
+
+// --- CENTRAL APPROVAL WORKFLOW TYPES ---
+
+export type ApprovalOfficeType = 
+  | 'REGISTRAR'
+  | 'UNIVERSITY_ADMIN'
+  | 'IQAC'
+  | 'EXAM_CELL'
+  | 'STUDENT_SECTION'
+  | 'HOSTEL_ADMIN'
+  | 'LIBRARY_ADMIN'
+  | 'TRANSPORT_ADMIN'
+  | 'MAINTENANCE_ADMIN'
+  | 'HOD_ACADEMIC'
+  | 'FINANCE_CELL';
+
+export type ApprovalRequestCategory = 
+  | 'BONAFIDE_CERTIFICATE'
+  | 'TRANSCRIPT_DEGREE'
+  | 'FEE_CONCESSION'
+  | 'HOSTEL_NO_DUES'
+  | 'RE_EVALUATION'
+  | 'NO_OBJECTION_CERTIFICATE'
+  | 'LEAVE_APPLICATION'
+  | 'RESEARCH_GRANT'
+  | 'EVENT_PERMISSION'
+  | 'INFRASTRUCTURE_MAINTENANCE'
+  | 'GENERAL_ADMINISTRATIVE';
+
+export type ApprovalStatus = 
+  | 'PENDING'
+  | 'UNDER_REVIEW'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'CHANGES_REQUESTED'
+  | 'FORWARDED'
+  | 'WITHDRAWN';
+
+export type ApprovalPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
+export interface ApprovalAttachment {
+  id: string;
+  fileName: string;
+  fileSize: string;
+  fileType: string;
+  fileUrl: string;
+  uploadedAt: string;
+}
+
+export interface ApprovalRemarkHistory {
+  id: string;
+  actionByUserId: string;
+  actionByUserName: string;
+  actionByUserRole: UserRole;
+  office: ApprovalOfficeType;
+  action: ApprovalStatus | 'COMMENTED';
+  remarks: string;
+  timestamp: string;
+}
+
+export interface ApprovalRequest {
+  id: string;
+  requestNo: string;
+  applicantId: string;
+  applicantName: string;
+  applicantRole: UserRole;
+  applicantEmail: string;
+  applicantPhone?: string;
+  applicantEnrollmentOrEmpId?: string;
+  departmentId?: string;
+  instituteId?: string;
+  
+  category: ApprovalRequestCategory;
+  title: string;
+  description: string;
+  priority: ApprovalPriority;
+  
+  targetOffice: ApprovalOfficeType;
+  currentOffice: ApprovalOfficeType;
+  
+  status: ApprovalStatus;
+  deadlineDate: string;
+  
+  attachments: ApprovalAttachment[];
+  remarksHistory: ApprovalRemarkHistory[];
+  
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
+
 
 

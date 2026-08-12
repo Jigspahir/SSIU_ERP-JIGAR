@@ -13,7 +13,7 @@ export const ExamCellWorkspacePage: React.FC = () => {
   const students = db.getStudents();
 
   const approvedForms = forms.filter(f => f.status === 'APPROVED');
-  const pendingForms = forms.filter(f => f.status === 'PENDING_ADMIN_APPROVAL' || f.status === 'PENDING_HOD_APPROVAL');
+  const pendingForms = forms.filter(f => f.status === 'VERIFICATION_PENDING' || f.status === 'SUBMITTED');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -51,7 +51,7 @@ export const ExamCellWorkspacePage: React.FC = () => {
                 <th>Student Name</th>
                 <th>Enrollment No</th>
                 <th>Fee Payment</th>
-                <th>HOD Approval</th>
+                <th>Attendance Eligibility</th>
                 <th>Final Status</th>
               </tr>
             </thead>
@@ -62,7 +62,7 @@ export const ExamCellWorkspacePage: React.FC = () => {
                   <td>{f.studentName}</td>
                   <td>{f.enrollmentNo}</td>
                   <td><Badge variant={f.paymentStatus === 'PAID' ? 'active' : 'danger'}>{f.paymentStatus}</Badge></td>
-                  <td><Badge variant={f.hodApproved ? 'active' : 'warning'}>{f.hodApproved ? 'APPROVED' : 'PENDING'}</Badge></td>
+                  <td><Badge variant={f.isEligible !== false ? 'active' : 'danger'}>{f.isEligible !== false ? 'ELIGIBLE' : 'SHORT ATTENDANCE'}</Badge></td>
                   <td>
                     <Badge variant={f.status === 'APPROVED' ? 'active' : f.status === 'REJECTED' ? 'danger' : 'warning'}>
                       {f.status}
