@@ -21,7 +21,7 @@ export const StudentDocumentsSection: React.FC<StudentDocumentsSectionProps> = (
   if (!student) return null;
 
   const { user, role } = useAuth();
-  const isAdmin = role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'PRINCIPAL' || role === 'HOD';
+  const isAdmin = role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'REGISTRAR' || role === 'STUDENT_SECTION' || role === 'PRINCIPAL' || role === 'HOD';
   const isStudent = role === 'STUDENT';
 
   const [documents, setDocuments] = useState<StudentDocument[]>([]);

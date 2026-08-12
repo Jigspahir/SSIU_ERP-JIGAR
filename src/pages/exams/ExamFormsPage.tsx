@@ -310,7 +310,7 @@ IMPORTANT INSTRUCTIONS FOR CANDIDATE:
             </select>
           </div>
 
-          {(role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') && (
+          {(role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'EXAM_CELL' || role === 'REGISTRAR') && (
             <div style={{ position: 'relative', width: '260px' }}>
               <input 
                 type="text" 
@@ -517,7 +517,7 @@ IMPORTANT INSTRUCTIONS FOR CANDIDATE:
       )}
 
       {/* ADMIN EXAMINATION APPLICATIONS DIRECTORY */}
-      {(role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') && (
+      {(role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'EXAM_CELL' || role === 'REGISTRAR') && (
         <div className="card" style={{ padding: '1.5rem' }}>
           <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '1.25rem' }}>
             Submitted Exam Applications Directory ({currentExam?.name})

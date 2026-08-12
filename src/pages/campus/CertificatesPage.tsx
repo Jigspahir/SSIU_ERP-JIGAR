@@ -188,7 +188,7 @@ This document is electronically verified by Swarrnim University Academic Registr
                         <button onClick={() => handleDownload(cert)} className="btn btn-primary btn-sm">
                           <Download size={14} /> Download Certificate
                         </button>
-                      ) : (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'PRINCIPAL') ? (
+                      ) : (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'REGISTRAR' || role === 'STUDENT_SECTION' || role === 'EXAM_CELL' || role === 'PRINCIPAL') ? (
                         <button onClick={() => handleApproveAndIssue(cert.id)} className="btn btn-active btn-sm">
                           <CheckCircle size={14} /> Approve &amp; Issue
                         </button>

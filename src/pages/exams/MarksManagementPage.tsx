@@ -120,7 +120,7 @@ export const MarksManagementPage: React.FC = () => {
     }
   }
 
-  if (role !== 'SUPER_ADMIN' && role !== 'UNIVERSITY_ADMIN' && role !== 'FACULTY' && role !== 'HOD') {
+  if (role !== 'SUPER_ADMIN' && role !== 'UNIVERSITY_ADMIN' && role !== 'EXAM_CELL' && role !== 'FACULTY' && role !== 'HOD') {
     return <div style={{ padding: '2rem' }}>Unauthorized Access</div>;
   }
 
