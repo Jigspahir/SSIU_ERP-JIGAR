@@ -1002,6 +1002,91 @@ export interface PatentRecord {
   grantedDate?: string;
 }
 
+// ─── HR MANAGEMENT MODULE TYPES ──────────────────────────────────────────
+
+export type EmployeeType = 'FACULTY' | 'ADMIN_STAFF' | 'TECHNICAL_STAFF' | 'SUPPORT_STAFF';
+export type EmployeeStatus = 'ACTIVE' | 'ON_LEAVE' | 'PROBATION' | 'RESIGNED' | 'RELIEVED';
+export type LeaveType = 'CASUAL' | 'MEDICAL' | 'EARNED' | 'DUTY_LEAVE' | 'MATERNITY';
+
+export interface Employee {
+  id: string;
+  employeeId: string; // e.g. "EMP-2024-001"
+  name: string;
+  email: string;
+  phone: string;
+  designation: string;
+  employeeType: EmployeeType;
+  instituteId: string;
+  departmentId: string;
+  joiningDate: string;
+  salary: number; // monthly gross pay
+  bankAccountNo: string;
+  panNo: string;
+  aadhaarNo: string;
+  qualification: string;
+  experienceYears: number;
+  status: EmployeeStatus;
+}
+
+export interface PayrollRecord {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  month: string; // e.g. "August 2026"
+  year: number;
+  basicPay: number;
+  hra: number;
+  da: number;
+  specialAllowance: number;
+  grossSalary: number;
+  pfDeduction: number;
+  taxDeduction: number;
+  netSalary: number;
+  status: 'DRAFT' | 'APPROVED' | 'PAID';
+  paidDate?: string;
+}
+
+export interface EmployeeLeaveApplication {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  departmentId: string;
+  leaveType: LeaveType;
+  startDate: string;
+  endDate: string;
+  totalDays: number;
+  reason: string;
+  status: ApprovalStatus;
+  approvedByUserId?: string;
+  approvedByUserName?: string;
+  appliedDate: string;
+}
+
+export interface PerformanceAppraisal {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  academicYearId: string;
+  teachingRating: number; // out of 5.0
+  researchRating: number; // out of 5.0
+  administrativeRating: number; // out of 5.0
+  overallScore: number; // out of 5.0
+  feedback: string;
+  status: 'DRAFT' | 'SUBMITTED' | 'REVIEWED' | 'APPROVED';
+}
+
+export interface TrainingFdpRecord {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  title: string;
+  organizer: string;
+  startDate: string;
+  endDate: string;
+  certificateUrl?: string;
+  status: 'ATTENDED' | 'COMPLETED' | 'VERIFIED';
+}
+
 
 
 

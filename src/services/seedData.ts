@@ -6,7 +6,8 @@ import {
   CRMLead, AdmissionApplication,
   Exam, ExamTimetable, ExamForm, StudentMarks, StudentResult, StudentFeedback, SupportTicket, StudentDocument,
   ERPNotification, InwardOutwardRecord, RegistrarFileMovement, ApprovalRequest, EdpDuty,
-  NaacCriterion, NaacKeyIndicator, NaacMetric, NaacDataSubmission, ResearchProject, PublicationRecord, PatentRecord
+  NaacCriterion, NaacKeyIndicator, NaacMetric, NaacDataSubmission, ResearchProject, PublicationRecord, PatentRecord,
+  Employee, PayrollRecord, EmployeeLeaveApplication, PerformanceAppraisal, TrainingFdpRecord
 } from '../types';
 
 export const initialUniversity: University = {
@@ -2830,6 +2831,152 @@ export const initialNaacDataSubmissions: NaacDataSubmission[] = [
     updatedAt: '2024-03-10'
   }
 ];
+
+// ─── HR MANAGEMENT MODULE SEED DATA ─────────────────────────────────────────
+
+export const initialEmployees: Employee[] = [
+  {
+    id: 'emp-101',
+    employeeId: 'EMP-2024-001',
+    name: 'Demo Faculty 1',
+    email: 'demo.faculty1@ssiu-demo.ac.in',
+    phone: '+91 00000 10002',
+    designation: 'Assistant Professor',
+    employeeType: 'FACULTY',
+    instituteId: 'inst-1',
+    departmentId: 'dept-1',
+    joiningDate: '2021-07-15',
+    salary: 75000,
+    bankAccountNo: 'SBIN00010482910',
+    panNo: 'ABCDE1234F',
+    aadhaarNo: '1234-5678-9012',
+    qualification: 'M.Tech, Ph.D (Pursuing)',
+    experienceYears: 6,
+    status: 'ACTIVE'
+  },
+  {
+    id: 'emp-102',
+    employeeId: 'EMP-2024-002',
+    name: 'Demo HOD 1',
+    email: 'demo.hod1@ssiu-demo.ac.in',
+    phone: '+91 00000 10004',
+    designation: 'Professor & HOD',
+    employeeType: 'FACULTY',
+    instituteId: 'inst-1',
+    departmentId: 'dept-1',
+    joiningDate: '2018-06-01',
+    salary: 135000,
+    bankAccountNo: 'HDFC0002849102',
+    panNo: 'FGHIJ5678K',
+    aadhaarNo: '9876-5432-1098',
+    qualification: 'Ph.D in Computer Engineering',
+    experienceYears: 14,
+    status: 'ACTIVE'
+  },
+  {
+    id: 'emp-103',
+    employeeId: 'EMP-2024-003',
+    name: 'Demo Officer 1',
+    email: 'demo.officer1@ssiu-demo.ac.in',
+    phone: '+91 00000 10007',
+    designation: 'Senior Registrar Officer',
+    employeeType: 'ADMIN_STAFF',
+    instituteId: 'inst-1',
+    departmentId: 'dept-1',
+    joiningDate: '2019-03-10',
+    salary: 95000,
+    bankAccountNo: 'ICIC0003920194',
+    panNo: 'KLMNO9012P',
+    aadhaarNo: '4567-8901-2345',
+    qualification: 'MBA Higher Education Management',
+    experienceYears: 10,
+    status: 'ACTIVE'
+  }
+];
+
+export const initialPayrollRecords: PayrollRecord[] = [
+  {
+    id: 'pay-aug-101',
+    employeeId: 'emp-101',
+    employeeName: 'Demo Faculty 1',
+    month: 'August 2026',
+    year: 2026,
+    basicPay: 45000,
+    hra: 18000,
+    da: 9000,
+    specialAllowance: 3000,
+    grossSalary: 75000,
+    pfDeduction: 5400,
+    taxDeduction: 2500,
+    netSalary: 67100,
+    status: 'PAID',
+    paidDate: '2026-08-01'
+  },
+  {
+    id: 'pay-aug-102',
+    employeeId: 'emp-102',
+    employeeName: 'Demo HOD 1',
+    month: 'August 2026',
+    year: 2026,
+    basicPay: 81000,
+    hra: 32400,
+    da: 16200,
+    specialAllowance: 5400,
+    grossSalary: 135000,
+    pfDeduction: 9720,
+    taxDeduction: 8500,
+    netSalary: 116780,
+    status: 'PAID',
+    paidDate: '2026-08-01'
+  }
+];
+
+export const initialLeaveApplications: EmployeeLeaveApplication[] = [
+  {
+    id: 'lv-101',
+    employeeId: 'emp-101',
+    employeeName: 'Demo Faculty 1',
+    departmentId: 'dept-1',
+    leaveType: 'CASUAL',
+    startDate: '2026-08-20',
+    endDate: '2026-08-21',
+    totalDays: 2,
+    reason: 'Attending IEEE International Conference on AI Architecture as Speaker',
+    status: 'APPROVED',
+    approvedByUserName: 'Demo HOD 1',
+    appliedDate: '2026-08-10'
+  }
+];
+
+export const initialPerformanceAppraisals: PerformanceAppraisal[] = [
+  {
+    id: 'pbas-2024-101',
+    employeeId: 'emp-101',
+    employeeName: 'Demo Faculty 1',
+    academicYearId: 'ay-2024',
+    teachingRating: 4.8,
+    researchRating: 4.6,
+    administrativeRating: 4.7,
+    overallScore: 4.70,
+    feedback: 'Exceptional teaching performance, high student rating & Scopus paper publication.',
+    status: 'APPROVED'
+  }
+];
+
+export const initialTrainingFdpRecords: TrainingFdpRecord[] = [
+  {
+    id: 'fdp-101',
+    employeeId: 'emp-101',
+    employeeName: 'Demo Faculty 1',
+    title: 'AICTE Training & Learning (ATAL) FDP on Generative AI & Deep Learning',
+    organizer: 'IIT Gandhinagar & AICTE',
+    startDate: '2024-01-10',
+    endDate: '2024-01-15',
+    certificateUrl: 'https://swarrnim.edu.in/docs/FDP_AICTE_Cert.pdf',
+    status: 'VERIFIED'
+  }
+];
+
 
 
 

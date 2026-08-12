@@ -38,6 +38,7 @@ import { EdpDutyPage } from './pages/campus/EdpDutyPage';
 
 // Fees & Finance Module Page
 import { FeesFinancePage } from './pages/finance/FeesFinancePage';
+import { HRManagementPage } from './pages/hr/HRManagementPage';
 
 // CRM & Admissions Module Page
 import { CRMPage } from './pages/crm/CRMPage';
@@ -152,6 +153,8 @@ const MainAppContent: React.FC = () => {
         return <Dashboard setActiveTab={setActiveTab} />;
       case 'fees':
         return <FeesFinancePage />;
+      case 'hr':
+        return <HRManagementPage />;
       case 'crm':
         return <CRMPage />;
       case 'reports':

@@ -55,6 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     // Finance & Documents
     'fees': { id: 'fees', label: 'Fees', icon: IndianRupee, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'STUDENT'], category: 'Finance & Admin' },
+    'hr': { id: 'hr', label: 'HR & Staff', icon: Users2, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'REGISTRAR', 'IQAC'], category: 'Finance & Admin' },
     'crm': { id: 'crm', label: 'Documents', icon: FolderCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Finance & Admin' },
     'certificates': { id: 'certificates', label: 'Certificates', icon: Award, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'STUDENT'], category: 'Finance & Admin' },
     'requests': { id: 'requests', label: 'Requests Desk', icon: CheckSquare, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN'], category: 'Finance & Admin' },

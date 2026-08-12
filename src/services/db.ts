@@ -8,7 +8,8 @@ import type {
   Exam, ExamTimetable, ExamForm, StudentMarks, StudentResult, StudentFeedback, SupportTicket, StudentDocument,
   ERPNotification, UserRole, InwardOutwardRecord, RegistrarFileMovement, ApprovalRequest, ApprovalOfficeType, ApprovalStatus,
   EdpDuty, EdpDutyEvidence, EdpDutyStatus,
-  NaacCriterion, NaacKeyIndicator, NaacMetric, NaacDataSubmission, ResearchProject, PublicationRecord, PatentRecord
+  NaacCriterion, NaacKeyIndicator, NaacMetric, NaacDataSubmission, ResearchProject, PublicationRecord, PatentRecord,
+  Employee, PayrollRecord, EmployeeLeaveApplication, PerformanceAppraisal, TrainingFdpRecord
 } from '../types';
 import { 
   initialUniversity, initialInstitutes, initialDepartments, initialPrograms, initialAcademicYears, 
@@ -23,7 +24,8 @@ import {
   initialERPNotifications, initialInwardOutwardRecords, initialRegistrarFileMovements, initialApprovalRequests,
   initialEdpDuties,
   initialNaacCriteria, initialNaacKeyIndicators, initialNaacMetrics, initialNaacDataSubmissions,
-  initialResearchProjects, initialPublicationRecords, initialPatentRecords
+  initialResearchProjects, initialPublicationRecords, initialPatentRecords,
+  initialEmployees, initialPayrollRecords, initialLeaveApplications, initialPerformanceAppraisals, initialTrainingFdpRecords
 } from './seedData';
 import { DB_STORAGE_KEY } from '../constants';
 
@@ -72,6 +74,11 @@ export interface DatabaseState {
   researchProjects: ResearchProject[];
   publications: PublicationRecord[];
   patents: PatentRecord[];
+  employees: Employee[];
+  payrollRecords: PayrollRecord[];
+  leaveApplications: EmployeeLeaveApplication[];
+  performanceAppraisals: PerformanceAppraisal[];
+  trainingFdpRecords: TrainingFdpRecord[];
 }
 
 class ERPDatabaseService {
@@ -127,7 +134,12 @@ class ERPDatabaseService {
       naacSubmissions: initialNaacDataSubmissions,
       researchProjects: initialResearchProjects,
       publications: initialPublicationRecords,
-      patents: initialPatentRecords
+      patents: initialPatentRecords,
+      employees: initialEmployees,
+      payrollRecords: initialPayrollRecords,
+      leaveApplications: initialLeaveApplications,
+      performanceAppraisals: initialPerformanceAppraisals,
+      trainingFdpRecords: initialTrainingFdpRecords
     };
   }
 
@@ -1235,6 +1247,59 @@ class ERPDatabaseService {
           erpSummary: 'Connected SSIU ERP Central Relational Database'
         };
     }
+  }
+
+  // ─── HR MANAGEMENT METHODS ───────────────────────────────────────────────
+  getEmployees(): Employee[] {
+    return this.state.employees || initialEmployees;
+  }
+
+  getEmployeeById(id: string): Employee | undefined {
+    return (this.state.employees || initialEmployees).find(e => e.id === id);
+  }
+
+  getPayrollRecords(): PayrollRecord[] {
+    return this.state.payrollRecords || initialPayrollRecords;
+  }
+
+  getEmployeeLeaveApplications(): EmployeeLeaveApplication[] {
+    return this.state.leaveApplications || initialLeaveApplications;
+  }
+
+  getPerformanceAppraisals(): PerformanceAppraisal[] {
+    return this.state.performanceAppraisals || initialPerformanceAppraisals;
+  }
+
+  getTrainingFdpRecords(): TrainingFdpRecord[] {
+    return this.state.trainingFdpRecords || initialTrainingFdpRecords;
+  }
+
+  submitEmployeeLeave(leaveData: Omit<EmployeeLeaveApplication, 'id' | 'appliedDate' | 'status'>, user: User): EmployeeLeaveApplication {
+    if (!this.state.leaveApplications) this.state.leaveApplications = [];
+    const newLeave: EmployeeLeaveApplication = {
+      ...leaveData,
+      id: `lv-${Date.now()}`,
+      status: 'SUBMITTED',
+      appliedDate: new Date().toISOString().split('T')[0]
+    };
+    this.state.leaveApplications.unshift(newLeave);
+    this.saveState();
+
+    this.logAudit('SUBMIT_LEAVE', 'HR Management', `Leave applied by ${user.name} for ${newLeave.totalDays} days`, user.name, user.role);
+    return newLeave;
+  }
+
+  approveEmployeeLeave(leaveId: string, approverUser: User, status: ApprovalStatus): void {
+    if (!this.state.leaveApplications) return;
+    const lv = this.state.leaveApplications.find(l => l.id === leaveId);
+    if (!lv) return;
+
+    lv.status = status;
+    lv.approvedByUserId = approverUser.id;
+    lv.approvedByUserName = approverUser.name;
+    this.saveState();
+
+    this.logAudit('APPROVE_LEAVE', 'HR Management', `Updated leave ${lv.id} status to ${status}`, approverUser.name, approverUser.role);
   }
 }
 
