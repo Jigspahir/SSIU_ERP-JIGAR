@@ -163,12 +163,34 @@ export const LoginPage: React.FC = () => {
           <HeaderLogo />
           
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: '520px', margin: '2rem 0' }}>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                backgroundColor: 'rgba(245, 166, 35, 0.15)',
+                border: '1px solid rgba(245, 166, 35, 0.4)',
+                color: 'var(--brand-gold)',
+                fontSize: '0.8125rem',
+                fontWeight: 800,
+                padding: '0.4rem 0.9rem',
+                borderRadius: 'var(--radius-full)',
+                letterSpacing: '0.5px',
+                textTransform: 'uppercase',
+                alignSelf: 'flex-start',
+                marginBottom: '1.25rem'
+              }}
+            >
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#F5A623', boxShadow: '0 0 8px #F5A623' }}></span>
+              <span>⚡ INTERACTIVE DEMO MODE ACTIVE</span>
+            </div>
+
             <h2 style={{ fontSize: '2.65rem', fontWeight: 900, color: '#FFFFFF', lineHeight: 1.15, letterSpacing: '-0.5px' }}>
               Empowering <span style={{ color: 'var(--brand-gold)' }}>Innovation</span> &amp; Academic Excellence
             </h2>
 
             <p style={{ fontSize: '1rem', color: '#94A3B8', marginTop: '1.25rem', lineHeight: 1.6 }}>
-              Welcome to Swarrnim Startup &amp; Innovation University ERP. Authenticate with your valid User ID and password to access your role-based dashboard.
+              Welcome to Swarrnim Startup &amp; Innovation University ERP. This system is running in <strong>Interactive Demo Mode</strong> with isolated sandbox data. Use the 1-click role logins below to explore all ERP workflows end-to-end.
             </p>
           </div>
         </div>

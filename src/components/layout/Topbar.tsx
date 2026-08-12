@@ -95,6 +95,28 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab, mobileO
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {/* DEMO MODE Indicator Badge */}
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            backgroundColor: 'rgba(245, 166, 35, 0.12)',
+            border: '1px solid rgba(245, 166, 35, 0.4)',
+            color: '#D97706',
+            fontSize: '0.75rem',
+            fontWeight: 800,
+            padding: '0.35rem 0.75rem',
+            borderRadius: 'var(--radius-full)',
+            letterSpacing: '0.5px',
+            textTransform: 'uppercase'
+          }}
+          title="DEMO MODE ACTIVE — Isolated Dummy Sandbox Data"
+        >
+          <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#F5A623', boxShadow: '0 0 6px #F5A623' }}></span>
+          <span>⚡ DEMO MODE</span>
+        </div>
+
         {/* Static Read-Only Active Role Indicator */}
         <div
           className="topbar-role-badge"

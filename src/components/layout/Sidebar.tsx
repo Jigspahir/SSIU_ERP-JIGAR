@@ -198,13 +198,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              transition: 'background var(--transition-fast)'
+              transition: 'all var(--transition-fast)'
             }}
-            title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+            title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
           >
             {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
         </div>
+
+        {!collapsed && (
+          <div
+            style={{
+              margin: '0.6rem 1.25rem 0.2rem 1.25rem',
+              padding: '0.35rem 0.75rem',
+              backgroundColor: 'rgba(245,166,35,0.12)',
+              border: '1px solid rgba(245,166,35,0.3)',
+              borderRadius: 'var(--radius-full)',
+              color: 'var(--brand-gold)',
+              fontSize: '0.6875rem',
+              fontWeight: 800,
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.4rem'
+            }}
+          >
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#F5A623', boxShadow: '0 0 6px #F5A623' }}></span>
+            <span>⚡ DEMO MODE ACTIVE</span>
+          </div>
+        )}
 
         <div style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '1rem 0.5rem' : '1.25rem 1rem' }}>
           {categories.map(cat => {
