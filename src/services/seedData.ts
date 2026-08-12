@@ -1,5 +1,5 @@
 import { 
-  Institute, Department, Program, AcademicYear, Batch, Semester, Division, Subject, 
+  University, Institute, Department, Program, AcademicYear, Batch, Semester, Division, Subject, 
   Faculty, Student, User, AuditLog, AttendanceSession, TimetableEntry, 
   SessionPlanTopic, UnitMaterial, Assignment, AssignmentSubmission, AcademicCalendarEvent,
   FeeStructure, StudentFeeRecord, FeePaymentTransaction,
@@ -8,11 +8,28 @@ import {
   ERPNotification, InwardOutwardRecord, RegistrarFileMovement, ApprovalRequest, EdpDuty
 } from '../types';
 
+export const initialUniversity: University = {
+  id: 'univ-ssiu',
+  code: 'SSIU',
+  name: 'Swarrnim Startup & Innovation University',
+  tagline: 'Where Ideas Become Reality • First Innovation University of India',
+  establishedYear: 2017,
+  chancellorName: 'Shri Risabh Jain',
+  viceChancellorName: 'Dr. K. L. Shivaprasad',
+  registrarName: 'Demo Registrar 1',
+  location: 'Gandhinagar, Gujarat',
+  address: 'Bhuyan Rathod, Opposite IFFCO, Near Adalaj Flyover, Gandhinagar - Ahmedabad Highway, Gujarat 382421',
+  email: 'registrar@swarrnim.edu.in',
+  phone: '+91 79 2328 1000',
+  website: 'https://swarrnim.edu.in'
+};
+
 export const initialInstitutes: Institute[] = [
   {
     id: 'inst-1',
     code: 'SSCIT',
     name: 'Swarrnim School of Computer & IT',
+    universityId: 'univ-ssiu',
     type: 'Engineering',
     establishedYear: 2017,
     principalName: 'Demo Principal',
@@ -617,6 +634,60 @@ export const initialStudents: Student[] = [
     mentorId: 'fac-1',
     abcId: '9842-1056-7890',
     abcIdStatus: 'VERIFIED',
+    academicLifecycleStatus: 'PURSUING',
+    academicHistory: [
+      {
+        id: 'hist-stu1-sem1',
+        academicYearId: 'ay-2023',
+        academicYearName: '2023-2024',
+        semesterId: 'sem-cse-1',
+        semesterNumber: 1,
+        batchId: 'batch-2023-2027',
+        divisionId: 'div-cse-1a',
+        divisionName: 'Division A',
+        spi: 8.4,
+        cpi: 8.4,
+        attendancePercentage: 92,
+        feeClearanceStatus: 'CLEARED',
+        status: 'PROMOTED',
+        completedDate: '2023-12-20',
+        remarks: 'Semester 1 completed with First Class Distinction'
+      },
+      {
+        id: 'hist-stu1-sem2',
+        academicYearId: 'ay-2023',
+        academicYearName: '2023-2024',
+        semesterId: 'sem-cse-2',
+        semesterNumber: 2,
+        batchId: 'batch-2023-2027',
+        divisionId: 'div-cse-2a',
+        divisionName: 'Division A',
+        spi: 8.7,
+        cpi: 8.55,
+        attendancePercentage: 89,
+        feeClearanceStatus: 'CLEARED',
+        status: 'PROMOTED',
+        completedDate: '2024-05-18',
+        remarks: 'Semester 2 completed successfully'
+      },
+      {
+        id: 'hist-stu1-sem3',
+        academicYearId: 'ay-2024',
+        academicYearName: '2024-2025',
+        semesterId: 'sem-cse-3',
+        semesterNumber: 3,
+        batchId: 'batch-2023-2027',
+        divisionId: 'div-cse-3a',
+        divisionName: 'Division A',
+        spi: 8.9,
+        cpi: 8.66,
+        attendancePercentage: 94,
+        feeClearanceStatus: 'CLEARED',
+        status: 'PROMOTED',
+        completedDate: '2024-12-15',
+        remarks: 'Semester 3 completed with Outstanding Honors'
+      }
+    ],
     status: 'ACTIVE'
   },
   {
@@ -643,6 +714,41 @@ export const initialStudents: Student[] = [
     mentorId: 'fac-1',
     abcId: '8712-4509-3321',
     abcIdStatus: 'PENDING_VERIFICATION',
+    academicLifecycleStatus: 'PURSUING',
+    academicHistory: [
+      {
+        id: 'hist-stu2-sem1',
+        academicYearId: 'ay-2023',
+        academicYearName: '2023-2024',
+        semesterId: 'sem-cse-1',
+        semesterNumber: 1,
+        batchId: 'batch-2023-2027',
+        divisionId: 'div-cse-1a',
+        divisionName: 'Division A',
+        spi: 8.1,
+        cpi: 8.1,
+        attendancePercentage: 86,
+        feeClearanceStatus: 'CLEARED',
+        status: 'PROMOTED',
+        completedDate: '2023-12-20'
+      },
+      {
+        id: 'hist-stu2-sem2',
+        academicYearId: 'ay-2023',
+        academicYearName: '2023-2024',
+        semesterId: 'sem-cse-2',
+        semesterNumber: 2,
+        batchId: 'batch-2023-2027',
+        divisionId: 'div-cse-2a',
+        divisionName: 'Division A',
+        spi: 8.4,
+        cpi: 8.25,
+        attendancePercentage: 88,
+        feeClearanceStatus: 'CLEARED',
+        status: 'PROMOTED',
+        completedDate: '2024-05-18'
+      }
+    ],
     status: 'ACTIVE'
   },
   {
@@ -667,6 +773,25 @@ export const initialStudents: Student[] = [
     guardianName: 'Demo Guardian 3',
     guardianPhone: '+91 00000 30003',
     mentorId: 'fac-2',
+    academicLifecycleStatus: 'PURSUING',
+    academicHistory: [
+      {
+        id: 'hist-stu3-sem1',
+        academicYearId: 'ay-2023',
+        academicYearName: '2023-2024',
+        semesterId: 'sem-cse-1',
+        semesterNumber: 1,
+        batchId: 'batch-2023-2027',
+        divisionId: 'div-cse-1b',
+        divisionName: 'Division B',
+        spi: 7.8,
+        cpi: 7.8,
+        attendancePercentage: 82,
+        feeClearanceStatus: 'CLEARED',
+        status: 'PROMOTED',
+        completedDate: '2023-12-20'
+      }
+    ],
     status: 'ACTIVE'
   },
   {
@@ -691,6 +816,8 @@ export const initialStudents: Student[] = [
     guardianName: 'Demo Guardian 4',
     guardianPhone: '+91 00000 30004',
     mentorId: 'fac-1',
+    academicLifecycleStatus: 'ADMITTED',
+    academicHistory: [],
     status: 'ACTIVE'
   }
 ];

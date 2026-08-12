@@ -34,10 +34,27 @@ export interface User {
   createdAt: string;
 }
 
+export interface University {
+  id: string;
+  code: string;
+  name: string;
+  tagline?: string;
+  establishedYear: number;
+  chancellorName: string;
+  viceChancellorName: string;
+  registrarName: string;
+  location: string;
+  address: string;
+  email: string;
+  phone: string;
+  website: string;
+}
+
 export interface Institute {
   id: string;
   code: string;
   name: string;
+  universityId?: string;
   type: 'Engineering' | 'Management' | 'Design' | 'Architecture' | 'Pharmacy' | 'Science' | 'Other';
   principalName?: string;
   principalId?: string;
@@ -123,6 +140,8 @@ export interface Subject {
   credits: number;
   theoryHoursPerWeek: number;
   labHoursPerWeek: number;
+  assignedFacultyId?: string;
+  enrolledStudentIds?: string[];
   status: 'ACTIVE' | 'INACTIVE';
 }
 
@@ -145,6 +164,24 @@ export interface Faculty {
   experienceYears: number;
   subjectIds: string[];
   status: 'ACTIVE' | 'ON_LEAVE' | 'INACTIVE';
+}
+
+export interface StudentAcademicHistoryRecord {
+  id: string;
+  academicYearId: string;
+  academicYearName: string;
+  semesterId: string;
+  semesterNumber: number;
+  batchId: string;
+  divisionId: string;
+  divisionName?: string;
+  spi?: number;
+  cpi?: number;
+  attendancePercentage?: number;
+  feeClearanceStatus?: 'CLEARED' | 'PENDING' | 'WAIVED';
+  status: 'COMPLETED' | 'PROMOTED' | 'DETAINED';
+  completedDate: string;
+  remarks?: string;
 }
 
 export interface Student {
@@ -173,6 +210,8 @@ export interface Student {
   abcIdStatus?: 'NOT_SUBMITTED' | 'PENDING_VERIFICATION' | 'VERIFIED' | 'REJECTED';
   abcIdDocUrl?: string;
   abcIdRemarks?: string;
+  academicHistory?: StudentAcademicHistoryRecord[];
+  academicLifecycleStatus?: 'ADMITTED' | 'PURSUING' | 'GRADUATED' | 'ALUMNI';
   status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'GRADUATED';
 }
 

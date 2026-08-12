@@ -1,6 +1,6 @@
 import type { 
-  Institute, Department, Program, AcademicYear, Batch, 
-  Semester, Division, Subject, Faculty, Student, User, AuditLog,
+  University, Institute, Department, Program, AcademicYear, Batch, 
+  Semester, Division, Subject, Faculty, Student, StudentAcademicHistoryRecord, User, AuditLog,
   AttendanceSession, TimetableEntry, SessionPlanTopic, UnitMaterial,
   Assignment, AssignmentSubmission, AcademicCalendarEvent,
   FeeStructure, StudentFeeRecord, FeePaymentTransaction,
@@ -10,7 +10,7 @@ import type {
   EdpDuty, EdpDutyEvidence, EdpDutyStatus
 } from '../types';
 import { 
-  initialInstitutes, initialDepartments, initialPrograms, initialAcademicYears, 
+  initialUniversity, initialInstitutes, initialDepartments, initialPrograms, initialAcademicYears, 
   initialBatches, initialSemesters, initialDivisions, initialSubjects, 
   initialFaculty, initialStudents, initialUsers, initialAuditLogs,
   initialAttendanceSessions, initialTimetableEntries, initialSessionPlanTopics,
@@ -954,6 +954,78 @@ class ERPDatabaseService {
     });
 
     this.logAudit('VERIFY_EDP_DUTY', 'EDP Duty', `Verified EDP duty ${duty.dutyCode} as ${status}`, adminUser.name, adminUser.role);
+  }
+
+  // ─── Academic Lifecycle Architecture Helpers ─────────────────────────────────
+  getUniversity(): University {
+    return initialUniversity;
+  }
+
+  getStudentAcademicTimeline(studentId: string): StudentAcademicHistoryRecord[] {
+    const student = this.state.students.find(s => s.id === studentId);
+    return student?.academicHistory || [];
+  }
+
+  getFacultySubjects(facultyId: string): Subject[] {
+    const fac = this.state.faculty.find(f => f.id === facultyId);
+    if (!fac || !fac.subjectIds) return [];
+    return this.state.subjects.filter(s => fac.subjectIds.includes(s.id));
+  }
+
+  getSubjectStudents(subjectId: string): Student[] {
+    const subject = this.state.subjects.find(s => s.id === subjectId);
+    if (!subject) return [];
+    return this.state.students.filter(s => s.semesterId === subject.semesterId && s.programId === subject.programId);
+  }
+
+  promoteStudentSemester(
+    studentId: string,
+    nextSemesterId: string,
+    nextDivisionId: string,
+    termEndSPI?: number
+  ): Student | null {
+    const student = this.state.students.find(s => s.id === studentId);
+    if (!student) return null;
+
+    const currentSem = this.state.semesters.find(s => s.id === student.semesterId);
+    const currentAY = this.state.academicYears.find(a => a.id === student.academicYearId);
+    const nextSem = this.state.semesters.find(s => s.id === nextSemesterId);
+    const div = this.state.divisions.find(d => d.id === student.divisionId);
+
+    // Create immutable historical record of completed semester
+    const historyRecord: StudentAcademicHistoryRecord = {
+      id: `hist-${student.id}-sem${currentSem?.number || Date.now()}`,
+      academicYearId: student.academicYearId || 'ay-2024',
+      academicYearName: currentAY?.name || '2024-2025',
+      semesterId: student.semesterId,
+      semesterNumber: currentSem?.number || 1,
+      batchId: student.batchId,
+      divisionId: student.divisionId,
+      divisionName: div?.name || 'Division A',
+      spi: termEndSPI || 8.0,
+      attendancePercentage: 88,
+      feeClearanceStatus: 'CLEARED',
+      status: 'PROMOTED',
+      completedDate: new Date().toISOString().split('T')[0],
+      remarks: `Promoted from Semester ${currentSem?.number || 1} to Semester ${nextSem?.number || 2}`
+    };
+
+    if (!student.academicHistory) {
+      student.academicHistory = [];
+    }
+    student.academicHistory.push(historyRecord);
+
+    // Update current active semester pointers
+    student.semesterId = nextSemesterId;
+    student.divisionId = nextDivisionId;
+    if (nextSem?.academicYearId) {
+      student.academicYearId = nextSem.academicYearId;
+    }
+    student.academicLifecycleStatus = nextSem && nextSem.number > 8 ? 'GRADUATED' : 'PURSUING';
+
+    this.saveState();
+    this.logAudit('PROMOTE_STUDENT', 'Academic Lifecycle', `Promoted ${student.name} (${student.enrollmentNo}) to Semester ${nextSem?.number || 'Next'}`);
+    return student;
   }
 }
 
