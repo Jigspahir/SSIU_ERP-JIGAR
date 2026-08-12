@@ -7,7 +7,8 @@ import {
   Exam, ExamTimetable, ExamForm, StudentMarks, StudentResult, StudentFeedback, SupportTicket, StudentDocument,
   ERPNotification, InwardOutwardRecord, RegistrarFileMovement, ApprovalRequest, EdpDuty,
   NaacCriterion, NaacKeyIndicator, NaacMetric, NaacDataSubmission, ResearchProject, PublicationRecord, PatentRecord,
-  Employee, PayrollRecord, EmployeeLeaveApplication, PerformanceAppraisal, TrainingFdpRecord
+  Employee, PayrollRecord, EmployeeLeaveApplication, PerformanceAppraisal, TrainingFdpRecord,
+  StartupIdea, StartupFounder, StartupFunding, IncubationMentorSession, IncubationWorkshop
 } from '../types';
 
 export const initialUniversity: University = {
@@ -2977,7 +2978,340 @@ export const initialTrainingFdpRecords: TrainingFdpRecord[] = [
   }
 ];
 
+// ─── INCUBATION & STARTUP MANAGEMENT SEED DATA ───────────────────────────────
 
+export const initialStartupFounders: StartupFounder[] = [
+  {
+    id: 'founder-001',
+    name: 'DEMO Student 1',
+    email: 'demo.student1@ssiu-demo.ac.in',
+    phone: '+91 00000 10001',
+    role: 'STUDENT',
+    studentId: 'stu-1',
+    programId: 'prog-1',
+    departmentId: 'dept-1',
+    instituteId: 'inst-1'
+  },
+  {
+    id: 'founder-002',
+    name: 'DEMO Student 2',
+    email: 'demo.student2@ssiu-demo.ac.in',
+    phone: '+91 00000 10002',
+    role: 'STUDENT',
+    studentId: 'stu-2',
+    programId: 'prog-1',
+    departmentId: 'dept-1',
+    instituteId: 'inst-1'
+  },
+  {
+    id: 'founder-003',
+    name: 'Demo Faculty 1',
+    email: 'demo.faculty1@ssiu-demo.ac.in',
+    phone: '+91 00000 10004',
+    role: 'FACULTY',
+    facultyId: 'fac-1',
+    departmentId: 'dept-1',
+    instituteId: 'inst-1',
+    designation: 'Assistant Professor'
+  }
+];
 
+export const initialStartupIdeas: StartupIdea[] = [
+  {
+    id: 'startup-001',
+    ideaCode: 'IDEA-2024-001',
+    title: 'DEMO - EduReach AI Adaptive Learning Platform',
+    description: 'DEMO startup: An AI-powered adaptive learning platform that personalizes curriculum delivery for rural students with low-bandwidth connectivity.',
+    problemStatement: 'Rural students lack access to quality personalized education due to limited internet bandwidth and one-size-fits-all curriculum.',
+    proposedSolution: 'Offline-first AI engine that downloads personalized micro-content based on learning gaps, syncs when connectivity is available.',
+    targetMarket: 'Rural K-12 students, government schools, NGO partners across Gujarat and Rajasthan',
+    sector: 'EDTECH',
+    stage: 'MVP',
+    founderIds: ['founder-001', 'founder-002'],
+    leadFounderId: 'founder-001',
+    instituteId: 'inst-1',
+    departmentId: 'dept-1',
+    registeredDate: '2024-01-15',
+    status: 'INCUBATING',
+    applicationStatus: 'INCUBATING',
+    screeningScore: 88,
+    screeningRemarks: 'Strong technical foundation, well-researched problem statement. Recommended for incubation.',
+    committeeRemarks: 'Approved unanimously. Excellent social impact potential. Assign EdTech domain mentor.',
+    approvedByUserId: 'user-admin-1',
+    approvedDate: '2024-02-10',
+    mentorId: 'fac-1',
+    mentorName: 'Demo Faculty 1',
+    patentApplicationNo: 'IN-2024-PA-00782',
+    patentStatus: 'FILED',
+    hasPrototype: true,
+    hasProduct: true,
+    fundingReceived: 500000,
+    totalInvestment: 750000,
+    annualRevenue: 120000,
+    employeesCount: 4,
+    investorNames: 'Gujarat iHub, SSIP Gujarat',
+    awards: 'SSIU Best Startup 2024, GUJCOST Innovation Award',
+    milestones: [
+      {
+        id: 'ms-001-1',
+        startupId: 'startup-001',
+        title: 'Working Prototype Submission',
+        description: 'Demonstrate offline-first learning module with AI content recommendation',
+        targetDate: '2024-03-31',
+        completedDate: '2024-03-28',
+        status: 'COMPLETED',
+        evidenceUrl: 'https://ssiu-demo.ac.in/incubation/startup-001/prototype-demo.mp4'
+      },
+      {
+        id: 'ms-001-2',
+        startupId: 'startup-001',
+        title: '100 Pilot Student Users',
+        description: 'Onboard 100 students across 2 government schools for pilot testing',
+        targetDate: '2024-06-30',
+        completedDate: '2024-06-15',
+        status: 'COMPLETED'
+      },
+      {
+        id: 'ms-001-3',
+        startupId: 'startup-001',
+        title: 'SSIP Funding Disbursement',
+        description: 'Receive first tranche of SSIP grant funding Rs. 5 Lakhs',
+        targetDate: '2024-09-30',
+        status: 'IN_PROGRESS'
+      },
+      {
+        id: 'ms-001-4',
+        startupId: 'startup-001',
+        title: '1000 Active Users - Revenue Target',
+        description: 'Scale to 1000 paid subscribers generating monthly revenue',
+        targetDate: '2025-03-31',
+        status: 'PENDING'
+      }
+    ],
+    documents: [
+      {
+        id: 'doc-001-1',
+        startupId: 'startup-001',
+        name: 'EduReach AI Pitch Deck v3.0',
+        type: 'PITCH_DECK',
+        uploadedDate: '2024-01-20',
+        fileUrl: 'https://ssiu-demo.ac.in/incubation/startup-001/pitch-deck.pdf',
+        verified: true
+      },
+      {
+        id: 'doc-001-2',
+        startupId: 'startup-001',
+        name: 'Business Plan 2024-2027',
+        type: 'BUSINESS_PLAN',
+        uploadedDate: '2024-01-25',
+        fileUrl: 'https://ssiu-demo.ac.in/incubation/startup-001/business-plan.pdf',
+        verified: true
+      },
+      {
+        id: 'doc-001-3',
+        startupId: 'startup-001',
+        name: 'Patent Application - IN-2024-PA-00782',
+        type: 'IPR_CERT',
+        uploadedDate: '2024-04-05',
+        fileUrl: 'https://ssiu-demo.ac.in/incubation/startup-001/patent.pdf',
+        verified: true
+      }
+    ],
+    createdAt: '2024-01-15',
+    updatedAt: '2024-08-01'
+  },
+  {
+    id: 'startup-002',
+    ideaCode: 'IDEA-2024-002',
+    title: 'DEMO - AgroSense IoT Crop Monitoring System',
+    description: 'DEMO startup: Low-cost IoT sensor network for real-time crop health monitoring, soil moisture analysis, and weather-based irrigation automation for small-scale farmers.',
+    problemStatement: 'Small-scale farmers lack access to precision agriculture technology due to high cost and complexity of existing solutions.',
+    proposedSolution: 'Affordable solar-powered IoT sensor nodes with mobile app integration, providing actionable insights in regional language (Gujarati/Hindi).',
+    targetMarket: 'Small and marginal farmers in Gujarat, Rajasthan, and Madhya Pradesh',
+    sector: 'AGRITECH',
+    stage: 'PROTOTYPE',
+    founderIds: ['founder-002'],
+    leadFounderId: 'founder-002',
+    instituteId: 'inst-1',
+    departmentId: 'dept-1',
+    registeredDate: '2024-03-10',
+    status: 'APPROVED',
+    applicationStatus: 'APPROVED',
+    screeningScore: 82,
+    screeningRemarks: 'Viable AgriTech concept with clear rural impact. Hardware prototype needs refinement.',
+    committeeRemarks: 'Approved. Assign AgriTech/IoT domain mentor. Refer for MSME scheme application.',
+    approvedByUserId: 'user-admin-1',
+    approvedDate: '2024-04-20',
+    mentorId: 'fac-1',
+    mentorName: 'Demo Faculty 1',
+    patentStatus: 'NONE',
+    hasPrototype: true,
+    hasProduct: false,
+    fundingReceived: 200000,
+    totalInvestment: 200000,
+    annualRevenue: 0,
+    employeesCount: 2,
+    awards: 'SSIU Innovation Challenge Runner-Up 2024',
+    milestones: [
+      {
+        id: 'ms-002-1',
+        startupId: 'startup-002',
+        title: 'IoT Sensor Node Prototype',
+        description: 'Build and test first working IoT sensor node with soil moisture and temperature sensors',
+        targetDate: '2024-05-31',
+        completedDate: '2024-05-28',
+        status: 'COMPLETED'
+      },
+      {
+        id: 'ms-002-2',
+        startupId: 'startup-002',
+        title: 'Field Pilot with 5 Farmers',
+        description: 'Deploy sensor nodes in 5 farmer fields for 60-day pilot validation',
+        targetDate: '2024-08-31',
+        status: 'IN_PROGRESS'
+      }
+    ],
+    documents: [
+      {
+        id: 'doc-002-1',
+        startupId: 'startup-002',
+        name: 'AgroSense Pitch Deck',
+        type: 'PITCH_DECK',
+        uploadedDate: '2024-03-15',
+        verified: true
+      }
+    ],
+    createdAt: '2024-03-10',
+    updatedAt: '2024-07-15'
+  },
+  {
+    id: 'startup-003',
+    ideaCode: 'IDEA-2024-003',
+    title: 'DEMO - MedConnect Telemedicine Platform',
+    description: 'DEMO startup: Telemedicine platform connecting rural patients with specialist doctors via video consultation, with AI-assisted preliminary symptom analysis.',
+    problemStatement: 'Rural patients travel 50-100 km to access specialist doctors, resulting in delayed diagnosis and high healthcare costs.',
+    proposedSolution: 'WhatsApp-integrated telemedicine with AI triage bot, supporting vernacular voice input for elderly and less-literate patients.',
+    targetMarket: 'Rural patients in tier-3 cities and villages, community health centers, district hospitals',
+    sector: 'HEALTHTECH',
+    stage: 'VALIDATION',
+    founderIds: ['founder-003'],
+    leadFounderId: 'founder-003',
+    instituteId: 'inst-1',
+    departmentId: 'dept-1',
+    registeredDate: '2024-05-20',
+    status: 'UNDER_SCREENING',
+    applicationStatus: 'UNDER_SCREENING',
+    patentStatus: 'NONE',
+    hasPrototype: false,
+    hasProduct: false,
+    fundingReceived: 0,
+    totalInvestment: 0,
+    annualRevenue: 0,
+    employeesCount: 1,
+    milestones: [],
+    documents: [
+      {
+        id: 'doc-003-1',
+        startupId: 'startup-003',
+        name: 'MedConnect Business Plan',
+        type: 'BUSINESS_PLAN',
+        uploadedDate: '2024-05-22',
+        verified: false
+      }
+    ],
+    createdAt: '2024-05-20',
+    updatedAt: '2024-05-20'
+  }
+];
 
+export const initialStartupFundings: StartupFunding[] = [
+  {
+    id: 'fund-001',
+    startupId: 'startup-001',
+    startupName: 'DEMO - EduReach AI Adaptive Learning Platform',
+    fundingType: 'SSIP_GOVT',
+    amount: 500000,
+    currency: 'INR',
+    source: 'Student Startup and Innovation Policy (SSIP) - Government of Gujarat',
+    receivedDate: '2024-07-15',
+    status: 'DISBURSED',
+    utilizationReport: 'Rs. 3 Lakhs utilized for AI model development and server costs. Rs. 2 Lakhs for field pilot implementation.'
+  },
+  {
+    id: 'fund-002',
+    startupId: 'startup-002',
+    startupName: 'DEMO - AgroSense IoT Crop Monitoring System',
+    fundingType: 'MSME_SCHEME',
+    amount: 200000,
+    currency: 'INR',
+    source: 'MSME Technology Upgradation Scheme - Govt of India',
+    receivedDate: '2024-06-01',
+    status: 'DISBURSED',
+    utilizationReport: 'Utilized for IoT sensor hardware procurement and PCB manufacturing.'
+  }
+];
 
+export const initialMentorSessions: IncubationMentorSession[] = [
+  {
+    id: 'session-001',
+    startupId: 'startup-001',
+    startupName: 'DEMO - EduReach AI Adaptive Learning Platform',
+    mentorId: 'fac-1',
+    mentorName: 'Demo Faculty 1',
+    sessionDate: '2024-04-10',
+    duration: 90,
+    agenda: 'Business Model Canvas Review, Go-To-Market Strategy for Rural Segment',
+    notes: 'Team has strong technical capabilities. Business model needs more clarity on revenue streams. Subscription + school licensing discussed.',
+    nextSteps: '1. Finalize pricing model. 2. Reach out to 3 NGOs for partnership MOU. 3. Register company as LLP.',
+    rating: 5
+  },
+  {
+    id: 'session-002',
+    startupId: 'startup-001',
+    startupName: 'DEMO - EduReach AI Adaptive Learning Platform',
+    mentorId: 'fac-1',
+    mentorName: 'Demo Faculty 1',
+    sessionDate: '2024-05-15',
+    duration: 60,
+    agenda: 'SSIP Application Review, Financial Projections Validation',
+    notes: 'SSIP application reviewed and refined. Financial projections are realistic for Year 1. Recommended to apply for GUJCOST grant as well.',
+    nextSteps: '1. Submit SSIP application by May 30. 2. Prepare 3-year financial model. 3. Apply for GUJCOST.',
+    rating: 4
+  }
+];
+
+export const initialIncubationWorkshops: IncubationWorkshop[] = [
+  {
+    id: 'ws-001',
+    title: 'DEMO - Design Thinking & Problem Validation Workshop',
+    description: 'Hands-on 2-day workshop on applying Design Thinking methodology for startup idea validation and customer discovery.',
+    date: '2024-02-15',
+    venue: 'SSIU Innovation Lab, Block A, Ground Floor',
+    conductedBy: 'Demo Faculty 1 & Guest Mentor XYZ',
+    topic: 'Design Thinking, Customer Discovery, Problem-Solution Fit',
+    registeredStartupIds: ['startup-001', 'startup-002'],
+    status: 'COMPLETED'
+  },
+  {
+    id: 'ws-002',
+    title: 'DEMO - Intellectual Property Rights (IPR) & Patent Filing Workshop',
+    description: 'Expert session on IP strategy for startups, patent filing process in India, and protecting innovations under TRIPS agreement.',
+    date: '2024-04-20',
+    venue: 'SSIU Seminar Hall, Block B, First Floor',
+    conductedBy: 'Demo IP Attorney 1 (Patent Attorney)',
+    topic: 'Patents, Trademarks, Copyright, IP Strategy for Startups',
+    registeredStartupIds: ['startup-001'],
+    status: 'COMPLETED'
+  },
+  {
+    id: 'ws-003',
+    title: 'DEMO - Startup Fundraising & Investor Pitch Masterclass',
+    description: 'Live pitching session with angel investors and VC representatives. Feedback on pitch decks, valuation concepts, and term sheet basics.',
+    date: '2026-09-15',
+    venue: 'SSIU Auditorium, Main Block',
+    conductedBy: 'Demo Investor 1 (Gujarat Angels Network), Demo VC Partner 1',
+    topic: 'Fundraising, Valuation, Term Sheets, Investor Relations',
+    registeredStartupIds: ['startup-001', 'startup-002'],
+    status: 'UPCOMING'
+  }
+];

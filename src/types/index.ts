@@ -1087,6 +1087,165 @@ export interface TrainingFdpRecord {
   status: 'ATTENDED' | 'COMPLETED' | 'VERIFIED';
 }
 
+// ─── INCUBATION & STARTUP MANAGEMENT MODULE TYPES ────────────────────────────
 
+export type StartupStage =
+  | 'IDEA'
+  | 'VALIDATION'
+  | 'PROTOTYPE'
+  | 'MVP'
+  | 'EARLY_REVENUE'
+  | 'GROWTH'
+  | 'SCALING'
+  | 'GRADUATED'
+  | 'ALUMNI';
 
+export type StartupSector =
+  | 'EDTECH'
+  | 'HEALTHTECH'
+  | 'AGRITECH'
+  | 'FINTECH'
+  | 'CLEAN_ENERGY'
+  | 'MANUFACTURING'
+  | 'IOT_ROBOTICS'
+  | 'AI_ML'
+  | 'SOCIAL_IMPACT'
+  | 'OTHER';
+
+export type IncubationApplicationStatus =
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'UNDER_SCREENING'
+  | 'SCREENED'
+  | 'COMMITTEE_REVIEW'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'INCUBATING'
+  | 'GRADUATED'
+  | 'WITHDRAWN';
+
+export type FundingType =
+  | 'SSIP_GOVT'
+  | 'DST_NIDHI'
+  | 'MSME_SCHEME'
+  | 'ANGEL_INVESTMENT'
+  | 'SEED_FUND'
+  | 'VENTURE_CAPITAL'
+  | 'GRANT'
+  | 'BOOTSTRAP';
+
+export interface StartupFounder {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: 'STUDENT' | 'FACULTY' | 'EXTERNAL';
+  studentId?: string;
+  facultyId?: string;
+  programId?: string;
+  departmentId?: string;
+  instituteId?: string;
+  designation?: string; // For faculty/external founders
+}
+
+export interface StartupIdea {
+  id: string;
+  ideaCode: string; // e.g. "IDEA-2024-001"
+  title: string;
+  description: string;
+  problemStatement: string;
+  proposedSolution: string;
+  targetMarket: string;
+  sector: StartupSector;
+  stage: StartupStage;
+  founderIds: string[];
+  leadFounderId: string;
+  instituteId: string;
+  departmentId: string;
+  registeredDate: string;
+  status: IncubationApplicationStatus;
+  applicationStatus: IncubationApplicationStatus;
+  screeningScore?: number;
+  screeningRemarks?: string;
+  committeeRemarks?: string;
+  approvedByUserId?: string;
+  approvedDate?: string;
+  rejectionReason?: string;
+  mentorId?: string;
+  mentorName?: string;
+  patentApplicationNo?: string;
+  patentStatus?: 'NONE' | 'FILED' | 'PUBLISHED' | 'GRANTED';
+  hasPrototype: boolean;
+  hasProduct: boolean;
+  fundingReceived: number;
+  totalInvestment: number;
+  annualRevenue: number;
+  employeesCount: number;
+  investorNames?: string;
+  awards?: string;
+  milestones: StartupMilestone[];
+  documents: StartupDocument[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StartupMilestone {
+  id: string;
+  startupId: string;
+  title: string;
+  description: string;
+  targetDate: string;
+  completedDate?: string;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE';
+  evidenceUrl?: string;
+}
+
+export interface StartupDocument {
+  id: string;
+  startupId: string;
+  name: string;
+  type: 'PITCH_DECK' | 'BUSINESS_PLAN' | 'PROTOTYPE_VIDEO' | 'IPR_CERT' | 'FUNDING_LETTER' | 'REGISTRATION_CERT' | 'OTHER';
+  uploadedDate: string;
+  fileUrl?: string;
+  verified: boolean;
+}
+
+export interface StartupFunding {
+  id: string;
+  startupId: string;
+  startupName: string;
+  fundingType: FundingType;
+  amount: number;
+  currency: 'INR' | 'USD';
+  source: string;
+  receivedDate: string;
+  status: 'APPLIED' | 'UNDER_REVIEW' | 'APPROVED' | 'DISBURSED' | 'REJECTED';
+  utilizationReport?: string;
+}
+
+export interface IncubationMentorSession {
+  id: string;
+  startupId: string;
+  startupName: string;
+  mentorId: string;
+  mentorName: string;
+  sessionDate: string;
+  duration: number; // minutes
+  agenda: string;
+  notes: string;
+  nextSteps: string;
+  rating?: number; // 1-5 by founder
+}
+
+export interface IncubationWorkshop {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  venue: string;
+  conductedBy: string;
+  topic: string;
+  registeredStartupIds: string[];
+  status: 'UPCOMING' | 'COMPLETED';
+}
 

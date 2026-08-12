@@ -6,7 +6,7 @@ import {
   Layers, Bookmark, Users2, UserCheck, ShieldCheck, 
   ChevronLeft, ChevronRight, User, BookOpen, Clock, FileText, FileCheck, CalendarDays,
   IndianRupee, FolderCheck, BarChart3, Settings, FileSignature, Award, MessageSquare, HelpCircle,
-  Bell, Library, CheckSquare, Send, CalendarCheck, FileSpreadsheet
+  Bell, Library, CheckSquare, Send, CalendarCheck, FileSpreadsheet, Rocket
 } from 'lucide-react';
 import { UserRole } from '../../types';
 
@@ -69,6 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     'notices': { id: 'notices', label: 'Notices', icon: Bell, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Campus' },
     'events': { id: 'events', label: 'Events', icon: CalendarCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Campus' },
     'edp-duties': { id: 'edp-duties', label: 'EDP Duties', icon: CalendarCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN'], category: 'Campus' },
+    'incubation': { id: 'incubation', label: 'Incubation & Startups', icon: Rocket, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC'], category: 'Campus' },
     'library': { id: 'library', label: 'Library', icon: Library, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'LIBRARY_ADMIN'], category: 'Campus' },
     'notifications': { id: 'notifications', label: 'Notifications', icon: Bell, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN'], category: 'Campus' },
 

@@ -9,7 +9,8 @@ import type {
   ERPNotification, UserRole, InwardOutwardRecord, RegistrarFileMovement, ApprovalRequest, ApprovalOfficeType, ApprovalStatus,
   EdpDuty, EdpDutyEvidence, EdpDutyStatus,
   NaacCriterion, NaacKeyIndicator, NaacMetric, NaacDataSubmission, ResearchProject, PublicationRecord, PatentRecord,
-  Employee, PayrollRecord, EmployeeLeaveApplication, PerformanceAppraisal, TrainingFdpRecord
+  Employee, PayrollRecord, EmployeeLeaveApplication, PerformanceAppraisal, TrainingFdpRecord,
+  StartupIdea, StartupFounder, StartupFunding, IncubationMentorSession, IncubationWorkshop, IncubationApplicationStatus
 } from '../types';
 import { 
   initialUniversity, initialInstitutes, initialDepartments, initialPrograms, initialAcademicYears, 
@@ -25,7 +26,8 @@ import {
   initialEdpDuties,
   initialNaacCriteria, initialNaacKeyIndicators, initialNaacMetrics, initialNaacDataSubmissions,
   initialResearchProjects, initialPublicationRecords, initialPatentRecords,
-  initialEmployees, initialPayrollRecords, initialLeaveApplications, initialPerformanceAppraisals, initialTrainingFdpRecords
+  initialEmployees, initialPayrollRecords, initialLeaveApplications, initialPerformanceAppraisals, initialTrainingFdpRecords,
+  initialStartupFounders, initialStartupIdeas, initialStartupFundings, initialMentorSessions, initialIncubationWorkshops
 } from './seedData';
 import { DB_STORAGE_KEY } from '../constants';
 
@@ -79,6 +81,11 @@ export interface DatabaseState {
   leaveApplications: EmployeeLeaveApplication[];
   performanceAppraisals: PerformanceAppraisal[];
   trainingFdpRecords: TrainingFdpRecord[];
+  startupIdeas: StartupIdea[];
+  startupFounders: StartupFounder[];
+  startupFundings: StartupFunding[];
+  mentorSessions: IncubationMentorSession[];
+  incubationWorkshops: IncubationWorkshop[];
 }
 
 class ERPDatabaseService {
@@ -139,7 +146,12 @@ class ERPDatabaseService {
       payrollRecords: initialPayrollRecords,
       leaveApplications: initialLeaveApplications,
       performanceAppraisals: initialPerformanceAppraisals,
-      trainingFdpRecords: initialTrainingFdpRecords
+      trainingFdpRecords: initialTrainingFdpRecords,
+      startupIdeas: initialStartupIdeas,
+      startupFounders: initialStartupFounders,
+      startupFundings: initialStartupFundings,
+      mentorSessions: initialMentorSessions,
+      incubationWorkshops: initialIncubationWorkshops
     };
   }
 
@@ -1300,6 +1312,100 @@ class ERPDatabaseService {
     this.saveState();
 
     this.logAudit('APPROVE_LEAVE', 'HR Management', `Updated leave ${lv.id} status to ${status}`, approverUser.name, approverUser.role);
+  }
+
+  // ─── INCUBATION & STARTUP MANAGEMENT METHODS ─────────────────────────────
+  getStartupIdeas(): StartupIdea[] {
+    return this.state.startupIdeas || initialStartupIdeas;
+  }
+
+  getStartupFounders(): StartupFounder[] {
+    return this.state.startupFounders || initialStartupFounders;
+  }
+
+  getStartupFundings(): StartupFunding[] {
+    return this.state.startupFundings || initialStartupFundings;
+  }
+
+  getMentorSessions(): IncubationMentorSession[] {
+    return this.state.mentorSessions || initialMentorSessions;
+  }
+
+  getIncubationWorkshops(): IncubationWorkshop[] {
+    return this.state.incubationWorkshops || initialIncubationWorkshops;
+  }
+
+  submitStartupIdea(ideaData: Omit<StartupIdea, 'id' | 'ideaCode' | 'createdAt' | 'updatedAt' | 'milestones' | 'documents'>, user: User): StartupIdea {
+    if (!this.state.startupIdeas) this.state.startupIdeas = [];
+    const count = this.state.startupIdeas.length + 1;
+    const newIdea: StartupIdea = {
+      ...ideaData,
+      id: `startup-${Date.now()}`,
+      ideaCode: `IDEA-${new Date().getFullYear()}-${String(count).padStart(3, '0')}`,
+      milestones: [],
+      documents: [],
+      createdAt: new Date().toISOString().split('T')[0],
+      updatedAt: new Date().toISOString().split('T')[0]
+    };
+    this.state.startupIdeas.unshift(newIdea);
+    this.saveState();
+    this.logAudit('SUBMIT_STARTUP_IDEA', 'Incubation', `Startup idea '${newIdea.title}' (${newIdea.ideaCode}) registered by ${user.name}`, user.name, user.role);
+    return newIdea;
+  }
+
+  updateStartupApplicationStatus(startupId: string, status: IncubationApplicationStatus, remarks: string, approverUser: User): void {
+    if (!this.state.startupIdeas) return;
+    const idea = this.state.startupIdeas.find(s => s.id === startupId);
+    if (!idea) return;
+    idea.applicationStatus = status;
+    idea.status = status;
+    if (status === 'APPROVED' || status === 'INCUBATING') {
+      idea.committeeRemarks = remarks;
+      idea.approvedByUserId = approverUser.id;
+      idea.approvedDate = new Date().toISOString().split('T')[0];
+    } else if (status === 'REJECTED') {
+      idea.rejectionReason = remarks;
+    } else if (status === 'UNDER_SCREENING') {
+      idea.screeningRemarks = remarks;
+    }
+    idea.updatedAt = new Date().toISOString().split('T')[0];
+    this.saveState();
+    this.logAudit('UPDATE_STARTUP_STATUS', 'Incubation', `Startup ${startupId} status updated to ${status} by ${approverUser.name}`, approverUser.name, approverUser.role);
+  }
+
+  assignMentorToStartup(startupId: string, mentorId: string, mentorName: string, adminUser: User): void {
+    if (!this.state.startupIdeas) return;
+    const idea = this.state.startupIdeas.find(s => s.id === startupId);
+    if (!idea) return;
+    idea.mentorId = mentorId;
+    idea.mentorName = mentorName;
+    idea.updatedAt = new Date().toISOString().split('T')[0];
+    this.saveState();
+    this.logAudit('ASSIGN_MENTOR', 'Incubation', `Mentor ${mentorName} assigned to startup ${startupId} by ${adminUser.name}`, adminUser.name, adminUser.role);
+  }
+
+  addMentorSession(sessionData: Omit<IncubationMentorSession, 'id'>, user: User): IncubationMentorSession {
+    if (!this.state.mentorSessions) this.state.mentorSessions = [];
+    const newSession: IncubationMentorSession = {
+      ...sessionData,
+      id: `session-${Date.now()}`
+    };
+    this.state.mentorSessions.unshift(newSession);
+    this.saveState();
+    this.logAudit('ADD_MENTOR_SESSION', 'Incubation', `Mentor session logged for startup ${sessionData.startupId}`, user.name, user.role);
+    return newSession;
+  }
+
+  addIncubationWorkshop(workshopData: Omit<IncubationWorkshop, 'id'>, user: User): IncubationWorkshop {
+    if (!this.state.incubationWorkshops) this.state.incubationWorkshops = [];
+    const newWs: IncubationWorkshop = {
+      ...workshopData,
+      id: `ws-${Date.now()}`
+    };
+    this.state.incubationWorkshops.unshift(newWs);
+    this.saveState();
+    this.logAudit('ADD_WORKSHOP', 'Incubation', `Workshop '${newWs.title}' created by ${user.name}`, user.name, user.role);
+    return newWs;
   }
 }
 

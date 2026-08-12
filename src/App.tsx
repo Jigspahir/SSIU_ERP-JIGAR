@@ -35,6 +35,7 @@ import { LibraryPage } from './pages/campus/LibraryPage';
 import { NotificationsPage } from './pages/campus/NotificationsPage';
 import { RequestsPage } from './pages/campus/RequestsPage';
 import { EdpDutyPage } from './pages/campus/EdpDutyPage';
+import { IncubationPage } from './pages/incubation/IncubationPage';
 
 // Fees & Finance Module Page
 import { FeesFinancePage } from './pages/finance/FeesFinancePage';
@@ -193,6 +194,8 @@ const MainAppContent: React.FC = () => {
         return <RequestsPage />;
       case 'edp-duties':
         return <EdpDutyPage />;
+      case 'incubation':
+        return <IncubationPage />;
       case 'exam-dashboard':
         return <ExamDashboardPage setActiveTab={setActiveTab} />;
       case 'exams':
