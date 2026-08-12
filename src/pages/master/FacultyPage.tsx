@@ -288,24 +288,23 @@ export const FacultyPage: React.FC = () => {
 
           <div className="form-group">
             <label className="form-label">Full Name *</label>
-            <input type="text" className="form-input" placeholder="e.g. Dr. Rajesh Sharma" value={name} onChange={e => setName(e.target.value)} required />
+            <input type="text" className="form-input" placeholder="e.g. Demo Faculty 1" value={name} onChange={e => setName(e.target.value)} required />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Designation *</label>
+            <select className="form-select" value={designation} onChange={e => setDesignation(e.target.value as any)}>
+              <option value="Assistant Professor">Assistant Professor</option>
+              <option value="Associate Professor">Associate Professor</option>
+              <option value="Professor">Professor</option>
+              <option value="Lecturer">Lecturer</option>
+              <option value="Adjunct">Adjunct</option>
+            </select>
           </div>
 
           <div className="grid-2">
             <div className="form-group">
-              <label className="form-label">Faculty Photo URL</label>
-              <input type="text" className="form-input" placeholder="https://images.unsplash.com/..." value={photo} onChange={e => setPhoto(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Joining Date</label>
-              <input type="date" className="form-input" value={joiningDate} onChange={e => setJoiningDate(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="grid-2">
-            <div className="form-group">
-              <label className="form-label">Official Email *</label>
-              <input type="email" className="form-input" placeholder="prof.sharma@swarrnim.edu.in" value={email} onChange={e => setEmail(e.target.value)} required />
+              <label className="form-label">Institutional Email *</label>
+              <input type="email" className="form-input" placeholder="demo.faculty1@ssiu-demo.ac.in" value={email} onChange={e => setEmail(e.target.value)} required />
             </div>
             <div className="form-group">
               <label className="form-label">Phone Number *</label>

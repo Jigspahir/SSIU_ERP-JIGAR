@@ -25,8 +25,8 @@ const initialCertificates: CertificateRequest[] = [
   {
     id: 'cert-1',
     studentId: 'stu-1',
-    studentName: 'Aarav Patel',
-    enrollmentNo: '230101001',
+    studentName: 'ABC Student 1',
+    enrollmentNo: 'STUDENT-001',
     departmentName: 'Computer Engineering',
     type: 'BONAFIDE',
     purpose: 'Passport Application & Bank Account Verification',
@@ -39,8 +39,8 @@ const initialCertificates: CertificateRequest[] = [
   {
     id: 'cert-2',
     studentId: 'stu-2',
-    studentName: 'Ananya Roy',
-    enrollmentNo: '230101002',
+    studentName: 'ABC Student 2',
+    enrollmentNo: 'STUDENT-002',
     departmentName: 'Computer Engineering',
     type: 'TRANSCRIPT',
     purpose: 'Higher Studies & Internship Application',
@@ -71,8 +71,8 @@ export const CertificatesPage: React.FC = () => {
     const newReq: CertificateRequest = {
       id: `cert-${Date.now()}`,
       studentId: currentStudent?.id || 'stu-1',
-      studentName: currentStudent?.name || user?.name || 'Aarav Patel',
-      enrollmentNo: currentStudent?.enrollmentNo || '230101001',
+      studentName: currentStudent?.name || user?.name || 'ABC Student 1',
+      enrollmentNo: currentStudent?.enrollmentNo || 'STUDENT-001',
       departmentName: 'Computer Engineering',
       type: certType,
       purpose,

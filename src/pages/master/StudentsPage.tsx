@@ -324,11 +324,11 @@ export const StudentsPage: React.FC = () => {
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Enrollment Number *</label>
-              <input type="text" className="form-input" placeholder="e.g. 230101001" value={enrollmentNo} onChange={e => setEnrollmentNo(e.target.value)} required />
+              <input type="text" className="form-input" placeholder="e.g. STUDENT-001" value={enrollmentNo} onChange={e => setEnrollmentNo(e.target.value)} required />
             </div>
             <div className="form-group">
               <label className="form-label">Full Student Name *</label>
-              <input type="text" className="form-input" placeholder="e.g. Rohan Patel" value={name} onChange={e => setName(e.target.value)} required />
+              <input type="text" className="form-input" placeholder="e.g. ABC Student 1" value={name} onChange={e => setName(e.target.value)} required />
             </div>
           </div>
 
@@ -374,11 +374,11 @@ export const StudentsPage: React.FC = () => {
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Institutional Email *</label>
-              <input type="email" className="form-input" placeholder="student.patel@swarrnim.edu.in" value={email} onChange={e => setEmail(e.target.value)} required />
+              <input type="email" className="form-input" placeholder="student1@ssiu-demo.ac.in" value={email} onChange={e => setEmail(e.target.value)} required />
             </div>
             <div className="form-group">
               <label className="form-label">Student Phone *</label>
-              <input type="text" className="form-input" placeholder="+91 91234 56789" value={phone} onChange={e => setPhone(e.target.value)} required />
+              <input type="text" className="form-input" placeholder="+91 00000 20001" value={phone} onChange={e => setPhone(e.target.value)} required />
             </div>
           </div>
 

@@ -19,9 +19,9 @@ interface MentoringSession {
 const initialSessions: MentoringSession[] = [
   {
     id: 'ms-1',
-    studentName: 'Aarav Patel',
-    enrollmentNo: '230101001',
-    facultyName: 'Prof. Rajesh Sharma',
+    studentName: 'ABC Student 1',
+    enrollmentNo: 'STUDENT-001',
+    facultyName: 'Demo Faculty 1',
     topic: 'Career Pathway Guidance & Internship Opportunities',
     date: '2024-03-12',
     timeSlot: '03:00 PM - 03:30 PM',
@@ -30,9 +30,9 @@ const initialSessions: MentoringSession[] = [
   },
   {
     id: 'ms-2',
-    studentName: 'Ananya Roy',
-    enrollmentNo: '230101002',
-    facultyName: 'Dr. Priya Desai',
+    studentName: 'ABC Student 2',
+    enrollmentNo: 'STUDENT-002',
+    facultyName: 'Demo Faculty 2',
     topic: 'Mid-term Attendance & Exam Preparation Counseling',
     date: '2024-03-20',
     timeSlot: '04:00 PM - 04:30 PM',
@@ -57,8 +57,8 @@ export const MentorPage: React.FC = () => {
 
     const newSess: MentoringSession = {
       id: `ms-${Date.now()}`,
-      studentName: user?.name || 'Aarav Patel',
-      enrollmentNo: '230101001',
+      studentName: user?.name || 'ABC Student 1',
+      enrollmentNo: 'STUDENT-001',
       facultyName: assignedFaculty.name,
       topic,
       date,

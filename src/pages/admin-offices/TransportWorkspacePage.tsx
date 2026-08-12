@@ -15,9 +15,9 @@ interface BusRoute {
 }
 
 const initialRoutes: BusRoute[] = [
-  { id: 'r-1', routeNo: 'Route 101', routeName: 'Ahmedabad ISRO Colony - Swarrnim Campus', driverName: 'Vikram Singh', driverPhone: '+91 98765 12345', capacity: 50, assignedStudents: 44 },
-  { id: 'r-2', routeNo: 'Route 102', routeName: 'Gandhinagar Sector 11 - Swarrnim Campus', driverName: 'Manish Patel', driverPhone: '+91 98765 67890', capacity: 50, assignedStudents: 48 },
-  { id: 'r-3', routeNo: 'Route 103', routeName: 'Chandkheda Circle - Swarrnim Campus', driverName: 'Suresh Kumar', driverPhone: '+91 98765 54321', capacity: 40, assignedStudents: 32 }
+  { id: 'r-1', routeNo: 'Route 101', routeName: 'Ahmedabad ISRO Colony - Swarrnim Campus', driverName: 'Demo Driver 1', driverPhone: '+91 00000 50001', capacity: 50, assignedStudents: 44 },
+  { id: 'r-2', routeNo: 'Route 102', routeName: 'Gandhinagar Sector 11 - Swarrnim Campus', driverName: 'Demo Driver 2', driverPhone: '+91 00000 50002', capacity: 50, assignedStudents: 48 },
+  { id: 'r-3', routeNo: 'Route 103', routeName: 'Chandkheda Circle - Swarrnim Campus', driverName: 'Demo Driver 3', driverPhone: '+91 00000 50003', capacity: 40, assignedStudents: 32 }
 ];
 
 export const TransportWorkspacePage: React.FC = () => {

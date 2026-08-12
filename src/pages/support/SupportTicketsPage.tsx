@@ -120,8 +120,8 @@ export const SupportTicketsPage: React.FC = () => {
     const newTicket: Omit<SupportTicket, 'id'> = {
       ticketNo,
       studentId: currentStudent?.id || 'stu-1',
-      studentName: currentStudent?.name || user?.name || 'Aarav Patel',
-      enrollmentNo: currentStudent?.enrollmentNo || user?.enrollmentNo || '230101001',
+      studentName: currentStudent?.name || user?.name || 'ABC Student 1',
+      enrollmentNo: currentStudent?.enrollmentNo || user?.enrollmentNo || 'STUDENT-001',
       departmentId: currentStudent?.departmentId || 'dept-1',
       assignedFacultyId: assignedFacultyId || undefined,
       assignedFacultyName: facObj?.name,

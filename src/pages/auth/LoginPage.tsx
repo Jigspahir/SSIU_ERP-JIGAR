@@ -34,7 +34,7 @@ export const LoginPage: React.FC = () => {
       title: 'Student Candidate',
       userId: 'student',
       pass: 'Student@123',
-      desc: 'Aarav Patel — B.Tech CSE Sem 4',
+      desc: 'ABC Student 1 — B.Tech CSE Sem 4 (STUDENT-001)',
       icon: GraduationCap,
       color: '#F5A623',
       bg: 'rgba(245, 166, 35, 0.08)'
@@ -44,7 +44,7 @@ export const LoginPage: React.FC = () => {
       title: 'Faculty / Mentor',
       userId: 'faculty',
       pass: 'Faculty@123',
-      desc: 'Prof. Vikram Trivedi — Associate Professor',
+      desc: 'Demo Faculty 1 — Associate Professor (FACULTY-001)',
       icon: UserCheck,
       color: '#0097D7',
       bg: 'rgba(0, 151, 215, 0.08)'
@@ -54,7 +54,7 @@ export const LoginPage: React.FC = () => {
       title: 'Department HOD',
       userId: 'hod',
       pass: 'Faculty@123',
-      desc: 'Dr. Amit Shah — HOD Computer Science',
+      desc: 'Demo HOD 1 — HOD Computer Engineering (HOD-001)',
       icon: UserCheck,
       color: '#10B981',
       bg: 'rgba(16, 185, 129, 0.08)'
@@ -64,7 +64,7 @@ export const LoginPage: React.FC = () => {
       title: 'Registrar Office',
       userId: 'registrar',
       pass: 'Admin@123',
-      desc: 'Dr. S. K. Mehta — University Registrar',
+      desc: 'Demo Registrar 1 — University Registrar',
       icon: ShieldCheck,
       color: '#F37023',
       bg: 'rgba(243, 112, 35, 0.08)'
@@ -74,7 +74,7 @@ export const LoginPage: React.FC = () => {
       title: 'Exam Controller',
       userId: 'examcell',
       pass: 'Admin@123',
-      desc: 'Prof. V. K. Patel — Controller of Exams',
+      desc: 'Demo Controller 1 — Controller of Exams',
       icon: ShieldCheck,
       color: '#183B70',
       bg: 'rgba(24, 59, 112, 0.08)'
@@ -84,7 +84,7 @@ export const LoginPage: React.FC = () => {
       title: 'Student Section',
       userId: 'studentsection',
       pass: 'Admin@123',
-      desc: 'Mrs. Rekha Joshi — Student Affairs Officer',
+      desc: 'Demo Officer 1 — Student Affairs Head',
       icon: UserCheck,
       color: '#0097D7',
       bg: 'rgba(0, 151, 215, 0.08)'
@@ -94,7 +94,7 @@ export const LoginPage: React.FC = () => {
       title: 'Hostel Warden',
       userId: 'hosteladmin',
       pass: 'Admin@123',
-      desc: 'Mr. Arvind Trivedi — Chief Hostel Warden',
+      desc: 'Demo Warden 1 — Chief Hostel Warden',
       icon: UserCheck,
       color: '#F5A623',
       bg: 'rgba(245, 166, 35, 0.08)'
@@ -104,7 +104,7 @@ export const LoginPage: React.FC = () => {
       title: 'IQAC Director',
       userId: 'iqac',
       pass: 'Admin@123',
-      desc: 'Dr. N. P. Sharma — Director, IQAC Cell',
+      desc: 'Demo IQAC Director 1 — Director, IQAC Cell',
       icon: ShieldCheck,
       color: '#7CB342',
       bg: 'rgba(124, 179, 66, 0.08)'
@@ -114,7 +114,7 @@ export const LoginPage: React.FC = () => {
       title: 'Institute Principal',
       userId: 'principal',
       pass: 'Admin@123',
-      desc: 'Dr. S. K. Gupta — Principal, SSCIT',
+      desc: 'Demo Principal 1 — Principal, SSCIT',
       icon: Building2,
       color: '#D81B60',
       bg: 'rgba(216, 27, 96, 0.08)'
@@ -124,7 +124,7 @@ export const LoginPage: React.FC = () => {
       title: 'University Super Admin',
       userId: 'admin',
       pass: 'Admin@123',
-      desc: 'Dr. Devang Patel — Full System Admin',
+      desc: 'Demo Admin 1 — University Super Admin',
       icon: Key,
       color: '#0F2C59',
       bg: 'rgba(15, 44, 89, 0.08)'

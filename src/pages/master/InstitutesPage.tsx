@@ -142,7 +142,7 @@ export const InstitutesPage: React.FC = () => {
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Principal Name</label>
-              <input type="text" className="form-input" placeholder="Dr. Ramesh K. Verma" value={principalName} onChange={e => setPrincipalName(e.target.value)} />
+              <input type="text" className="form-input" placeholder="e.g. Demo Principal 1" value={principalName} onChange={e => setPrincipalName(e.target.value)} />
             </div>
             <div className="form-group">
               <label className="form-label">Established Year</label>

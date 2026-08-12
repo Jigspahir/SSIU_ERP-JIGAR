@@ -20,7 +20,7 @@ interface MaintenanceTicket {
 const initialMaintenanceTickets: MaintenanceTicket[] = [
   { id: 'm-1', ticketNo: 'EST-2024-081', facility: 'SSCIT Lab 301', category: 'IT_NETWORK', issueText: 'LAN Switch 2 port connectivity drop in Row B', reportedBy: 'Prof. Demo Faculty', priority: 'HIGH', status: 'IN_PROGRESS', date: '2024-03-10' },
   { id: 'm-2', ticketNo: 'EST-2024-082', facility: 'Management Auditorium', category: 'ELECTRICAL', issueText: 'Stage projector bulb replacement required', reportedBy: 'Demo HOD Five', priority: 'MEDIUM', status: 'OPEN', date: '2024-03-12' },
-  { id: 'm-3', ticketNo: 'EST-2024-083', facility: 'Hostel Block A', category: 'PLUMBING', issueText: 'Water dispenser maintenance filter change', reportedBy: 'Mr. Arvind Trivedi', priority: 'LOW', status: 'RESOLVED', date: '2024-03-08' }
+  { id: 'm-3', ticketNo: 'EST-2024-083', facility: 'Hostel Block A', category: 'PLUMBING', issueText: 'Water dispenser maintenance filter change', reportedBy: 'Demo Warden 1', priority: 'LOW', status: 'RESOLVED', date: '2024-03-08' }
 ];
 
 export const MaintenanceWorkspacePage: React.FC = () => {

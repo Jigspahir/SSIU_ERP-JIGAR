@@ -153,7 +153,7 @@ export const DepartmentsPage: React.FC = () => {
             </div>
             <div className="form-group">
               <label className="form-label">Head of Department (HOD)</label>
-              <input type="text" className="form-input" placeholder="Dr. Amit Patel" value={hodName} onChange={e => setHodName(e.target.value)} />
+              <input type="text" className="form-input" placeholder="e.g. Demo HOD 1" value={hodName} onChange={e => setHodName(e.target.value)} />
             </div>
           </div>
 
