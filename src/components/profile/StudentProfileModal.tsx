@@ -264,8 +264,13 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   <div><span style={{ color: 'var(--text-muted)' }}>Blood Group:</span> <Badge variant="orange">{student.bloodGroup || 'N/A'}</Badge></div>
                   <div><span style={{ color: 'var(--text-muted)' }}>Student Email:</span> <strong>{student.email}</strong></div>
                   <div><span style={{ color: 'var(--text-muted)' }}>Phone Number:</span> <strong>{student.phone}</strong></div>
-                  <div><span style={{ color: 'var(--text-muted)' }}>ABC ID:</span> <strong style={{ color: 'var(--brand-orange)' }}>{student.abcId || 'Not Submitted'}</strong></div>
-                  <div><span style={{ color: 'var(--text-muted)' }}>ABC Status:</span> <Badge variant={student.abcIdStatus === 'VERIFIED' ? 'active' : student.abcIdStatus === 'REJECTED' ? 'danger' : 'orange'}>{student.abcIdStatus || 'NOT_SUBMITTED'}</Badge></div>
+                  {/* ABC ID: only shown to authorized student record managers, not Faculty/HOD */}
+                  {(role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'REGISTRAR' || role === 'STUDENT_SECTION' || role === 'PRINCIPAL') && (
+                    <>
+                      <div><span style={{ color: 'var(--text-muted)' }}>ABC ID:</span> <strong style={{ color: 'var(--brand-orange)' }}>{student.abcId || 'Not Submitted'}</strong></div>
+                      <div><span style={{ color: 'var(--text-muted)' }}>ABC Status:</span> <Badge variant={student.abcIdStatus === 'VERIFIED' ? 'active' : student.abcIdStatus === 'REJECTED' ? 'danger' : 'orange'}>{student.abcIdStatus || 'NOT_SUBMITTED'}</Badge></div>
+                    </>
+                  )}
                   {student.address && (
                     <div><span style={{ color: 'var(--text-muted)' }}>Residential Address:</span> <strong>{student.address}</strong></div>
                   )}

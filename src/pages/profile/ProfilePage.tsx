@@ -153,7 +153,7 @@ export const ProfilePage: React.FC = () => {
               )}
               {user.employeeId && <span>Employee ID: <strong>{user.employeeId}</strong></span>}
               {user.enrollmentNo && <span>Enrollment No: <strong>{user.enrollmentNo}</strong></span>}
-              {studentRecord?.abcId && <span>ABC ID: <strong>{studentRecord.abcId}</strong></span>}
+              {role === 'STUDENT' && studentRecord?.abcId && <span>ABC ID: <strong>{studentRecord.abcId}</strong></span>}
             </div>
           </div>
         </div>
@@ -201,7 +201,8 @@ export const ProfilePage: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
 
-      {/* --- ABC ID MODULE SECTION --- */}
+      {/* --- ABC ID MODULE SECTION: Student-Only --- */}
+      {role === 'STUDENT' && (
       <div className="card" style={{ padding: '1.75rem', borderLeft: '4px solid var(--brand-orange)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
           <div>
@@ -265,39 +266,28 @@ export const ProfilePage: React.FC = () => {
             </div>
           </form>
 
-          {/* Verification Guidelines & Admin Controls */}
+          {/* Verification Status (read-only for Student – verification done by Student Section) */}
           <div style={{ background: 'var(--bg-surface-hover)', padding: '1.25rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <div>
               <h4 style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                 <ShieldCheck size={18} color="#10B981" /> Verification Status &amp; Remarks
               </h4>
-              
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                After submission, your ABC ID is verified by the Student Section office. Verification typically takes 1–3 working days.
+              </p>
               <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
                 <div><strong>Current ABC ID:</strong> {studentRecord?.abcId || 'Not submitted yet'}</div>
                 <div><strong>Submission Status:</strong> {studentRecord?.abcIdStatus || 'NOT_SUBMITTED'}</div>
                 <div><strong>Admin Remarks:</strong> {studentRecord?.abcIdRemarks || 'No remarks added yet'}</div>
               </div>
             </div>
-
-            {/* Admin Verification Quick Actions */}
-            {(role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'PRINCIPAL' || role === 'HOD') && (
-              <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '0.5rem' }}>
-                  ADMIN MANAGEMENT ACTIONS:
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <button className="btn btn-primary btn-sm" onClick={handleAdminVerifyAbcId}>
-                    <Check size={14} /> Verify ABC ID
-                  </button>
-                  <button className="btn btn-danger btn-sm" onClick={() => setIsRejectingModalOpen(true)}>
-                    <XCircle size={14} /> Reject ABC ID
-                  </button>
-                </div>
-              </div>
-            )}
+            <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              <strong>📋 Steps:</strong> 1. Enter your 12-digit ABC ID from DigiLocker &nbsp;→&nbsp; 2. Upload proof &nbsp;→&nbsp; 3. Submit &nbsp;→&nbsp; 4. Await Student Section verification
+            </div>
           </div>
         </div>
       </div>
+      )}
 
       <div className="grid-2">
         {/* Profile Info Form */}

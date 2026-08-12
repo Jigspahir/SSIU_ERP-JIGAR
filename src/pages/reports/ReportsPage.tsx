@@ -143,14 +143,14 @@ export const ReportsPage: React.FC = () => {
         if (selectedDivisionId !== 'ALL') list = list.filter(s => s.divisionId === selectedDivisionId);
         if (searchQuery) list = list.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.enrollmentNo.includes(searchQuery));
 
-        const headers = ['Enrollment No', 'Student Candidate Name', 'Email Address', 'Phone No', 'Institute', 'Department', 'Program', 'Semester', 'Division', 'ABC ID', 'ABC ID Status', 'Status'];
+        const headers = ['Enrollment No', 'Student Candidate Name', 'Email Address', 'Phone No', 'Institute', 'Department', 'Program', 'Semester', 'Division', 'Status'];
         const rows: (string | number)[][] = list.map(s => {
           const inst = db.getInstituteById(s.instituteId)?.code || s.instituteId;
           const dept = db.getDepartmentById(s.departmentId)?.code || s.departmentId;
           const prog = db.getProgramById(s.programId)?.code || s.programId;
           const sem = db.getSemesterById(s.semesterId)?.code || s.semesterId;
           const div = db.getDivisionById(s.divisionId)?.name || s.divisionId;
-          return [s.enrollmentNo, s.name, s.email, s.phone, inst, dept, prog, sem, div, s.abcId || 'N/A', s.abcIdStatus || 'NOT_SUBMITTED', s.status];
+          return [s.enrollmentNo, s.name, s.email, s.phone, inst, dept, prog, sem, div, s.status];
         });
         return { reportTitle: 'Official Student Enrolment & Roster Master Report', headers, rows };
       }
