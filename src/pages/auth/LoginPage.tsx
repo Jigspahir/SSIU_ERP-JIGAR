@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { HeaderLogo } from '../../components/layout/HeaderLogo';
 import { ForgotPasswordModal } from './ForgotPasswordModal';
-import { Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, AlertTriangle, UserCheck, Key, GraduationCap } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, AlertTriangle, UserCheck, Key, GraduationCap, Building2 } from 'lucide-react';
 import { UserRole } from '../../types';
 
 export const LoginPage: React.FC = () => {
@@ -108,6 +108,16 @@ export const LoginPage: React.FC = () => {
       icon: ShieldCheck,
       color: '#7CB342',
       bg: 'rgba(124, 179, 66, 0.08)'
+    },
+    {
+      role: 'PRINCIPAL',
+      title: 'Institute Principal',
+      userId: 'principal',
+      pass: 'Admin@123',
+      desc: 'Dr. S. K. Gupta — Principal, SSCIT',
+      icon: Building2,
+      color: '#D81B60',
+      bg: 'rgba(216, 27, 96, 0.08)'
     },
     {
       role: 'SUPER_ADMIN',
