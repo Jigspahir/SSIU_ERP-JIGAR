@@ -67,6 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     // Campus Services
     'notices': { id: 'notices', label: 'Notices', icon: Bell, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Campus' },
     'events': { id: 'events', label: 'Events', icon: CalendarCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Campus' },
+    'edp-duties': { id: 'edp-duties', label: 'EDP Duties', icon: CalendarCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN'], category: 'Campus' },
     'library': { id: 'library', label: 'Library', icon: Library, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'LIBRARY_ADMIN'], category: 'Campus' },
     'notifications': { id: 'notifications', label: 'Notifications', icon: Bell, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN'], category: 'Campus' },
 
@@ -99,14 +100,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const facultyOrderKeys = [
     'dashboard', 'subjects', 'timetable', 'attendance', 'session-plan', 'materials',
-    'assignments', 'exam-marks', 'exam-dashboard', 'requests', 'tickets', 'mentor', 'feedback', 'profile'
+    'assignments', 'exam-marks', 'exam-dashboard', 'requests', 'edp-duties', 'tickets', 'mentor', 'feedback', 'profile'
   ];
 
   const adminOrderKeys = [
     'dashboard', 'registrar', 'iqac', 'exam-cell', 'student-section', 'hostel-admin', 'library-admin', 'transport-admin', 'maintenance-admin',
     'students', 'faculty', 'departments', 'programs', 'subjects',
     'calendar', 'attendance', 'exam-dashboard', 'fees', 'crm', 'certificates',
-    'requests', 'tickets', 'feedback', 'notices', 'events', 'reports', 'settings', 'profile'
+    'requests', 'edp-duties', 'tickets', 'feedback', 'notices', 'events', 'reports', 'settings', 'profile'
   ];
 
   let orderKeys = adminOrderKeys;
@@ -115,15 +116,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   } else if (role === 'FACULTY') {
     orderKeys = facultyOrderKeys;
   } else if (role === 'REGISTRAR') {
-    orderKeys = ['dashboard', 'registrar', 'requests', 'students', 'faculty', 'departments', 'programs', 'notices', 'reports', 'profile'];
+    orderKeys = ['dashboard', 'registrar', 'requests', 'edp-duties', 'students', 'faculty', 'departments', 'programs', 'notices', 'reports', 'profile'];
   } else if (role === 'IQAC') {
-    orderKeys = ['dashboard', 'iqac', 'requests', 'faculty', 'feedback', 'reports', 'profile'];
+    orderKeys = ['dashboard', 'iqac', 'requests', 'edp-duties', 'faculty', 'feedback', 'reports', 'profile'];
   } else if (role === 'EXAM_CELL') {
-    orderKeys = ['dashboard', 'exam-cell', 'exam-dashboard', 'requests', 'students', 'reports', 'profile'];
+    orderKeys = ['dashboard', 'exam-cell', 'exam-dashboard', 'requests', 'edp-duties', 'students', 'reports', 'profile'];
   } else if (role === 'STUDENT_SECTION') {
-    orderKeys = ['dashboard', 'student-section', 'requests', 'students', 'certificates', 'notifications', 'profile'];
+    orderKeys = ['dashboard', 'student-section', 'requests', 'edp-duties', 'students', 'certificates', 'notifications', 'profile'];
   } else if (role === 'HOSTEL_ADMIN') {
-    orderKeys = ['dashboard', 'hostel-admin', 'requests', 'students', 'tickets', 'notifications', 'profile'];
+    orderKeys = ['dashboard', 'hostel-admin', 'requests', 'edp-duties', 'students', 'tickets', 'notifications', 'profile'];
   } else if (role === 'LIBRARY_ADMIN') {
     orderKeys = ['dashboard', 'library-admin', 'requests', 'library', 'students', 'profile'];
   } else if (role === 'TRANSPORT_ADMIN') {

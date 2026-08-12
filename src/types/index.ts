@@ -785,6 +785,72 @@ export interface ApprovalRequest {
   completedAt?: string;
 }
 
+// --- EDP DUTY MANAGEMENT MODULE TYPES ---
+
+export type EdpDutyRole = 
+  | 'EVENT_COORDINATOR'
+  | 'VENUE_INCHARGE'
+  | 'DISCIPLINE_OFFICER'
+  | 'TECHNICAL_LEAD'
+  | 'REGISTRATION_DESK'
+  | 'STAGE_MANAGER'
+  | 'VIP_HOSPITALITY'
+  | 'CHIEF_GUEST_ESCORT'
+  | 'GENERAL_DUTY';
+
+export type EdpDutyStatus = 
+  | 'ASSIGNED'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'VERIFIED'
+  | 'EXCUSED'
+  | 'ABSENT';
+
+export interface EdpDutyEvidence {
+  id: string;
+  photoUrl: string;
+  latitude: number;
+  longitude: number;
+  locationAddress: string;
+  capturedAt: string;
+  deviceInfo?: string;
+  remarks?: string;
+}
+
+export interface EdpDuty {
+  id: string;
+  dutyCode: string; // e.g. "EDP-2024-001"
+  eventName: string;
+  eventType: 'CONVOCATION' | 'SEMINAR' | 'EXAM_INVIGILATION' | 'WORKSHOP' | 'CULTURAL_FEST' | 'SPORTS_MEET' | 'NAAC_AUDIT';
+  dutyRole: EdpDutyRole;
+  
+  assignedUserId: string;
+  assignedUserName: string;
+  assignedUserRole: UserRole;
+  assignedUserDesignation?: string;
+  
+  instituteId: string;
+  departmentId: string;
+  
+  dutyDate: string; // YYYY-MM-DD
+  startTime: string; // HH:MM
+  endTime: string; // HH:MM
+  venue: string;
+  responsibilityDetails: string;
+  
+  status: EdpDutyStatus;
+  reportsNotes?: string;
+  evidenceList: EdpDutyEvidence[];
+  
+  verifiedByAdminId?: string;
+  verifiedByAdminName?: string;
+  verifiedAt?: string;
+  verificationRemarks?: string;
+  
+  createdAt: string;
+  updatedAt: string;
+}
+
 
 
 

@@ -6,7 +6,8 @@ import type {
   FeeStructure, StudentFeeRecord, FeePaymentTransaction,
   CRMLead, AdmissionApplication,
   Exam, ExamTimetable, ExamForm, StudentMarks, StudentResult, StudentFeedback, SupportTicket, StudentDocument,
-  ERPNotification, UserRole, InwardOutwardRecord, RegistrarFileMovement, ApprovalRequest, ApprovalOfficeType, ApprovalStatus
+  ERPNotification, UserRole, InwardOutwardRecord, RegistrarFileMovement, ApprovalRequest, ApprovalOfficeType, ApprovalStatus,
+  EdpDuty, EdpDutyEvidence, EdpDutyStatus
 } from '../types';
 import { 
   initialInstitutes, initialDepartments, initialPrograms, initialAcademicYears, 
@@ -18,7 +19,8 @@ import {
   initialFeePaymentTransactions, initialCRMLeads, initialAdmissionApplications,
   initialExams, initialExamTimetables, initialExamForms, initialStudentMarks,
   initialStudentResults, initialStudentFeedbacks, initialSupportTickets, initialStudentDocuments,
-  initialERPNotifications, initialInwardOutwardRecords, initialRegistrarFileMovements, initialApprovalRequests
+  initialERPNotifications, initialInwardOutwardRecords, initialRegistrarFileMovements, initialApprovalRequests,
+  initialEdpDuties
 } from './seedData';
 import { DB_STORAGE_KEY } from '../constants';
 
@@ -59,6 +61,7 @@ export interface DatabaseState {
   inwardOutwardRecords: InwardOutwardRecord[];
   registrarFileMovements: RegistrarFileMovement[];
   approvalRequests: ApprovalRequest[];
+  edpDuties: EdpDuty[];
 }
 
 class ERPDatabaseService {
@@ -107,6 +110,7 @@ class ERPDatabaseService {
       inwardOutwardRecords: initialInwardOutwardRecords,
       registrarFileMovements: initialRegistrarFileMovements,
       approvalRequests: initialApprovalRequests,
+      edpDuties: initialEdpDuties
     };
   }
 
@@ -148,6 +152,7 @@ class ERPDatabaseService {
           inwardOutwardRecords: parsed.inwardOutwardRecords || defaults.inwardOutwardRecords,
           registrarFileMovements: parsed.registrarFileMovements || defaults.registrarFileMovements,
           approvalRequests: parsed.approvalRequests || defaults.approvalRequests,
+          edpDuties: parsed.edpDuties || defaults.edpDuties,
         };
       }
     } catch (e) {
@@ -830,6 +835,125 @@ class ERPDatabaseService {
       }
     });
     this.saveState();
+  }
+
+  // ─── EDP Duty Management Methods ──────────────────────────────────────────
+  getEdpDuties(): EdpDuty[] {
+    return this.state.edpDuties || [];
+  }
+
+  getScopedEdpDuties(user: User | null, role?: UserRole | null): EdpDuty[] {
+    const list = this.getEdpDuties();
+    if (!user || !role) return list;
+
+    if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'REGISTRAR' || role === 'IQAC') {
+      return list;
+    }
+
+    if (role === 'PRINCIPAL' && user.instituteId) {
+      return list.filter(d => d.instituteId === user.instituteId || d.assignedUserId === user.id);
+    }
+
+    if (role === 'HOD' && user.departmentId) {
+      return list.filter(d => d.departmentId === user.departmentId || d.assignedUserId === user.id);
+    }
+
+    // Faculty & other staff see duties assigned to them
+    return list.filter(d => d.assignedUserId === user.id || d.assignedUserId === user.employeeId);
+  }
+
+  addEdpDuty(dutyData: Partial<EdpDuty>, creatorUser?: User | null): EdpDuty {
+    const newId = `edp-${Date.now()}`;
+    const dutyCode = `EDP-${new Date().getFullYear()}-${String((this.state.edpDuties || []).length + 1).padStart(3, '0')}`;
+
+    const newDuty: EdpDuty = {
+      id: newId,
+      dutyCode,
+      eventName: dutyData.eventName || 'Official Campus Event',
+      eventType: dutyData.eventType || 'SEMINAR',
+      dutyRole: dutyData.dutyRole || 'GENERAL_DUTY',
+      assignedUserId: dutyData.assignedUserId || 'fac-1',
+      assignedUserName: dutyData.assignedUserName || 'Assigned Staff Member',
+      assignedUserRole: dutyData.assignedUserRole || 'FACULTY',
+      assignedUserDesignation: dutyData.assignedUserDesignation || 'Faculty Member',
+      instituteId: dutyData.instituteId || 'inst-1',
+      departmentId: dutyData.departmentId || 'dept-1',
+      dutyDate: dutyData.dutyDate || new Date().toISOString().split('T')[0],
+      startTime: dutyData.startTime || '09:00 AM',
+      endTime: dutyData.endTime || '05:00 PM',
+      venue: dutyData.venue || 'University Main Campus',
+      responsibilityDetails: dutyData.responsibilityDetails || 'General Event Duty Responsibility',
+      status: 'ASSIGNED',
+      reportsNotes: '',
+      evidenceList: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    if (!this.state.edpDuties) this.state.edpDuties = [];
+    this.state.edpDuties.unshift(newDuty);
+    this.saveState();
+
+    // Notify assigned user
+    this.addNotification({
+      title: `New EDP Event Duty Assigned: ${newDuty.eventName}`,
+      message: `You have been assigned as ${newDuty.dutyRole.replace('_', ' ')} for ${newDuty.eventName} on ${newDuty.dutyDate} at ${newDuty.venue}.`,
+      module: 'EVENT',
+      timestamp: new Date().toISOString(),
+      targetUserId: newDuty.assignedUserId,
+      linkTab: 'edp-duties'
+    });
+
+    this.logAudit('CREATE_EDP_DUTY', 'EDP Duty', `Created duty ${dutyCode} for ${newDuty.assignedUserName}`, creatorUser?.name || 'System Admin', creatorUser?.role || 'SUPER_ADMIN');
+
+    return newDuty;
+  }
+
+  addEdpDutyEvidence(dutyId: string, evidenceData: Omit<EdpDutyEvidence, 'id'>, notes?: string): void {
+    if (!this.state.edpDuties) return;
+    const duty = this.state.edpDuties.find(d => d.id === dutyId);
+    if (!duty) return;
+
+    const newEvidence: EdpDutyEvidence = {
+      id: `ev-${Date.now()}`,
+      ...evidenceData
+    };
+
+    if (!duty.evidenceList) duty.evidenceList = [];
+    duty.evidenceList.push(newEvidence);
+    duty.status = 'COMPLETED';
+    if (notes) duty.reportsNotes = notes;
+    duty.updatedAt = new Date().toISOString();
+
+    this.saveState();
+    this.logAudit('SUBMIT_EDP_EVIDENCE', 'EDP Duty', `Submitted geo-tagged evidence for ${duty.dutyCode}`, duty.assignedUserName, duty.assignedUserRole);
+  }
+
+  verifyEdpDuty(dutyId: string, adminUser: User, status: EdpDutyStatus, remarks?: string): void {
+    if (!this.state.edpDuties) return;
+    const duty = this.state.edpDuties.find(d => d.id === dutyId);
+    if (!duty) return;
+
+    duty.status = status;
+    duty.verifiedByAdminId = adminUser.id;
+    duty.verifiedByAdminName = adminUser.name;
+    duty.verifiedAt = new Date().toISOString();
+    if (remarks) duty.verificationRemarks = remarks;
+    duty.updatedAt = new Date().toISOString();
+
+    this.saveState();
+
+    // Notify assigned user
+    this.addNotification({
+      title: `EDP Duty Status Updated: ${duty.dutyCode}`,
+      message: `Your EDP Event Duty status for ${duty.eventName} has been marked as ${status} by ${adminUser.name}.`,
+      module: 'SYSTEM',
+      timestamp: new Date().toISOString(),
+      targetUserId: duty.assignedUserId,
+      linkTab: 'edp-duties'
+    });
+
+    this.logAudit('VERIFY_EDP_DUTY', 'EDP Duty', `Verified EDP duty ${duty.dutyCode} as ${status}`, adminUser.name, adminUser.role);
   }
 }
 

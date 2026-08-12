@@ -27,7 +27,8 @@ export type ReportCategory =
   | 'HOSTEL_OCCUPANCY'
   | 'IQAC_BENCHMARKS'
   | 'REGISTRAR_DISPATCH'
-  | 'APPROVAL_WORKFLOWS';
+  | 'APPROVAL_WORKFLOWS'
+  | 'EDP_DUTIES';
 
 export const ReportsPage: React.FC = () => {
   const { user, role } = useAuth();
@@ -104,7 +105,8 @@ export const ReportsPage: React.FC = () => {
     { key: 'HOSTEL_OCCUPANCY', label: '14. Hostel Occupancy & Clearances', roles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR', 'HOSTEL_ADMIN'] },
     { key: 'IQAC_BENCHMARKS', label: '15. IQAC Audits & NAAC Benchmarks', roles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'IQAC', 'REGISTRAR', 'PRINCIPAL'] },
     { key: 'REGISTRAR_DISPATCH', label: '16. Registrar File Movements & Mail Register', roles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR'] },
-    { key: 'APPROVAL_WORKFLOWS', label: '17. Central Approval Workflows Audit Trail', roles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'PRINCIPAL', 'HOD'] }
+    { key: 'APPROVAL_WORKFLOWS', label: '17. Central Approval Workflows Audit Trail', roles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'PRINCIPAL', 'HOD'] },
+    { key: 'EDP_DUTIES', label: '18. EDP Duty Management & Evidence Vault', roles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY'] }
   ];
 
   const permittedCategories = availableCategories.filter(c => c.roles.includes(role || 'STUDENT'));
@@ -319,6 +321,26 @@ export const ReportsPage: React.FC = () => {
           a.deadlineDate
         ]);
         return { reportTitle: 'Central Approval Workflows Audit Trail & Status Report', headers, rows };
+      }
+
+      case 'EDP_DUTIES': {
+        const dutiesList = db.getScopedEdpDuties(user, role);
+        const headers = ['Duty Code', 'Event Name', 'Event Category', 'Duty Role', 'Assigned Staff', 'Staff Designation', 'Duty Date', 'Time Slot', 'Venue', 'GPS Evidence', 'Status', 'Verified By'];
+        const rows: (string | number)[][] = dutiesList.map(d => [
+          d.dutyCode,
+          d.eventName,
+          d.eventType,
+          d.dutyRole.replace('_', ' '),
+          d.assignedUserName,
+          d.assignedUserDesignation || 'Staff',
+          d.dutyDate,
+          `${d.startTime} - ${d.endTime}`,
+          d.venue,
+          d.evidenceList.length > 0 ? `GPS VERIFIED (${d.evidenceList[0].latitude.toFixed(4)}°N, ${d.evidenceList[0].longitude.toFixed(4)}°E)` : 'PENDING',
+          d.status,
+          d.verifiedByAdminName || 'UNVERIFIED'
+        ]);
+        return { reportTitle: 'EDP Duty Management & Geo Evidence Audit Register', headers, rows };
       }
 
       default: {

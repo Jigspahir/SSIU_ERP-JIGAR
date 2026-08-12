@@ -5,7 +5,7 @@ import {
   FeeStructure, StudentFeeRecord, FeePaymentTransaction,
   CRMLead, AdmissionApplication,
   Exam, ExamTimetable, ExamForm, StudentMarks, StudentResult, StudentFeedback, SupportTicket, StudentDocument,
-  ERPNotification, InwardOutwardRecord, RegistrarFileMovement, ApprovalRequest
+  ERPNotification, InwardOutwardRecord, RegistrarFileMovement, ApprovalRequest, EdpDuty
 } from '../types';
 
 export const initialInstitutes: Institute[] = [
@@ -2386,6 +2386,91 @@ export const initialApprovalRequests: ApprovalRequest[] = [
     ],
     createdAt: '2026-08-12T09:30:00.000Z',
     updatedAt: '2026-08-12T09:30:00.000Z'
+  }
+];
+
+export const initialEdpDuties: EdpDuty[] = [
+  {
+    id: 'edp-101',
+    dutyCode: 'EDP-2024-001',
+    eventName: 'Annual University Convocation 2024',
+    eventType: 'CONVOCATION',
+    dutyRole: 'STAGE_MANAGER',
+    assignedUserId: 'fac-1',
+    assignedUserName: 'Prof. Vikram Trivedi',
+    assignedUserRole: 'FACULTY',
+    assignedUserDesignation: 'Associate Professor',
+    instituteId: 'inst-1',
+    departmentId: 'dept-1',
+    dutyDate: '2026-08-15',
+    startTime: '09:00 AM',
+    endTime: '02:00 PM',
+    venue: 'Swarrnim Auditorium Main Stage',
+    responsibilityDetails: 'Stage coordination, degree certificate scroll distribution, and VIP guest dais management.',
+    status: 'VERIFIED',
+    reportsNotes: 'Convocation stage proceedings executed smoothly without delay. All 450 degree scrolls verified.',
+    evidenceList: [
+      {
+        id: 'ev-101a',
+        photoUrl: 'https://images.unsplash.com/photo-1541829070764-84a7d30dd3f3?auto=format&fit=crop&w=600&q=80',
+        latitude: 23.0225,
+        longitude: 72.5714,
+        locationAddress: 'Swarrnim Main Auditorium, Swarrnim Campus, Gandhinagar, Gujarat 382421',
+        capturedAt: '2026-08-15T09:15:00Z',
+        deviceInfo: 'Samsung Galaxy Tab S9 - Android 14 GPS Verified',
+        remarks: 'Morning stage setup inspection completed with Convocation Committee.'
+      }
+    ],
+    verifiedByAdminId: 'user-registrar',
+    verifiedByAdminName: 'Dr. S. K. Mehta',
+    verifiedAt: '2026-08-15T15:00:00Z',
+    verificationRemarks: 'Duty verified. Stage protocol adhered to standards.',
+    createdAt: '2026-08-10T10:00:00Z',
+    updatedAt: '2026-08-15T15:00:00Z'
+  },
+  {
+    id: 'edp-102',
+    dutyCode: 'EDP-2024-002',
+    eventName: 'National AI & Quantum Computing Hackathon',
+    eventType: 'WORKSHOP',
+    dutyRole: 'TECHNICAL_LEAD',
+    assignedUserId: 'user-hod-1',
+    assignedUserName: 'Dr. Amit Shah',
+    assignedUserRole: 'HOD',
+    assignedUserDesignation: 'HOD Computer Engineering',
+    instituteId: 'inst-1',
+    departmentId: 'dept-1',
+    dutyDate: '2026-08-18',
+    startTime: '10:00 AM',
+    endTime: '05:00 PM',
+    venue: 'SSCIT High Performance Computer Lab 301',
+    responsibilityDetails: 'Manage GPU server access, high-speed Wi-Fi network, and technical judging criteria.',
+    status: 'ASSIGNED',
+    evidenceList: [],
+    createdAt: '2026-08-11T11:00:00Z',
+    updatedAt: '2026-08-11T11:00:00Z'
+  },
+  {
+    id: 'edp-103',
+    dutyCode: 'EDP-2024-003',
+    eventName: 'Semester Mid-Term Examination Invigilation',
+    eventType: 'EXAM_INVIGILATION',
+    dutyRole: 'VENUE_INCHARGE',
+    assignedUserId: 'fac-2',
+    assignedUserName: 'Prof. Sunita Patel',
+    assignedUserRole: 'FACULTY',
+    assignedUserDesignation: 'Professor',
+    instituteId: 'inst-1',
+    departmentId: 'dept-1',
+    dutyDate: '2026-08-20',
+    startTime: '10:30 AM',
+    endTime: '01:30 PM',
+    venue: 'Exam Hall 204 (Block A)',
+    responsibilityDetails: 'Exam hall seating verification, question paper distribution, and invigilation log sign-off.',
+    status: 'ASSIGNED',
+    evidenceList: [],
+    createdAt: '2026-08-12T08:30:00Z',
+    updatedAt: '2026-08-12T08:30:00Z'
   }
 ];
 
