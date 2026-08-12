@@ -10,7 +10,8 @@ import type {
   EdpDuty, EdpDutyEvidence, EdpDutyStatus,
   NaacCriterion, NaacKeyIndicator, NaacMetric, NaacDataSubmission, ResearchProject, PublicationRecord, PatentRecord,
   Employee, PayrollRecord, EmployeeLeaveApplication, PerformanceAppraisal, TrainingFdpRecord,
-  StartupIdea, StartupFounder, StartupFunding, IncubationMentorSession, IncubationWorkshop, IncubationApplicationStatus
+  StartupIdea, StartupFounder, StartupFunding, IncubationMentorSession, IncubationWorkshop, IncubationApplicationStatus,
+  StartupMilestone, StartupDocument, NoteSheet, NoteSheetMovement, NoteSheetWorkflowConfig, NoteSheetStatus, NoteSheetAction
 } from '../types';
 import { 
   initialUniversity, initialInstitutes, initialDepartments, initialPrograms, initialAcademicYears, 
@@ -86,6 +87,8 @@ export interface DatabaseState {
   startupFundings: StartupFunding[];
   mentorSessions: IncubationMentorSession[];
   incubationWorkshops: IncubationWorkshop[];
+  noteSheets: NoteSheet[];
+  noteSheetWorkflowConfigs: NoteSheetWorkflowConfig[];
 }
 
 class ERPDatabaseService {
@@ -151,7 +154,11 @@ class ERPDatabaseService {
       startupFounders: initialStartupFounders,
       startupFundings: initialStartupFundings,
       mentorSessions: initialMentorSessions,
-      incubationWorkshops: initialIncubationWorkshops
+      incubationWorkshops: initialIncubationWorkshops,
+      noteSheets: [],
+      noteSheetWorkflowConfigs: [
+        { id: 'ssiu-default', name: 'Default SSIU Workflow', steps: ['HOD', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'VICE_PRESIDENT'], isActive: true }
+      ]
     };
   }
 
@@ -194,6 +201,25 @@ class ERPDatabaseService {
           registrarFileMovements: parsed.registrarFileMovements || defaults.registrarFileMovements,
           approvalRequests: parsed.approvalRequests || defaults.approvalRequests,
           edpDuties: parsed.edpDuties || defaults.edpDuties,
+          naacCriteria: parsed.naacCriteria || defaults.naacCriteria,
+          naacKeyIndicators: parsed.naacKeyIndicators || defaults.naacKeyIndicators,
+          naacMetrics: parsed.naacMetrics || defaults.naacMetrics,
+          naacSubmissions: parsed.naacSubmissions || defaults.naacSubmissions,
+          researchProjects: parsed.researchProjects || defaults.researchProjects,
+          publications: parsed.publications || defaults.publications,
+          patents: parsed.patents || defaults.patents,
+          employees: parsed.employees || defaults.employees,
+          payrollRecords: parsed.payrollRecords || defaults.payrollRecords,
+          leaveApplications: parsed.leaveApplications || defaults.leaveApplications,
+          performanceAppraisals: parsed.performanceAppraisals || defaults.performanceAppraisals,
+          trainingFdpRecords: parsed.trainingFdpRecords || defaults.trainingFdpRecords,
+          startupIdeas: parsed.startupIdeas || defaults.startupIdeas,
+          startupFounders: parsed.startupFounders || defaults.startupFounders,
+          startupFundings: parsed.startupFundings || defaults.startupFundings,
+          mentorSessions: parsed.mentorSessions || defaults.mentorSessions,
+          incubationWorkshops: parsed.incubationWorkshops || defaults.incubationWorkshops,
+          noteSheets: parsed.noteSheets || defaults.noteSheets,
+          noteSheetWorkflowConfigs: parsed.noteSheetWorkflowConfigs || defaults.noteSheetWorkflowConfigs,
         };
       }
     } catch (e) {
@@ -1335,6 +1361,62 @@ class ERPDatabaseService {
     return this.state.incubationWorkshops || initialIncubationWorkshops;
   }
 
+  // Student-specific: get all startups where userId is a founder
+  getStartupsByFounder(userId: string): StartupIdea[] {
+    return (this.state.startupIdeas || initialStartupIdeas).filter(
+      s => s.founderIds.includes(userId) || s.leadFounderId === userId
+    );
+  }
+
+  // Student-specific: get mentor sessions for a specific startup
+  getMentorSessionsByStartup(startupId: string): IncubationMentorSession[] {
+    return (this.state.mentorSessions || initialMentorSessions).filter(s => s.startupId === startupId);
+  }
+
+  // Student-specific: get fundings for a specific startup
+  getStartupFundingsByStartup(startupId: string): StartupFunding[] {
+    return (this.state.startupFundings || initialStartupFundings).filter(f => f.startupId === startupId);
+  }
+
+  // Student-authorized update: student can only update non-approval-gated fields
+  updateStartupByStudent(startupId: string, updates: Partial<Pick<StartupIdea, 'description' | 'problemStatement' | 'proposedSolution' | 'targetMarket' | 'hasPrototype' | 'hasProduct' | 'annualRevenue' | 'employeesCount' | 'investorNames' | 'awards' | 'patentApplicationNo' | 'patentStatus'>>, user: User): void {
+    if (!this.state.startupIdeas) return;
+    const idea = this.state.startupIdeas.find(s => s.id === startupId);
+    if (!idea) return;
+    // Verify user is a founder
+    if (!idea.founderIds.includes(user.id) && idea.leadFounderId !== user.id) return;
+    Object.assign(idea, updates);
+    idea.updatedAt = new Date().toISOString().split('T')[0];
+    this.saveState();
+    this.logAudit('STUDENT_UPDATE_STARTUP', 'Incubation', `Startup ${startupId} updated by student founder ${user.name}`, user.name, user.role);
+  }
+
+  // Student: add milestone update to their startup
+  addMilestoneUpdate(startupId: string, milestone: Omit<StartupMilestone, 'id'>, user: User): StartupMilestone {
+    if (!this.state.startupIdeas) this.state.startupIdeas = [];
+    const idea = this.state.startupIdeas.find(s => s.id === startupId);
+    if (!idea) throw new Error('Startup not found');
+    const newMs: StartupMilestone = { ...milestone, id: `ms-${Date.now()}` };
+    idea.milestones.push(newMs);
+    idea.updatedAt = new Date().toISOString().split('T')[0];
+    this.saveState();
+    this.logAudit('ADD_MILESTONE', 'Incubation', `Milestone '${milestone.title}' added to startup ${startupId}`, user.name, user.role);
+    return newMs;
+  }
+
+  // Student: add document to their startup
+  addStartupDocument(startupId: string, doc: Omit<StartupDocument, 'id'>, user: User): StartupDocument {
+    if (!this.state.startupIdeas) this.state.startupIdeas = [];
+    const idea = this.state.startupIdeas.find(s => s.id === startupId);
+    if (!idea) throw new Error('Startup not found');
+    const newDoc: StartupDocument = { ...doc, id: `doc-${Date.now()}`, verified: false };
+    idea.documents.push(newDoc);
+    idea.updatedAt = new Date().toISOString().split('T')[0];
+    this.saveState();
+    this.logAudit('ADD_STARTUP_DOC', 'Incubation', `Document '${doc.name}' added to startup ${startupId}`, user.name, user.role);
+    return newDoc;
+  }
+
   submitStartupIdea(ideaData: Omit<StartupIdea, 'id' | 'ideaCode' | 'createdAt' | 'updatedAt' | 'milestones' | 'documents'>, user: User): StartupIdea {
     if (!this.state.startupIdeas) this.state.startupIdeas = [];
     const count = this.state.startupIdeas.length + 1;
@@ -1407,6 +1489,190 @@ class ERPDatabaseService {
     this.logAudit('ADD_WORKSHOP', 'Incubation', `Workshop '${newWs.title}' created by ${user.name}`, user.name, user.role);
     return newWs;
   }
+
+  // ─── DIGITAL NOTE SHEET & UNIVERSITY APPROVAL WORKFLOW METHODS ───────────────
+  getNoteSheets(): NoteSheet[] {
+    if (!this.state.noteSheets) this.state.noteSheets = [];
+    return this.state.noteSheets;
+  }
+
+  getNoteSheetWorkflowConfigs(): NoteSheetWorkflowConfig[] {
+    if (!this.state.noteSheetWorkflowConfigs) {
+      this.state.noteSheetWorkflowConfigs = [
+        { id: 'ssiu-default', name: 'Default SSIU Workflow', steps: ['HOD', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'VICE_PRESIDENT'], isActive: true }
+      ];
+    }
+    return this.state.noteSheetWorkflowConfigs;
+  }
+
+  saveNoteSheetWorkflowConfig(config: NoteSheetWorkflowConfig): void {
+    if (!this.state.noteSheetWorkflowConfigs) this.state.noteSheetWorkflowConfigs = [];
+    const idx = this.state.noteSheetWorkflowConfigs.findIndex(c => c.id === config.id);
+    if (idx >= 0) {
+      this.state.noteSheetWorkflowConfigs[idx] = config;
+    } else {
+      this.state.noteSheetWorkflowConfigs.push(config);
+    }
+    this.saveState();
+  }
+
+  createNoteSheet(noteData: Omit<NoteSheet, 'id' | 'noteSheetNumber' | 'status' | 'currentOffice' | 'movements' | 'version' | 'createdAt' | 'updatedAt'>, user: User, isDraft: boolean): NoteSheet {
+    if (!this.state.noteSheets) this.state.noteSheets = [];
+    const count = this.state.noteSheets.length + 1;
+    const year = new Date().getFullYear();
+    const noteSheetNumber = `SSIU-NS-${year}-${String(count).padStart(4, '0')}`;
+    
+    const config = this.getNoteSheetWorkflowConfigs().find(c => c.isActive) || { steps: ['HOD', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'VICE_PRESIDENT'] };
+    const firstStep = config.steps[0] as NoteSheet['currentOffice'];
+
+    const newNote: NoteSheet = {
+      ...noteData,
+      id: `ns-${Date.now()}`,
+      noteSheetNumber,
+      status: isDraft ? 'DRAFT' : 'SUBMITTED',
+      currentOffice: isDraft ? 'CREATOR' : firstStep,
+      version: 1,
+      attachments: noteData.attachments || [],
+      movements: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    if (!isDraft) {
+      // Add first movement
+      newNote.movements.push({
+        id: `mvt-${Date.now()}`,
+        noteSheetId: newNote.id,
+        fromUser: `${user.name} (${user.role})`,
+        toUser: `Pending Approval - ${firstStep}`,
+        action: 'SUBMIT',
+        remarks: 'Note Sheet submitted online.',
+        timestamp: new Date().toLocaleString()
+      });
+      // Send notification
+      this.sendWorkflowNotification(firstStep, `New Note Sheet ${noteSheetNumber} submitted for approval by ${user.name}.`);
+    }
+
+    this.state.noteSheets.unshift(newNote);
+    this.saveState();
+    this.logAudit(isDraft ? 'CREATE_DRAFT_NOTESHEET' : 'SUBMIT_NOTESHEET', 'Administration', `Note Sheet ${noteSheetNumber} created by ${user.name}`, user.name, user.role);
+    return newNote;
+  }
+
+  processNoteSheetAction(noteSheetId: string, action: NoteSheetAction, remarks: string, attachmentUrl: string | undefined, user: User): void {
+    if (!this.state.noteSheets) this.state.noteSheets = [];
+    const ns = this.state.noteSheets.find(n => n.id === noteSheetId);
+    if (!ns) return;
+
+    const config = this.getNoteSheetWorkflowConfigs().find(c => c.isActive) || { steps: ['HOD', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'VICE_PRESIDENT'] };
+    const steps = config.steps;
+    const currentIdx = steps.indexOf(ns.currentOffice);
+
+    let nextStep: NoteSheet['currentOffice'] | 'COMPLETED' | 'CREATOR' = ns.currentOffice;
+    let nextStatus: NoteSheetStatus = ns.status;
+
+    if (action === 'APPROVE' || action === 'FORWARD') {
+      if (currentIdx === -1) {
+        // From draft/creator to first step
+        nextStep = steps[0] as NoteSheet['currentOffice'];
+        nextStatus = 'SUBMITTED';
+      } else if (currentIdx === steps.length - 1) {
+        // Last authority approves
+        nextStep = 'COMPLETED';
+        nextStatus = 'APPROVED';
+      } else {
+        // Move to next step
+        nextStep = steps[currentIdx + 1] as NoteSheet['currentOffice'];
+        nextStatus = 'PENDING_APPROVAL';
+      }
+
+      ns.movements.push({
+        id: `mvt-${Date.now()}`,
+        noteSheetId: ns.id,
+        fromUser: `${user.name} (${user.role})`,
+        toUser: nextStep === 'COMPLETED' ? 'Completed / Approved' : `Pending Approval - ${nextStep}`,
+        action,
+        remarks,
+        attachmentUrl,
+        timestamp: new Date().toLocaleString()
+      });
+
+      if (nextStep === 'COMPLETED') {
+        this.sendNotificationToUser(ns.creatorId, `Your Note Sheet ${ns.noteSheetNumber} has been fully APPROVED!`);
+      } else {
+        this.sendWorkflowNotification(nextStep as string, `Note Sheet ${ns.noteSheetNumber} forwarded to your office for approval.`);
+      }
+    } else if (action === 'RETURN') {
+      // Return to previous step or creator
+      if (currentIdx <= 0) {
+        nextStep = 'CREATOR';
+      } else {
+        nextStep = steps[currentIdx - 1] as NoteSheet['currentOffice'];
+      }
+      nextStatus = 'RETURNED';
+
+      ns.movements.push({
+        id: `mvt-${Date.now()}`,
+        noteSheetId: ns.id,
+        fromUser: `${user.name} (${user.role})`,
+        toUser: nextStep === 'CREATOR' ? `Creator (${ns.creatorName})` : `Pending Correction - ${nextStep}`,
+        action,
+        remarks,
+        attachmentUrl,
+        timestamp: new Date().toLocaleString()
+      });
+
+      ns.version += 1; // Increment version on correction loop
+      this.sendNotificationToUser(ns.creatorId, `Your Note Sheet ${ns.noteSheetNumber} was returned for correction: ${remarks}`);
+    } else if (action === 'REJECT') {
+      nextStep = 'CREATOR';
+      nextStatus = 'REJECTED';
+
+      ns.movements.push({
+        id: `mvt-${Date.now()}`,
+        noteSheetId: ns.id,
+        fromUser: `${user.name} (${user.role})`,
+        toUser: `Rejected - ${user.name}`,
+        action,
+        remarks,
+        attachmentUrl,
+        timestamp: new Date().toLocaleString()
+      });
+
+      this.sendNotificationToUser(ns.creatorId, `Your Note Sheet ${ns.noteSheetNumber} has been REJECTED. Reason: ${remarks}`);
+    }
+
+    ns.currentOffice = nextStep as NoteSheet['currentOffice'];
+    ns.status = nextStatus;
+    ns.updatedAt = new Date().toISOString();
+    this.saveState();
+    this.logAudit('PROCESS_NOTESHEET', 'Administration', `Note Sheet ${ns.noteSheetNumber} processed: ${action} by ${user.name}`, user.name, user.role);
+  }
+
+  private sendWorkflowNotification(officeRole: string, message: string): void {
+    // Notify all active users matching the role/office
+    const targetUsers = this.getUsers().filter(u => u.role === officeRole || (officeRole === 'DEPUTY_REGISTRAR' && u.role === 'REGISTRAR'));
+    targetUsers.forEach(u => {
+      this.addNotification({
+        targetUserId: u.id,
+        title: 'Note Sheet Action Required',
+        message,
+        module: 'SYSTEM',
+        timestamp: new Date().toISOString()
+      });
+    });
+  }
+
+  private sendNotificationToUser(userId: string, message: string): void {
+    this.addNotification({
+      targetUserId: userId,
+      title: 'Note Sheet Status Update',
+      message,
+      module: 'SYSTEM',
+      timestamp: new Date().toISOString()
+    });
+  }
 }
+
 
 export const db = new ERPDatabaseService();

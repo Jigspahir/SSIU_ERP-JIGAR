@@ -1249,3 +1249,65 @@ export interface IncubationWorkshop {
   status: 'UPCOMING' | 'COMPLETED';
 }
 
+// ─── DIGITAL NOTE SHEET & UNIVERSITY APPROVAL WORKFLOW ───────────────────────
+export type NoteSheetStatus =
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'PENDING_APPROVAL'
+  | 'RETURNED'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'COMPLETED';
+
+export type NoteSheetAction =
+  | 'CREATE'
+  | 'SUBMIT'
+  | 'APPROVE'
+  | 'FORWARD'
+  | 'RETURN'
+  | 'REJECT';
+
+export interface NoteSheetMovement {
+  id: string;
+  noteSheetId: string;
+  fromUser: string; // Name & Role
+  toUser: string; // Name & Role
+  action: NoteSheetAction;
+  remarks: string;
+  attachmentUrl?: string;
+  timestamp: string;
+}
+
+export interface NoteSheet {
+  id: string;
+  noteSheetNumber: string; // Auto-generated e.g., SSIU-NS-2024-0001
+  date: string;
+  instituteId: string;
+  departmentId: string;
+  creatorId: string;
+  creatorName: string;
+  contactNumber: string;
+  subject: string;
+  proposal: string;
+  purposeJustification: string;
+  budgetRequired: boolean;
+  estimatedCost: number;
+  vendorQuotation?: string;
+  requiredDate: string;
+  status: NoteSheetStatus;
+  currentOffice: 'HOD' | 'HOI' | 'DEPUTY_REGISTRAR' | 'REGISTRAR' | 'VICE_PRESIDENT' | 'COMPLETED' | 'CREATOR';
+  currentHandlerId?: string; // Current user ID responsible
+  attachments: string[]; // List of mock file names/URLs
+  movements: NoteSheetMovement[];
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NoteSheetWorkflowConfig {
+  id: string;
+  name: string;
+  steps: string[]; // Array of roles e.g., ['HOD', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'VICE_PRESIDENT']
+  isActive: boolean;
+}
+

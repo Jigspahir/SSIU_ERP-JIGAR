@@ -38,9 +38,15 @@ const statusBadgeVariant = (s: IncubationApplicationStatus) => {
 
 type TabType = 'DASHBOARD' | 'STARTUPS' | 'REGISTER' | 'SCREENING' | 'FUNDING' | 'MENTOR' | 'WORKSHOPS' | 'REPORTS';
 
+import { StudentStartupPortal } from './StudentStartupPortal';
+
 export const IncubationPage: React.FC = () => {
   const { user, role } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('DASHBOARD');
+
+  if (role === 'STUDENT') {
+    return <StudentStartupPortal />;
+  }
 
   // DB state
   const [startups, setStartups] = useState<StartupIdea[]>(db.getStartupIdeas());

@@ -90,6 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     'programs': { id: 'programs', label: 'Programs', icon: GraduationCap, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'REGISTRAR'], category: 'Master' },
     'reports': { id: 'reports', label: 'Reports', icon: BarChart3, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC', 'EXAM_CELL'], category: 'System' },
     'settings': { id: 'settings', label: 'Settings', icon: Settings, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN'], category: 'System' },
+    'note-sheets': { id: 'note-sheets', label: 'Note Sheets', icon: FileText, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN'], category: 'Administration' },
     'profile': { id: 'profile', label: 'My Profile', icon: User, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN'], category: 'System' }
   };
 
@@ -102,14 +103,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const facultyOrderKeys = [
     'dashboard', 'subjects', 'timetable', 'attendance', 'session-plan', 'materials',
-    'assignments', 'exam-marks', 'exam-dashboard', 'requests', 'edp-duties', 'tickets', 'mentor', 'feedback', 'profile'
+    'assignments', 'exam-marks', 'exam-dashboard', 'requests', 'edp-duties', 'tickets', 'mentor', 'feedback', 'note-sheets', 'profile'
   ];
 
   const adminOrderKeys = [
     'dashboard', 'registrar', 'iqac', 'exam-cell', 'student-section', 'hostel-admin', 'library-admin', 'transport-admin', 'maintenance-admin',
     'students', 'faculty', 'departments', 'programs', 'subjects',
     'calendar', 'attendance', 'exam-dashboard', 'fees', 'crm', 'certificates',
-    'requests', 'edp-duties', 'tickets', 'feedback', 'notices', 'events', 'reports', 'settings', 'profile'
+    'requests', 'edp-duties', 'tickets', 'feedback', 'notices', 'events', 'reports', 'settings', 'note-sheets', 'profile'
   ];
 
   let orderKeys = adminOrderKeys;
@@ -118,21 +119,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
   } else if (role === 'FACULTY') {
     orderKeys = facultyOrderKeys;
   } else if (role === 'REGISTRAR') {
-    orderKeys = ['dashboard', 'registrar', 'requests', 'edp-duties', 'students', 'faculty', 'departments', 'programs', 'notices', 'reports', 'profile'];
+    orderKeys = ['dashboard', 'registrar', 'requests', 'edp-duties', 'students', 'faculty', 'departments', 'programs', 'notices', 'reports', 'note-sheets', 'profile'];
   } else if (role === 'IQAC') {
-    orderKeys = ['dashboard', 'iqac', 'requests', 'edp-duties', 'faculty', 'feedback', 'reports', 'profile'];
+    orderKeys = ['dashboard', 'iqac', 'requests', 'edp-duties', 'faculty', 'feedback', 'reports', 'note-sheets', 'profile'];
   } else if (role === 'EXAM_CELL') {
-    orderKeys = ['dashboard', 'exam-cell', 'exam-dashboard', 'requests', 'edp-duties', 'students', 'reports', 'profile'];
+    orderKeys = ['dashboard', 'exam-cell', 'exam-dashboard', 'requests', 'edp-duties', 'students', 'reports', 'note-sheets', 'profile'];
   } else if (role === 'STUDENT_SECTION') {
-    orderKeys = ['dashboard', 'student-section', 'requests', 'edp-duties', 'students', 'certificates', 'notifications', 'profile'];
+    orderKeys = ['dashboard', 'student-section', 'requests', 'edp-duties', 'students', 'certificates', 'notifications', 'note-sheets', 'profile'];
   } else if (role === 'HOSTEL_ADMIN') {
-    orderKeys = ['dashboard', 'hostel-admin', 'requests', 'edp-duties', 'students', 'tickets', 'notifications', 'profile'];
+    orderKeys = ['dashboard', 'hostel-admin', 'requests', 'edp-duties', 'students', 'tickets', 'notifications', 'note-sheets', 'profile'];
   } else if (role === 'LIBRARY_ADMIN') {
-    orderKeys = ['dashboard', 'library-admin', 'requests', 'library', 'students', 'profile'];
+    orderKeys = ['dashboard', 'library-admin', 'requests', 'library', 'students', 'note-sheets', 'profile'];
   } else if (role === 'TRANSPORT_ADMIN') {
-    orderKeys = ['dashboard', 'transport-admin', 'requests', 'students', 'profile'];
+    orderKeys = ['dashboard', 'transport-admin', 'requests', 'students', 'note-sheets', 'profile'];
   } else if (role === 'MAINTENANCE_ADMIN') {
-    orderKeys = ['dashboard', 'maintenance-admin', 'requests', 'tickets', 'profile'];
+    orderKeys = ['dashboard', 'maintenance-admin', 'requests', 'tickets', 'note-sheets', 'profile'];
   }
 
   const visibleItems: NavItem[] = orderKeys

@@ -59,6 +59,7 @@ import { MaintenanceWorkspacePage } from './pages/admin-offices/MaintenanceWorks
 
 // System Settings Module Page
 import { SystemSettingsPage } from './pages/settings/SystemSettingsPage';
+import { NoteSheetPage } from './pages/admin-offices/NoteSheetPage';
 
 // Examination Management Module Pages
 import { ExamDashboardPage } from './pages/exams/ExamDashboardPage';
@@ -110,37 +111,37 @@ const MainAppContent: React.FC = () => {
     if (examTabs.includes(tab)) return true;
 
     if (role === 'PRINCIPAL') {
-      return ['departments', 'programs', 'academic-years', 'batches', 'semesters', 'divisions', 'subjects', 'faculty', 'students'].includes(tab);
+      return ['departments', 'programs', 'academic-years', 'batches', 'semesters', 'divisions', 'subjects', 'faculty', 'students', 'note-sheets'].includes(tab);
     }
     if (role === 'HOD') {
-      return ['programs', 'batches', 'semesters', 'divisions', 'subjects', 'faculty', 'students'].includes(tab);
+      return ['programs', 'batches', 'semesters', 'divisions', 'subjects', 'faculty', 'students', 'note-sheets'].includes(tab);
     }
     if (role === 'FACULTY') {
-      return ['divisions', 'subjects', 'students', 'faculty'].includes(tab);
+      return ['divisions', 'subjects', 'students', 'faculty', 'note-sheets'].includes(tab);
     }
     if (role === 'REGISTRAR') {
-      return ['registrar', 'students', 'faculty', 'departments', 'programs', 'notices', 'reports'].includes(tab);
+      return ['registrar', 'students', 'faculty', 'departments', 'programs', 'notices', 'reports', 'note-sheets'].includes(tab);
     }
     if (role === 'IQAC') {
-      return ['iqac', 'faculty', 'feedback', 'reports'].includes(tab);
+      return ['iqac', 'faculty', 'feedback', 'reports', 'note-sheets'].includes(tab);
     }
     if (role === 'EXAM_CELL') {
-      return ['exam-cell', 'exam-dashboard', 'exams', 'exam-forms', 'exam-schedule', 'exam-hallticket', 'exam-marks', 'exam-results', 'exam-marksheet', 'students', 'reports'].includes(tab);
+      return ['exam-cell', 'exam-dashboard', 'exams', 'exam-forms', 'exam-schedule', 'exam-hallticket', 'exam-marks', 'exam-results', 'exam-marksheet', 'students', 'reports', 'note-sheets'].includes(tab);
     }
     if (role === 'STUDENT_SECTION') {
-      return ['student-section', 'students', 'certificates', 'notifications'].includes(tab);
+      return ['student-section', 'students', 'certificates', 'notifications', 'note-sheets'].includes(tab);
     }
     if (role === 'HOSTEL_ADMIN') {
-      return ['hostel-admin', 'students', 'tickets', 'notifications'].includes(tab);
+      return ['hostel-admin', 'students', 'tickets', 'notifications', 'note-sheets'].includes(tab);
     }
     if (role === 'LIBRARY_ADMIN') {
-      return ['library-admin', 'library', 'students'].includes(tab);
+      return ['library-admin', 'library', 'students', 'note-sheets'].includes(tab);
     }
     if (role === 'TRANSPORT_ADMIN') {
-      return ['transport-admin', 'students'].includes(tab);
+      return ['transport-admin', 'students', 'note-sheets'].includes(tab);
     }
     if (role === 'MAINTENANCE_ADMIN') {
-      return ['maintenance-admin', 'tickets'].includes(tab);
+      return ['maintenance-admin', 'tickets', 'note-sheets'].includes(tab);
     }
     return false;
   };
@@ -252,6 +253,8 @@ const MainAppContent: React.FC = () => {
         return <StudentsPage />;
       case 'profile':
         return <ProfilePage />;
+      case 'note-sheets':
+        return role !== 'STUDENT' ? <NoteSheetPage /> : <Dashboard setActiveTab={setActiveTab} />;
       default:
         return <Dashboard setActiveTab={setActiveTab} />;
     }
