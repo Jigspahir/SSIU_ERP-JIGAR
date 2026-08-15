@@ -5,6 +5,7 @@ import { Badge } from '../../components/common/Badge';
 import { StatCard } from '../../components/common/StatCard';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { FeeReceiptModal } from '../../components/finance/FeeReceiptModal';
+import { DashboardReportModal } from '../../components/reports/DashboardReportModal';
 import { 
   FeeStructure, StudentFeeRecord, FeePaymentTransaction, PaymentMode, FeePaymentStatus 
 } from '../../types';
@@ -41,6 +42,7 @@ export const FeesFinancePage: React.FC = () => {
   const [selectedTransactionForReceipt, setSelectedTransactionForReceipt] = useState<FeePaymentTransaction | null>(null);
   const [deletingRecord, setDeletingRecord] = useState<StudentFeeRecord | null>(null);
   const [refundingTx, setRefundingTx] = useState<FeePaymentTransaction | null>(null);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   // Student Semester View State
   const [studentSelectedSem, setStudentSelectedSem] = useState<string>('sem-cse-4');
@@ -677,11 +679,14 @@ export const FeesFinancePage: React.FC = () => {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button className="btn btn-primary" onClick={() => setIsReportModalOpen(true)}>
+            <FileText size={16} /> Generate Fee Report
+          </button>
           <button className="btn btn-secondary" onClick={handleExportCSVReport}>
             <Download size={16} /> Export Financial Ledger (CSV)
           </button>
-          <button className="btn btn-primary" onClick={() => setIsAddStructureModalOpen(true)}>
+          <button className="btn btn-secondary" onClick={() => setIsAddStructureModalOpen(true)}>
             <Plus size={16} /> Add Fee Structure
           </button>
         </div>
@@ -1065,6 +1070,21 @@ export const FeesFinancePage: React.FC = () => {
         isOpen={!!selectedTransactionForReceipt}
         onClose={() => setSelectedTransactionForReceipt(null)}
         transaction={selectedTransactionForReceipt}
+      />
+
+      {/* Dashboard Report Modal */}
+      <DashboardReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        dashboardType="FEES"
+        currentFilters={{
+          programId: selectedProgFilter,
+          semesterId: selectedSemFilter,
+          paymentStatus: selectedStatusFilter as any,
+          searchQuery: searchTerm
+        }}
+        user={user}
+        role={role}
       />
     </div>
   );

@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
 import { StatCard } from '../../components/common/StatCard';
 import { Badge } from '../../components/common/Badge';
 import { PieChart } from '../../components/common/Charts';
+import { DashboardReportModal } from '../../components/reports/DashboardReportModal';
 import { 
   Building2, GitFork, GraduationCap, Users as Users2, UserCheck, 
   BookOpen, Calendar, ArrowRight, ShieldCheck, 
@@ -18,6 +19,7 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
   const { user, role } = useAuth();
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   const institutes = db.getInstitutes();
   const departments = db.getDepartments();
@@ -69,70 +71,370 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
 
   const stats = getScopedStats();
 
-  // 1. Super Admin & University Admin Dashboard
+  // 1. Campus Dashboard (Phase 1 Executive & Admin Foundation)
   const renderAdminDashboard = () => {
     const totalActiveSubjects = subjects.filter(s => s.status === 'ACTIVE').length;
+    const totalEnrolled = stats.totalStudents || 1284;
+    const activeEnrolled = stats.activeStudents || 1221;
+    const activePercentage = ((activeEnrolled / (totalEnrolled || 1)) * 100).toFixed(1);
 
-    const deptStudentData = [
-      { label: 'CSE Dept', value: stats.scopedStudents.filter(s => s.departmentId === 'dept-cse' || s.departmentId === 'dept-1').length || 145, color: '#4285F4' },
-      { label: 'IT Dept', value: stats.scopedStudents.filter(s => s.departmentId === 'dept-it' || s.departmentId === 'dept-2').length || 110, color: '#EA4335' },
-      { label: 'AI & DS Dept', value: stats.scopedStudents.filter(s => s.departmentId === 'dept-aids' || s.departmentId === 'dept-3').length || 125, color: '#FBBC05' },
-      { label: 'Mech Dept', value: stats.scopedStudents.filter(s => s.departmentId === 'dept-mech' || s.departmentId === 'dept-4').length || 85, color: '#34A853' },
-      { label: 'EE Dept', value: stats.scopedStudents.filter(s => s.departmentId === 'dept-ee' || s.departmentId === 'dept-5').length || 75, color: '#8E24AA' }
+    // Current Date Formatting
+    const todayFormatted = new Date().toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    // 1. Student Enrollment Distribution
+    const enrollmentData = [
+      { label: 'Regular B.Tech/B.Sc', value: Math.round(totalEnrolled * 0.82), color: '#4285F4' },
+      { label: 'Lateral Entry (D2D)', value: Math.round(totalEnrolled * 0.12), color: '#34A853' },
+      { label: 'Management / NRI Quota', value: Math.round(totalEnrolled * 0.06), color: '#FBBC05' }
     ];
 
+    // 2. Campus Attendance Distribution
+    const attendanceData = [
+      { label: 'Present Today', value: 1185, color: '#34A853' },
+      { label: 'Unexcused Absent', value: 99, color: '#EA4335' },
+      { label: 'Late Arrival', value: 35, color: '#FBBC05' },
+      { label: 'Approved Leave', value: 24, color: '#4285F4' }
+    ];
+
+    // 3. Fee Revenue Breakdown
     const feeCategoryData = [
       { label: 'Tuition Fees Paid', value: Math.round(financeStats.totalCollected * 0.75), color: '#34A853' },
       { label: 'Exam Fees Paid', value: Math.round(financeStats.totalCollected * 0.15), color: '#4285F4' },
       { label: 'Hostel & Mess Paid', value: Math.round(financeStats.totalCollected * 0.10), color: '#FBBC05' },
-      { label: 'Pending Dues', value: financeStats.totalPending, color: '#EA4335' }
+      { label: 'Pending Term 2 Dues', value: financeStats.totalPending, color: '#EA4335' }
     ];
+
+    // 4. Department-wise Student Strength
+    const deptStudentData = [
+      { label: 'CSE Dept', value: stats.scopedStudents.filter(s => s.departmentId === 'dept-cse' || s.departmentId === 'dept-1').length || 145, color: '#4285F4' },
+      { label: 'AI & DS Dept', value: stats.scopedStudents.filter(s => s.departmentId === 'dept-aids' || s.departmentId === 'dept-3').length || 125, color: '#FBBC05' },
+      { label: 'IT Dept', value: stats.scopedStudents.filter(s => s.departmentId === 'dept-it' || s.departmentId === 'dept-2').length || 110, color: '#34A853' },
+      { label: 'Mech Dept', value: stats.scopedStudents.filter(s => s.departmentId === 'dept-mech' || s.departmentId === 'dept-4').length || 85, color: '#FF6D00' },
+      { label: 'EE Dept', value: stats.scopedStudents.filter(s => s.departmentId === 'dept-ee' || s.departmentId === 'dept-5').length || 75, color: '#8E24AA' }
+    ];
+
+    const pendingApprovalsCount = approvalRequests.filter(r => r.status === 'PENDING').length;
+    const userInitials = (user?.name || 'AD').split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
-        <div className="card" style={{ padding: '1.5rem', background: 'linear-gradient(135deg, #071325 0%, #0F2C59 100%)', color: '#FFFFFF' }}>
-          <Badge variant="gold">University Executive Dashboard</Badge>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#FFFFFF', marginTop: '0.5rem' }}>
-            Welcome, {user?.name || 'Administrator'}
-          </h2>
-          <p style={{ fontSize: '0.875rem', color: '#94A3B8', marginTop: '0.25rem' }}>
-            {user?.designation || 'Swarrnim Startup & Innovation University Headquarters'}
-          </p>
+        {/* =========================================================================
+            3. PROFESSIONAL DASHBOARD HEADER
+            ========================================================================= */}
+        <div
+          className="card"
+          style={{
+            padding: '1.75rem',
+            background: 'linear-gradient(135deg, #071325 0%, #0F2C59 60%, #1A365D 100%)',
+            color: '#FFFFFF',
+            borderRadius: '16px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            boxShadow: '0 10px 25px -5px rgba(15, 44, 89, 0.3)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '1.25rem'
+          }}
+        >
+          {/* Title & Welcome Info */}
+          <div style={{ maxWidth: '620px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+              <Badge variant="gold">Campus Dashboard</Badge>
+              <span style={{ fontSize: '0.75rem', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <CalendarDays size={14} color="#F59E0B" /> {todayFormatted}
+              </span>
+            </div>
+            <h1 style={{ fontSize: '1.875rem', fontWeight: 900, color: '#FFFFFF', margin: 0, letterSpacing: '-0.5px' }}>
+              Welcome back, {user?.name || 'Administrator'}
+            </h1>
+            <p style={{ fontSize: '0.875rem', color: '#CBD5E1', marginTop: '0.35rem', lineHeight: 1.5 }}>
+              Swarrnim Startup &amp; Innovation University • Real-time operational intelligence, academic analytics &amp; institutional governance.
+            </p>
+          </div>
+
+          {/* Quick Notifications & User Profile Area */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            {/* Generate Report Button */}
+            <button
+              onClick={() => setIsReportModalOpen(true)}
+              className="btn"
+              style={{
+                backgroundColor: '#F37023',
+                color: '#FFFFFF',
+                border: 'none',
+                padding: '0.6rem 1rem',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: '0.8125rem',
+                boxShadow: '0 4px 10px rgba(243, 112, 35, 0.35)',
+                transition: 'all 0.2s ease'
+              }}
+              title="Generate Campus Overview Report"
+            >
+              <FileText size={16} />
+              <span>Generate Report</span>
+            </button>
+
+            {/* Notification Trigger Button */}
+            <button
+              onClick={() => setActiveTab('notifications')}
+              className="btn"
+              style={{
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                color: '#FFFFFF',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                backdropFilter: 'blur(8px)',
+                padding: '0.6rem 1rem',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              title="View Unread Notifications"
+            >
+              <div style={{ position: 'relative' }}>
+                <Bell size={18} color="#FBBF24" />
+                {userNotifications.length > 0 && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '-6px',
+                      right: '-6px',
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      backgroundColor: '#EF4444',
+                      border: '2px solid #0F2C59'
+                    }}
+                  />
+                )}
+              </div>
+              <span style={{ fontSize: '0.8125rem', fontWeight: 700 }}>
+                {userNotifications.length} Alerts
+              </span>
+            </button>
+
+            {/* Profile Avatar & Details Area */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.5rem 0.85rem',
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                borderRadius: '14px',
+                border: '1px solid rgba(255, 255, 255, 0.15)'
+              }}
+            >
+              <div
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  backgroundColor: '#F37023',
+                  color: '#FFFFFF',
+                  fontWeight: 900,
+                  fontSize: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 10px rgba(243, 112, 35, 0.35)'
+                }}
+              >
+                {userInitials}
+              </div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '0.875rem', color: '#FFFFFF' }}>
+                  {user?.name || 'Executive User'}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: '#FCD34D', fontWeight: 600 }}>
+                  {role?.replace('_', ' ') || 'UNIVERSITY ADMIN'}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="grid-4">
-          <StatCard title="Total Students" value={stats.totalStudents} subtitle="Across constituent schools" icon={Users2} colorScheme="orange" onClick={() => setActiveTab('students')} />
-          <StatCard title="Active Faculty" value={stats.activeFaculty} subtitle="Teaching staff on roster" icon={UserCheck} colorScheme="navy" onClick={() => setActiveTab('faculty')} />
-          <StatCard title="Collected Revenue" value={`₹${(financeStats.totalCollected / 100000).toFixed(2)} L`} subtitle={`${financeStats.collectionPercentage}% collected`} icon={IndianRupee} colorScheme="green" onClick={() => setActiveTab('fees')} />
-          <StatCard title="Pending Approvals" value={approvalRequests.filter(r => r.status === 'PENDING').length} subtitle="Central Workflow Desk" icon={CheckSquare} colorScheme="gold" onClick={() => setActiveTab('requests')} />
+        {/* =========================================================================
+            4. 6 KPI ANALYTICS CARDS (LARGE NUMBERS + PERCENTAGES + TRENDS + HOVER)
+            ========================================================================= */}
+        <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+          {/* 1. Total Students */}
+          <StatCard
+            title="Total Students"
+            value={totalEnrolled.toLocaleString()}
+            subtitle={`${activeEnrolled} Active (${activePercentage}%)`}
+            trend="+8.4% YoY"
+            icon={GraduationCap}
+            colorScheme="orange"
+            onClick={() => setActiveTab('students')}
+          />
+
+          {/* 2. Faculty & Staff */}
+          <StatCard
+            title="Faculty & Staff"
+            value={stats.totalFaculty.toLocaleString()}
+            subtitle="1:18 Faculty-Student Ratio"
+            trend="100% on Roster"
+            icon={Users2}
+            colorScheme="navy"
+            onClick={() => setActiveTab('faculty')}
+          />
+
+          {/* 3. Campus Attendance */}
+          <StatCard
+            title="Campus Attendance"
+            value="92.4%"
+            subtitle="1,185 / 1,284 Students Present"
+            trend="+1.8% vs Last Week"
+            icon={UserCheck}
+            colorScheme="green"
+            onClick={() => setActiveTab('attendance')}
+          />
+
+          {/* 4. Fee Collection */}
+          <StatCard
+            title="Fee Collection"
+            value={`₹${(financeStats.totalCollected / 100000).toFixed(2)} L`}
+            subtitle={`${financeStats.collectionPercentage}% Collected`}
+            trend="+12.5% This Month"
+            icon={IndianRupee}
+            colorScheme="green"
+            onClick={() => setActiveTab('fees')}
+          />
+
+          {/* 5. Pending Fees */}
+          <StatCard
+            title="Pending Fees"
+            value={`₹${(financeStats.totalPending / 100000).toFixed(2)} L`}
+            subtitle={`${(100 - financeStats.collectionPercentage).toFixed(1)}% Outstanding`}
+            trend="Term 2 Invoices"
+            icon={Clock}
+            colorScheme="gold"
+            onClick={() => setActiveTab('fees')}
+          />
+
+          {/* 6. Active Courses */}
+          <StatCard
+            title="Active Courses"
+            value={`${totalActiveSubjects || 36}`}
+            subtitle={`${programs.length} Degree Programs`}
+            trend="6 Semesters Mapped"
+            icon={BookOpen}
+            colorScheme="blue"
+            onClick={() => setActiveTab('academics')}
+          />
+        </div>
+
+        {/* =========================================================================
+            6. 4 GOOGLE FORMS-STYLE VISUALIZATIONS & CHARTS (DONUT + RESPONSES)
+            ========================================================================= */}
+        <div className="grid-2">
+          {/* Visual 1: Student Enrollment Distribution */}
+          <PieChart
+            title="Student Enrollment & Categories"
+            data={enrollmentData}
+            badgeLabel="ENROLLMENT"
+            summaryText="Regular B.Tech admissions represent 82% of current student intake, followed by 12% Lateral Entry scholars."
+          />
+
+          {/* Visual 2: Campus Attendance Analytics */}
+          <PieChart
+            title="Daily Campus Attendance Overview"
+            data={attendanceData}
+            badgeLabel="ATTENDANCE"
+            summaryText="92.4% classroom attendance benchmark achieved today, exceeding the institutional 75% minimum threshold."
+          />
         </div>
 
         <div className="grid-2">
-          <PieChart title="Student Distribution by Department" data={deptStudentData} badgeLabel="ADMISSIONS" summaryText="Computer Science & Engineering and AI-DS lead total admissions across university campuses." />
-          <PieChart title="Fee Collection & Revenue Breakdown" data={feeCategoryData} unit="₹" badgeLabel="FINANCE" summaryText="Tuition fees account for 75% of total revenue collected across all active student accounts." />
+          {/* Visual 3: Fee Revenue & Collection Breakdown */}
+          <PieChart
+            title="Fee Collection & Revenue Breakdown"
+            data={feeCategoryData}
+            unit="₹"
+            badgeLabel="FINANCE"
+            summaryText="Tuition fees account for 75% of total realized revenue, with Term 2 collections underway across all departments."
+          />
+
+          {/* Visual 4: Department-wise Student Strength */}
+          <PieChart
+            title="Department-wise Student Strength"
+            data={deptStudentData}
+            badgeLabel="DEPARTMENTS"
+            summaryText="Computer Science & Engineering and AI-DS lead total admissions across university campuses."
+          />
         </div>
 
+        {/* =========================================================================
+            7. ACADEMIC OPERATIONS SUMMARY & EXECUTIVE CONTROLS
+            ========================================================================= */}
         <div className="grid-2">
-          <div className="card" style={{ padding: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '1rem' }}>Academic Operations Summary</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}><span>Constituent Institutes:</span><strong>{institutes.length} Schools</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}><span>Academic Departments:</span><strong>{departments.length} Depts</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}><span>Degree Programs:</span><strong>{programs.length} Programs</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}><span>Active Subjects &amp; Courses:</span><strong>{totalActiveSubjects} Active</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: 'var(--brand-navy)' }}><span>Current Academic Session:</span><Badge variant="orange">{currentAY.name}</Badge></div>
+          <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Building2 size={20} color="var(--brand-orange)" /> Academic Operations Summary
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>
+                  <span>Constituent Institutes:</span><strong>{institutes.length} Schools</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>
+                  <span>Academic Departments:</span><strong>{departments.length} Depts</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>
+                  <span>Degree Programs:</span><strong>{programs.length} Programs</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>
+                  <span>Active Subjects &amp; Courses:</span><strong>{totalActiveSubjects || 36} Active</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: 'var(--brand-navy)', paddingTop: '0.25rem' }}>
+                  <span>Current Academic Session:</span><Badge variant="orange">{currentAY.name}</Badge>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '1.25rem', padding: '0.75rem', backgroundColor: 'var(--bg-surface-hover)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', fontSize: '0.8125rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>Pending Central Approvals:</span>
+              <Badge variant={pendingApprovalsCount > 0 ? 'orange' : 'active'}>{pendingApprovalsCount} Items</Badge>
             </div>
           </div>
 
           <div className="card" style={{ padding: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '1rem' }}>Executive Controls</h3>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '1rem' }}>
+              Executive Quick Actions
+            </h3>
             <div className="grid-2" style={{ gap: '0.75rem' }}>
-              <button className="btn btn-primary" onClick={() => setActiveTab('requests')}><CheckSquare size={16} /> Central Approval Desk</button>
-              <button className="btn btn-primary" onClick={() => setActiveTab('fees')}><IndianRupee size={16} /> Fees &amp; Billing</button>
-              <button className="btn btn-secondary" onClick={() => setActiveTab('students')}><Users2 size={16} /> Student Directory</button>
-              <button className="btn btn-secondary" onClick={() => setActiveTab('faculty')}><UserCheck size={16} /> Faculty Directory</button>
-              <button className="btn btn-secondary" onClick={() => setActiveTab('reports')}><BarChart3 size={16} /> System Reports</button>
-              <button className="btn btn-secondary" onClick={() => setActiveTab('settings')}><Settings size={16} /> System Settings</button>
+              <button className="btn btn-primary" onClick={() => setActiveTab('requests')}>
+                <CheckSquare size={16} /> Central Approval Desk
+              </button>
+              <button className="btn btn-primary" onClick={() => setActiveTab('fees')}>
+                <IndianRupee size={16} /> Fees &amp; Billing
+              </button>
+              <button className="btn btn-secondary" onClick={() => setActiveTab('students')}>
+                <Users2 size={16} /> Student Directory
+              </button>
+              <button className="btn btn-secondary" onClick={() => setActiveTab('faculty')}>
+                <UserCheck size={16} /> Faculty Directory
+              </button>
+              <button className="btn btn-secondary" onClick={() => setActiveTab('reports')}>
+                <BarChart3 size={16} /> System Reports
+              </button>
+              <button className="btn btn-secondary" onClick={() => setActiveTab('settings')}>
+                <Settings size={16} /> System Settings
+              </button>
             </div>
           </div>
         </div>
@@ -520,14 +822,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
     );
   };
 
-  // Route to proper role dashboard
-  if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'PRINCIPAL') return renderAdminDashboard();
-  if (role === 'REGISTRAR') return renderRegistrarDashboard();
-  if (role === 'IQAC') return renderIQACDashboard();
-  if (role === 'EXAM_CELL') return renderExamCellDashboard();
-  if (role === 'STUDENT_SECTION') return renderStudentSectionDashboard();
-  if (role === 'HOSTEL_ADMIN') return renderHostelAdminDashboard();
-  if (role === 'HOD') return renderHODDashboard();
-  if (role === 'FACULTY') return renderFacultyDashboard();
-  return renderStudentDashboard();
+  const renderCurrentView = () => {
+    if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'PRINCIPAL') return renderAdminDashboard();
+    if (role === 'REGISTRAR') return renderRegistrarDashboard();
+    if (role === 'IQAC') return renderIQACDashboard();
+    if (role === 'EXAM_CELL') return renderExamCellDashboard();
+    if (role === 'STUDENT_SECTION') return renderStudentSectionDashboard();
+    if (role === 'HOSTEL_ADMIN') return renderHostelAdminDashboard();
+    if (role === 'HOD') return renderHODDashboard();
+    if (role === 'FACULTY') return renderFacultyDashboard();
+    return renderStudentDashboard();
+  };
+
+  return (
+    <>
+      {renderCurrentView()}
+      <DashboardReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        dashboardType="CAMPUS_HOME"
+        user={user}
+        role={role}
+      />
+    </>
+  );
 };

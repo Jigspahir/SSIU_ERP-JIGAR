@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
 import { Badge } from '../../components/common/Badge';
 import { StatCard } from '../../components/common/StatCard';
 import { BarChart, LineChart, PieChart } from '../../components/common/Charts';
+import { DashboardReportModal } from '../../components/reports/DashboardReportModal';
 import { 
   FileSignature, Calendar, FileCheck, Award, Users, CheckCircle2, 
   Clock, ShieldCheck, FileText, ArrowRight, IndianRupee
@@ -15,6 +16,7 @@ interface ExamDashboardPageProps {
 
 export const ExamDashboardPage: React.FC<ExamDashboardPageProps> = ({ setActiveTab }) => {
   const { user, role } = useAuth();
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   const exams = db.getExams();
   const forms = db.getExamForms();
@@ -70,6 +72,14 @@ export const ExamDashboardPage: React.FC<ExamDashboardPageProps> = ({ setActiveT
               : 'University examination control center: master setup, form approvals, hall tickets & results'}
           </p>
         </div>
+
+        <button
+          onClick={() => setIsReportModalOpen(true)}
+          className="btn btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.1rem' }}
+        >
+          <FileText size={16} /> Generate Exam Report
+        </button>
       </div>
 
       {/* Role-Specific Metric Cards */}
@@ -269,6 +279,15 @@ export const ExamDashboardPage: React.FC<ExamDashboardPageProps> = ({ setActiveT
           </table>
         </div>
       </div>
+
+      {/* Dashboard Report Modal */}
+      <DashboardReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        dashboardType="EXAMINATION"
+        user={user}
+        role={role}
+      />
     </div>
   );
 };

@@ -15,6 +15,7 @@ import {
   Edit3, Trash2, Download, Eye
 } from 'lucide-react';
 import { fileStorage } from '../../services/fileStorage';
+import { DashboardReportModal } from '../../components/reports/DashboardReportModal';
 
 export const CRMPage: React.FC = () => {
   const { user, role, canMutate } = useAuth();
@@ -41,6 +42,7 @@ export const CRMPage: React.FC = () => {
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [isReviewApplicationModalOpen, setIsReviewApplicationModalOpen] = useState(false);
   const [isNewApplicationModalOpen, setIsNewApplicationModalOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   
   const [selectedLead, setSelectedLead] = useState<CRMLead | null>(null);
   const [selectedApplication, setSelectedApplication] = useState<AdmissionApplication | null>(null);
@@ -419,11 +421,14 @@ export const CRMPage: React.FC = () => {
         </div>
 
         {role !== 'FACULTY' && (
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-primary" onClick={() => setIsReportModalOpen(true)}>
+              <FileText size={16} /> Generate Admission Report
+            </button>
             <button className="btn btn-secondary" onClick={() => setIsNewApplicationModalOpen(true)}>
               New Application Form
             </button>
-            <button className="btn btn-primary" onClick={handleOpenAddLead}>
+            <button className="btn btn-secondary" onClick={handleOpenAddLead}>
               <Plus size={16} /> Add CRM Lead
             </button>
           </div>
@@ -967,6 +972,19 @@ export const CRMPage: React.FC = () => {
         onConfirm={handleDeleteLeadConfirm}
         title="Remove CRM Lead"
         message={`Are you sure you want to remove the lead record for "${deletingLead?.name}"?`}
+      />
+
+      {/* Dashboard Report Modal */}
+      <DashboardReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        dashboardType="ADMISSION"
+        currentFilters={{
+          status: appStatusFilter !== 'ALL' ? appStatusFilter : undefined,
+          searchQuery: searchTerm
+        }}
+        user={user}
+        role={role}
       />
     </div>
   );

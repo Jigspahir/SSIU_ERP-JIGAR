@@ -3,13 +3,15 @@ import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
 import { Badge } from '../../components/common/Badge';
 import { AttendanceSession, AttendanceStatus } from '../../types';
+import { DashboardReportModal } from '../../components/reports/DashboardReportModal';
 import { 
   CheckCircle2, XCircle, Clock, Calendar, Search, Filter, 
-  Check, Save, AlertTriangle, BarChart3, UserCheck, ShieldCheck 
+  Check, Save, AlertTriangle, BarChart3, UserCheck, ShieldCheck, FileText 
 } from 'lucide-react';
 
 export const AttendancePage: React.FC = () => {
   const { user, role } = useAuth();
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   
   const subjects = db.getSubjects();
   const divisions = db.getDivisions();
@@ -417,16 +419,40 @@ export const AttendancePage: React.FC = () => {
 
   return (
     <div>
-      <div style={{ marginBottom: '1.5rem' }}>
-        <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
-          Attendance Management
-        </h2>
-        <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-          {role === 'STUDENT' ? 'Track your subject-wise lecture attendance & academic standing' : role === 'FACULTY' ? 'Mark, submit & review student attendance for your assigned classes' : 'Monitor attendance compliance across departments & divisions'}
-        </p>
+      <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
+            Attendance Management &amp; Audit
+          </h2>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+            {role === 'STUDENT' ? 'Track your subject-wise lecture attendance & academic standing' : role === 'FACULTY' ? 'Mark, submit & review student attendance for your assigned classes' : 'Monitor attendance compliance across departments & divisions'}
+          </p>
+        </div>
+
+        <button
+          onClick={() => setIsReportModalOpen(true)}
+          className="btn btn-primary"
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.1rem' }}
+        >
+          <FileText size={16} /> Generate Attendance Report
+        </button>
       </div>
 
       {role === 'STUDENT' ? renderStudentView() : role === 'FACULTY' ? renderFacultyView() : renderAdminView()}
+
+      <DashboardReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        dashboardType="ATTENDANCE"
+        currentFilters={{
+          departmentId: selectedDepartmentId,
+          subjectId: selectedSubjectId,
+          startDate: selectedDate,
+          endDate: selectedDate
+        }}
+        user={user}
+        role={role}
+      />
     </div>
   );
 };
