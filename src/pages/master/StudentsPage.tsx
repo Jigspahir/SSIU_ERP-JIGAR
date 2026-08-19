@@ -7,10 +7,16 @@ import { Modal } from '../../components/common/Modal';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { Badge } from '../../components/common/Badge';
 import { StudentProfileModal } from '../../components/profile/StudentProfileModal';
-import { Eye } from 'lucide-react';
+import { MentorAssignmentTab } from '../../components/mentor/MentorAssignmentTab';
+import { Eye, Users, UserCheck } from 'lucide-react';
 
-export const StudentsPage: React.FC = () => {
+interface StudentsPageProps {
+  initialTab?: 'DIRECTORY' | 'MENTOR_ASSIGNMENT';
+}
+
+export const StudentsPage: React.FC<StudentsPageProps> = ({ initialTab = 'DIRECTORY' }) => {
   const { user, role, canMutate } = useAuth();
+  const [activeTab, setActiveTab] = useState<'DIRECTORY' | 'MENTOR_ASSIGNMENT'>(initialTab);
   const [students, setStudents] = useState<Student[]>(() => db.getStudents());
 
   // Filter Dropdowns State
@@ -126,7 +132,7 @@ export const StudentsPage: React.FC = () => {
     setAddress(item.address || '');
     setAdmissionDate(item.admissionDate || '');
     setInstituteId(item.instituteId);
-    setDepartmentId(item.departmentId);
+    setDepartmentId(item.departmentId || '');
     setProgramId(item.programId);
     setBatchId(item.batchId);
     setSemesterId(item.semesterId);
@@ -246,17 +252,44 @@ export const StudentsPage: React.FC = () => {
   ];
 
   return (
-    <div>
-      <DataTable
-        title="Student Management Directory"
-        subtitle={`Manage student profiles, academic placements, and enrollments`}
-        data={scopedStudents}
-        columns={columns}
-        searchPlaceholder="Search student by name, enrollment no, email..."
-        searchFields={['name', 'enrollmentNo', 'email', 'phone']}
-        filterSlot={
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {/* Institute Filter */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* Top Level Student Navigation Tabs */}
+      {(role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'PRINCIPAL' || role === 'HOD') && (
+        <div style={{
+          display: 'flex', gap: '0.5rem', borderBottom: '2px solid var(--border-color)',
+          paddingBottom: '0.5rem', alignItems: 'center'
+        }}>
+          <button
+            className={`btn ${activeTab === 'DIRECTORY' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('DIRECTORY')}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+          >
+            <Users size={16} /> Student Directory
+          </button>
+          <button
+            className={`btn ${activeTab === 'MENTOR_ASSIGNMENT' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('MENTOR_ASSIGNMENT')}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+          >
+            <UserCheck size={16} /> Mentor Assignment
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'MENTOR_ASSIGNMENT' ? (
+        <MentorAssignmentTab />
+      ) : (
+        <>
+          <DataTable
+            title="Student Management Directory"
+            subtitle={`Manage student profiles, academic placements, and enrollments`}
+            data={scopedStudents}
+            columns={columns}
+            searchPlaceholder="Search student by name, enrollment no, email..."
+            searchFields={['name', 'enrollmentNo', 'email', 'phone']}
+            filterSlot={
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {/* Institute Filter */}
             {(role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') && (
               <select className="form-select" style={{ width: '160px', height: '38px', fontSize: '0.8125rem' }} value={selectedInstFilter} onChange={e => setSelectedInstFilter(e.target.value)}>
                 <option value="ALL">All Institutes</option>
@@ -482,6 +515,8 @@ export const StudentsPage: React.FC = () => {
         title="Delete Student Record"
         message={`Are you sure you want to delete "${deletingItem?.name}"?`}
       />
+        </>
+      )}
     </div>
   );
 };

@@ -47,6 +47,7 @@ model Institute {
   employees   Employee[]
   researchProjects ResearchProject[]
   libraries        Library[]
+  feeStructures    FeeStructure[]
 
   @@index([universityId])
 }
@@ -66,6 +67,11 @@ model Department {
   faculty   Faculty[]
   employees Employee[]
   researchProjects ResearchProject[]
+  inwardRegisters  InwardRegister[]
+  outwardRegisters OutwardRegister[]
+  serviceRequests  StudentServiceRequest[]
+  edpDuties        EdpDuty[]
+  feeStructures    FeeStructure[]
 
   @@index([instituteId])
 }
@@ -104,6 +110,8 @@ model AcademicYear {
 
   batches              Batch[]
   studentMentorMappings StudentMentorMapping[]
+  academicRisks        AcademicRisk[]
+  feeStructures        FeeStructure[]
 }
 
 model Batch {
@@ -146,6 +154,7 @@ model Semester {
 
   studentFacultyMappings StudentFacultyMapping[]
   facultySubjectMappings FacultySubjectMapping[]
+  academicRisks          AcademicRisk[]
 
   @@unique([batchId, semesterNumber])
   @@index([batchId])
@@ -189,6 +198,8 @@ model Subject {
   facultySubjectMappings FacultySubjectMapping[]
   examSchedules          ExamSchedule[]
   examResults            ExamResult[]
+  examSubjects           ExamSubject[]
+  examFormSubjects       ExamFormSubject[]
   books                  Book[]
   digitalResources       DigitalResource[]
 
@@ -215,6 +226,17 @@ model Student {
   departmentId String
   batchId      String
   currentDivisionId String?
+  
+  // Academic Bank of Credits (ABC) ID
+  abcId                 String?
+  abcIdStatus           String    @default("NOT_SUBMITTED") // NOT_SUBMITTED | PENDING_VERIFICATION | VERIFIED | REJECTED
+  abcIdVerifiedByUserId String?
+  abcIdVerifiedByName   String?
+  abcIdVerifiedAt       DateTime?
+  abcIdRejectionReason  String?
+  abcIdAcademicYear     String?
+  abcIdRemarks          String?
+  
   status       String   @default("ACTIVE") // ACTIVE | INACTIVE | GRADUATED | DROPPED
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -227,6 +249,7 @@ model Student {
 
   studentFacultyMappings StudentFacultyMapping[]
   studentMentorMappings  StudentMentorMapping[]
+  mentorAssignments      MentorAssignment[]
   examForms              ExamForm[]
   examResults            ExamResult[]
   feeAccounts            StudentFeeAccount[]
@@ -249,7 +272,16 @@ model Student {
   hostelAttendances      HostelAttendance[]
   outpassRequests        OutpassRequest[]
   hostelComplaints       HostelComplaint[]
+  hostelMaintenanceRequests HostelMaintenanceRequest[]
   messEnrollments        MessEnrollment[]
+  academicRisks          AcademicRisk[]
+  roomAllocations        ExamRoomAllocation[]
+  hostelVisitors         HostelVisitor[]
+  feeInvoices            FeeInvoice[]
+  paymentOrders          PaymentOrder[]
+  paymentTransactions    PaymentTransaction[]
+  paymentReceipts        PaymentReceipt[]
+  seatAllocations        ExamSeatAllocation[]
 
   @@index([instituteId])
   @@index([departmentId])
@@ -278,9 +310,11 @@ model Faculty {
 
   studentFacultyMappings StudentFacultyMapping[]
   studentMentorMappings  StudentMentorMapping[]  @relation("MentorFaculty")
+  mentorAssignments      MentorAssignment[]
   facultySubjectMappings FacultySubjectMapping[]
   researchMemberships    ResearchMember[]
   startupMentorships     StartupMentor[]
+  edpDutiesObserved      EdpDuty[]             @relation("EdpDutyTeachingFaculty")
 
   @@index([instituteId])
   @@index([departmentId])
@@ -337,6 +371,15 @@ model User {
   personalNotes           PersonalNote[]
   communicationsCreated   Communication[]       @relation("CommCreator")
   libraryMemberships      LibraryMembership[]
+  inwardRegistersReceived InwardRegister[]      @relation("InwardReceiver")
+  inwardRegistersAssigned InwardRegister[]      @relation("InwardAssignee")
+  inwardForwardingsCreated InwardForwarding[]   @relation("InwardForwarder")
+  outwardRegistersSent    OutwardRegister[]     @relation("OutwardSender")
+  registerAuditLogs       InwardOutwardAuditLog[] @relation("RegisterAuditActor")
+  edpDutiesAssigned       EdpDuty[]             @relation("EdpDutyOfficer")
+  noteSheetsCreated       NoteSheet[]           @relation("NoteSheetCreator")
+  examEdpDuties           ExamEdpDuty[]         @relation("ExamEdpStaff")
+  bulkImports             BulkImport[]          @relation("BulkImportUploader")
 
   @@index([username])
   @@index([erpId])
@@ -613,6 +656,60 @@ model StudentMentorMapping {
   @@index([mentorFacultyId])
 }
 
+model MentorAssignment {
+  id               String   @id @default(uuid())
+  studentId        String
+  mentorFacultyId  String
+  assignedByUserId String
+  assignedByRole   String   // HOD, PRINCIPAL, SUPER_ADMIN
+  assignedByName   String?
+  instituteId      String
+  departmentId     String
+  programId        String
+  academicYearId   String
+  semesterId       String?
+  section          String?  // e.g. "Div A"
+  assignedDate     DateTime @default(now())
+  effectiveFrom    DateTime @default(now())
+  effectiveTo      DateTime?
+  status           String   @default("ACTIVE") // ACTIVE, INACTIVE
+  changeReason     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  student          Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  faculty          Faculty  @relation(fields: [mentorFacultyId], references: [id], onDelete: Cascade)
+  history          MentorAssignmentHistory[]
+
+  @@index([studentId])
+  @@index([mentorFacultyId])
+  @@index([departmentId])
+  @@index([instituteId])
+  @@index([status])
+}
+
+model MentorAssignmentHistory {
+  id                 String   @id @default(uuid())
+  assignmentId       String
+  studentId          String
+  previousMentorId   String?
+  previousMentorName String?
+  newMentorId        String
+  newMentorName      String
+  changedByUserId    String
+  changedByName      String
+  changedByRole      String
+  changeReason       String
+  effectiveFrom      DateTime
+  effectiveTo        DateTime @default(now())
+  createdAt          DateTime @default(now())
+
+  assignment         MentorAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@index([assignmentId])
+  @@index([studentId])
+}
+
 model FacultySubjectMapping {
   id         String   @id @default(uuid())
   facultyId  String
@@ -651,29 +748,114 @@ model ExamType {
 }
 
 model Exam {
-  id           String   @id @default(uuid())
-  code         String   @unique
-  name         String
-  examTypeId   String
-  programId    String
-  academicYearCode String  // e.g. 2024-25
-  semesterNumber   Int
-  startDate    DateTime?
-  endDate      DateTime?
-  status       String   @default("UPCOMING") // UPCOMING | ACTIVE | COMPLETED | CANCELLED
-  createdByUserId String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id               String    @id @default(uuid())
+  code             String    @unique
+  name             String
+  examTypeId       String?
+  type             String?   // Regular, Backlog, Supplementary, Remedial, Re-Examination, Improvement, Special Examination, Other
+  programId        String
+  academicYearId   String?
+  academicYearCode String?   // e.g. 2026-27
+  semesterId       String?
+  semesterNumber   Int?
+  instituteId      String?
+  departmentId     String?
+  session          String?   // e.g. Summer 2026, Winter 2026
+  startDate        DateTime?
+  endDate          DateTime?
+  formStartDate    DateTime?
+  formEndDate      DateTime?
+  status           String    @default("DRAFT") // DRAFT | FORM_OPEN | FORM_CLOSED | SCHEDULED | ONGOING | COMPLETED | RESULT_PROCESSING | RESULT_PUBLISHED | CANCELLED
+  description      String?   @db.Text
+  instructions     String?   @db.Text
+  notesheetId      String?
+  createdByUserId  String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  examType      ExamType       @relation(fields: [examTypeId], references: [id])
-  program       Program        @relation(fields: [programId], references: [id])
-  formWindows   ExamFormWindow[]
-  examForms     ExamForm[]
-  schedules     ExamSchedule[]
+  examType         ExamType?        @relation(fields: [examTypeId], references: [id])
+  program          Program          @relation(fields: [programId], references: [id])
+  notesheet        NoteSheet?       @relation(fields: [notesheetId], references: [id])
+  formWindows      ExamFormWindow[]
+  examForms        ExamForm[]
+  schedules        ExamSchedule[]
+  examSubjects     ExamSubject[]
+  examFees         ExamFee[]
+  lateFeeRules     ExamLateFeeRule[]
+  centreAllocations ExamCentreAllocation[]
+  seatAllocations  ExamSeatAllocation[]
+  edpDuties        ExamEdpDuty[]
 
   @@index([examTypeId])
   @@index([programId])
+  @@index([instituteId])
+  @@index([departmentId])
+  @@index([academicYearId])
+  @@index([semesterId])
   @@index([status])
+  @@index([notesheetId])
+  @@index([createdAt])
+}
+
+model ExamSubject {
+  id              String    @id @default(uuid())
+  examId          String
+  subjectId       String
+  examType        String    @default("REGULAR")
+  examDate        DateTime?
+  durationMinutes Int       @default(180)
+  maximumMarks    Decimal   @default(100) @db.Decimal(5, 2)
+  passingMarks    Decimal   @default(40) @db.Decimal(5, 2)
+  internalMarks   Decimal   @default(30) @db.Decimal(5, 2)
+  externalMarks   Decimal   @default(70) @db.Decimal(5, 2)
+  credits         Decimal   @default(3) @db.Decimal(4, 2)
+  examMode        String    @default("OFFLINE") // OFFLINE | ONLINE | OTHER
+  status          String    @default("ACTIVE")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  exam            Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
+  subject         Subject   @relation(fields: [subjectId], references: [id])
+  examFormSubjects ExamFormSubject[]
+
+  @@unique([examId, subjectId, examType])
+  @@index([examId])
+  @@index([subjectId])
+}
+
+model ExamFee {
+  id            String    @id @default(uuid())
+  examId        String
+  examType      String    // REGULAR | BACKLOG | SUPPLEMENTARY | REMEDIAL | RE_EXAM | IMPROVEMENT | SPECIAL
+  amount        Decimal   @db.Decimal(10, 2)
+  currency      String    @default("INR")
+  isMandatory   Boolean   @default(true)
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  exam          Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@index([examId])
+  @@index([examType])
+}
+
+model ExamLateFeeRule {
+  id              String    @id @default(uuid())
+  examId          String
+  calculationType String    @default("FIXED") // FIXED | PER_DAY | PERCENTAGE
+  amount          Decimal   @db.Decimal(10, 2)
+  maximumAmount   Decimal?  @db.Decimal(10, 2)
+  gracePeriodDays Int       @default(0)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  exam            Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@index([examId])
+  @@index([isActive])
 }
 
 model ExamFormWindow {
@@ -697,30 +879,71 @@ model ExamFormWindow {
 }
 
 model ExamForm {
-  id               String    @id @default(uuid())
-  examId           String
-  examFormWindowId String
-  studentId        String
-  semesterId       String
-  attemptNumber    Int       @default(1)
-  status           String    @default("DRAFT") // DRAFT | SUBMITTED | APPROVED | REJECTED | CANCELLED
-  submittedAt      DateTime?
-  feePaid          Boolean   @default(false)
-  totalFee         Decimal   @default(0) @db.Decimal(10, 2)
-  remarks          String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id                   String    @id @default(uuid())
+  examId               String
+  studentId            String
+  formNumber           String    @unique
+  examFormWindowId     String?
+  semesterId           String?
+  attemptNumber        Int       @default(1)
+  status               String    @default("DRAFT") // DRAFT | SUBMITTED | PAYMENT_PENDING | PAYMENT_COMPLETED | VERIFICATION_PENDING | VERIFIED | REJECTED | CANCELLED
+  paymentStatus        String    @default("PENDING") // PENDING | COMPLETED | FAILED | WAIVED
+  examFeeAmount        Decimal   @default(0) @db.Decimal(10, 2)
+  lateFeeAmount        Decimal   @default(0) @db.Decimal(10, 2)
+  totalAmount          Decimal   @default(0) @db.Decimal(10, 2)
+  totalFee             Decimal   @default(0) @db.Decimal(10, 2)
+  feePaid              Boolean   @default(false)
+  paymentOrderId       String?
+  paymentTransactionId String?
+  paidAt               DateTime?
+  submittedAt          DateTime?
+  submittedBy          String?
+  verifiedAt           DateTime?
+  verifiedBy           String?
+  verificationRemarks  String?
+  returnedAt           DateTime?
+  returnedBy           String?
+  returnReason         String?
+  rejectedAt           DateTime?
+  rejectedBy           String?
+  rejectionReason      String?
+  remarks              String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  exam           Exam           @relation(fields: [examId], references: [id])
-  examFormWindow ExamFormWindow @relation(fields: [examFormWindowId], references: [id])
-  student        Student        @relation(fields: [studentId], references: [id])
-  semester       Semester       @relation(fields: [semesterId], references: [id])
+  exam           Exam            @relation(fields: [examId], references: [id], onDelete: Cascade)
+  examFormWindow ExamFormWindow? @relation(fields: [examFormWindowId], references: [id])
+  student        Student         @relation(fields: [studentId], references: [id])
+  semester       Semester?       @relation(fields: [semesterId], references: [id])
+  formSubjects   ExamFormSubject[]
+  hallTicket     HallTicket?
   results        ExamResult[]
 
   @@unique([examId, studentId, attemptNumber])
   @@index([examId])
   @@index([studentId])
+  @@index([formNumber])
   @@index([status])
+  @@index([paymentStatus])
+}
+
+model ExamFormSubject {
+  id                   String    @id @default(uuid())
+  examFormId           String
+  examinationSubjectId String?
+  subjectId            String
+  amount               Decimal   @default(0) @db.Decimal(10, 2)
+  status               String    @default("ENROLLED") // ENROLLED | EXEMPTED | DROPPED
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  examForm             ExamForm  @relation(fields: [examFormId], references: [id], onDelete: Cascade)
+  examinationSubject   ExamSubject? @relation(fields: [examinationSubjectId], references: [id])
+  subject              Subject   @relation(fields: [subjectId], references: [id])
+
+  @@unique([examFormId, subjectId])
+  @@index([examFormId])
+  @@index([subjectId])
 }
 
 model ExamSchedule {
@@ -749,22 +972,43 @@ model ExamSchedule {
 }
 
 model ExamResult {
-  id             String    @id @default(uuid())
-  examFormId     String
-  studentId      String
-  subjectId      String
-  examScheduleId String?
-  marksObtained  Decimal?  @db.Decimal(6, 2)
-  maxMarks       Decimal   @default(100) @db.Decimal(6, 2)
-  grade          String?   // A+, A, B+, B, C, D, F
-  gradePoints    Decimal?  @db.Decimal(4, 2)
-  isPassed       Boolean?
-  isAbsent       Boolean   @default(false)
-  resultStatus   String    @default("PENDING") // PENDING | DECLARED | WITHHELD | CANCELLED
-  publishedAt    DateTime?
-  enteredByUserId String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id                  String    @id @default(uuid())
+  examFormId          String
+  studentId           String
+  subjectId           String
+  examScheduleId      String?
+  internalMarks       Decimal?  @db.Decimal(6, 2)
+  maxInternalMarks    Decimal?  @default(30) @db.Decimal(6, 2)
+  externalMarks       Decimal?  @db.Decimal(6, 2)
+  maxExternalMarks    Decimal?  @default(70) @db.Decimal(6, 2)
+  practicalMarks      Decimal?  @db.Decimal(6, 2)
+  maxPracticalMarks   Decimal?  @default(0) @db.Decimal(6, 2)
+  marksObtained       Decimal?  @db.Decimal(6, 2)
+  maxMarks            Decimal   @default(100) @db.Decimal(6, 2)
+  grade               String?   // O, A+, A, B+, B, C, P, F, AB
+  gradePoints         Decimal?  @db.Decimal(4, 2)
+  isPassed            Boolean?
+  isAbsent            Boolean   @default(false)
+  isMalpractice       Boolean   @default(false)
+  evaluationStatus    String    @default("PENDING") // PENDING | DRAFT | SUBMITTED | UNDER_REVIEW | VERIFIED | APPROVED | REVISED | RETURNED | REJECTED
+  resultStatus        String    @default("PENDING") // PENDING | DECLARED | WITHHELD | CANCELLED
+  publishedAt         DateTime?
+  enteredByUserId     String?
+  submittedByUserId   String?
+  submittedAt         DateTime?
+  evaluatedByUserId   String?
+  evaluatedAt         DateTime?
+  verifiedByUserId    String?
+  verifiedAt          DateTime?
+  approvedByUserId    String?
+  approvedAt          DateTime?
+  originalMarks       Decimal?  @db.Decimal(6, 2)
+  correctionReason    String?
+  returnReason        String?
+  correctedByUserId   String?
+  correctedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   examForm     ExamForm      @relation(fields: [examFormId], references: [id], onDelete: Cascade)
   student      Student       @relation(fields: [studentId], references: [id])
@@ -775,82 +1019,689 @@ model ExamResult {
   @@index([studentId])
   @@index([subjectId])
   @@index([resultStatus])
+  @@index([evaluationStatus])
 }
 
 // --- FEES SECTION ---
 
 model FeeHead {
-  id          String   @id @default(uuid())
-  code        String   @unique   // TUITION, HOSTEL, LAB, LIBRARY, EXAM, TRANSPORT, OTHER
-  name        String
-  description String?
-  isOptional  Boolean  @default(false)
-  status      String   @default("ACTIVE")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  code          String   @unique // TUITION, EXAM, HOSTEL, TRANSPORT, BONAFIDE, TRANSCRIPT, DEGREE
+  name          String
+  description   String?
+  category      String   @default("ACADEMIC") // ACADEMIC | ADMISSION | EXAMINATION | HOSTEL | TRANSPORT | CERTIFICATE | LIBRARY | LABORATORY | STUDENT_ACTIVITY | OTHER
+  defaultAmount Decimal? @db.Decimal(12, 2) @default(0)
+  isMandatory   Boolean  @default(true)
+  isOptional    Boolean  @default(false)
+  isActive      Boolean  @default(true)
+  status        String   @default("ACTIVE") // ACTIVE | INACTIVE
+  createdBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   feeStructureItems FeeStructureItem[]
   feePaymentItems   FeePaymentItem[]
+  studentFeeItems   StudentFeeItem[]
+  invoiceItems      FeeInvoiceItem[]
+  auditLogs         FeeHeadAuditLog[]
+  lateFeeRules      LateFeeRule[]
+
+  @@index([code])
+  @@index([category])
+  @@index([isActive])
+  @@index([status])
+}
+
+model FeeHeadAuditLog {
+  id                String   @id @default(uuid())
+  feeHeadId         String
+  action            String   // CREATED | UPDATED | ACTIVATED | DEACTIVATED
+  performedByUserId String
+  performedByName   String?
+  details           String?
+  createdAt         DateTime @default(now())
+
+  feeHead           FeeHead  @relation(fields: [feeHeadId], references: [id], onDelete: Cascade)
+
+  @@index([feeHeadId])
+  @@index([performedByUserId])
+  @@index([createdAt])
 }
 
 model FeeStructure {
-  id           String   @id @default(uuid())
-  programId    String
-  semesterId   String
-  academicYearCode String
-  name         String
-  totalAmount  Decimal  @db.Decimal(12, 2)
-  dueDate      DateTime?
-  status       String   @default("ACTIVE")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String    @id @default(uuid())
+  structureCode     String?   @unique // e.g. FS-BTECH-CSE-S5-2026-V1
+  instituteId       String?
+  departmentId      String?
+  programId         String
+  semesterId        String
+  academicYearCode  String    // e.g. "2026-27"
+  academicYearId    String?
+  studentCategoryId String?
+  name              String
+  description       String?
+  totalAmount       Decimal   @db.Decimal(12, 2)
+  dueDate           DateTime?
+  effectiveFrom     DateTime?
+  effectiveTo       DateTime?
+  status            String    @default("DRAFT") // DRAFT | ACTIVE | INACTIVE | ARCHIVED
+  version           Int       @default(1)
+  createdBy         String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  program  Program  @relation(fields: [programId], references: [id])
-  semester Semester @relation(fields: [semesterId], references: [id])
-  items    FeeStructureItem[]
-  accounts StudentFeeAccount[]
+  institute    Institute?    @relation(fields: [instituteId], references: [id])
+  department   Department?   @relation(fields: [departmentId], references: [id])
+  academicYear AcademicYear? @relation(fields: [academicYearId], references: [id])
+  program      Program       @relation(fields: [programId], references: [id])
+  semester     Semester      @relation(fields: [semesterId], references: [id])
+  items        FeeStructureItem[]
+  accounts     StudentFeeAccount[]
+  invoices     FeeInvoice[]
+  auditLogs    FeeStructureAuditLog[]
+  lateFeeRules LateFeeRule[]
 
-  @@unique([programId, semesterId, academicYearCode])
+  @@index([structureCode])
+  @@index([instituteId])
+  @@index([departmentId])
   @@index([programId])
   @@index([semesterId])
+  @@index([academicYearCode])
+  @@index([status])
 }
 
 model FeeStructureItem {
   id             String   @id @default(uuid())
   feeStructureId String
   feeHeadId      String
-  amount         Decimal  @db.Decimal(10, 2)
+  amount         Decimal  @db.Decimal(12, 2)
+  isMandatory    Boolean  @default(true)
   isOptional     Boolean  @default(false)
-
-  feeStructure FeeStructure @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
-  feeHead      FeeHead      @relation(fields: [feeHeadId], references: [id])
-
-  @@unique([feeStructureId, feeHeadId])
-  @@index([feeStructureId])
-}
-
-model StudentFeeAccount {
-  id             String   @id @default(uuid())
-  studentId      String
-  feeStructureId String
-  academicYearCode String
-  totalDue       Decimal  @db.Decimal(12, 2)
-  totalPaid      Decimal  @default(0) @db.Decimal(12, 2)
-  totalDiscount  Decimal  @default(0) @db.Decimal(12, 2)
-  balanceDue     Decimal  @db.Decimal(12, 2)
-  status         String   @default("UNPAID") // UNPAID | PARTIAL | PAID | OVERDUE | WAIVED
+  frequency      String   @default("PER_SEMESTER") // ONE_TIME | PER_SEMESTER | PER_YEAR | MONTHLY | OTHER
+  sequence       Int      @default(1)
+  description    String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  feeStructure FeeStructure @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
+  feeHead      FeeHead      @relation(fields: [feeHeadId], references: [id])
+  studentFeeItems StudentFeeItem[]
+
+  @@unique([feeStructureId, feeHeadId])
+  @@index([feeStructureId])
+  @@index([feeHeadId])
+}
+
+model FeeStructureAuditLog {
+  id                String   @id @default(uuid())
+  feeStructureId    String
+  action            String   // CREATED | UPDATED | DUPLICATED | ACTIVATED | DEACTIVATED | ITEM_ADDED | ITEM_UPDATED | ITEM_REMOVED
+  performedByUserId String
+  performedByName   String?
+  details           String?
+  createdAt         DateTime @default(now())
+
+  feeStructure      FeeStructure @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
+
+  @@index([feeStructureId])
+  @@index([performedByUserId])
+  @@index([createdAt])
+}
+
+model StudentFeeAccount {
+  id               String   @id @default(uuid())
+  studentId        String
+  feeStructureId   String
+  academicYearCode String
+  totalDue         Decimal  @db.Decimal(12, 2)
+  totalPaid        Decimal  @default(0) @db.Decimal(12, 2)
+  totalDiscount    Decimal  @default(0) @db.Decimal(12, 2)
+  totalWaived      Decimal  @default(0) @db.Decimal(12, 2)
+  balanceDue       Decimal  @db.Decimal(12, 2)
+  status           String   @default("PENDING") // PENDING | PARTIALLY_PAID | PAID | OVERDUE | WAIVED | CANCELLED
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
   student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
   feeStructure FeeStructure @relation(fields: [feeStructureId], references: [id])
+  items        StudentFeeItem[]
+  invoices     FeeInvoice[]
   payments     FeePayment[]
   discounts    FeeDiscount[]
   refunds      FeeRefund[]
+  auditLogs    StudentFeeAccountAuditLog[]
 
   @@unique([studentId, feeStructureId])
   @@index([studentId])
+  @@index([feeStructureId])
   @@index([status])
+}
+
+model StudentFeeItem {
+  id                  String   @id @default(uuid())
+  studentFeeAccountId String
+  feeHeadId           String
+  feeStructureItemId  String?
+  amount              Decimal  @db.Decimal(12, 2)
+  paidAmount          Decimal  @default(0) @db.Decimal(12, 2)
+  discountAmount      Decimal  @default(0) @db.Decimal(12, 2)
+  waivedAmount        Decimal  @default(0) @db.Decimal(12, 2)
+  outstandingAmount   Decimal  @db.Decimal(12, 2)
+  status              String   @default("PENDING") // PENDING | PARTIALLY_PAID | PAID | WAIVED
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  studentFeeAccount   StudentFeeAccount @relation(fields: [studentFeeAccountId], references: [id], onDelete: Cascade)
+  feeHead             FeeHead           @relation(fields: [feeHeadId], references: [id])
+  feeStructureItem    FeeStructureItem? @relation(fields: [feeStructureItemId], references: [id])
+  invoiceItems        FeeInvoiceItem[]
+
+  @@unique([studentFeeAccountId, feeHeadId])
+  @@index([studentFeeAccountId])
+  @@index([feeHeadId])
+  @@index([status])
+}
+
+model StudentFeeAccountAuditLog {
+  id                  String   @id @default(uuid())
+  studentFeeAccountId String
+  action              String   // FEE_ASSIGNED | DUPLICATE_ATTEMPT | ACCOUNT_CREATED | STATUS_CHANGED | FEE_ITEM_CREATED
+  performedByUserId   String
+  performedByName     String?
+  details             String?
+  createdAt           DateTime @default(now())
+
+  studentFeeAccount   StudentFeeAccount @relation(fields: [studentFeeAccountId], references: [id], onDelete: Cascade)
+
+  @@index([studentFeeAccountId])
+  @@index([performedByUserId])
+  @@index([createdAt])
+}
+
+model FeeInvoice {
+  id                  String             @id @default(uuid())
+  invoiceNumber       String             @unique // e.g. SSIU/FEE/2026-27/000001
+  studentId           String
+  studentFeeAccountId String
+  feeStructureId      String
+  academicYearId      String?
+  academicYearCode    String
+  semesterId          String
+  invoiceDate         DateTime           @default(now())
+  dueDate             DateTime
+  subtotal            Decimal            @db.Decimal(12, 2)
+  discountAmount      Decimal            @default(0) @db.Decimal(12, 2)
+  waiverAmount        Decimal            @default(0) @db.Decimal(12, 2)
+  lateFeeAmount       Decimal            @default(0) @db.Decimal(12, 2)
+  totalAmount         Decimal            @db.Decimal(12, 2)
+  status              String             @default("ISSUED") // DRAFT | ISSUED | PARTIALLY_PAID | PAID | OVERDUE | CANCELLED
+  remarks             String?
+  issuedAt            DateTime?
+  cancelledAt         DateTime?
+  cancelledBy         String?
+  cancellationReason  String?
+  createdBy           String
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  student             Student            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentFeeAccount   StudentFeeAccount  @relation(fields: [studentFeeAccountId], references: [id], onDelete: Cascade)
+  feeStructure        FeeStructure       @relation(fields: [feeStructureId], references: [id])
+  items               FeeInvoiceItem[]
+  auditLogs           FeeInvoiceAuditLog[]
+  paymentOrders       PaymentOrder[]
+  paymentTransactions PaymentTransaction[]
+  paymentReceipts     PaymentReceipt[]
+  lateFeeRecords      LateFeeRecord[]
+
+  @@index([studentId])
+  @@index([studentFeeAccountId])
+  @@index([feeStructureId])
+  @@index([invoiceNumber])
+  @@index([status])
+  @@index([dueDate])
+  @@index([createdAt])
+}
+
+model FeeInvoiceItem {
+  id                String          @id @default(uuid())
+  invoiceId         String
+  feeHeadId         String
+  studentFeeItemId  String?
+  description       String?
+  amount            Decimal         @db.Decimal(12, 2)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  invoice           FeeInvoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  feeHead           FeeHead         @relation(fields: [feeHeadId], references: [id])
+  studentFeeItem    StudentFeeItem? @relation(fields: [studentFeeItemId], references: [id])
+
+  @@index([invoiceId])
+  @@index([feeHeadId])
+  @@index([studentFeeItemId])
+}
+
+model FeeInvoiceAuditLog {
+  id                String          @id @default(uuid())
+  invoiceId         String
+  action            String          // CREATED | ISSUED | UPDATED | CANCELLED | DOWNLOADED | PRINTED
+  performedByUserId String
+  performedByName   String?
+  details           String?
+  createdAt         DateTime        @default(now())
+
+  invoice           FeeInvoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([performedByUserId])
+  @@index([createdAt])
+}
+
+model PaymentOrder {
+  id              String               @id @default(uuid())
+  orderNumber     String               @unique // e.g. ORD-2026-000001
+  invoiceId       String
+  studentId       String
+  gateway         String               @default("RAZORPAY")
+  gatewayOrderId  String?
+  amount          Decimal              @db.Decimal(12, 2)
+  currency        String               @default("INR")
+  status          String               @default("PENDING") // CREATED | PENDING | PAID | FAILED | CANCELLED | EXPIRED
+  expiresAt       DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  invoice         FeeInvoice           @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  student         Student              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  transactions    PaymentTransaction[]
+
+  @@index([invoiceId])
+  @@index([studentId])
+  @@index([gatewayOrderId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model PaymentTransaction {
+  id                       String            @id @default(uuid())
+  paymentOrderId           String?
+  invoiceId                String
+  studentId                String
+  transactionNumber        String            @unique // e.g. TXN-2026-000001
+  gateway                  String            @default("RAZORPAY")
+  gatewayPaymentId         String?           @unique
+  gatewayOrderId           String?
+  amount                   Decimal           @db.Decimal(12, 2)
+  currency                 String            @default("INR")
+  paymentMethod            String            @default("UPI") // UPI | CARD | NETBANKING | WALLET | ONLINE | OTHER
+  status                   String            @default("SUCCESS") // INITIATED | SUCCESS | FAILED | CANCELLED | REFUNDED
+  failureReason            String?
+  gatewayResponseReference String?
+  paidAt                   DateTime?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+
+  paymentOrder             PaymentOrder?     @relation(fields: [paymentOrderId], references: [id])
+  invoice                  FeeInvoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  student                  Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  auditLogs                PaymentAuditLog[]
+  receipt                  PaymentReceipt?
+
+  @@index([paymentOrderId])
+  @@index([invoiceId])
+  @@index([studentId])
+  @@index([gatewayPaymentId])
+  @@index([status])
+  @@index([paidAt])
+  @@index([createdAt])
+}
+
+model PaymentAuditLog {
+  id                String              @id @default(uuid())
+  transactionId     String?
+  paymentOrderId    String?
+  action            String              // ORDER_CREATED | VERIFICATION_ATTEMPT | PAYMENT_SUCCESS | PAYMENT_FAILURE | PAYMENT_CANCELLED | DUPLICATE_ATTEMPT | UNAUTHORIZED_ATTEMPT | WEBHOOK_RECEIVED
+  performedByUserId String?
+  performedByName   String?
+  details           String?
+  ipAddress         String?
+  createdAt         DateTime            @default(now())
+
+  transaction       PaymentTransaction? @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@index([transactionId])
+  @@index([paymentOrderId])
+  @@index([performedByUserId])
+  @@index([createdAt])
+}
+
+model PaymentReceipt {
+  id                   String                   @id @default(uuid())
+  receiptNumber        String                   @unique // e.g. SSIU/REC/2026-27/000001
+  paymentTransactionId String                   @unique
+  invoiceId            String
+  studentId            String
+  amount               Decimal                  @db.Decimal(12, 2)
+  totalPaidAfter       Decimal                  @db.Decimal(12, 2)
+  balanceRemaining     Decimal                  @db.Decimal(12, 2)
+  paymentDate          DateTime                 @default(now())
+  paymentMode          String                   @default("ONLINE")
+  gateway              String                   @default("RAZORPAY")
+  status               String                   @default("ISSUED") // ISSUED | CANCELLED
+  pdfReference         String?
+  generatedAt          DateTime                 @default(now())
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  paymentTransaction   PaymentTransaction       @relation(fields: [paymentTransactionId], references: [id], onDelete: Cascade)
+  invoice              FeeInvoice               @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  student              Student                  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  auditLogs            PaymentReceiptAuditLog[]
+
+  @@index([receiptNumber])
+  @@index([paymentTransactionId])
+  @@index([invoiceId])
+  @@index([studentId])
+  @@index([paymentDate])
+  @@index([createdAt])
+}
+
+model PaymentReceiptAuditLog {
+  id                String         @id @default(uuid())
+  receiptId         String
+  action            String         // GENERATED | VIEWED | DOWNLOADED | PRINTED
+  performedByUserId String?
+  performedByName   String?
+  details           String?
+  createdAt         DateTime       @default(now())
+
+  receipt           PaymentReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  @@index([receiptId])
+  @@index([performedByUserId])
+  @@index([createdAt])
+}
+
+// ─── Phase 7: Late Fee Management ──────────────────────────────────────────
+
+model LateFeeRule {
+  id                String    @id @default(uuid())
+  name              String
+  description       String?
+  feeStructureId    String?
+  feeHeadId         String?
+  calculationType   String    @default("PER_DAY") // FIXED | PER_DAY | PERCENTAGE | ONE_TIME
+  amount            Decimal   @db.Decimal(12, 2)  // flat amount or per-day amount or percentage value
+  maximumAmount     Decimal?  @db.Decimal(12, 2)  // cap on total late fee
+  gracePeriodDays   Int       @default(0)          // days after due date before late fee begins
+  applyOnOutstanding Boolean  @default(false)      // true = % on outstanding; false = % on invoice total
+  isActive          Boolean   @default(true)
+  createdBy         String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  feeStructure      FeeStructure?   @relation(fields: [feeStructureId], references: [id])
+  feeHead           FeeHead?        @relation(fields: [feeHeadId], references: [id])
+  lateFeeRecords    LateFeeRecord[]
+
+  @@index([feeStructureId])
+  @@index([feeHeadId])
+  @@index([isActive])
+  @@index([createdAt])
+}
+
+model LateFeeRecord {
+  id               String    @id @default(uuid())
+  invoiceId        String
+  ruleId           String
+  calculationDate  DateTime  @default(now())
+  overdueDays      Int       @default(0)
+  baseAmount       Decimal   @db.Decimal(12, 2)
+  lateFeeAmount    Decimal   @db.Decimal(12, 2)
+  status           String    @default("APPLIED") // APPLIED | REVERSED
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  invoice          FeeInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  rule             LateFeeRule @relation(fields: [ruleId], references: [id])
+
+  @@index([invoiceId])
+  @@index([ruleId])
+  @@index([status])
+  @@index([calculationDate])
+  @@index([createdAt])
+}
+
+// ─── CENTRALIZED UNIVERSITY NOTESHEET ENGINE (PHASE 1) ───────────────────────
+
+model NoteSheet {
+  id                     String    @id @default(uuid())
+  notesheetNumber        String    @unique // e.g. SIT-NOTESHEET-0826-001
+  notesheetType          String    @default("Administrative") // Administrative | Academic | Financial | Purchase | HR | Student Matter | Examination | Hostel | Infrastructure | IT / Technical | Maintenance | Event | Legal / Compliance | Other
+  visibility             String    @default("NORMAL") // NORMAL | CONFIDENTIAL | HIGHLY_CONFIDENTIAL
+  title                  String    // Subject / Title
+  subject                String    // Alias
+  department             String    // EXAM | HOSTEL | ACCOUNTS | ADMIN | ADMISSION | TRANSPORT | STUDENT_SECTION | LIBRARY | MAINTENANCE | IQAC | REGISTRAR | CSE | IT | etc.
+  section                String?   // e.g. Conduct, Evaluation, Mess, Boys Hostel, Block A
+  referenceNumber        String?   // Memo / Circular reference
+  date                   DateTime  @default(now())
+  priority               String    @default("NORMAL") // NORMAL | IMPORTANT | URGENT | IMMEDIATE
+  description            String?   @db.Text
+  proposal               String    @db.Text
+  purposeJustification   String    @db.Text
+  financialRequirement   Boolean   @default(false)
+  budgetRequired         Boolean   @default(false)
+  estimatedCost          Decimal   @default(0) @db.Decimal(12, 2)
+  amountInWords          String?
+  financialImpact        String?   @db.Text
+  currency               String    @default("INR")
+  expenseCategory        String?
+  budgetHead             String?
+  budgetAvailable        Boolean   @default(false)
+  requestedAmount        Decimal?  @db.Decimal(12, 2)
+  approvedAmount         Decimal?  @db.Decimal(12, 2)
+  approvedAmountRemarks  String?
+  approvedAmountByUserId String?
+  approvedAmountByName   String?
+  approvedAmountAt       DateTime?
+  financeRemarks         String?   @db.Text
+  procurementRequirement String?
+  supportingFinancialDoc String?
+  vendorQuotation        String?
+  requiredDate           DateTime?
+  workflowDueDate        DateTime?
+  isOverdue              Boolean   @default(false)
+  previousNoteSheetId    String?
+  previousNoteSheetNumber String?
+  relatedNoteSheetIds    String?
+  status                 String    @default("DRAFT") // DRAFT | SUBMITTED | UNDER_REVIEW | PENDING_APPROVAL | FORWARDED | CLARIFICATION_REQUIRED | RETURNED | APPROVED | ACTION_PENDING | ACTION_IN_PROGRESS | ACTION_COMPLETED | REJECTED | CLOSED | CANCELLED | REOPENED
+  currentOffice          String    @default("CREATOR") // HOD | HOI | REGISTRAR | VICE_PRESIDENT | ACCOUNTS | EXAM_CELL | HOSTEL_ADMIN | COMPLETED | CREATOR
+  currentHandlerId       String?   // User UUID responsible
+  decision               String?   // APPROVED | REJECTED | RETURNED | CLARIFICATION_REQUIRED
+  decisionDate           DateTime?
+  decisionReason         String?   @db.Text
+  approvedByUserId       String?
+  approvedByName         String?
+  approvedAt             DateTime?
+  rejectedByUserId       String?
+  rejectedByName         String?
+  rejectedAt             DateTime?
+  returnedByUserId       String?
+  returnedByName         String?
+  returnedAt             DateTime?
+  actionTakenSummary     String?   @db.Text
+  actionTakenByUserId    String?
+  actionTakenByName      String?
+  actionTakenAt          DateTime?
+  actionTakenProofUrl    String?
+  reopenedReason         String?   @db.Text
+  reopenedByUserId       String?
+  reopenedByName         String?
+  reopenedAt             DateTime?
+  closedByUserId         String?
+  closedByName           String?
+  closedAt               DateTime?
+  createdByUserId        String
+  createdByName          String
+  createdByRole          String
+  contactNumber          String?
+  version                Int       @default(1)
+  instituteId            String?
+  instituteName          String?
+  departmentId           String?   // Optional FK to academic department if applicable
+  departmentName         String?
+  periodMMYY             String?   // e.g. 0826
+  sequenceNumber         Int?      @default(1)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  createdByUser          User      @relation("NoteSheetCreator", fields: [createdByUserId], references: [id])
+  items                  NoteSheetEstimateItem[]
+  attachments            NoteSheetAttachment[]
+  history                NoteSheetHistory[]
+  complianceItems        NoteSheetComplianceItem[]
+  clarifications         NoteSheetClarification[]
+  exams                  Exam[]
+
+  @@index([notesheetNumber])
+  @@index([instituteId, periodMMYY, sequenceNumber])
+  @@index([department])
+  @@index([section])
+  @@index([status])
+  @@index([priority])
+  @@index([visibility])
+  @@index([createdByUserId])
+  @@index([currentOffice])
+  @@index([createdAt])
+}
+
+model NoteSheetEstimateItem {
+  id          String    @id @default(uuid())
+  notesheetId String
+  itemName    String
+  description String?
+  quantity    Decimal   @default(1) @db.Decimal(10, 2)
+  unit        String    @default("Nos")
+  rate        Decimal   @default(0) @db.Decimal(12, 2)
+  amount      Decimal   @default(0) @db.Decimal(12, 2)
+  sequence    Int       @default(1)
+  createdAt   DateTime  @default(now())
+
+  notesheet   NoteSheet @relation(fields: [notesheetId], references: [id], onDelete: Cascade)
+
+  @@index([notesheetId])
+}
+
+model NoteSheetAttachment {
+  id               String    @id @default(uuid())
+  notesheetId      String
+  fileName         String
+  fileType         String    // PDF, DOC, DOCX, XLS, XLSX, JPG, JPEG, PNG
+  fileSize         Int       @default(0) // In bytes
+  fileUrl          String
+  documentCategory String?   // Quotation, Proposal, Estimate, Bill, Approval Letter, etc.
+  version          Int       @default(1)
+  uploadedByUserId String
+  uploadedByName   String
+  createdAt        DateTime  @default(now())
+
+  notesheet        NoteSheet @relation(fields: [notesheetId], references: [id], onDelete: Cascade)
+
+  @@index([notesheetId])
+  @@index([uploadedByUserId])
+}
+
+model NoteSheetHistory {
+  id               String    @id @default(uuid())
+  notesheetId      String
+  fromUserId       String?
+  fromUserName     String
+  fromUserRole     String
+  toOffice         String
+  action           String    // CREATED | SUBMITTED | REVIEWED | FORWARDED | RETURNED | APPROVED | REJECTED | CLOSED | ATTACHMENT_ADDED | EDITED
+  remarks          String    @db.Text
+  attachmentUrl    String?
+  timestamp        DateTime  @default(now())
+  createdAt        DateTime  @default(now())
+
+  notesheet        NoteSheet @relation(fields: [notesheetId], references: [id], onDelete: Cascade)
+
+  @@index([notesheetId])
+  @@index([action])
+  @@index([fromUserId])
+  @@index([createdAt])
+}
+
+model NoteSheetComplianceItem {
+  id               String    @id @default(uuid())
+  notesheetId      String
+  actionDescription String   @db.Text
+  responsibleDept  String
+  responsibleUserId String?
+  responsibleUserName String?
+  deadline         DateTime?
+  status           String    @default("PENDING") // PENDING | IN_PROGRESS | COMPLETED | OVERDUE
+  completedAt      DateTime?
+  remarks          String?   @db.Text
+  proofUrl         String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  notesheet        NoteSheet @relation(fields: [notesheetId], references: [id], onDelete: Cascade)
+
+  @@index([notesheetId])
+  @@index([status])
+}
+
+model NoteSheetClarification {
+  id               String    @id @default(uuid())
+  notesheetId      String
+  requestedByUserId String
+  requestedByName  String
+  requestedByRole  String
+  query            String    @db.Text
+  requestedAt      DateTime  @default(now())
+  response         String?   @db.Text
+  respondedByUserId String?
+  respondedByName  String?
+  respondedAt      DateTime?
+  status           String    @default("PENDING") // PENDING | ANSWERED
+
+  notesheet        NoteSheet @relation(fields: [notesheetId], references: [id], onDelete: Cascade)
+
+  @@index([notesheetId])
+  @@index([status])
+}
+
+model NoteSheetWorkflowMatrix {
+  id               String    @id @default(uuid())
+  instituteId      String?
+  departmentId     String?
+  notesheetType    String?
+  financialRequired Boolean  @default(false)
+  minAmount        Decimal?  @db.Decimal(12, 2)
+  maxAmount        Decimal?  @db.Decimal(12, 2)
+  sequence         Int       @default(1)
+  authorityRole    String
+  specificUserId   String?
+  isMandatory      Boolean   @default(true)
+  isParallel       Boolean   @default(false)
+  parallelGroupId  String?
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+
+  @@index([instituteId, departmentId, notesheetType])
+}
+
+model NoteSheetSequence {
+  id               String    @id @default(uuid())
+  instituteCode    String
+  periodMMYY       String    // e.g. 0826
+  lastSequence     Int       @default(0)
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([instituteCode, periodMMYY])
 }
 
 model FeePayment {
@@ -921,6 +1772,35 @@ model FeeRefund {
 
   @@index([feeAccountId])
   @@index([status])
+}
+
+model PaymentReconciliation {
+  id                    String    @id @default(uuid())
+  reconciliationNumber  String    @unique // REC-REC-2026-000001
+  paymentTransactionId  String?
+  gatewayPaymentId      String?
+  transactionRef        String?
+  studentId             String?
+  reconciliationType    String    @default("GATEWAY") // GATEWAY | BANK_TRANSFER | MANUAL
+  gatewayAmount         Decimal?  @db.Decimal(12, 2)
+  erpAmount             Decimal?  @db.Decimal(12, 2)
+  discrepancyAmount     Decimal?  @default(0) @db.Decimal(12, 2)
+  paymentDate           DateTime  @default(now())
+  paymentMode           String?   // UPI | CARD | NET_BANKING | BANK_TRANSFER | CASH | CHEQUE | OTHER
+  gatewayStatus         String?   // SUCCESS | FAILED | PENDING
+  erpStatus             String?   // SUCCESS | PENDING | NOT_FOUND
+  reconciliationStatus  String    @default("PENDING") // MATCHED | PENDING | MISMATCH | RECONCILED
+  remarks               String?
+  reconciledByUserId    String?
+  reconciledAt          DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([reconciliationNumber])
+  @@index([paymentTransactionId])
+  @@index([gatewayPaymentId])
+  @@index([reconciliationStatus])
+  @@index([paymentDate])
 }
 
 
@@ -1303,81 +2183,160 @@ model PurchaseInvoice {
   @@index([paymentStatus])
 }
 
-// --- ASSET MANAGEMENT ---
+// --- ASSET & INVENTORY MANAGEMENT (CENTRALIZED UNIVERSITY MODULE) ---
 
 model AssetCategory {
-  id          String   @id @default(uuid())
-  code        String   @unique
-  name        String
-  description String?
-  parentId    String?
-  depreciationRate Decimal @default(0) @db.Decimal(5, 2) // % per year
-  usefulLifeYears  Int     @default(5)
-  status      String   @default("ACTIVE")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String    @id @default(uuid())
+  code             String    @unique
+  name             String
+  categoryType     String    @default("IT_EQUIPMENT") // IT_EQUIPMENT | OFFICE_EQUIPMENT | FURNITURE | STATIONERY_CONSUMABLES | PHYSICAL_RECORDS | LAB_TECHNICAL | FACILITY_ELECTRICAL
+  description      String?
+  parentId         String?
+  depreciationRate Decimal   @default(0) @db.Decimal(5, 2) // % per year
+  usefulLifeYears  Int       @default(5)
+  status           String    @default("ACTIVE")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  parent   AssetCategory?  @relation("AssetCategoryHierarchy", fields: [parentId], references: [id])
-  children AssetCategory[] @relation("AssetCategoryHierarchy")
-  assets   Asset[]
+  parent           AssetCategory?    @relation("AssetCategoryHierarchy", fields: [parentId], references: [id])
+  children         AssetCategory[]   @relation("AssetCategoryHierarchy")
+  assets           Asset[]
+  items            InventoryItem[]
 
   @@index([parentId])
+  @@index([categoryType])
+}
+
+model InventoryLocation {
+  id             String    @id @default(uuid())
+  instituteId    String
+  departmentId   String?
+  building       String
+  block          String?
+  floor          String
+  roomNo         String
+  roomType       String    @default("LAB") // CLASSROOM | LAB | FACULTY_ROOM | STORE_ROOM | OFFICE | ARCHIVE | LIBRARY
+  labName        String?
+  rackNumber     String?
+  shelfNumber    String?
+  drawerNumber   String?
+  boxNumber      String?
+  custodianName  String?
+  status         String    @default("ACTIVE")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  assets         Asset[]
+  stockBalances  StockBalance[]
+  physicalFiles  PhysicalFileRecord[]
+
+  @@index([instituteId])
+  @@index([departmentId])
+  @@index([building, roomNo])
+}
+
+model InventoryItem {
+  id               String    @id @default(uuid())
+  itemCode         String    @unique // e.g. IT-PC, STN-A4, FURN-CHAIR
+  name             String
+  categoryId       String
+  subcategory      String?
+  unit             String    @default("PCS") // PCS | BOX | PACKET | REAM | SET | BOTTLE | ROLL | KG | LITRE | OTHER
+  isConsumable     Boolean   @default(false)
+  minimumStockLevel Decimal  @default(10) @db.Decimal(10, 2)
+  reorderLevel     Decimal   @default(25) @db.Decimal(10, 2)
+  standardRate     Decimal?  @db.Decimal(10, 2)
+  description      String?
+  status           String    @default("ACTIVE")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  category         AssetCategory      @relation(fields: [categoryId], references: [id])
+  stockBalances    StockBalance[]
+  transactions     StockTransaction[]
+
+  @@index([categoryId])
+  @@index([isConsumable])
 }
 
 model Asset {
   id               String    @id @default(uuid())
-  assetTag         String    @unique    // AST-IT-000001
+  assetTag         String    @unique // e.g. SIT-CE-PC-0001, SIT-CE-MON-0001
   name             String
   description      String?
   categoryId       String
+  instituteId      String
+  departmentId     String?
+  locationId       String?
   serialNo         String?
   modelNo          String?
   manufacturer     String?
   purchaseDate     DateTime?
   purchasePrice    Decimal?  @db.Decimal(12, 2)
   currentValue     Decimal?  @db.Decimal(12, 2)
+  usefulLifeYears  Int       @default(5)
+  depreciationRate Decimal?  @db.Decimal(5, 2)
+  warrantyStart    DateTime?
   warrantyExpiry   DateTime?
-  location         String?
+  vendor           String?
+  poNo             String?   // Linked Purchase Order
+  invoiceRef       String?   // Invoice number
+  location         String?   // Free-text location summary
   buildingBlock    String?
   floor            String?
   roomNo           String?
+  assignedToUserId String?
+  assignedToName   String?
   assignedDeptId   String?
-  status           String    @default("AVAILABLE")
-  // AVAILABLE | ASSIGNED | UNDER_MAINTENANCE | DISPOSED | LOST | DAMAGED
-  poNo             String?   // Linked purchase order number
-  grnNo            String?   // Linked GRN number
-  invoiceRef       String?
+  assetCondition   String    @default("GOOD") // NEW | EXCELLENT | GOOD | FAIR | POOR | DAMAGED
+  status           String    @default("ACTIVE")
+  // ACTIVE | IN_STORE | ASSIGNED | UNDER_MAINTENANCE | DAMAGED | LOST | TRANSFERRED | DISPOSED | RETIRED
+  cpuConfigJson    String?   @db.Text // Embedded JSON specs for Desktop/Server CPUs
+  qrCodeData       String?
   remarks          String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  category     AssetCategory    @relation(fields: [categoryId], references: [id])
-  assignments  AssetAssignment[]
-  transfers    AssetTransfer[]
-  maintenanceLogs AssetMaintenance[]
-  disposals    AssetDisposal[]
+  category         AssetCategory       @relation(fields: [categoryId], references: [id])
+  inventoryLocation InventoryLocation? @relation(fields: [locationId], references: [id])
+  assignments      AssetAssignment[]
+  transfers        AssetTransfer[]
+  maintenanceLogs  AssetMaintenance[]
+  disposals        AssetDisposal[]
+  verificationLogs PhysicalVerificationLog[]
 
+  @@index([instituteId])
+  @@index([departmentId])
   @@index([categoryId])
   @@index([status])
   @@index([assetTag])
 }
 
 model AssetAssignment {
-  id             String    @id @default(uuid())
-  assetId        String
-  assignedToUserId String?
-  assignedToDeptId String?
-  assignedByUserId String?
-  assignmentDate DateTime  @default(now())
-  returnDate     DateTime?
-  purpose        String?
-  status         String    @default("ACTIVE") // ACTIVE | RETURNED | TRANSFERRED
-  remarks        String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id                 String    @id @default(uuid())
+  assetId            String
+  assignedToUserId   String?
+  assignedToName     String
+  assignedToEmpCode  String?
+  assignedToDeptId   String?
+  assignedToDeptName String?
+  assignedByUserId   String?
+  assignedByName     String?
+  location           String?
+  roomNo             String?
+  assignmentDate     DateTime  @default(now())
+  expectedReturnDate DateTime?
+  returnDate         DateTime?
+  conditionAtIssue   String    @default("GOOD")
+  conditionAtReturn  String?
+  purpose            String?
+  status             String    @default("ACTIVE") // ACTIVE | RETURNED | TRANSFERRED
+  remarks            String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  asset          Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  assignedToUser User? @relation("AssignedToUser", fields: [assignedToUserId], references: [id])
+  asset              Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  assignedToUser     User?     @relation("AssignedToUser", fields: [assignedToUserId], references: [id])
 
   @@index([assetId])
   @@index([assignedToUserId])
@@ -1386,47 +2345,57 @@ model AssetAssignment {
 
 model AssetTransfer {
   id                  String    @id @default(uuid())
-  transferNo          String    @unique   // TRF-2024-000001
+  transferNo          String    @unique // TRF-2026-000001
   assetId             String
+  fromInstituteId     String
+  toInstituteId       String
   fromDeptId          String?
   toDeptId            String?
   fromLocation        String?
   toLocation          String?
+  fromCustodian       String?
+  toCustodian         String?
   transferDate        DateTime  @default(now())
   transferredByUserId String?
+  transferredByName   String?
+  authorizedByName    String?
   receivedByUserId    String?
+  receivedByName      String?
   reason              String?
-  status              String    @default("COMPLETED") // PENDING | COMPLETED | CANCELLED
+  status              String    @default("COMPLETED") // PENDING | APPROVED | COMPLETED | CANCELLED
+  remarks             String?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  asset               Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   @@index([assetId])
   @@index([status])
 }
 
 model AssetMaintenance {
-  id                String    @id @default(uuid())
-  maintenanceNo     String    @unique   // MNT-2024-000001
-  assetId           String
-  maintenanceType   String    // PREVENTIVE | CORRECTIVE | BREAKDOWN | AMC
-  description       String
-  reportedDate      DateTime  @default(now())
-  scheduledDate     DateTime?
-  completedDate     DateTime?
-  vendor            String?
-  cost              Decimal?  @db.Decimal(10, 2)
-  partsReplaced     String?
-  nextMaintenanceDue DateTime?
-  status            String    @default("PENDING")
-  // PENDING | IN_PROGRESS | COMPLETED | CANCELLED
-  performedByUserId String?
-  remarks           String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                 String    @id @default(uuid())
+  maintenanceNo      String    @unique // MNT-2026-000001
+  assetId            String
+  maintenanceType    String    @default("CORRECTIVE") // PREVENTIVE | CORRECTIVE | BREAKDOWN | AMC | CALIBRATION
+  issueDescription   String    @db.Text
+  reportedByUserId   String?
+  reportedByName     String
+  reportedDate       DateTime  @default(now())
+  scheduledDate      DateTime?
+  completedDate      DateTime?
+  vendorTechnician   String?
+  estimatedCost      Decimal?  @db.Decimal(10, 2)
+  actualCost         Decimal?  @db.Decimal(10, 2)
+  partsReplaced      String?
+  status             String    @default("REPORTED")
+  // REPORTED | ASSIGNED | IN_PROGRESS | WAITING_PARTS | COMPLETED | CANCELLED
+  remarks            String?
+  documentUrl        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  asset              Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   @@index([assetId])
   @@index([status])
@@ -1434,25 +2403,168 @@ model AssetMaintenance {
 }
 
 model AssetDisposal {
-  id              String    @id @default(uuid())
-  disposalNo      String    @unique   // DIS-2024-000001
-  assetId         String    @unique   // One disposal per asset
-  disposalMethod  String    // AUCTION | SCRAPPED | DONATED | SOLD | WRITTEN_OFF
-  disposalDate    DateTime  @default(now())
-  disposalValue   Decimal?  @db.Decimal(10, 2)
-  buyerName       String?
-  reason          String
-  approvedByUserId String?
-  approvedAt      DateTime?
-  status          String    @default("PENDING") // PENDING | APPROVED | COMPLETED | CANCELLED
-  remarks         String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                 String    @id @default(uuid())
+  disposalNo         String    @unique // DIS-2026-000001
+  assetId            String    @unique // One disposal per asset
+  disposalMethod     String    @default("SCRAPPED") // AUCTION | SCRAPPED | DONATED | SOLD | WRITTEN_OFF
+  disposalDate       DateTime  @default(now())
+  bookValue          Decimal?  @db.Decimal(10, 2)
+  disposalValue      Decimal?  @db.Decimal(10, 2)
+  buyerName          String?
+  reason             String    @db.Text
+  approvedByUserId   String?
+  approvedByName     String?
+  approvedAt         DateTime?
+  status             String    @default("PROPOSED") // PROPOSED | UNDER_APPROVAL | APPROVED | DISPOSED | CANCELLED
+  remarks            String?
+  documentUrl        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  asset              Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   @@index([status])
   @@index([disposalDate])
+}
+
+model StockBalance {
+  id                 String    @id @default(uuid())
+  itemId             String
+  instituteId        String
+  departmentId       String?
+  locationId         String?
+  openingQuantity    Decimal   @default(0) @db.Decimal(10, 2)
+  receivedQuantity   Decimal   @default(0) @db.Decimal(10, 2)
+  issuedQuantity     Decimal   @default(0) @db.Decimal(10, 2)
+  returnedQuantity   Decimal   @default(0) @db.Decimal(10, 2)
+  currentBalance     Decimal   @default(0) @db.Decimal(10, 2)
+  minimumStockLevel  Decimal   @default(10) @db.Decimal(10, 2)
+  reorderLevel       Decimal   @default(25) @db.Decimal(10, 2)
+  unit               String    @default("PCS")
+  lastUpdated        DateTime  @default(now())
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  item               InventoryItem      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  inventoryLocation  InventoryLocation? @relation(fields: [locationId], references: [id])
+
+  @@unique([itemId, instituteId, departmentId])
+  @@index([instituteId])
+  @@index([departmentId])
+}
+
+model StockTransaction {
+  id                 String    @id @default(uuid())
+  transactionNo      String    @unique // STX-2026-000001
+  itemId             String
+  instituteId        String
+  departmentId       String?
+  transactionType    String    // RECEIVE | ISSUE | RETURN | ADJUSTMENT
+  quantity           Decimal   @db.Decimal(10, 2)
+  unit               String    @default("PCS")
+  unitPrice          Decimal?  @db.Decimal(10, 2)
+  totalAmount        Decimal?  @db.Decimal(12, 2)
+  vendorName         String?
+  purchaseOrderNo    String?
+  invoiceNo          String?
+  issuedToUserId     String?
+  issuedToName       String?
+  issuedToDeptId     String?
+  purpose            String?
+  approvedByName     String?
+  receivedByName     String?
+  batchNumber        String?
+  expiryDate         DateTime?
+  documentUrl        String?
+  remarks            String?
+  transactionDate    DateTime  @default(now())
+  createdAt          DateTime  @default(now())
+
+  item               InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+  @@index([instituteId])
+  @@index([departmentId])
+  @@index([transactionType])
+  @@index([transactionDate])
+}
+
+model PhysicalFileRecord {
+  id                 String    @id @default(uuid())
+  fileId             String    @unique // e.g. SSIU-EXAM-2026-001, SIT-CE-NAAC-CR1-001
+  fileNumber         String
+  fileName           String
+  fileCategory       String    // STUDENT_FILES | FACULTY_FILES | ADMISSION_FILES | EXAM_FILES | FINANCE_FILES | HR_FILES | DEPT_FILES | NAAC_IQAC_FILES | RESEARCH_FILES | EVENT_FILES | OTHER
+  instituteId        String
+  departmentId       String?
+  locationId         String?
+  academicYear       String?   // e.g. 2024-2025
+  documentYear       Int?      @default(2026)
+  storageLocation    String?   // e.g. Central Archive Room
+  rackNumber         String?   // e.g. R-01
+  shelfNumber        String?   // e.g. S-03
+  boxNumber          String?   // e.g. B-12
+  custodianName      String?
+  custodianEmployeeId String?
+  dateOpened         DateTime  @default(now())
+  retentionUntil     DateTime?
+  status             String    @default("ACTIVE") // ACTIVE | ARCHIVED | TRANSFERRED | DESTROYED
+  description        String?   @db.Text
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  inventoryLocation  InventoryLocation? @relation(fields: [locationId], references: [id])
+
+  @@index([instituteId])
+  @@index([departmentId])
+  @@index([fileCategory])
+  @@index([status])
+  @@index([fileNumber])
+}
+
+model PhysicalVerificationLog {
+  id                 String    @id @default(uuid())
+  verificationNo     String    @unique // PV-2026-000001
+  assetId            String
+  expectedLocation   String
+  actualLocation     String
+  expectedCustodian  String?
+  actualCustodian    String?
+  physicalCondition  String    @default("GOOD") // EXCELLENT | GOOD | DAMAGED | OBSOLETE
+  verifiedByUserId   String?
+  verifiedByName     String
+  verificationDate   DateTime  @default(now())
+  status             String    @default("VERIFIED") // VERIFIED | NOT_FOUND | DAMAGED | LOCATION_MISMATCH | CUSTODIAN_MISMATCH | TRANSFER_REQUIRED
+  discrepancyNotes   String?   @db.Text
+  actionTaken        String?
+  createdAt          DateTime  @default(now())
+
+  asset              Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@index([verificationDate])
+  @@index([status])
+}
+
+model InventoryAuditLog {
+  id                 String    @id @default(uuid())
+  action             String    // CREATE | UPDATE | ASSIGN | RETURN | ISSUE | RECEIVE | TRANSFER | MAINTENANCE | VERIFY | DISPOSE | IMPORT | EXPORT
+  module             String    @default("INVENTORY") // ASSETS | CONSUMABLES | PHYSICAL_FILES | LOCATIONS | TRANSFERS
+  entityId           String
+  entityName         String
+  instituteId        String?
+  departmentId       String?
+  performedByUserId  String?
+  performedByName    String
+  performedByRole    String?
+  oldValueJson       String?   @db.Text
+  newValueJson       String?   @db.Text
+  remarks            String?
+  timestamp          DateTime  @default(now())
+
+  @@index([action])
+  @@index([entityId])
+  @@index([timestamp])
 }
 
 // --- HR, LEAVE, ATTENDANCE & PAYROLL ---
@@ -1609,41 +2721,48 @@ model Hostel {
   hostelType  String   @default("STANDARD") // STANDARD | DELUXE | INTERNATIONAL
   gender      String   @default("BOYS")     // BOYS | GIRLS | CO_ED
   instituteId String?
+  building    String?
+  address     String?
   location    String?
   capacity    Int      @default(100)
   wardenName  String?
   wardenPhone String?
   wardenEmail String?
-  status      String   @default("ACTIVE")
+  status      String   @default("ACTIVE")   // ACTIVE | INACTIVE
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  rooms        HostelRoom[]
-  allotments   HostelAllotment[]
-  attendances  HostelAttendance[]
-  complaints   HostelComplaint[]
-  visitors     HostelVisitor[]
-  maintenances HostelMaintenance[]
+  rooms               HostelRoom[]
+  allotments          HostelAllotment[]
+  attendances         HostelAttendance[]
+  complaints          HostelComplaint[]
+  visitors            HostelVisitor[]
+  maintenances        HostelMaintenance[]
+  maintenanceRequests HostelMaintenanceRequest[]
 
   @@index([gender])
   @@index([status])
 }
 
 model HostelRoom {
-  id         String   @id @default(uuid())
-  hostelId   String
-  roomNumber String
-  floor      Int      @default(1)
-  capacity   Int      @default(2)
-  roomType   String   @default("NON_AC") // AC | NON_AC | DELUXE
-  facilities String?  // e.g. "Attached Bath, Balcony, Study Table"
-  status     String   @default("AVAILABLE") // AVAILABLE | FULL | MAINTENANCE | BLOCKED
-  createdAt  DateTime @default(now())
+  id           String   @id @default(uuid())
+  hostelId     String
+  block        String?  @default("Block A")
+  roomNumber   String
+  floor        Int      @default(1)
+  capacity     Int      @default(2)
+  occupiedBeds Int      @default(0)
+  roomType     String   @default("DOUBLE") // SINGLE | DOUBLE | TRIPLE | FOUR_SEATER | OTHER | AC | NON_AC | DELUXE
+  facilities   String?  // e.g. "Attached Bath, Balcony, Study Table"
+  status       String   @default("AVAILABLE") // AVAILABLE | FULL | MAINTENANCE | BLOCKED
+  createdAt    DateTime @default(now())
 
-  hostel     Hostel            @relation(fields: [hostelId], references: [id], onDelete: Cascade)
-  beds       HostelBed[]
-  allotments HostelAllotment[]
-  complaints HostelComplaint[]
+  hostel              Hostel                     @relation(fields: [hostelId], references: [id], onDelete: Cascade)
+  beds                HostelBed[]
+  allotments          HostelAllotment[]
+  complaints          HostelComplaint[]
+  visitors            HostelVisitor[]
+  maintenanceRequests HostelMaintenanceRequest[]
 
   @@unique([hostelId, roomNumber])
   @@index([hostelId])
@@ -1791,25 +2910,65 @@ model OutpassRequest {
 }
 
 model HostelVisitor {
-  id           String    @id @default(uuid())
-  visitorName  String
-  studentId    String
-  hostelId     String
-  relation     String    // PARENT | GUARDIAN | SIBLING | RELATIVE | FRIEND
-  purpose      String
-  contactPhone String
-  checkInTime  DateTime  @default(now())
-  checkOutTime DateTime?
-  idProofType  String?   @default("AADHAAR")
-  status       String    @default("CHECKED_IN") // EXPECTED | CHECKED_IN | CHECKED_OUT | CANCELLED
-  approvedBy   String?
-  createdAt    DateTime  @default(now())
+  id                   String    @id @default(uuid())
+  passNumber           String?   @unique // VIS-2026-000001
+  visitorName          String
+  studentId            String
+  hostelId             String
+  roomId               String?
+  relation             String    // PARENT | GUARDIAN | SIBLING | RELATIVE | FRIEND | OFFICIAL | OTHER
+  purpose              String
+  contactPhone         String
+  visitorEmail         String?
+  idProofType          String?   @default("AADHAAR") // AADHAAR | PAN | DRIVING_LICENSE | VOTER_ID | PASSPORT | OTHER
+  idProofNumber        String?
+  idProofDocumentUrl   String?
+  visitorPhotoUrl      String?
+  vehicleNumber        String?
+  expectedCheckInDate  DateTime? @db.Date
+  expectedCheckOutDate DateTime? @db.Date
+  checkInTime          DateTime?
+  checkOutTime         DateTime?
+  status               String    @default("REQUESTED") // REQUESTED | APPROVED | REJECTED | CHECKED_IN | CHECKED_OUT | CANCELLED
+  requestedAt          DateTime  @default(now())
+  approvedByUserId     String?
+  approvedAt           DateTime?
+  rejectedByUserId     String?
+  rejectedAt           DateTime?
+  rejectionReason      String?
+  checkedInByUserId    String?
+  checkedOutByUserId   String?
+  remarks              String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  hostel       Hostel    @relation(fields: [hostelId], references: [id])
+  student              Student             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  hostel               Hostel              @relation(fields: [hostelId], references: [id])
+  room                 HostelRoom?         @relation(fields: [roomId], references: [id])
+  logs                 HostelVisitorLog[]
 
+  @@index([passNumber])
   @@index([studentId])
   @@index([hostelId])
+  @@index([roomId])
   @@index([status])
+  @@index([checkInTime])
+}
+
+model HostelVisitorLog {
+  id                String   @id @default(uuid())
+  visitorId         String
+  action            String   // REQUESTED | APPROVED | REJECTED | CHECKED_IN | CHECKED_OUT | CANCELLED | EXTENDED
+  performedByUserId String
+  fromStatus        String?
+  toStatus          String?
+  remarks           String?
+  createdAt         DateTime @default(now())
+
+  visitor           HostelVisitor @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+
+  @@index([visitorId])
+  @@index([performedByUserId])
 }
 
 model HostelComplaint {
@@ -1853,6 +3012,94 @@ model HostelMaintenance {
 
   @@index([hostelId])
   @@index([status])
+}
+
+model HostelMaintenanceRequest {
+  id                     String    @id @default(uuid())
+  requestNo              String    @unique // HOST-MNT-2026-000001
+  studentId              String
+  hostelId               String
+  roomId                 String?
+  category               String    // ELECTRICAL | PLUMBING | FURNITURE | AC_FAN | WATER | CLEANING | INTERNET | ROOM | WASHROOM | COMMON_AREA | OTHER
+  title                  String
+  description            String
+  priority               String    @default("MEDIUM") // LOW | MEDIUM | HIGH | URGENT
+  status                 String    @default("SUBMITTED") // SUBMITTED | ASSIGNED | IN_PROGRESS | ON_HOLD | RESOLVED | CLOSED | REJECTED | REOPENED
+  photoUrl               String?
+  assignedToStaffId      String?
+  assignedToStaffName    String?
+  assignedByUserId       String?
+  assignedByName         String?
+  assignedAt             DateTime?
+  expectedCompletionDate DateTime?
+  slaHours               Int       @default(48) // 4 for URGENT, 24 for HIGH, 48 for MEDIUM, 72 for LOW
+  slaDueDate             DateTime?
+  holdReason             String?
+  resolutionDetails      String?
+  resolvedAt             DateTime?
+  resolvedPhotoUrl       String?
+  studentConfirmedAt     DateTime?
+  studentRating          Int?
+  studentFeedback        String?
+  reopenedReason         String?
+  reopenedAt             DateTime?
+  closedAt               DateTime?
+  closedByUserId         String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  student     Student                        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  hostel      Hostel                         @relation(fields: [hostelId], references: [id])
+  room        HostelRoom?                    @relation(fields: [roomId], references: [id])
+  history     HostelMaintenanceHistory[]
+  attachments HostelMaintenanceAttachment[]
+
+  @@index([requestNo])
+  @@index([studentId])
+  @@index([hostelId])
+  @@index([roomId])
+  @@index([category])
+  @@index([priority])
+  @@index([status])
+  @@index([assignedToStaffId])
+  @@index([createdAt])
+}
+
+model HostelMaintenanceHistory {
+  id                String   @id @default(uuid())
+  requestId         String
+  action            String   // CREATED | ASSIGNED | PRIORITY_CHANGED | ACCEPTED | STARTED | ON_HOLD | RESOLVED | CONFIRMED | REOPENED | CLOSED | REJECTED
+  fromStatus        String?
+  toStatus          String?
+  performedByUserId String
+  performedByName   String?
+  performedByRole   String?
+  remarks           String?
+  timestamp         DateTime @default(now())
+
+  request           HostelMaintenanceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([performedByUserId])
+  @@index([timestamp])
+}
+
+model HostelMaintenanceAttachment {
+  id                String   @id @default(uuid())
+  requestId         String
+  fileName          String
+  fileUrl           String
+  fileType          String?
+  attachmentType    String   @default("PROBLEM_PHOTO") // PROBLEM_PHOTO | COMPLETION_PHOTO | DOCUMENT
+  uploadedByUserId  String
+  uploadedByName    String?
+  uploadedByRole    String?
+  createdAt         DateTime @default(now())
+
+  request           HostelMaintenanceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([uploadedByUserId])
 }
 
 model Mess {
@@ -1900,66 +3147,158 @@ model MessEnrollment {
 // --- UNIVERSITY TRANSPORT & FLEET MANAGEMENT ---
 
 model Vehicle {
-  id                 String   @id @default(uuid())
-  registrationNumber String   @unique // GJ-01-AB-1234
-  vehicleType        String   @default("BUS") // BUS | MINI_BUS | VAN | AMBULANCE | CAR
-  makeModel          String   // e.g. "Tata Starbus 40 Seater"
-  capacity           Int      @default(40)
-  fuelType           String   @default("DIESEL") // DIESEL | CNG | ELECTRIC | PETROL
-  purchaseDate       DateTime?
-  insuranceExpiry    DateTime?
-  fitnessExpiry      DateTime?
-  pucExpiry          DateTime?
-  permitExpiry       DateTime?
-  status             String   @default("ACTIVE") // ACTIVE | INACTIVE | MAINTENANCE | ACCIDENT | RETIRED
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                         String   @id @default(uuid())
+  vehicleNumber              String?  // e.g. "BUS-01" or "VAN-02"
+  registrationNumber         String   @unique // GJ-01-AB-1234
+  vehicleType                String   @default("BUS") // BUS | MINI_BUS | VAN | AMBULANCE | CAR
+  makeModel                  String   // e.g. "Tata Starbus 40 Seater"
+  manufacturer               String?  // e.g. "Tata Motors"
+  model                      String?  // e.g. "Starbus Ultra"
+  year                       Int?     // e.g. 2024
+  capacity                   Int      @default(40)
+  fuelType                   String   @default("DIESEL") // DIESEL | CNG | ELECTRIC | PETROL
+  ownerType                  String   @default("UNIVERSITY") // UNIVERSITY | LEASED | CONTRACT | OTHER
+  chassisNumber              String?
+  engineNumber               String?
+  rcNumber                   String?
+  purchaseDate               DateTime?
+  insuranceNumber            String?
+  insuranceExpiry            DateTime?
+  fitnessCertificateNumber   String?
+  fitnessExpiry              DateTime?
+  permitNumber               String?
+  permitExpiry               DateTime?
+  pollutionCertificateNumber String?
+  pucExpiry                  DateTime?
+  status                     String   @default("ACTIVE") // ACTIVE | INACTIVE | UNDER_MAINTENANCE | EXPIRED | RETIRED
+  remarks                    String?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 
-  allotments   TransportAllotment[]
-  trips        TransportTrip[]
-  maintenances VehicleMaintenance[]
-  documents    VehicleDocument[]
-  incidents    TransportIncident[]
-  complaints   TransportComplaint[]
+  allotments                 TransportAllotment[]
+  trips                      TransportTrip[]
+  maintenances               VehicleMaintenance[]
+  documents                  VehicleDocument[]
+  incidents                  TransportIncident[]
+  complaints                 TransportComplaint[]
+  driverMappings             VehicleDriverMapping[]
+  routeMappings              VehicleRouteMapping[]
 
   @@index([status])
+  @@index([registrationNumber])
 }
 
 model DriverProfile {
+  id               String    @id @default(uuid())
+  driverId         String?   @unique // DRV-001
+  driverName       String
+  contactNumber    String
+  email            String?
+  dateOfBirth      DateTime?
+  licenseNumber    String    @unique
+  licenseType      String    @default("HEAVY_VEHICLE") // HEAVY_VEHICLE | COMMERCIAL | LIGHT_VEHICLE
+  licenseIssueDate DateTime?
+  licenseExpiry    DateTime?
+  experienceYears  Decimal   @default(5) @db.Decimal(4, 1)
+  address          String?
+  emergencyContact String?
+  driverPhotoUrl   String?
+  documentUrl      String?
+  status           String    @default("ACTIVE") // ACTIVE | INACTIVE | ON_LEAVE | SUSPENDED
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  documents        DriverDocument[]
+  trips            TransportTrip[]
+  incidents        TransportIncident[]
+  vehicleMappings  VehicleDriverMapping[]
+
+  @@index([status])
+  @@index([licenseNumber])
+}
+
+model DriverDocument {
+  id          String    @id @default(uuid())
+  driverId    String
+  docType     String    // DRIVING_LICENSE | MEDICAL_CERTIFICATE | POLICE_VERIFICATION | TRAINING_CERTIFICATE | OTHER
+  docNumber   String
+  issueDate   DateTime?
+  expiryDate  DateTime?
+  docUrl      String?
+  uploadedBy  String?
+  status      String    @default("VALID") // VALID | EXPIRING_SOON | EXPIRED
+  remarks     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  driver      DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([docType])
+  @@index([status])
+}
+
+model VehicleDriverMapping {
   id             String    @id @default(uuid())
-  driverName     String
-  contactNumber  String
-  licenseNumber  String    @unique
-  licenseType    String    @default("HEAVY_VEHICLE") // HEAVY_VEHICLE | COMMERCIAL | LIGHT_VEHICLE
-  licenseExpiry  DateTime?
-  experienceYears Decimal  @default(5) @db.Decimal(4, 1)
-  status         String    @default("ACTIVE") // ACTIVE | ON_LEAVE | SUSPENDED | INACTIVE
+  vehicleId      String
+  driverId       String
+  assignedDate   DateTime  @default(now()) @db.Date
+  unassignedDate DateTime? @db.Date
+  status         String    @default("ACTIVE") // ACTIVE | INACTIVE | REPLACED
+  isPrimary      Boolean   @default(true)
+  remarks        String?
   createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  trips          TransportTrip[]
-  incidents      TransportIncident[]
+  vehicle        Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  driver         DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
+  @@index([vehicleId])
+  @@index([driverId])
   @@index([status])
 }
 
 model TransportRoute {
   id              String   @id @default(uuid())
   routeNumber     String   @unique // R-101
+  routeCode       String?  // R-101
   routeName       String   // e.g. "Ahmedabad ISKCON — Gandhinagar Campus"
   startPoint      String
   endPoint        String
   distanceKm      Decimal  @default(25) @db.Decimal(6, 2)
   estDurationMins Int      @default(45)
   monthlyFee      Decimal  @default(2500) @db.Decimal(10, 2)
-  status          String   @default("ACTIVE")
+  status          String   @default("ACTIVE") // ACTIVE | INACTIVE
   createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   stops           TransportStop[]
   applications    TransportApplication[]
   allotments      TransportAllotment[]
   trips           TransportTrip[]
   complaints      TransportComplaint[]
+  vehicleMappings VehicleRouteMapping[]
 
+  @@index([status])
+  @@index([routeNumber])
+}
+
+model VehicleRouteMapping {
+  id           String    @id @default(uuid())
+  vehicleId    String
+  routeId      String
+  shiftType    String    @default("REGULAR") // REGULAR | MORNING_PICKUP | EVENING_DROP | SPECIAL
+  assignedDate DateTime  @default(now()) @db.Date
+  status       String    @default("ACTIVE") // ACTIVE | INACTIVE | SUSPENDED
+  remarks      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  vehicle      Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  route        TransportRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+  @@index([routeId])
   @@index([status])
 }
 
@@ -1967,10 +3306,13 @@ model TransportStop {
   id         String   @id @default(uuid())
   routeId    String
   stopName   String
+  stopCode   String?
   location   String?
   sequence   Int      @default(1)
   pickupTime String   // e.g. "07:30 AM"
   dropTime   String   // e.g. "05:45 PM"
+  latitude   Decimal? @db.Decimal(10, 7)
+  longitude  Decimal? @db.Decimal(10, 7)
   status     String   @default("ACTIVE")
   createdAt  DateTime @default(now())
 
@@ -1988,6 +3330,7 @@ model TransportApplication {
   studentId     String
   routeId       String
   stopId        String
+  requestType   String   @default("NEW_ALLOCATION") // NEW_ALLOCATION | ROUTE_CHANGE | STOP_CHANGE | TEMPORARY_REQUEST | CANCELLATION
   academicYear  String   @default("2026-27")
   status        String   @default("SUBMITTED") // DRAFT | SUBMITTED | UNDER_REVIEW | APPROVED | REJECTED | ALLOCATED | CANCELLED
   reviewedBy    String?
@@ -2056,9 +3399,10 @@ model TransportTrip {
   routeId     String
   driverId    String?
   tripDate    DateTime @db.Date
+  shift       String?  // MORNING | EVENING | SPECIAL
   startTime   String   // e.g. "07:00 AM"
   endTime     String?  // e.g. "08:30 AM"
-  tripType    String   @default("PICKUP") // PICKUP | DROP | SPECIAL | EVENT | OTHER
+  tripType    String   @default("PICKUP") // PICKUP | DROP | SPECIAL_TRIP | OTHER
   status      String   @default("SCHEDULED") // SCHEDULED | IN_TRANSIT | COMPLETED | DELAYED | CANCELLED
   createdAt   DateTime @default(now())
 
@@ -2092,11 +3436,15 @@ model VehicleMaintenance {
   maintenanceNo String    @unique // MNT-VEH-2026-000001
   vehicleId     String
   issue         String
+  category      String    @default("ENGINE") // ENGINE | ELECTRICAL | TYRES | BRAKES | BODY_WORK | AC_COOLING | SERVICE_ROUTINE | OTHER
+  description   String?
   priority      String    @default("NORMAL") // URGENT | HIGH | NORMAL | LOW
+  reportedDate  DateTime  @default(now())
   assignedStaff String?
   estimatedCost Decimal?  @db.Decimal(10, 2)
   actualCost    Decimal?  @db.Decimal(10, 2)
-  status        String    @default("OPEN") // OPEN | ASSIGNED | IN_PROGRESS | COMPLETED | CANCELLED
+  notesheetId   String?
+  status        String    @default("REPORTED") // REPORTED | ASSIGNED | IN_PROGRESS | COMPLETED | CANCELLED
   completedDate DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -2110,11 +3458,15 @@ model VehicleMaintenance {
 model VehicleDocument {
   id         String    @id @default(uuid())
   vehicleId  String
-  docType    String    // INSURANCE | PERMIT | FITNESS | PUC | RC_BOOK
+  docType    String    // RC | INSURANCE | FITNESS | PERMIT | POLLUTION | OTHER
   docNumber  String
+  issueDate  DateTime?
   expiryDate DateTime?
   docUrl     String?
+  uploadedBy String?
+  uploadedAt DateTime  @default(now())
   status     String    @default("VALID") // VALID | EXPIRING_SOON | EXPIRED
+  remarks    String?
 
   vehicle    Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
@@ -3071,6 +4423,7 @@ model CommitteeMeeting {
   status         String   @default("SCHEDULED") // SCHEDULED | CONDUCTED | ADJOURNED
 
   committee      Committee @relation(fields: [committeeId], references: [id], onDelete: Cascade)
+  actionItems    CommitteeActionItem[]
 
   @@index([committeeId])
 }
@@ -3219,29 +4572,62 @@ model ModuleAuthorityConfig {
 // --- PERSONAL WORK DIARY & WORK MANAGEMENT ---
 
 model WorkDiary {
-  id                String    @id @default(uuid())
-  userId            String
-  workTitle         String
-  description       String?
-  category          String    @default("GENERAL") // GENERAL | ACADEMIC | ADMINISTRATIVE | MEETING | EXAMINATION | RESEARCH | NAAC | OTHER
-  workDate          DateTime  @db.Date
-  startTime         String?
-  endTime           String?
-  priority          String    @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
-  status            String    @default("COMPLETED") // PLANNED | IN_PROGRESS | COMPLETED | DEFERRED | CANCELLED
-  relatedModule     String?
-  relatedPerson     String?
-  relatedDepartment String?
-  relatedInstitute  String?
-  remarks           String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                  String    @id @default(uuid())
+  userId              String
+  workTitle           String
+  description         String?
+  category            String    @default("GENERAL") // GENERAL | ACADEMIC | ADMINISTRATIVE | MEETING | EXAMINATION | RESEARCH | NAAC | OTHER
+  workDate            DateTime  @db.Date
+  startTime           String?
+  endTime             String?
+  priority            String    @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
+  status              String    @default("DRAFT") // DRAFT | SUBMITTED | FACULTY_REVIEW | HOD_REVIEW | APPROVED | REJECTED | COMPLETED | IN_PROGRESS | OVERDUE | CANCELLED
+  relatedModule       String?
+  relatedPerson       String?
+  relatedDepartment   String?
+  relatedInstitute    String?
+  departmentId        String?
+  instituteId         String?
+  remarks             String?
+  submittedAt         DateTime?
+  facultyComments     String?
+  facultyReviewedAt   DateTime?
+  facultyReviewedById String?
+  hodComments         String?
+  hodReviewedAt       DateTime?
+  hodReviewedById     String?
+  approvedAt          DateTime?
+  approvedById        String?
+  rejectedAt          DateTime?
+  rejectedById        String?
+  rejectionReason     String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  history WorkDiaryHistory[]
 
   @@index([userId])
   @@index([workDate])
   @@index([status])
+  @@index([departmentId])
+  @@index([instituteId])
+}
+
+model WorkDiaryHistory {
+  id          String    @id @default(uuid())
+  workDiaryId String
+  action      String    // CREATED | SAVED_DRAFT | SUBMITTED | UPDATED | FACULTY_REVIEWED | HOD_REVIEWED | APPROVED | REJECTED
+  fromStatus  String?
+  toStatus    String
+  performedBy String
+  comments    String?
+  createdAt   DateTime  @default(now())
+
+  workDiary WorkDiary @relation(fields: [workDiaryId], references: [id], onDelete: Cascade)
+
+  @@index([workDiaryId])
+  @@index([performedBy])
 }
 
 model WorkTask {
@@ -3547,6 +4933,199 @@ model DispatchRecord {
   @@index([deliveryStatus])
 }
 
+// --- UNIVERSITY INWARD & OUTWARD REGISTER ---
+
+model InwardRegister {
+  id               String    @id @default(uuid())
+  registerNo       String    @unique // INW/2026/000001
+  receiptDate      DateTime  @default(now()) @db.Date
+  receivedDate     DateTime  @default(now()) @db.Date
+  senderName       String
+  senderOrganization String?
+  senderEmail      String?
+  senderPhone      String?
+  letterNumber     String?
+  letterDate       DateTime? @db.Date
+  subject          String
+  description      String?
+  documentType     String    @default("LETTER") // LETTER | CIRCULAR | NOTICE | APPLICATION | GOVERNMENT_COMMUNICATION | UNIVERSITY_COMMUNICATION | INVOICE | LEGAL_DOCUMENT | ACADEMIC_DOCUMENT | OTHER
+  departmentId     String?
+  receivedByUserId String
+  assignedToUserId String?
+  priority         String    @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
+  receivedThrough  String    @default("POST") // POST | COURIER | EMAIL | HAND_DELIVERY | OTHER
+  status           String    @default("RECEIVED") // RECEIVED | UNDER_PROCESS | FORWARDED | ACTION_REQUIRED | COMPLETED | CLOSED
+  dueDate          DateTime? @db.Date
+  documentUrl      String?
+  attachmentName   String?
+  documentSize     Int?
+  documentTypeMime String?
+  remarks          String?
+  notesheetId      String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  department       Department?           @relation(fields: [departmentId], references: [id])
+  receivedBy       User                  @relation("InwardReceiver", fields: [receivedByUserId], references: [id])
+  assignedTo       User?                 @relation("InwardAssignee", fields: [assignedToUserId], references: [id])
+  forwardings      InwardForwarding[]
+  statusHistory    InwardStatusHistory[]
+  auditLogs        InwardOutwardAuditLog[]
+
+  @@index([registerNo])
+  @@index([receivedDate])
+  @@index([departmentId])
+  @@index([status])
+  @@index([priority])
+  @@index([receivedByUserId])
+  @@index([assignedToUserId])
+  @@index([notesheetId])
+}
+
+model InwardForwarding {
+  id                     String    @id @default(uuid())
+  inwardId               String
+  forwardedByUserId      String
+  forwardedToOffice      String?
+  forwardedToDepartmentId String?
+  forwardedToUserId      String?
+  forwardedDate          DateTime  @default(now())
+  actionRequired         String
+  dueDate                DateTime? @db.Date
+  remarks                String?
+  status                 String    @default("PENDING") // PENDING | IN_PROGRESS | ACTION_TAKEN | COMPLETED
+  actionTaken            String?
+  actionTakenDate        DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  inward                 InwardRegister @relation(fields: [inwardId], references: [id], onDelete: Cascade)
+  forwardedBy            User           @relation("InwardForwarder", fields: [forwardedByUserId], references: [id])
+
+  @@index([inwardId])
+  @@index([forwardedByUserId])
+  @@index([forwardedToDepartmentId])
+  @@index([forwardedToUserId])
+  @@index([status])
+}
+
+model InwardStatusHistory {
+  id                String   @id @default(uuid())
+  inwardId          String
+  fromStatus        String?
+  toStatus          String
+  changedByUserId   String
+  remarks           String?
+  createdAt         DateTime @default(now())
+
+  inward            InwardRegister @relation(fields: [inwardId], references: [id], onDelete: Cascade)
+
+  @@index([inwardId])
+  @@index([changedByUserId])
+}
+
+model OutwardRegister {
+  id                   String    @id @default(uuid())
+  dispatchNo           String    @unique // OUT/2026/000001
+  dispatchDate         DateTime  @default(now()) @db.Date
+  letterDate           DateTime? @db.Date
+  receiverName         String
+  receiverOrganization String?
+  receiverAddress      String?
+  receiverEmail        String?
+  receiverPhone        String?
+  subject              String
+  referenceNumber      String?
+  documentType         String    @default("LETTER") // LETTER | CIRCULAR | NOTICE | APPLICATION | GOVERNMENT_COMMUNICATION | UNIVERSITY_COMMUNICATION | INVOICE | LEGAL_DOCUMENT | ACADEMIC_DOCUMENT | OTHER
+  departmentId         String?
+  sentByUserId         String
+  mode                 String    @default("COURIER") // POST | COURIER | EMAIL | HAND_DELIVERY | OTHER
+  courierService       String?
+  trackingNo           String?
+  priority             String    @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
+  status               String    @default("DRAFT") // DRAFT | READY | DISPATCHED | DELIVERED | RETURNED | CANCELLED
+  expectedDeliveryDate DateTime? @db.Date
+  deliveredDate        DateTime? @db.Date
+  deliveryStatus       String?   // PENDING | IN_TRANSIT | DELIVERED | RETURNED | LOST
+  documentUrl          String?
+  attachmentName       String?
+  remarks              String?
+  notesheetId          String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  department           Department?            @relation(fields: [departmentId], references: [id])
+  sentBy               User                   @relation("OutwardSender", fields: [sentByUserId], references: [id])
+  dispatches           OutwardDispatch[]
+  statusHistory        OutwardStatusHistory[]
+  auditLogs            InwardOutwardAuditLog[]
+
+  @@index([dispatchNo])
+  @@index([dispatchDate])
+  @@index([departmentId])
+  @@index([status])
+  @@index([mode])
+  @@index([sentByUserId])
+  @@index([notesheetId])
+}
+
+model OutwardDispatch {
+  id                   String    @id @default(uuid())
+  outwardId            String
+  courierService       String
+  trackingNumber       String?
+  dispatchDate         DateTime  @default(now())
+  expectedDeliveryDate DateTime? @db.Date
+  deliveryDate         DateTime? @db.Date
+  deliveryStatus       String    @default("PENDING") // PENDING | IN_TRANSIT | DELIVERED | RETURNED | LOST
+  dispatchedByUserId   String?
+  remarks              String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  outward              OutwardRegister @relation(fields: [outwardId], references: [id], onDelete: Cascade)
+
+  @@index([outwardId])
+  @@index([deliveryStatus])
+}
+
+model OutwardStatusHistory {
+  id                String   @id @default(uuid())
+  outwardId         String
+  fromStatus        String?
+  toStatus          String
+  changedByUserId   String
+  remarks           String?
+  createdAt         DateTime @default(now())
+
+  outward           OutwardRegister @relation(fields: [outwardId], references: [id], onDelete: Cascade)
+
+  @@index([outwardId])
+  @@index([changedByUserId])
+}
+
+model InwardOutwardAuditLog {
+  id                String   @id @default(uuid())
+  recordType        String   // INWARD | OUTWARD
+  inwardId          String?
+  outwardId         String?
+  action            String   // CREATED | UPDATED | STATUS_CHANGED | ASSIGNED | FORWARDED | ACTION_TAKEN | ATTACHMENT_ADDED | DISPATCHED | DELIVERED | RETURNED | COMPLETED | CLOSED | CANCELLED
+  performedByUserId String
+  fromStatus        String?
+  toStatus          String?
+  remarks           String?
+  createdAt         DateTime @default(now())
+
+  inward            InwardRegister?  @relation(fields: [inwardId], references: [id], onDelete: Cascade)
+  outward           OutwardRegister? @relation(fields: [outwardId], references: [id], onDelete: Cascade)
+  performedBy       User             @relation("RegisterAuditActor", fields: [performedByUserId], references: [id])
+
+  @@index([recordType])
+  @@index([inwardId])
+  @@index([outwardId])
+  @@index([performedByUserId])
+}
+
 // --- DIGITAL STUDENT SERVICE DESK & CERTIFICATES ---
 
 model StudentService {
@@ -3587,33 +5166,48 @@ model StudentServiceRequirement {
 }
 
 model StudentServiceRequest {
-  id                 String    @id @default(uuid())
-  requestNo          String    @unique // REQ-2026-000001
-  studentId          String
-  serviceId          String
-  submissionDate     DateTime  @default(now())
-  status             String    @default("SUBMITTED") // SUBMITTED | UNDER_VERIFICATION | FORWARDED | APPROVAL_PENDING | APPROVED | REJECTED | RETURNED | PROCESSING | READY | COMPLETED | CANCELLED
-  currentStage       String    @default("SUBMITTED")
-  currentAuthorityRole String  @default("STUDENT_SECTION")
-  currentAssigneeId  String?
-  purpose            String?
-  remarks            String?
-  rejectionReason    String?
-  dueDate            DateTime? @db.Date
-  completedAt        DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id                   String    @id @default(uuid())
+  requestNo            String    @unique // REQ-2026-000001
+  studentId            String
+  serviceId            String
+  departmentId         String?
+  subject              String?
+  description          String?
+  category             String?   // ACADEMIC | CERTIFICATE | HOSTEL | TRANSPORT | FINANCE | LIBRARY | EXAMINATION | GENERAL | OTHER
+  priority             String    @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
+  submissionDate       DateTime  @default(now())
+  status               String    @default("SUBMITTED") // SUBMITTED | ASSIGNED | IN_PROGRESS | PENDING_STUDENT | RESOLVED | REJECTED | CANCELLED | COMPLETED
+  currentStage         String    @default("SUBMITTED")
+  currentAuthorityRole String    @default("STUDENT_SECTION")
+  assignedToUserId     String?
+  assignedDepartmentId String?
+  purpose              String?
+  remarks              String?
+  resolution           String?
+  resolvedByUserId     String?
+  resolvedAt           DateTime?
+  rejectionReason      String?
+  dueDate              DateTime? @db.Date
+  completedAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  student Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  service StudentService @relation(fields: [serviceId], references: [id])
+  student              Student                         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  service              StudentService                  @relation(fields: [serviceId], references: [id])
+  department           Department?                     @relation(fields: [departmentId], references: [id])
 
-  documents    StudentServiceRequestDocument[]
-  certificates Certificate[]
+  documents            StudentServiceRequestDocument[]
+  certificates         Certificate[]
+  messages             StudentServiceRequestMessage[]
+  history              StudentServiceRequestHistory[]
 
   @@index([requestNo])
   @@index([studentId])
   @@index([serviceId])
+  @@index([departmentId])
+  @@index([assignedToUserId])
   @@index([status])
+  @@index([priority])
   @@index([currentAuthorityRole])
 }
 
@@ -3626,9 +5220,43 @@ model StudentServiceRequestDocument {
   fileType    String?
   uploadedAt  DateTime @default(now())
 
-  request StudentServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  request     StudentServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
 
   @@index([requestId])
+}
+
+model StudentServiceRequestMessage {
+  id          String   @id @default(uuid())
+  requestId   String
+  senderId    String
+  senderName  String?
+  senderType  String   // STUDENT | STAFF | ADMIN | SYSTEM
+  message     String
+  attachments String?  // JSON string or comma-separated URLs
+  isInternal  Boolean  @default(false) // Staff internal note
+  createdAt   DateTime @default(now())
+
+  request     StudentServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([senderId])
+}
+
+model StudentServiceRequestHistory {
+  id                String   @id @default(uuid())
+  requestId         String
+  action            String   // CREATED | ASSIGNED | STATUS_CHANGED | REPLIED | RESOLVED | REJECTED | CANCELLED | REOPENED
+  performedByUserId String
+  performedByName   String?
+  fromStatus        String?
+  toStatus          String?
+  remarks           String?
+  createdAt         DateTime @default(now())
+
+  request           StudentServiceRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([performedByUserId])
 }
 
 model Certificate {
@@ -3859,36 +5487,190 @@ model Enrollment {
 // --- UNIVERSITY EXAMINATION, EVALUATION & RESULT MANAGEMENT ---
 
 model ExamCentre {
-  id          String   @id @default(uuid())
-  code        String   @unique // CENTRE-01
-  name        String
-  building    String
-  address     String?
-  capacity    Int      @default(500)
-  status      String   @default("ACTIVE") // ACTIVE | INACTIVE
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  code          String   @unique // CENTRE-01
+  name          String
+  instituteId   String?
+  building      String
+  address       String?
+  contactPerson String?
+  contactNumber String?
+  capacity      Int      @default(500)
+  status        String   @default("ACTIVE") // ACTIVE | INACTIVE
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  rooms       ExamRoom[]
+  rooms             ExamRoom[]
+  centreAllocations ExamCentreAllocation[]
+  seatAllocations   ExamSeatAllocation[]
+  edpDuties         ExamEdpDuty[]
 
+  @@index([code])
   @@index([status])
 }
 
 model ExamRoom {
   id          String   @id @default(uuid())
   centreId    String
-  roomNumber  String
+  building    String?
+  roomNumber  String   // e.g. "ROOM-101"
+  roomCode    String?  // e.g. "R101"
   floor       Int      @default(1)
   capacity    Int      @default(40)
+  roomType    String   @default("CLASSROOM") // CLASSROOM | LAB | HALL | OTHER
   hasCCTV     Boolean  @default(true)
-  status      String   @default("ACTIVE")
+  status      String   @default("AVAILABLE") // AVAILABLE | UNAVAILABLE | ACTIVE | INACTIVE
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  centre      ExamCentre @relation(fields: [centreId], references: [id], onDelete: Cascade)
-  invigilations InvigilatorAssignment[]
+  centre          ExamCentre              @relation(fields: [centreId], references: [id], onDelete: Cascade)
+  invigilations   InvigilatorAssignment[]
+  allocations     ExamRoomAllocation[]
+  seatAllocations ExamSeatAllocation[]
+  edpDuties       ExamEdpDuty[]
 
   @@unique([centreId, roomNumber])
   @@index([centreId])
+  @@index([roomNumber])
+  @@index([status])
+}
+
+model ExamCentreAllocation {
+  id                String   @id @default(uuid())
+  examId            String
+  centreId          String
+  status            String   @default("ACTIVE") // ACTIVE | CANCELLED
+  allocatedCapacity Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  exam   Exam       @relation(fields: [examId], references: [id], onDelete: Cascade)
+  centre ExamCentre @relation(fields: [centreId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, centreId])
+  @@index([examId])
+  @@index([centreId])
+}
+
+model ExamSeatAllocation {
+  id             String    @id @default(uuid())
+  examId         String
+  examScheduleId String?
+  centreId       String
+  roomId         String
+  studentId      String
+  hallTicketId   String?
+  seatNumber     String    // e.g. "A01", "01"
+  row            String?   // e.g. "A"
+  column         Int?      // e.g. 1
+  status         String    @default("ALLOCATED") // ALLOCATED | CHANGED | CANCELLED
+  reason         String?   // Reason for change if applicable
+  allocatedAt    DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  exam    Exam                   @relation(fields: [examId], references: [id], onDelete: Cascade)
+  centre  ExamCentre             @relation(fields: [centreId], references: [id], onDelete: Cascade)
+  room    ExamRoom               @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  student Student                @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  history ExamSeatChangeHistory[]
+
+  @@index([examId])
+  @@index([centreId])
+  @@index([roomId])
+  @@index([studentId])
+  @@index([seatNumber])
+  @@index([status])
+}
+
+model ExamSeatChangeHistory {
+  id                String   @id @default(uuid())
+  seatAllocationId  String
+  studentId         String
+  examId            String
+  fromCentreId      String?
+  toCentreId        String?
+  fromRoomId        String?
+  toRoomId          String?
+  fromSeatNumber    String?
+  toSeatNumber      String
+  reason            String
+  changedByUserId   String
+  changedAt         DateTime @default(now())
+
+  allocation ExamSeatAllocation @relation(fields: [seatAllocationId], references: [id], onDelete: Cascade)
+
+  @@index([seatAllocationId])
+  @@index([studentId])
+  @@index([examId])
+}
+
+model ExamEdpDuty {
+  id              String    @id @default(uuid())
+  dutyNo          String    @unique // EXAM-EDP-2026-000001
+  examId          String
+  dutyDate        DateTime  @db.Date
+  shift           String    // MORNING | AFTERNOON | EVENING | "09:30 AM - 12:30 PM"
+  centreId        String
+  building        String?
+  roomId          String?
+  dutyType        String    // EDP_OPERATOR | EXAM_SUPPORT | TECHNICAL_SUPPORT | CONTROL_ROOM | OTHER
+  staffUserId     String
+  status          String    @default("ASSIGNED") // ASSIGNED | CONFIRMED | COMPLETED | CANCELLED | REJECTED
+  rejectionReason String?
+  remarks         String?
+  assignedByUserId String?
+  assignedAt      DateTime  @default(now())
+  confirmedAt     DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+  updatedAt       DateTime  @updatedAt
+
+  exam      Exam                 @relation(fields: [examId], references: [id], onDelete: Cascade)
+  centre    ExamCentre           @relation(fields: [centreId], references: [id], onDelete: Cascade)
+  room      ExamRoom?            @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  staffUser User                 @relation("ExamEdpStaff", fields: [staffUserId], references: [id], onDelete: Cascade)
+  history   ExamEdpDutyHistory[]
+
+  @@index([dutyNo])
+  @@index([examId])
+  @@index([centreId])
+  @@index([roomId])
+  @@index([staffUserId])
+  @@index([dutyDate])
+  @@index([status])
+}
+
+model ExamEdpDutyHistory {
+  id                String   @id @default(uuid())
+  dutyId            String
+  action            String   // ASSIGNED | CONFIRMED | REJECTED | COMPLETED | CANCELLED | REALLOCATED
+  performedByUserId String
+  reason            String?
+  createdAt         DateTime @default(now())
+
+  duty ExamEdpDuty @relation(fields: [dutyId], references: [id], onDelete: Cascade)
+
+  @@index([dutyId])
+  @@index([performedByUserId])
+}
+
+model ExamRoomAllocation {
+  id             String    @id @default(uuid())
+  examScheduleId String
+  roomId         String
+  studentId      String
+  seatNumber     String?   // e.g. "R101-S01"
+  deskNumber     String?
+  status         String    @default("ALLOCATED") // ALLOCATED | PRESENT | ABSENT | REALLOCATED
+  createdAt      DateTime  @default(now())
+
+  room           ExamRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  student        Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([examScheduleId, studentId])
+  @@index([examScheduleId])
+  @@index([roomId])
+  @@index([studentId])
 }
 
 model InvigilatorAssignment {
@@ -3929,15 +5711,23 @@ model HallTicket {
   hallTicketNo     String   @unique // HT-2026-000001
   examId           String
   studentId        String
+  examFormId       String?  @unique
   examSessionName  String   @default("Summer 2026 Regular/Remedial")
   verificationCode String   @unique
+  examCentreId     String?
+  centreName       String?
+  building         String?
+  roomNumber       String?
+  seatNumber       String?
+  requiresReissue  Boolean  @default(false)
   issueDate        DateTime @default(now())
   status           String   @default("GENERATED") // GENERATED | ISSUED | BLOCKED | CANCELLED
   qrData           String?
   downloadUrl      String?
   createdAt        DateTime @default(now())
 
-  student          Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student          Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  examForm         ExamForm? @relation(fields: [examFormId], references: [id], onDelete: Cascade)
 
   @@index([hallTicketNo])
   @@index([examId])
@@ -3978,19 +5768,56 @@ model ResultSummary {
   sgpa             Decimal? @db.Decimal(4, 2)
   cgpa             Decimal? @db.Decimal(4, 2)
   backlogsCount    Int      @default(0)
-  resultStatus     String   @default("PASS") // PASS | FAIL | ATKT | WITHHELD
+  resultStatus     String   @default("PASS") // PASS | FAIL | ATKT | WITHHELD | REVISED
   isPublished      Boolean  @default(false)
   publishedAt      DateTime?
   marksheetNo      String?  @unique // MS-2026-000001
+  verificationCode String?  @unique // VREF-RES-2026-000001
+  withheldCategory String?
+  withheldReason   String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   student          Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  revisions        ResultRevisionHistory[]
 
   @@unique([studentId, examId])
   @@index([studentId])
   @@index([examId])
   @@index([resultStatus])
+  @@index([verificationCode])
+}
+
+model GradeConfiguration {
+  id            String   @id @default(uuid())
+  grade         String   @unique // O, A+, A, B+, B, C, P, F, AB
+  minPercentage Decimal  @db.Decimal(5, 2)
+  maxPercentage Decimal  @db.Decimal(5, 2)
+  gradePoint    Decimal  @db.Decimal(4, 2)
+  description   String?
+  isPass        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ResultRevisionHistory {
+  id                   String    @id @default(uuid())
+  resultSummaryId      String
+  examResultId         String?
+  previousMarks        Decimal?  @db.Decimal(6, 2)
+  newMarks             Decimal?  @db.Decimal(6, 2)
+  previousGrade        String?
+  newGrade             String?
+  previousResultStatus String?
+  newResultStatus      String?
+  reason               String
+  changedByUserId      String
+  changedAt            DateTime  @default(now())
+
+  resultSummary        ResultSummary @relation(fields: [resultSummaryId], references: [id], onDelete: Cascade)
+
+  @@index([resultSummaryId])
+  @@index([examResultId])
 }
 
 model RevaluationRequest {
@@ -4278,11 +6105,792 @@ model ExitClearance {
   resignation      Resignation @relation(fields: [resignationId], references: [id], onDelete: Cascade)
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// PHASE 1A: AI & SMART ACADEMIC ANALYTICS — EARLY ACADEMIC RISK PREDICTION
+// ──────────────────────────────────────────────────────────────────────────────
 
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
 
+model AcademicRisk {
+  id                String    @id @default(uuid())
+  studentId         String
+  academicYearId    String
+  semesterId        String
+  attendanceScore   Float     @default(0)   // 0-100 normalized component score
+  assignmentScore   Float     @default(0)   // 0-100 normalized component score
+  examinationScore  Float     @default(0)   // 0-100 normalized component score
+  engagementScore   Float     @default(0)   // 0-100 normalized component score
+  riskScore         Float     @default(0)   // 0-100 weighted composite
+  riskLevel         RiskLevel @default(LOW)
+  predictionReason  String?
+  recommendedAction String?
+  lastCalculatedAt  DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
+  student      Student      @relation(fields: [studentId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  semester     Semester     @relation(fields: [semesterId], references: [id])
 
+  @@unique([studentId, academicYearId, semesterId])
+  @@index([riskLevel])
+  @@index([riskScore])
+  @@index([studentId])
+}
 
+// ──────────────────────────────────────────────────────────────────────────────
+// 38. EDP DUTY & ACADEMIC SURVEILLANCE INSPECTION MANAGEMENT
+// ──────────────────────────────────────────────────────────────────────────────
+
+model EdpDuty {
+  id                           String    @id @default(uuid())
+  dutyNo                       String    @unique // EDP-2026-000001
+  departmentId                 String
+  subjectId                    String?
+  subjectName                  String?
+  classRoom                    String    // e.g. "Room 302, Lab 4, Block B"
+  batchOrDivision              String?   // e.g. "B.Tech CSE - 4th Sem (Div A)"
+  teachingFacultyId            String?   // Faculty taking lecture
+  teachingFacultyName          String?
+  assignedOfficerId            String    // User performing the EDP inspection
+  dutyDate                     DateTime  @db.Date
+  startTime                    String    // e.g. "10:30 AM"
+  endTime                      String    // e.g. "11:30 AM"
+  totalRegisteredStudents      Int       @default(0)
+  presentStudentCount          Int       @default(0)
+  absentStudentCount           Int       @default(0)
+  studentAttendancePercentage  Decimal?  @db.Decimal(5, 2)
+  lectureTopic                 String?
+  teachingMethodology          String?   // BLACKBOARD | PROJECTOR | PPT | LAB_HANDS_ON | HYBRID
+  classroomEnvironment         String?   // DISCIPLINED | NOISY | CLEAN | PROJECTOR_ISSUE
+  status                       String    @default("ASSIGNED") // ASSIGNED | IN_PROGRESS | SUBMITTED | VERIFIED | COMPLETED | CANCELLED
+  observations                 String?
+  remarks                      String?
+  verifiedByUserId             String?
+  verifiedAt                   DateTime?
+  createdAt                    DateTime  @default(now())
+  updatedAt                    DateTime  @updatedAt
+
+  department                   Department                     @relation(fields: [departmentId], references: [id])
+  assignedOfficer              User                           @relation("EdpDutyOfficer", fields: [assignedOfficerId], references: [id])
+  teachingFaculty              Faculty?                       @relation("EdpDutyTeachingFaculty", fields: [teachingFacultyId], references: [id])
+
+  photos                       EdpDutyPhoto[]
+  studentObservations          EdpDutyStudentObservation[]
+  history                      EdpDutyHistory[]
+
+  @@index([dutyNo])
+  @@index([departmentId])
+  @@index([assignedOfficerId])
+  @@index([teachingFacultyId])
+  @@index([dutyDate])
+  @@index([status])
+}
+
+model EdpDutyPhoto {
+  id                 String   @id @default(uuid())
+  dutyId             String
+  photoUrl           String
+  caption            String?
+  capturedAt         DateTime @default(now())
+  uploadedByUserId   String
+  fileSize           Int?
+  latitude           Decimal? @db.Decimal(10, 7)
+  longitude          Decimal? @db.Decimal(10, 7)
+  createdAt          DateTime @default(now())
+
+  duty               EdpDuty  @relation(fields: [dutyId], references: [id], onDelete: Cascade)
+
+  @@index([dutyId])
+  @@index([uploadedByUserId])
+}
+
+model EdpDutyStudentObservation {
+  id                 String   @id @default(uuid())
+  dutyId             String
+  studentId          String?
+  enrollmentNo       String
+  studentName        String
+  attendanceStatus   String   @default("PRESENT") // PRESENT | ABSENT | LATE | LEFT_EARLY
+  observationRemarks String?
+  createdAt          DateTime @default(now())
+
+  duty               EdpDuty  @relation(fields: [dutyId], references: [id], onDelete: Cascade)
+
+  @@index([dutyId])
+  @@index([enrollmentNo])
+}
+
+model EdpDutyHistory {
+  id                String   @id @default(uuid())
+  dutyId            String
+  action            String   // CREATED | ASSIGNED | STARTED | INSPECTION_SUBMITTED | VERIFIED | UPDATED | CANCELLED
+  performedByUserId String
+  performedByName   String?
+  fromStatus        String?
+  toStatus          String?
+  remarks           String?
+  createdAt         DateTime @default(now())
+
+  duty              EdpDuty  @relation(fields: [dutyId], references: [id], onDelete: Cascade)
+
+  @@index([dutyId])
+  @@index([performedByUserId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 39. CENTRALIZED REPORTING & EXPORT AUDIT LOGS
+// ──────────────────────────────────────────────────────────────────────────────
+
+model CentralReportAuditLog {
+  id                String   @id @default(uuid())
+  module            String   // WORK_DIARY | EXAMINATION | RESULTS | ADMISSION | INWARD | OUTWARD | HOSTEL_VISITOR | TRANSPORT | CAMPUS_SERVICES | EDP_DUTY | STUDENTS | FACULTY | FEES
+  reportType        String   // SINGLE_RECORD | DATE_WISE | DEPARTMENT_WISE | INSTITUTE_WISE | USER_WISE | STATUS_WISE | FILTER_WISE | DASHBOARD_SUMMARY
+  format            String   // JSON | CSV | EXCEL | PDF | HTML_PRINT
+  generatedByUserId String
+  filterParams      String?  // JSON stringified filters
+  rowCount          Int      @default(0)
+  generatedAt       DateTime @default(now())
+
+  @@index([module])
+  @@index([generatedByUserId])
+  @@index([generatedAt])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 40. CENTRALIZED BULK EXCEL IMPORT SYSTEM
+// ──────────────────────────────────────────────────────────────────────────────
+
+model BulkImport {
+  id                String          @id @default(uuid())
+  importNo          String          @unique // IMP-2026-000001
+  importType        String          // STUDENT | FACULTY | SUBJECT | EXAM_FORM | MARKS | HOSTEL_STUDENT | HOSTEL_ROOM | FEE_ASSIGNMENT | TRANSPORT_VEHICLE | TRANSPORT_DRIVER | TRANSPORT_ROUTE
+  fileName          String
+  fileSize          Int?
+  uploadedByUserId  String
+  uploadedByName    String?
+  uploadedByRole    String?
+  instituteId       String?
+  departmentId      String?
+  status            String          @default("UPLOADED") // UPLOADED | VALIDATING | READY | IMPORTED | PARTIALLY_IMPORTED | FAILED | CANCELLED
+  importMode        String          @default("INSERT_ONLY") // INSERT_ONLY | UPSERT
+  totalRows         Int             @default(0)
+  validRows         Int             @default(0)
+  invalidRows       Int             @default(0)
+  duplicateRows     Int             @default(0)
+  importedRows      Int             @default(0)
+  failedRows        Int             @default(0)
+  skippedRows       Int             @default(0)
+  validationSummary String?         // JSON string summary of errors/warnings
+  metadata          String?         // JSON extra info (e.g. examId, academicYear, etc.)
+  createdAt         DateTime        @default(now())
+  completedAt       DateTime?
+
+  uploadedByUser    User            @relation("BulkImportUploader", fields: [uploadedByUserId], references: [id])
+  rows              BulkImportRow[]
+  history           BulkImportHistory[]
+
+  @@index([importNo])
+  @@index([importType])
+  @@index([uploadedByUserId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model BulkImportRow {
+  id             String      @id @default(uuid())
+  importId       String
+  rowNumber      Int
+  rawData        String      // JSON string of row key-values
+  parsedData     String?     // JSON string of sanitized & normalized data
+  status         String      @default("PENDING") // PENDING | VALID | INVALID | DUPLICATE | WARNING | IMPORTED | FAILED | SKIPPED
+  targetId       String?     // Entity ID if inserted/updated
+  errorMessage   String?
+  errorField     String?
+  warningMessage String?
+  createdAt      DateTime    @default(now())
+
+  import         BulkImport  @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@unique([importId, rowNumber])
+  @@index([importId])
+  @@index([status])
+}
+
+model BulkImportHistory {
+  id                String      @id @default(uuid())
+  importId          String
+  action            String      // UPLOADED | VALIDATED | CONFIRMED | IMPORTED | FAILED | CANCELLED
+  performedByUserId String
+  performedByName   String?
+  details           String?
+  timestamp         DateTime    @default(now())
+
+  import            BulkImport  @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@index([importId])
+  @@index([performedByUserId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 27. STUDENT SECTION & OFFICIAL SERVICES
+// ──────────────────────────────────────────────────────────────────────────────
+
+model StudentSectionService {
+  id                   String   @id @default(uuid())
+  code                 String   @unique
+  name                 String
+  description          String
+  category             String   // CERTIFICATE | TRANSCRIPT | DEGREE | DUPLICATE_ID | VERIFICATION | MIGRATION | TRANSFER | MARKSHEET | OTHER
+  fee                  Float    @default(0)
+  urgentFee            Float    @default(0)
+  isRefundable         Boolean  @default(false)
+  deliveryMode         String   @default("BOTH") // DIGITAL | PHYSICAL | BOTH
+  processingDays       Int      @default(3)
+  urgentProcessingDays Int      @default(1)
+  requiredDocuments    String[] @default([])
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  requests             StudentSectionRequest[]
+}
+
+model StudentSectionRequest {
+  id                   String   @id @default(uuid())
+  requestNo            String   @unique
+  studentId            String
+  studentName          String
+  enrollmentNo         String
+  email                String
+  phone                String?
+  departmentId         String
+  departmentName       String
+  programId            String
+  programName          String
+  semesterId           String?
+  semesterName         String?
+  
+  serviceId            String
+  serviceCode          String
+  serviceName          String
+  category             String
+  purpose              String
+  copies               Int      @default(1)
+  isUrgent             Boolean  @default(false)
+
+  calculatedFee        Float    @default(0)
+  paymentStatus        String   @default("PENDING") // NOT_REQUIRED | PENDING | PAID | FAILED | REFUNDED | WAIVED
+  paymentTransactionId String?
+  receiptNo            String?
+  paidAt               DateTime?
+
+  deliveryMode         String   @default("BOTH")
+  deliveryAddress      String?
+  trackingNumber       String?
+  dispatchedAt         DateTime?
+
+  status               String   @default("SUBMITTED") // DRAFT | SUBMITTED | PAYMENT_PENDING | PAID | UNDER_REVIEW | PROCESSING | READY | COMPLETED | REJECTED | CANCELLED
+  assignedStaffId      String?
+  assignedStaffName    String?
+  rejectionReason      String?
+  remarks              String?
+
+  documentId           String?
+  documentNo           String?
+  documentUrl          String?
+  documentIssuedAt     DateTime?
+
+  timeline             Json     @default("[]")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  service              StudentSectionService @relation(fields: [serviceId], references: [id])
+  documents            StudentSectionDocument[]
+
+  @@index([studentId])
+  @@index([enrollmentNo])
+  @@index([serviceId])
+  @@index([status])
+}
+
+model StudentSectionDocument {
+  id               String   @id @default(uuid())
+  documentNo       String   @unique
+  requestId        String
+  requestNo        String
+  studentId        String
+  studentName      String
+  enrollmentNo     String
+  departmentName   String
+  programName      String
+  serviceName      String
+  title            String
+  fileUrl          String
+  fileType         String   @default("PDF")
+  generatedBy      String
+  generatedByName  String
+  generatedAt      DateTime @default(now())
+  version          Int      @default(1)
+  verificationCode String   @unique
+  status           String   @default("ACTIVE") // ACTIVE | REVOKED
+  downloadsCount   Int      @default(0)
+
+  request          StudentSectionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([studentId])
+  @@index([enrollmentNo])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 28. FEE QUERIES & EXAM FEE CONFIG
+// ──────────────────────────────────────────────────────────────────────────────
+
+model FeeQuery {
+  id                        String   @id @default(uuid())
+  queryNo                   String   @unique
+  studentId                 String
+  studentName               String
+  enrollmentNo              String
+  email                     String
+  phone                     String?
+  departmentId              String
+  departmentName            String
+  programId                 String
+  programName               String
+  
+  category                  String   // SEMESTER_FEE | EXAM_FEE | BACKLOG_FEE | RE_EXAM_FEE | RECHECK_FEE | REASSESSMENT_FEE | LATE_FEE | PAYMENT_ISSUE | RECEIPT_ISSUE | REFUND | OTHER_FEE_QUERY
+  subject                   String
+  description               String
+  priority                  String   @default("MEDIUM") // LOW | MEDIUM | HIGH | URGENT
+  attachmentUrl             String?
+
+  studentFeeRecordId        String?
+  paymentTransactionId      String?
+  claimedAmount             Float?
+  transactionReferenceNo    String?
+
+  status                    String   @default("SUBMITTED") // SUBMITTED | UNDER_REVIEW | RESOLVED | REJECTED | CLOSED
+  assignedAccountsHandlerId String?
+  assignedAccountsHandlerName String?
+  resolutionSummary         String?
+  resolutionRemarks         String?
+  resolvedAt                DateTime?
+
+  timeline                  Json     @default("[]")
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  @@index([studentId])
+  @@index([enrollmentNo])
+  @@index([status])
+  @@index([category])
+}
+
+model ExamFeeConfig {
+  id               String   @id @default(uuid())
+  category         String   @unique // REGULAR_EXAM | BACKLOG_EXAM | RE_EXAM | RECHECK | REASSESSMENT | EXAM_FORM | LATE_EXAM_FORM
+  name             String
+  code             String   @unique
+  description      String
+  baseAmount       Float    @default(0)
+  perSubjectAmount Float    @default(0)
+  lateFeePerDay    Float    @default(0)
+  maxLateFee       Float    @default(0)
+  isRefundable     Boolean  @default(false)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// ─── SUBJECT-WISE ATTENDANCE, 75% EXAM ELIGIBILITY & APPROVAL MODELS ─────────────
+
+model AttendanceEligibilityConfig {
+  id                        String   @id @default(uuid())
+  minimumAttendancePct      Float    @default(75.0)
+  condonationFloorPct       Float    @default(60.0)
+  isCondonationAllowed      Boolean  @default(true)
+  academicYearId            String?
+  updatedByUserId           String?
+  updatedByName             String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+}
+
+model AttendanceApplication {
+  id                        String   @id @default(uuid())
+  applicationNo             String   @unique // APP/ATT/2026/000001
+  studentId                 String
+  studentName               String
+  enrollmentNo              String
+  studentEmail              String
+  studentPhone              String?
+  instituteId               String
+  departmentId              String
+  programId                 String
+  semesterId                String
+  subjectId                 String
+  subjectCode               String
+  subjectName               String
+  subjectFacultyId          String
+  subjectFacultyName        String
+  mentorFacultyId           String
+  mentorFacultyName         String
+  hodUserId                 String
+  hodUserName               String
+  hoiUserId                 String
+  hoiUserName               String
+  
+  totalClasses              Int
+  presentClasses            Int
+  absentClasses             Int
+  currentAttendancePct      Float
+  requiredAttendancePct     Float    @default(75.0)
+  shortagePct               Float
+  
+  reason                    String   // MEDICAL | UNIVERSITY_ACTIVITY | OFFICIAL_DUTY | ACADEMIC_ACTIVITY | OTHER
+  description               String
+  supportingDocumentUrl     String?
+  supportingDocumentName    String?
+  applicationDate           DateTime @default(now())
+  
+  currentHandlerRole        String   // SUBJECT_FACULTY | FACULTY_MENTOR | HOD | PRINCIPAL | COMPLETED | REJECTED
+  currentHandlerId          String
+  currentHandlerName        String
+  
+  status                    String   @default("SUBMITTED_TO_FACULTY") // SUBMITTED_TO_FACULTY | FACULTY_APPROVED | FACULTY_REJECTED | WITH_MENTOR | MENTOR_APPROVED | MENTOR_REJECTED | WITH_HOD | HOD_APPROVED | HOD_REJECTED | WITH_HOI | HOI_APPROVED | HOI_REJECTED | MORE_INFORMATION_REQUIRED | FINAL_APPROVED | EXAM_ELIGIBLE | CLOSED
+  finalEligibilityGranted   Boolean  @default(false)
+  eligibilityType           String?  // NORMAL_ATTENDANCE | ATTENDANCE_APPROVAL
+  
+  timeline                  Json     @default("[]")
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  @@index([studentId])
+  @@index([enrollmentNo])
+  @@index([subjectId])
+  @@index([subjectFacultyId])
+  @@index([mentorFacultyId])
+  @@index([hodUserId])
+  @@index([hoiUserId])
+  @@index([status])
+}
+
+model AttendanceApprovalHistory {
+  id                String   @id @default(uuid())
+  applicationId     String
+  action            String   // APPLICATION_SUBMITTED | FACULTY_APPROVED | FACULTY_REJECTED | MENTOR_APPROVED | MENTOR_REJECTED | HOD_APPROVED | HOD_REJECTED | HOI_APPROVED | HOI_REJECTED | MORE_INFO_REQUESTED
+  fromUserId        String
+  fromUserName      String
+  fromUserRole      String
+  toUserId          String?
+  toUserName        String?
+  toUserRole        String?
+  remarks           String
+  previousStatus    String
+  newStatus         String
+  timestamp         DateTime @default(now())
+  createdAt         DateTime @default(now())
+
+  @@index([applicationId])
+  @@index([fromUserId])
+  @@index([toUserId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 38. DOCUMENT MASTER & STUDENT ACADEMIC DOCUMENT REPOSITORY
+// ──────────────────────────────────────────────────────────────────────────────
+
+model DocumentMaster {
+  id                    String    @id @default(uuid())
+  code                  String    @unique // e.g. DOC-ACA-001, DOC-ID-001, DOC-INTL-001
+  name                  String
+  category              String    // ACADEMIC | IDENTITY | ADMISSION | UNIVERSITY_RECORD | COMPLETION_EXIT | FINANCIAL_SCHOLARSHIP | INTERNATIONAL_STUDENT | INTERNSHIP_TRAINING | MEDICAL | OTHER
+  subcategory           String?   // e.g. IDENTITY_NATIONALITY, IMMIGRATION_VISA, ADMISSION, ACADEMIC_QUALIFICATION, FINANCIAL_SPONSORSHIP, MEDICAL_INSURANCE, ACCOMMODATION_LOCAL, UNIVERSITY_COMPLIANCE, EXIT_COMPLETION
+  description           String?
+  required              String    @default("REQUIRED") // REQUIRED | OPTIONAL | NOT_APPLICABLE
+  studentType           String    @default("ALL") // ALL | DOMESTIC | INTERNATIONAL
+  programId             String?
+  departmentId          String?
+  admissionType         String?   // REGULAR | D2D | LATERAL | MANAGEMENT | NRI | INTERNATIONAL | ALL
+  semester              Int?
+  internationalOnly     Boolean   @default(false)
+  verificationRequired  Boolean   @default(true)
+  verifiedByRole        String    @default("FACULTY_MENTOR") // FACULTY_MENTOR | HOD | PRINCIPAL | STUDENT_SECTION | UNIVERSITY_ADMIN | REGISTRAR
+  allowedFileTypes      String    @default("PDF,JPG,JPEG,PNG")
+  maxFileSize           Int       @default(10) // in MB
+  multipleFilesAllowed  Boolean   @default(false)
+  expiryRequired        Boolean   @default(false)
+  displayOrder          Int       @default(1)
+  status                String    @default("ACTIVE") // ACTIVE | INACTIVE
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  studentDocuments      StudentAcademicDocument[]
+  applicabilities       DocumentApplicability[]
+
+  @@index([category])
+  @@index([subcategory])
+  @@index([studentType])
+  @@index([status])
+  @@index([code])
+}
+
+model StudentAcademicDocument {
+  id                    String    @id @default(uuid())
+  studentId             String
+  enrollmentNo          String
+  studentName           String
+  documentMasterId      String
+  documentCode          String
+  documentName          String
+  category              String
+  subcategory           String?
+  studentType           String    @default("DOMESTIC") // DOMESTIC | INTERNATIONAL
+  currentVersion        Int       @default(1)
+  
+  fileName              String
+  fileSize              String
+  fileUrl               String
+  fileType              String?
+  
+  issueDate             DateTime?
+  expiryDate            DateTime?
+  
+  status                String    @default("PENDING_VERIFICATION") // PENDING_VERIFICATION | VERIFIED | REJECTED | REUPLOAD_REQUIRED | EXPIRED
+  isLocked              Boolean   @default(false) // Permanently locked once verified
+  
+  verifiedByUserId      String?
+  verifiedByName        String?
+  verifiedByRole        String?
+  verifiedAt            DateTime?
+  
+  rejectionReason       String?
+  remarks               String?
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  documentMaster        DocumentMaster @relation(fields: [documentMasterId], references: [id], onDelete: Cascade)
+  versions              StudentAcademicDocumentVersion[]
+  verifications         DocumentVerification[]
+
+  @@index([studentId])
+  @@index([enrollmentNo])
+  @@index([documentMasterId])
+  @@index([status])
+  @@index([isLocked])
+}
+
+model StudentAcademicDocumentVersion {
+  id                String   @id @default(uuid())
+  documentId        String
+  versionNumber     Int
+  fileName          String
+  fileSize          String
+  fileUrl           String
+  fileType          String?
+  issueDate         DateTime?
+  expiryDate        DateTime?
+  uploadedByUserId  String
+  uploadedByName    String
+  uploadedAt        DateTime @default(now())
+  status            String   @default("SUBMITTED") // SUBMITTED | VERIFIED | REJECTED
+  rejectionReason   String?
+  remarks           String?
+  
+  document          StudentAcademicDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([versionNumber])
+}
+
+model DocumentVerification {
+  id                String   @id @default(uuid())
+  documentId        String
+  action            String   // VERIFIED | REJECTED | UNLOCKED_OVERRIDE | REUPLOAD_REQUESTED
+  performedByUserId String
+  performedByName   String
+  performedByRole   String
+  reason            String?
+  previousStatus    String
+  newStatus         String
+  timestamp         DateTime @default(now())
+
+  document          StudentAcademicDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([performedByUserId])
+}
+
+model DocumentApplicability {
+  id                String   @id @default(uuid())
+  documentMasterId  String
+  studentType       String   @default("ALL") // ALL | DOMESTIC | INTERNATIONAL
+  programId         String?
+  departmentId      String?
+  admissionType     String?
+  semester          Int?
+  requiredStatus    String   @default("REQUIRED") // REQUIRED | OPTIONAL | NOT_APPLICABLE
+  createdAt         DateTime @default(now())
+
+  documentMaster    DocumentMaster @relation(fields: [documentMasterId], references: [id], onDelete: Cascade)
+
+  @@index([documentMasterId])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// REGISTRAR OFFICE MANAGEMENT SYSTEM MODELS
+// ──────────────────────────────────────────────────────────────────────────────
+
+model OfficialCorrespondence {
+  id                String   @id @default(uuid())
+  correspondenceType String  // INCOMING | OUTGOING | CIRCULAR | EXTERNAL_GOV
+  referenceNumber   String   @unique
+  date              DateTime
+  senderOrRecipient String
+  subject           String
+  instituteId       String?
+  instituteName     String?
+  departmentId      String?
+  departmentName    String?
+  category          String   // UGC | AICTE | GOV_GUJARAT | AFFILIATION | ACADEMIC | GENERAL
+  priority          String   @default("NORMAL") // URGENT | HIGH | NORMAL
+  status            String   @default("RECEIVED") // RECEIVED | UNDER_REVIEW | DISPATCHED | ACTION_TAKEN | CLOSED
+  receivedOrPreparedByName String?
+  approvedByName    String?
+  attachmentUrl     String?
+  actionTaken       String?
+  remarks           String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([correspondenceType])
+  @@index([referenceNumber])
+  @@index([instituteId])
+  @@index([status])
+}
+
+model FileMovementRecord {
+  id              String   @id @default(uuid())
+  fileNumber      String
+  subject         String
+  currentHolder   String
+  fromOffice      String
+  toOffice        String
+  sentDate        DateTime
+  receivedDate    DateTime?
+  actionRequired  String
+  status          String   @default("IN_TRANSIT") // IN_TRANSIT | RECEIVED | ACTIONED | ARCHIVED
+  remarks         String?
+  createdAt       DateTime @default(now())
+
+  @@index([fileNumber])
+  @@index([status])
+  @@index([currentHolder])
+}
+
+model CommitteeActionItem {
+  id                    String   @id @default(uuid())
+  meetingId             String
+  itemNumber            String
+  description           String
+  responsibleDepartment String
+  responsiblePerson     String
+  deadline              DateTime
+  status                String   @default("PENDING") // PENDING | IN_PROGRESS | COMPLETED | OVERDUE
+  complianceRemarks     String?
+  completedAt           DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  meeting               CommitteeMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([meetingId])
+  @@index([status])
+  @@index([responsibleDepartment])
+}
+
+model StatutoryApproval {
+  id                  String   @id @default(uuid())
+  requestNo           String   @unique
+  title               String
+  category            String   // AFFILIATION | PROGRAM_SANCTION | FACULTY_APPOINTMENT | CURRICULUM | BUDGET | SPECIAL
+  applicantEntity     String
+  instituteId         String?
+  departmentId        String?
+  submittedDate       DateTime @default(now())
+  status              String   @default("PENDING") // PENDING | APPROVED | REJECTED | REQUEST_INFO | FORWARDED
+  actionedByUserId    String?
+  actionedByName      String?
+  actionedAt          DateTime?
+  remarks             String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([requestNo])
+  @@index([category])
+  @@index([status])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// 26. NOTIFICATION & RECIPIENT TARGETING MODELS
+// ──────────────────────────────────────────────────────────────────────────────
+
+model Notification {
+  id                   String                 @id @default(uuid())
+  type                 String                 @default("INFORMATION") // ACTION_REQUIRED | STATUS_UPDATE | INFORMATION | REMINDER | APPROVAL_REQUIRED | REJECTION | SUCCESS | DEADLINE
+  title                String
+  message              String
+  module               String                 // HOSTEL | EXAM | FEES | ATTENDANCE | NOTESHEET | DOCUMENT | REQUEST | APPROVAL | SYSTEM | NOTICE
+  referenceId          String?
+  referenceType        String?
+  priority             String                 @default("NORMAL")      // URGENT | HIGH | MEDIUM | NORMAL | LOW
+  scopeType            String                 @default("TARGETED")    // TARGETED | DEPARTMENT_WIDE | INSTITUTE_WIDE | UNIVERSITY_WIDE
+  targetRole           String?
+  targetInstituteId    String?
+  targetDepartmentId   String?
+  targetProgramId      String?
+  targetSemesterId     String?
+  targetDivisionId     String?
+  targetAcademicYearId String?
+  linkTab              String?
+  actionUrl            String?
+  actionLabel          String?
+  createdBy            String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  recipients           NotificationRecipient[]
+
+  @@index([module])
+  @@index([scopeType])
+  @@index([createdAt])
+  @@index([referenceId])
+}
+
+model NotificationRecipient {
+  id             String       @id @default(uuid())
+  notificationId String
+  userId         String
+  userRole       String?
+  deliveredAt    DateTime     @default(now())
+  readAt         DateTime?
+  isRead         Boolean      @default(false)
+
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId])
+  @@index([userId])
+  @@index([isRead])
+  @@index([notificationId])
+}
 
 
 

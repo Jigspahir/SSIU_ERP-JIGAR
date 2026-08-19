@@ -1,4 +1,5 @@
 import { UserRole } from '../types';
+import * as XLSX from 'xlsx';
 
 export interface ReportFilterOptions {
   instituteName?: string;
@@ -302,3 +303,550 @@ export const exportToWord = (
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 };
+
+/**
+ * Official Centralized Excel Import Template Generator (.xlsx format data)
+ */
+export const downloadStudentImportTemplateExcel = () => {
+  const headers = [
+    'Student ID',
+    'Enrollment No',
+    'Student Name',
+    'Institute',
+    'Department',
+    'Program',
+    'Academic Year',
+    'Semester',
+    'Email',
+    'Mobile'
+  ];
+
+  const sampleRows = [
+    [
+      'STU-2026-001',
+      '2026SITCE001',
+      'Aarav Sharma',
+      'Swarrnim Institute of Technology',
+      'Computer Engineering',
+      'B.Tech in Computer Engineering',
+      '2024-2025',
+      'Semester 1',
+      'aarav.sharma@swarrnim.edu.in',
+      '+91 98765 43210'
+    ],
+    [
+      'STU-2026-002',
+      '2026AIN001',
+      'Priya Patel',
+      'Arihant Institute of Nursing',
+      'N/A',
+      'B.Sc. (Nursing)',
+      '2024-2025',
+      'Semester 1',
+      'priya.patel@swarrnim.edu.in',
+      '+91 98765 43211'
+    ],
+    [
+      'STU-2026-003',
+      '2026SSMCLA001',
+      'Rohan Mehta',
+      'Swarrnim School of Management, Commerce & Liberal Arts',
+      'N/A',
+      'MBA',
+      '2024-2025',
+      'Semester 1',
+      'rohan.mehta@swarrnim.edu.in',
+      '+91 98765 43212'
+    ]
+  ];
+
+  exportToExcel(
+    'Student Import Official Master Template',
+    headers,
+    sampleRows,
+    {},
+    { name: 'SSIU Academic Administration', role: 'REGISTRAR' }
+  );
+};
+
+export interface ExcelValidationError {
+  rowNumber: number;
+  field: string;
+  value: string;
+  reason: string;
+}
+
+/**
+ * Validates uploaded Excel rows against Central Academic Master
+ */
+export const validateAcademicExcelRows = (
+  rows: Record<string, string>[],
+  institutes: { id: string; name: string; code: string }[],
+  departments: { id: string; name: string; code: string; instituteId: string }[],
+  programs: { id: string; name: string; code: string; instituteId: string; departmentId?: string }[]
+): { isValid: boolean; errors: ExcelValidationError[] } => {
+  const errors: ExcelValidationError[] = [];
+
+  rows.forEach((row, idx) => {
+    const rowNum = idx + 2; // Accounting for 1-based header row
+    const instName = (row['Institute'] || row['institute'] || '').trim();
+    const deptName = (row['Department'] || row['department'] || '').trim();
+    const progName = (row['Program'] || row['program'] || '').trim();
+
+    // 1. Validate Institute
+    const matchedInst = institutes.find(i => 
+      i.name.toLowerCase() === instName.toLowerCase() || 
+      i.code.toLowerCase() === instName.toLowerCase() ||
+      i.id.toLowerCase() === instName.toLowerCase()
+    );
+
+    if (!matchedInst) {
+      errors.push({
+        rowNumber: rowNum,
+        field: 'Institute',
+        value: instName,
+        reason: `Invalid Institute: "${instName}". Value must match an active Institute in the Central Master.`
+      });
+      return;
+    }
+
+    // Check if institute requires departments
+    const instDepts = departments.filter(d => d.instituteId === matchedInst.id);
+    const hasDepartments = instDepts.length > 0;
+
+    // 2. Validate Department
+    let matchedDept: any = null;
+    if (hasDepartments) {
+      if (!deptName || deptName === 'N/A' || deptName === '-') {
+        errors.push({
+          rowNumber: rowNum,
+          field: 'Department',
+          value: deptName,
+          reason: `Department is required for ${matchedInst.name}.`
+        });
+      } else {
+        matchedDept = instDepts.find(d => 
+          d.name.toLowerCase() === deptName.toLowerCase() || 
+          d.code.toLowerCase() === deptName.toLowerCase()
+        );
+        if (!matchedDept) {
+          errors.push({
+            rowNumber: rowNum,
+            field: 'Department',
+            value: deptName,
+            reason: `Invalid Department "${deptName}" for ${matchedInst.name}.`
+          });
+        }
+      }
+    }
+
+    // 3. Validate Program
+    const instPrograms = programs.filter(p => p.instituteId === matchedInst.id);
+    const matchedProg = instPrograms.find(p => {
+      const matchName = p.name.toLowerCase() === progName.toLowerCase() || p.code.toLowerCase() === progName.toLowerCase();
+      if (!matchName) return false;
+      if (hasDepartments && matchedDept) {
+        return p.departmentId === matchedDept.id;
+      }
+      return true;
+    });
+
+    if (!matchedProg) {
+      errors.push({
+        rowNumber: rowNum,
+        field: 'Program',
+        value: progName,
+        reason: `Invalid Program: "${progName}" for ${matchedInst.name}${matchedDept ? ` (${matchedDept.name})` : ''}.`
+      });
+    }
+  });
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+// ──────────────────────────────────────────────────────────────────────────────
+// INVENTORY & ASSET EXCEL TEMPLATES & VALIDATORS
+// ──────────────────────────────────────────────────────────────────────────────
+
+export const downloadAssetImportTemplateExcel = () => {
+  const headers = [
+    'Asset Name',
+    'Category Code (e.g. IT-COMP, IT-LAP, FURN-DESK, LAB-EQ)',
+    'Institute Name / Code',
+    'Department Name / Code',
+    'Location (Room/Lab)',
+    'Building & Floor',
+    'Serial Number',
+    'Model Number',
+    'Manufacturer',
+    'Purchase Date (YYYY-MM-DD)',
+    'Purchase Cost (₹)',
+    'Warranty End (YYYY-MM-DD)',
+    'Vendor',
+    'PO Number',
+    'Condition (NEW/EXCELLENT/GOOD/FAIR)',
+    'Processor (For PC)',
+    'RAM (For PC)',
+    'Storage (For PC)',
+    'Operating System (For PC)',
+    'Assigned Employee Code',
+    'Assigned Employee Name'
+  ];
+
+  const sampleRows = [
+    [
+      'Dell OptiPlex 7000 Workstation',
+      'IT-COMP',
+      'Swarrnim Institute of Technology',
+      'Computer Engineering',
+      'A-204 AI Lab',
+      'Engineering Block A, 2nd Floor',
+      'DL-OPT-994182',
+      'OptiPlex 7000',
+      'Dell',
+      '2026-08-01',
+      78500,
+      '2029-07-31',
+      'Dell India Enterprises',
+      'PO-SSIU-2026-01',
+      'EXCELLENT',
+      'Intel Core i7 12th Gen',
+      '32 GB DDR4',
+      '1 TB SSD + 2 TB HDD',
+      'Windows 11 Pro',
+      'EMP-SIT-042',
+      'Dr. Aarav Mehta'
+    ],
+    [
+      'Executive Mesh High-Back Chair',
+      'FURN-CHAIR',
+      'Swarrnim Institute of Technology',
+      'Computer Engineering',
+      'HOD Cabin A-201',
+      'Engineering Block A, 2nd Floor',
+      'CH-EX-0021',
+      'ErgoMax Pro',
+      'Godrej Interio',
+      '2026-07-15',
+      14500,
+      '2028-07-14',
+      'Godrej Commercial',
+      'PO-SSIU-2026-04',
+      'EXCELLENT',
+      '',
+      '',
+      '',
+      '',
+      'EMP-SIT-001',
+      'Dr. Manish Patel'
+    ]
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
+  ws['!cols'] = headers.map(() => ({ wch: 25 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Asset_Import_Template');
+  XLSX.writeFile(wb, 'Asset_Import_Template.xlsx');
+};
+
+export const downloadConsumableStockTemplateExcel = () => {
+  const headers = [
+    'Item Code (e.g. STN-A4, STN-TONER)',
+    'Item Name',
+    'Category Code (e.g. STN-PAPER, STN-OFF, STN-TONER)',
+    'Unit (PCS/BOX/PACKET/REAM/SET/ROLL/KG/LITRE)',
+    'Institute Name / Code',
+    'Department Name / Code',
+    'Storage Location',
+    'Opening Quantity',
+    'Minimum Stock Level',
+    'Reorder Level',
+    'Standard Rate (₹)'
+  ];
+
+  const sampleRows = [
+    [
+      'STN-A4-JK',
+      'JK Copier A4 Paper 75 GSM (Ream of 500 Sheets)',
+      'STN-PAPER',
+      'REAM',
+      'Swarrnim Institute of Technology',
+      'Computer Engineering',
+      'Department Store Cupboard A-201',
+      100,
+      25,
+      50,
+      340
+    ],
+    [
+      'STN-TONER-HP88A',
+      'HP 88A Black Original LaserJet Toner Cartridge',
+      'STN-TONER',
+      'PCS',
+      'Swarrnim Institute of Technology',
+      'Computer Engineering',
+      'Department Store Cupboard A-201',
+      15,
+      8,
+      15,
+      3850
+    ]
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
+  ws['!cols'] = headers.map(() => ({ wch: 25 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Consumables_Template');
+  XLSX.writeFile(wb, 'Consumable_Stock_Template.xlsx');
+};
+
+export const downloadPhysicalFileTemplateExcel = () => {
+  const headers = [
+    'File Number / Reference',
+    'File Title / Description',
+    'File Category (EXAM_FILES/STUDENT_FILES/NAAC_IQAC_FILES/ADMISSION_FILES/FINANCE_FILES/DEPT_FILES)',
+    'Institute Name / Code',
+    'Department Name / Code',
+    'Academic Year (e.g. 2025-2026)',
+    'Document Year (YYYY)',
+    'Storage Location Room',
+    'Rack Number (e.g. R-04)',
+    'Shelf Number (e.g. S-02)',
+    'Box Number (e.g. B-18)',
+    'Custodian Name',
+    'Custodian Employee ID',
+    'Date Opened (YYYY-MM-DD)',
+    'Retention Until (YYYY-MM-DD)',
+    'Status (ACTIVE/ARCHIVED)'
+  ];
+
+  const sampleRows = [
+    [
+      'EXAM/REG/2026/001',
+      'Summer 2026 Regular Examination Sanction & Result Gazette',
+      'EXAM_FILES',
+      'Swarrnim Institute of Technology',
+      'Computer Engineering',
+      '2025-2026',
+      2026,
+      'Statutory Document Archive ARC-101',
+      'Rack R-04',
+      'Shelf S-02',
+      'Box B-18',
+      'Dr. Sanjay Patel',
+      'EMP-SSIU-004',
+      '2026-05-10',
+      '2036-05-09',
+      'ACTIVE'
+    ]
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
+  ws['!cols'] = headers.map(() => ({ wch: 25 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Physical_Files_Template');
+  XLSX.writeFile(wb, 'Physical_File_Register_Template.xlsx');
+};
+
+export const downloadAssetAssignmentTemplateExcel = () => {
+  const headers = [
+    'Asset ID / Tag (e.g. SIT-CE-PC-0001)',
+    'Assigned To Employee Code',
+    'Assigned To Name',
+    'Designation',
+    'Location / Room No',
+    'Issue Date (YYYY-MM-DD)',
+    'Expected Return Date (YYYY-MM-DD)',
+    'Condition at Issue (NEW/EXCELLENT/GOOD/FAIR)',
+    'Purpose / Remarks'
+  ];
+
+  const sampleRows = [
+    [
+      'SIT-CE-PC-0001',
+      'EMP-SIT-042',
+      'Dr. Aarav Mehta',
+      'Professor & Lab Incharge',
+      'Engineering Block A (A-204)',
+      '2026-08-01',
+      '2027-07-31',
+      'EXCELLENT',
+      'Allocated for AI Research & Lab Instruction'
+    ]
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
+  ws['!cols'] = headers.map(() => ({ wch: 25 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Asset_Assignment_Template');
+  XLSX.writeFile(wb, 'Employee_Asset_Assignment_Template.xlsx');
+};
+
+export const validateAssetExcelRows = (
+  rows: any[],
+  institutes: any[],
+  departments: any[],
+  categories: any[]
+): { isValid: boolean; errors: { rowNumber: number; field: string; value: any; reason: string }[]; validatedData: any[] } => {
+  const errors: { rowNumber: number; field: string; value: any; reason: string }[] = [];
+  const validatedData: any[] = [];
+
+  rows.forEach((row, idx) => {
+    const rowNum = idx + 2;
+    const name = row['Asset Name'] || row['name'];
+    const catCode = row['Category Code (e.g. IT-COMP, IT-LAP, FURN-DESK, LAB-EQ)'] || row['categoryId'] || row['categoryCode'];
+    const instName = row['Institute Name / Code'] || row['instituteName'] || row['instituteId'];
+    const deptName = row['Department Name / Code'] || row['departmentName'] || row['departmentId'];
+
+    if (!name) {
+      errors.push({ rowNumber: rowNum, field: 'Asset Name', value: name, reason: 'Asset Name is required.' });
+    }
+
+    // Validate Institute
+    const matchedInst = institutes.find(i =>
+      i.name.toLowerCase() === (instName || '').toLowerCase() ||
+      i.code.toLowerCase() === (instName || '').toLowerCase() ||
+      i.id === instName
+    );
+
+    if (!matchedInst) {
+      errors.push({ rowNumber: rowNum, field: 'Institute', value: instName, reason: `Unknown Institute "${instName}".` });
+      return;
+    }
+
+    // Validate Department if institute has departments
+    const instDepts = departments.filter(d => d.instituteId === matchedInst.id);
+    let matchedDept: any = undefined;
+    if (instDepts.length > 0) {
+      matchedDept = instDepts.find(d =>
+        d.name.toLowerCase() === (deptName || '').toLowerCase() ||
+        d.code.toLowerCase() === (deptName || '').toLowerCase() ||
+        d.id === deptName
+      );
+      if (!matchedDept && deptName && deptName !== 'N/A') {
+        errors.push({ rowNumber: rowNum, field: 'Department', value: deptName, reason: `Invalid Department "${deptName}" for ${matchedInst.name}.` });
+      }
+    }
+
+    // Validate Category
+    const matchedCat = categories.find(c =>
+      c.code.toLowerCase() === (catCode || '').toLowerCase() ||
+      c.id === catCode ||
+      c.name.toLowerCase() === (catCode || '').toLowerCase()
+    );
+
+    if (!matchedCat) {
+      errors.push({ rowNumber: rowNum, field: 'Category', value: catCode, reason: `Unknown Category Code "${catCode}".` });
+    }
+
+    if (errors.filter(e => e.rowNumber === rowNum).length === 0) {
+      validatedData.push({
+        name,
+        categoryId: matchedCat?.id || 'cat-it-1',
+        categoryName: matchedCat?.name || 'IT Equipment',
+        categoryGroup: matchedCat?.categoryGroup || 'IT_EQUIPMENT',
+        instituteId: matchedInst.id,
+        instituteName: matchedInst.name,
+        departmentId: matchedDept?.id,
+        departmentName: matchedDept?.name,
+        locationName: row['Location (Room/Lab)'] || 'Department Store',
+        building: row['Building & Floor'] || 'Engineering Block A',
+        serialNumber: row['Serial Number'],
+        modelNumber: row['Model Number'],
+        manufacturer: row['Manufacturer'],
+        purchaseDate: row['Purchase Date (YYYY-MM-DD)'] || new Date().toISOString().split('T')[0],
+        purchaseCost: Number(row['Purchase Cost (₹)'] || 0),
+        currentValue: Number(row['Purchase Cost (₹)'] || 0),
+        warrantyEnd: row['Warranty End (YYYY-MM-DD)'],
+        vendor: row['Vendor'],
+        purchaseOrderNumber: row['PO Number'],
+        assetCondition: row['Condition (NEW/EXCELLENT/GOOD/FAIR)'] || 'GOOD',
+        status: row['Assigned Employee Name'] ? 'ASSIGNED' : 'IN_STORE',
+        assignedToName: row['Assigned Employee Name'],
+        assignedToEmpCode: row['Assigned Employee Code'],
+        cpuConfig: (matchedCat?.categoryGroup === 'IT_EQUIPMENT' && row['Processor (For PC)']) ? {
+          processor: row['Processor (For PC)'],
+          ram: row['RAM (For PC)'] || '16 GB',
+          storageCapacity: row['Storage (For PC)'] || '512 GB SSD',
+          os: row['Operating System (For PC)'] || 'Windows 11'
+        } : undefined
+      });
+    }
+  });
+
+  return { isValid: errors.length === 0, errors, validatedData };
+};
+
+export const validateConsumableExcelRows = (
+  rows: any[],
+  institutes: any[],
+  departments: any[],
+  categories: any[]
+): { isValid: boolean; errors: { rowNumber: number; field: string; value: any; reason: string }[]; validatedData: any[] } => {
+  const errors: { rowNumber: number; field: string; value: any; reason: string }[] = [];
+  const validatedData: any[] = [];
+
+  rows.forEach((row, idx) => {
+    const rowNum = idx + 2;
+    const itemCode = row['Item Code (e.g. STN-A4, STN-TONER)'] || row['itemCode'];
+    const name = row['Item Name'] || row['name'];
+    const catCode = row['Category Code (e.g. STN-PAPER, STN-OFF, STN-TONER)'] || row['categoryId'];
+    const unit = row['Unit (PCS/BOX/PACKET/REAM/SET/ROLL/KG/LITRE)'] || row['unit'] || 'PCS';
+    const instName = row['Institute Name / Code'] || row['instituteName'];
+    const deptName = row['Department Name / Code'] || row['departmentName'];
+
+    if (!name) errors.push({ rowNumber: rowNum, field: 'Item Name', value: name, reason: 'Item Name is required.' });
+
+    const matchedInst = institutes.find(i =>
+      i.name.toLowerCase() === (instName || '').toLowerCase() ||
+      i.code.toLowerCase() === (instName || '').toLowerCase()
+    );
+
+    if (!matchedInst) {
+      errors.push({ rowNumber: rowNum, field: 'Institute', value: instName, reason: `Unknown Institute "${instName}".` });
+      return;
+    }
+
+    const instDepts = departments.filter(d => d.instituteId === matchedInst.id);
+    let matchedDept: any = undefined;
+    if (instDepts.length > 0 && deptName && deptName !== 'N/A') {
+      matchedDept = instDepts.find(d =>
+        d.name.toLowerCase() === deptName.toLowerCase() ||
+        d.code.toLowerCase() === deptName.toLowerCase()
+      );
+    }
+
+    const matchedCat = categories.find(c =>
+      c.code.toLowerCase() === (catCode || '').toLowerCase() ||
+      c.id === catCode ||
+      c.name.toLowerCase() === (catCode || '').toLowerCase()
+    );
+
+    if (errors.filter(e => e.rowNumber === rowNum).length === 0) {
+      validatedData.push({
+        itemCode: itemCode || `STN-${Date.now().toString().slice(-4)}`,
+        name,
+        categoryId: matchedCat?.id || 'cat-stn-1',
+        categoryName: matchedCat?.name || 'Stationery',
+        categoryGroup: matchedCat?.categoryGroup || 'STATIONERY_CONSUMABLES',
+        unit,
+        instituteId: matchedInst.id,
+        instituteName: matchedInst.name,
+        departmentId: matchedDept?.id,
+        departmentName: matchedDept?.name,
+        locationName: row['Storage Location'] || 'Department Store',
+        openingQuantity: Number(row['Opening Quantity'] || 0),
+        minimumStockLevel: Number(row['Minimum Stock Level'] || 10),
+        reorderLevel: Number(row['Reorder Level'] || 25),
+        standardRate: Number(row['Standard Rate (₹)'] || 0)
+      });
+    }
+  });
+
+  return { isValid: errors.length === 0, errors, validatedData };
+};
+
+

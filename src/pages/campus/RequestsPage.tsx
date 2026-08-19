@@ -1,254 +1,533 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
-import { ApprovalOfficeType, ApprovalPriority, ApprovalRequest, ApprovalStatus } from '../../types';
+import { studentRequestService } from '../../services/studentRequestService';
+import { exportToExcel } from '../../services/exportService';
+import { StudentRequest, StudentRequestStatus } from '../../types/studentRequest';
 import { StatCard } from '../../components/common/StatCard';
 import { Badge } from '../../components/common/Badge';
-import { ApprovalRequestModal } from '../../components/approval/ApprovalRequestModal';
-import { ApprovalDetailModal } from '../../components/approval/ApprovalDetailModal';
-import { getCategoryLabel, getOfficeLabel, PriorityBadge, StatusBadge } from '../../components/approval/ApprovalWorkflowBadge';
-import { FileCheck, CheckCircle2, Clock, Plus, Filter, Search, ShieldCheck, AlertCircle, Eye } from 'lucide-react';
+import { StudentRequestModal } from '../../components/approval/StudentRequestModal';
+import { StudentRequestDetailModal } from '../../components/approval/StudentRequestDetailModal';
+import { 
+  FileCheck, CheckCircle2, Clock, Plus, Filter, Search, ShieldCheck, 
+  AlertCircle, Eye, Inbox, Send, CornerDownLeft, FileText, Download, RotateCcw,
+  Sparkles, Layers, CheckCircle, XCircle, UserCheck, ArrowRight
+} from 'lucide-react';
 
-export const RequestsPage: React.FC = () => {
+interface RequestsPageProps {
+  initialCategory?: string;
+  initialRecordId?: string;
+  initialRequestId?: string;
+  initialQueue?: 'ALL' | 'PENDING_MY_ACTION' | 'WITH_MENTOR' | 'WITH_DEPT' | 'COMPLETED' | 'REOPENED';
+}
+
+export const RequestsPage: React.FC<RequestsPageProps> = ({ 
+  initialCategory = 'ALL',
+  initialRecordId,
+  initialRequestId,
+  initialQueue
+}) => {
   const { user, role } = useAuth();
-  
-  const [requests, setRequests] = useState<ApprovalRequest[]>(() => db.getScopedApprovalRequests(user, role));
-  const [activeViewTab, setActiveViewTab] = useState<'ALL' | 'MY_REQUESTS' | 'PENDING_OFFICE' | 'COMPLETED'>('ALL');
-  const [filterOffice, setFilterOffice] = useState<string>('ALL');
-  const [filterStatus, setFilterStatus] = useState<string>('ALL');
+  const isStudent = role === 'STUDENT';
+  const isFaculty = role === 'FACULTY';
+  const isHod = role === 'HOD';
+
+  const [activeQueueTab, setActiveQueueTab] = useState<'ALL' | 'PENDING_MY_ACTION' | 'WITH_MENTOR' | 'WITH_DEPT' | 'COMPLETED' | 'REOPENED'>(
+    initialQueue || (isStudent ? 'ALL' : 'PENDING_MY_ACTION')
+  );
+  const [filterCategory, setFilterCategory] = useState<string>(initialCategory);
+
+  React.useEffect(() => {
+    if (initialCategory) {
+      setFilterCategory(initialCategory);
+    }
+  }, [initialCategory]);
+
+  React.useEffect(() => {
+    if (initialQueue) {
+      setActiveQueueTab(initialQueue);
+    }
+  }, [initialQueue]);
+
   const [filterPriority, setFilterPriority] = useState<string>('ALL');
+  const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState<ApprovalRequest | null>(null);
+  const [selectedStudentRequest, setSelectedStudentRequest] = useState<StudentRequest | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const refreshData = () => {
-    setRequests([...db.getScopedApprovalRequests(user, role)]);
+  // Refresh trigger
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const showToast = (type: 'success' | 'error', text: string) => {
+    setToastMessage({ type, text });
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
+  const refreshData = () => {
+    setRefreshKey(prev => prev + 1);
+  };
+
+  // Scoped Student Requests
+  const allScopedRequests = useMemo(() => {
+    return studentRequestService.getScopedRequests(user, role);
+  }, [user, role, refreshKey]);
+
+  // Deep-link Auto-Open Exact Request Record
+  React.useEffect(() => {
+    const targetId = initialRecordId || initialRequestId;
+    if (targetId && allScopedRequests.length > 0) {
+      const match = allScopedRequests.find(r => r.id === targetId || r.requestNo === targetId);
+      if (match) {
+        setSelectedStudentRequest(match);
+      } else {
+        showToast('error', 'This item is no longer available or you do not have permission to view it.');
+      }
+    }
+  }, [initialRecordId, initialRequestId, allScopedRequests]);
+
+  // Statistics KPI
+  const stats = useMemo(() => {
+    const total = allScopedRequests.length;
+    const pendingMyAction = allScopedRequests.filter(r => {
+      if (isStudent) return r.status === 'COMPLETED'; // Action: confirm or reopen
+      if (isFaculty && r.currentHandler === 'MENTOR') return true; // Action: mentor route or complete
+      if (isFaculty && r.currentHandler === 'SUBJECT_FACULTY') return true; // Action: work or resolve
+      if (isHod && r.currentHandler === 'HOD') return true;
+      return r.currentHandlerId === user?.id || r.currentHandlerRole === (role as any);
+    }).length;
+
+    const withMentor = allScopedRequests.filter(r => r.currentHandler === 'MENTOR').length;
+    const withDept = allScopedRequests.filter(r => r.currentHandler === 'DEPARTMENT' || r.currentHandler === 'SUBJECT_FACULTY' || r.currentHandler === 'HOD' || r.currentHandler === 'HOI').length;
+    const completed = allScopedRequests.filter(r => r.status === 'COMPLETED').length;
+    const reopened = allScopedRequests.filter(r => r.status === 'REOPENED').length;
+
+    return { total, pendingMyAction, withMentor, withDept, completed, reopened };
+  }, [allScopedRequests, user, role, isStudent, isFaculty, isHod]);
+
+  // Filtered requests
   const filteredRequests = useMemo(() => {
-    return requests.filter(r => {
+    let list = allScopedRequests;
+
+    if (activeQueueTab === 'PENDING_MY_ACTION') {
+      list = list.filter(r => {
+        if (isStudent) return r.status === 'COMPLETED';
+        if (isFaculty && r.currentHandler === 'MENTOR') return true;
+        if (isFaculty && r.currentHandler === 'SUBJECT_FACULTY') return true;
+        if (isHod && r.currentHandler === 'HOD') return true;
+        return r.currentHandlerId === user?.id || r.currentHandlerRole === (role as any);
+      });
+    } else if (activeQueueTab === 'WITH_MENTOR') {
+      list = list.filter(r => r.currentHandler === 'MENTOR');
+    } else if (activeQueueTab === 'WITH_DEPT') {
+      list = list.filter(r => r.currentHandler === 'DEPARTMENT' || r.currentHandler === 'SUBJECT_FACULTY' || r.currentHandler === 'HOD' || r.currentHandler === 'HOI');
+    } else if (activeQueueTab === 'COMPLETED') {
+      list = list.filter(r => r.status === 'COMPLETED');
+    } else if (activeQueueTab === 'REOPENED') {
+      list = list.filter(r => r.status === 'REOPENED');
+    }
+
+    return list.filter(r => {
       // Search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
-        const matchesQuery = 
+        const matches = 
           r.requestNo.toLowerCase().includes(q) ||
-          r.applicantName.toLowerCase().includes(q) ||
-          r.title.toLowerCase().includes(q) ||
-          (r.applicantEnrollmentOrEmpId && r.applicantEnrollmentOrEmpId.toLowerCase().includes(q));
-        if (!matchesQuery) return false;
+          r.studentName.toLowerCase().includes(q) ||
+          r.enrollmentNo.toLowerCase().includes(q) ||
+          r.subject.toLowerCase().includes(q) ||
+          r.mentorName.toLowerCase().includes(q) ||
+          r.description.toLowerCase().includes(q);
+        if (!matches) return false;
       }
 
-      // View Tab
-      if (activeViewTab === 'MY_REQUESTS' && user && r.applicantId !== user.id && r.applicantEmail !== user.email) {
-        return false;
-      }
-      if (activeViewTab === 'PENDING_OFFICE' && (r.status === 'APPROVED' || r.status === 'REJECTED' || r.status === 'WITHDRAWN')) {
-        return false;
-      }
-      if (activeViewTab === 'COMPLETED' && r.status !== 'APPROVED' && r.status !== 'REJECTED') {
+      // Category
+      if (filterCategory !== 'ALL' && r.category !== filterCategory) {
         return false;
       }
 
-      // Dropdown Filters
-      if (filterOffice !== 'ALL' && r.currentOffice !== filterOffice && r.targetOffice !== filterOffice) {
-        return false;
-      }
-      if (filterStatus !== 'ALL' && r.status !== filterStatus) {
-        return false;
-      }
+      // Priority
       if (filterPriority !== 'ALL' && r.priority !== filterPriority) {
+        return false;
+      }
+
+      // Status
+      if (filterStatus !== 'ALL' && r.status !== filterStatus) {
         return false;
       }
 
       return true;
     });
-  }, [requests, activeViewTab, filterOffice, filterStatus, filterPriority, searchQuery, user]);
+  }, [allScopedRequests, activeQueueTab, searchQuery, filterCategory, filterPriority, filterStatus, user, role, isStudent, isFaculty, isHod]);
 
-  const totalCount = requests.length;
-  const pendingCount = requests.filter(r => r.status === 'PENDING' || r.status === 'UNDER_REVIEW' || r.status === 'FORWARDED').length;
-  const approvedCount = requests.filter(r => r.status === 'APPROVED').length;
-  const urgentCount = requests.filter(r => (r.priority === 'URGENT' || r.priority === 'HIGH') && r.status !== 'APPROVED' && r.status !== 'REJECTED').length;
+  // Export to Excel
+  const handleExportExcel = () => {
+    const headers = [
+      'Request No', 'Date', 'Student Name', 'Enrollment No', 'Department',
+      'Category', 'Subject / Title', 'Assigned Mentor', 'Current Handler',
+      'Priority', 'Status', 'Resolved At', 'Completed At'
+    ];
+
+    const rows = filteredRequests.map(r => [
+      r.requestNo,
+      new Date(r.createdAt).toLocaleDateString(),
+      r.studentName,
+      r.enrollmentNo,
+      r.departmentName,
+      r.category.replace(/_/g, ' '),
+      r.subject,
+      r.mentorName,
+      r.currentHandlerName || r.currentHandler,
+      r.priority,
+      r.status,
+      r.resolvedAt ? new Date(r.resolvedAt).toLocaleDateString() : '-',
+      r.completedAt ? new Date(r.completedAt).toLocaleDateString() : '-'
+    ]);
+
+    exportToExcel('Student_Requests_Ledger', headers, rows, {}, { name: user?.name, role: user?.role });
+    showToast('success', 'Student Requests exported to Excel successfully.');
+  };
+
+  const getStatusBadge = (status: StudentRequestStatus) => {
+    switch (status) {
+      case 'COMPLETED':
+        return <Badge variant="success">Completed</Badge>;
+      case 'RETURNED_TO_MENTOR':
+      case 'RESOLVED':
+        return <Badge variant="gold">Returned to Mentor</Badge>;
+      case 'WORK_IN_PROGRESS':
+        return <Badge variant="active">Work In Progress</Badge>;
+      case 'FORWARDED_TO_FACULTY':
+      case 'WITH_FACULTY':
+        return <Badge variant="active">With Subject Faculty</Badge>;
+      case 'FORWARDED_TO_HOD':
+      case 'WITH_HOD':
+        return <Badge variant="warning">With HOD</Badge>;
+      case 'FORWARDED_TO_HOI':
+      case 'WITH_HOI':
+        return <Badge variant="warning">With HOI (Principal)</Badge>;
+      case 'FORWARDED_TO_DEPARTMENT':
+      case 'WITH_DEPARTMENT':
+        return <Badge variant="navy">With Department</Badge>;
+      case 'REOPENED':
+        return <Badge variant="danger">Reopened</Badge>;
+      case 'RETURNED_FOR_REWORK':
+        return <Badge variant="danger">Rework Requested</Badge>;
+      default:
+        return <Badge variant="navy">{status.replace(/_/g, ' ')}</Badge>;
+    }
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* Header */}
+      
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div style={{
+          position: 'fixed',
+          top: '1.5rem',
+          right: '1.5rem',
+          zIndex: 9999,
+          backgroundColor: toastMessage.type === 'success' ? 'var(--brand-green)' : 'var(--brand-red)',
+          color: '#FFF',
+          padding: '0.875rem 1.25rem',
+          borderRadius: '8px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.75rem',
+          fontWeight: 600,
+          fontSize: '0.9rem'
+        }}>
+          {toastMessage.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+          <span>{toastMessage.text}</span>
+        </div>
+      )}
+
+      {/* Modals */}
+      {isSubmitModalOpen && (
+        <StudentRequestModal
+          isOpen={isSubmitModalOpen}
+          onClose={() => setIsSubmitModalOpen(false)}
+          onSuccess={() => {
+            refreshData();
+            showToast('success', 'Student request submitted directly to your Mentor.');
+          }}
+        />
+      )}
+
+      {selectedStudentRequest && (
+        <StudentRequestDetailModal
+          request={selectedStudentRequest}
+          isOpen={Boolean(selectedStudentRequest)}
+          onClose={() => setSelectedStudentRequest(null)}
+          onRefresh={() => {
+            refreshData();
+            showToast('success', 'Request state updated successfully.');
+          }}
+        />
+      )}
+
+      {/* Page Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
-            Central Approval Workflow &amp; Request Desk
+          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+            <UserCheck size={28} style={{ color: 'var(--brand-gold)' }} />
+            Student Request Central Routing &amp; Escalation Portal
           </h2>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-            Integrated multi-office approval portal connecting Registrar, Vice Chancellor, IQAC, Exam Cell, Student Section &amp; Hostels
+            {isStudent
+              ? 'Submit academic, department, and campus requests. Every request is automatically routed to your assigned Mentor for controlled processing.'
+              : 'Review mentee requests, perform controlled subject faculty/HOD routing, track department resolutions, and verify student problem closure.'}
           </p>
         </div>
 
-        <button className="btn btn-primary btn-sm" onClick={() => setIsSubmitModalOpen(true)}>
-          <Plus size={16} /> Submit New Request
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button onClick={handleExportExcel} className="btn btn-secondary">
+            <Download size={16} /> Export Ledger
+          </button>
+          
+          {isStudent && (
+            <button onClick={() => setIsSubmitModalOpen(true)} className="btn btn-primary">
+              <Plus size={16} /> Create New Request
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* KPI Stat Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+        <StatCard
+          title="Total Requests"
+          value={stats.total}
+          icon={FileText}
+          colorScheme="navy"
+          subtitle="All scoped student requests"
+        />
+        <StatCard
+          title={isStudent ? "Awaiting Your Confirmation" : "Pending My Action"}
+          value={stats.pendingMyAction}
+          icon={Clock}
+          colorScheme="gold"
+          subtitle={isStudent ? "Requests marked completed" : "Action required on your desk"}
+        />
+        <StatCard
+          title="With Mentor"
+          value={stats.withMentor}
+          icon={UserCheck}
+          colorScheme="orange"
+          subtitle="Initial routing / review"
+        />
+        <StatCard
+          title="Completed & Verified"
+          value={stats.completed}
+          icon={CheckCircle2}
+          colorScheme="green"
+          subtitle="Closed by Mentor / Student"
+        />
+        <StatCard
+          title="Reopened Requests"
+          value={stats.reopened}
+          icon={RotateCcw}
+          colorScheme="blue"
+          subtitle="Unresolved / Returned"
+        />
+      </div>
+
+      {/* Queue Tabs */}
+      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', flexWrap: 'wrap' }}>
+        <button
+          onClick={() => setActiveQueueTab('ALL')}
+          className={`btn ${activeQueueTab === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ fontSize: '0.85rem', padding: '0.4rem 0.85rem' }}
+        >
+          All Requests ({allScopedRequests.length})
+        </button>
+
+        <button
+          onClick={() => setActiveQueueTab('PENDING_MY_ACTION')}
+          className={`btn ${activeQueueTab === 'PENDING_MY_ACTION' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ fontSize: '0.85rem', padding: '0.4rem 0.85rem' }}
+        >
+          <Clock size={14} /> Action Required ({stats.pendingMyAction})
+        </button>
+
+        <button
+          onClick={() => setActiveQueueTab('WITH_MENTOR')}
+          className={`btn ${activeQueueTab === 'WITH_MENTOR' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ fontSize: '0.85rem', padding: '0.4rem 0.85rem' }}
+        >
+          With Mentor ({stats.withMentor})
+        </button>
+
+        <button
+          onClick={() => setActiveQueueTab('WITH_DEPT')}
+          className={`btn ${activeQueueTab === 'WITH_DEPT' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ fontSize: '0.85rem', padding: '0.4rem 0.85rem' }}
+        >
+          With Dept / Faculty ({stats.withDept})
+        </button>
+
+        <button
+          onClick={() => setActiveQueueTab('COMPLETED')}
+          className={`btn ${activeQueueTab === 'COMPLETED' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ fontSize: '0.85rem', padding: '0.4rem 0.85rem' }}
+        >
+          Completed ({stats.completed})
+        </button>
+
+        <button
+          onClick={() => setActiveQueueTab('REOPENED')}
+          className={`btn ${activeQueueTab === 'REOPENED' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{ fontSize: '0.85rem', padding: '0.4rem 0.85rem' }}
+        >
+          Reopened ({stats.reopened})
         </button>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid-4">
-        <StatCard title="Total Tracked Requests" value={String(totalCount)} icon={FileCheck} subtitle="Across All Offices" />
-        <StatCard title="Pending Action Queue" value={String(pendingCount)} icon={Clock} colorScheme="gold" subtitle="Awaiting Desk Review" />
-        <StatCard title="Approved &amp; Sanctioned" value={String(approvedCount)} icon={CheckCircle2} colorScheme="green" subtitle="Completed Workflows" />
-        <StatCard title="High / Urgent Priority" value={String(urgentCount)} icon={AlertCircle} colorScheme="orange" subtitle="Expedited Review" />
-      </div>
-
-      {/* Filter Toolbar Card */}
-      <div className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {/* View Tabs */}
-        <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', flexWrap: 'wrap' }}>
-          {[
-            { key: 'ALL', label: `All Requests (${requests.length})` },
-            { key: 'PENDING_OFFICE', label: `Pending Office Desk (${pendingCount})` },
-            { key: 'MY_REQUESTS', label: 'My Submitted Requests' },
-            { key: 'COMPLETED', label: `Completed Archive (${approvedCount})` },
-          ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveViewTab(tab.key as any)}
-              className={`btn btn-sm ${activeViewTab === tab.key ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ fontSize: '0.8125rem' }}
-            >
-              {tab.label}
-            </button>
-          ))}
+      {/* Filter Bar */}
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', backgroundColor: '#FFF', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+        <div style={{ flex: 1, minWidth: '240px', position: 'relative' }}>
+          <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search by Request No, Student, Subject, Mentor..."
+            className="input-field"
+            style={{ width: '100%', paddingLeft: '2.25rem' }}
+          />
         </div>
 
-        {/* Filter Bar Controls */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
-            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input
-              type="text"
-              className="form-input"
-              style={{ paddingLeft: '36px', fontSize: '0.84375rem' }}
-              placeholder="Search by Request No, Title, Student or Employee Name..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-          </div>
+        <select
+          value={filterCategory}
+          onChange={e => setFilterCategory(e.target.value)}
+          className="input-field"
+          style={{ minWidth: '170px' }}
+        >
+          <option value="ALL">All Categories</option>
+          <option value="SUBJECT_RELATED">Subject Related</option>
+          <option value="ACADEMIC">Academic</option>
+          <option value="ATTENDANCE">Attendance</option>
+          <option value="EXAMINATION">Examination</option>
+          <option value="FEES">Fees & Accounts</option>
+          <option value="HOSTEL">Hostel</option>
+          <option value="TRANSPORT">Transport</option>
+          <option value="IT_SUPPORT">IT Support</option>
+          <option value="COMPLAINT">Complaint</option>
+        </select>
 
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <Filter size={15} color="var(--brand-orange)" />
-              <select
-                className="form-select"
-                style={{ width: 'auto', fontSize: '0.8125rem' }}
-                value={filterOffice}
-                onChange={e => setFilterOffice(e.target.value)}
-              >
-                <option value="ALL">All Target Offices</option>
-                <option value="REGISTRAR">Registrar Office</option>
-                <option value="UNIVERSITY_ADMIN">Vice Chancellor / Admin</option>
-                <option value="IQAC">IQAC Cell</option>
-                <option value="EXAM_CELL">Exam Controller</option>
-                <option value="STUDENT_SECTION">Student Section</option>
-                <option value="HOSTEL_ADMIN">Hostel Warden Office</option>
-                <option value="LIBRARY_ADMIN">Library Office</option>
-                <option value="TRANSPORT_ADMIN">Transport Office</option>
-                <option value="MAINTENANCE_ADMIN">Maintenance Office</option>
-                <option value="HOD_ACADEMIC">HOD Desk</option>
-                <option value="FINANCE_CELL">Finance Cell</option>
-              </select>
-            </div>
+        <select
+          value={filterPriority}
+          onChange={e => setFilterPriority(e.target.value)}
+          className="input-field"
+          style={{ minWidth: '140px' }}
+        >
+          <option value="ALL">All Priorities</option>
+          <option value="LOW">Low</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="HIGH">High</option>
+          <option value="URGENT">Urgent</option>
+        </select>
 
-            <select
-              className="form-select"
-              style={{ width: 'auto', fontSize: '0.8125rem' }}
-              value={filterStatus}
-              onChange={e => setFilterStatus(e.target.value)}
-            >
-              <option value="ALL">All Statuses</option>
-              <option value="PENDING">PENDING</option>
-              <option value="UNDER_REVIEW">UNDER REVIEW</option>
-              <option value="FORWARDED">FORWARDED</option>
-              <option value="CHANGES_REQUESTED">CHANGES REQUESTED</option>
-              <option value="APPROVED">APPROVED</option>
-              <option value="REJECTED">REJECTED</option>
-            </select>
-
-            <select
-              className="form-select"
-              style={{ width: 'auto', fontSize: '0.8125rem' }}
-              value={filterPriority}
-              onChange={e => setFilterPriority(e.target.value)}
-            >
-              <option value="ALL">All Priorities</option>
-              <option value="URGENT">URGENT</option>
-              <option value="HIGH">HIGH</option>
-              <option value="MEDIUM">MEDIUM</option>
-              <option value="LOW">LOW</option>
-            </select>
-          </div>
-        </div>
+        <select
+          value={filterStatus}
+          onChange={e => setFilterStatus(e.target.value)}
+          className="input-field"
+          style={{ minWidth: '160px' }}
+        >
+          <option value="ALL">All Statuses</option>
+          <option value="SUBMITTED">Submitted</option>
+          <option value="WITH_MENTOR">With Mentor</option>
+          <option value="FORWARDED_TO_FACULTY">With Faculty</option>
+          <option value="FORWARDED_TO_HOD">With HOD</option>
+          <option value="FORWARDED_TO_DEPARTMENT">With Department</option>
+          <option value="WORK_IN_PROGRESS">Work In Progress</option>
+          <option value="RETURNED_TO_MENTOR">Returned to Mentor</option>
+          <option value="COMPLETED">Completed</option>
+          <option value="REOPENED">Reopened</option>
+        </select>
       </div>
 
-      {/* Main Request Queue Table */}
-      <div className="card" style={{ padding: '1.5rem' }}>
+      {/* Requests Table */}
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
-          <table className="table">
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
             <thead>
-              <tr>
-                <th>Request ID</th>
-                <th>Applicant Candidate</th>
-                <th>Category</th>
-                <th>Target Office</th>
-                <th>Priority</th>
-                <th>Deadline Date</th>
-                <th>Status</th>
-                <th>Action</th>
+              <tr style={{ backgroundColor: 'var(--bg-main)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                <th style={{ padding: '0.875rem 1rem' }}>Request No</th>
+                <th style={{ padding: '0.875rem 1rem' }}>Student Details</th>
+                <th style={{ padding: '0.875rem 1rem' }}>Category &amp; Subject</th>
+                <th style={{ padding: '0.875rem 1rem' }}>Assigned Mentor</th>
+                <th style={{ padding: '0.875rem 1rem' }}>Current Desk</th>
+                <th style={{ padding: '0.875rem 1rem' }}>Priority</th>
+                <th style={{ padding: '0.875rem 1rem' }}>Status</th>
+                <th style={{ padding: '0.875rem 1rem', textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredRequests.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
-                    <ShieldCheck size={36} color="var(--brand-orange)" style={{ opacity: 0.6, marginBottom: '0.5rem' }} />
-                    <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--brand-navy)' }}>No requests found</div>
-                    <div style={{ fontSize: '0.8125rem', marginTop: '4px' }}>There are no approval workflow requests matching the selected filter criteria.</div>
+                  <td colSpan={8} style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <UserCheck size={36} style={{ margin: '0 auto 0.75rem auto', color: 'var(--border-color)' }} />
+                    <p style={{ margin: 0, fontWeight: 600, fontSize: '0.95rem' }}>No student requests found in this view</p>
+                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.825rem' }}>Try adjusting your search or tab filters</p>
                   </td>
                 </tr>
               ) : (
-                filteredRequests.map(req => (
-                  <tr key={req.id} className="table-row-hover">
-                    <td style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>
-                      <div>{req.requestNo}</div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{new Date(req.createdAt).toLocaleDateString()}</div>
+                filteredRequests.map(r => (
+                  <tr
+                    key={r.id}
+                    style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color var(--transition-fast)' }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(240, 244, 248, 0.4)'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                  >
+                    <td style={{ padding: '0.875rem 1rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
+                      {r.requestNo}
                     </td>
-                    <td>
-                      <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{req.applicantName}</div>
+
+                    <td style={{ padding: '0.875rem 1rem' }}>
+                      <div style={{ fontWeight: 600 }}>{r.studentName}</div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {req.applicantRole} • {req.applicantEnrollmentOrEmpId || '-'}
+                        {r.enrollmentNo} • {r.departmentName}
                       </div>
                     </td>
-                    <td>
-                      <div style={{ fontWeight: 600, fontSize: '0.84375rem' }}>{getCategoryLabel(req.category)}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '200px' }}>
-                        {req.title}
+
+                    <td style={{ padding: '0.875rem 1rem' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{r.subject}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {r.category.replace(/_/g, ' ')} {r.subjectCode && `(${r.subjectCode})`}
                       </div>
                     </td>
-                    <td>
-                      <Badge variant="navy">{getOfficeLabel(req.currentOffice)}</Badge>
+
+                    <td style={{ padding: '0.875rem 1rem', color: 'var(--brand-green)', fontWeight: 600 }}>
+                      {r.mentorName}
                     </td>
-                    <td>
-                      <PriorityBadge priority={req.priority} />
+
+                    <td style={{ padding: '0.875rem 1rem' }}>
+                      <span style={{ fontWeight: 600, fontSize: '0.825rem', color: 'var(--brand-navy)' }}>
+                        {r.currentHandlerName || r.currentHandler}
+                      </span>
                     </td>
-                    <td style={{ fontSize: '0.8125rem', fontWeight: 600 }}>
-                      {req.deadlineDate}
+
+                    <td style={{ padding: '0.875rem 1rem' }}>
+                      <Badge variant={r.priority === 'URGENT' ? 'danger' : r.priority === 'HIGH' ? 'warning' : 'navy'}>
+                        {r.priority}
+                      </Badge>
                     </td>
-                    <td>
-                      <StatusBadge status={req.status} />
+
+                    <td style={{ padding: '0.875rem 1rem' }}>
+                      {getStatusBadge(r.status)}
                     </td>
-                    <td>
+
+                    <td style={{ padding: '0.875rem 1rem', textAlign: 'right' }}>
                       <button
-                        className="btn btn-secondary btn-sm"
-                        onClick={() => setSelectedRequest(req)}
-                        style={{ fontSize: '0.78125rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        onClick={() => setSelectedStudentRequest(r)}
+                        className="btn btn-secondary"
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
                       >
-                        <Eye size={14} /> Review Request
+                        <Eye size={14} /> Open &amp; Action
                       </button>
                     </td>
                   </tr>
@@ -259,25 +538,6 @@ export const RequestsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Modals */}
-      <ApprovalRequestModal
-        isOpen={isSubmitModalOpen}
-        onClose={() => setIsSubmitModalOpen(false)}
-        onSuccess={() => {
-          refreshData();
-          alert('Approval Request submitted successfully and dispatched to target office.');
-        }}
-      />
-
-      <ApprovalDetailModal
-        request={selectedRequest}
-        isOpen={Boolean(selectedRequest)}
-        onClose={() => setSelectedRequest(null)}
-        onSuccess={() => {
-          refreshData();
-          alert('Approval request action recorded successfully.');
-        }}
-      />
     </div>
   );
 };

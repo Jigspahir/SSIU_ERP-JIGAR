@@ -6,10 +6,11 @@ import {
 } from 'lucide-react';
 import { UserRole } from '../../types';
 import { db } from '../../services/db';
+import { notificationService } from '../../services/notificationService';
 
 interface TopbarProps {
   activeTab: string;
-  setActiveTab: (tab: string) => void;
+  setActiveTab: (tab: string, params?: any) => void;
   mobileOpen?: boolean;
   setMobileOpen?: (open: boolean) => void;
 }
@@ -237,7 +238,11 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab, mobileO
                         }}
                         onClick={() => {
                           if (user?.id) db.markNotificationAsRead(notif.id, user.id);
-                          if (notif.linkTab) {
+                          const target = notificationService.resolveNotificationTarget(notif, user, role);
+                          if (target.tab) {
+                            setActiveTab(target.tab, target.params);
+                            setShowNotifications(false);
+                          } else if (notif.linkTab) {
                             setActiveTab(notif.linkTab);
                             setShowNotifications(false);
                           }

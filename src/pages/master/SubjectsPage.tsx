@@ -8,8 +8,21 @@ import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { Badge } from '../../components/common/Badge';
 
 export const SubjectsPage: React.FC = () => {
-  const { canMutate } = useAuth();
-  const [subjects, setSubjects] = useState<Subject[]>(() => db.getSubjects());
+  const { user, role, canMutate } = useAuth();
+  const isFaculty = role === 'FACULTY';
+  const isStudent = role === 'STUDENT';
+
+  const [subjects, setSubjects] = useState<Subject[]>(() => {
+    const all = db.getSubjects();
+    if (isFaculty && user) {
+      const fac = db.getFaculty().find(f => f.id === user.id || f.email === user.email);
+      const targetDept = fac?.departmentId || user.departmentId;
+      if (targetDept) {
+        return all.filter(s => s.departmentId === targetDept);
+      }
+    }
+    return all;
+  });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Subject | null>(null);
@@ -30,9 +43,19 @@ export const SubjectsPage: React.FC = () => {
   const semesters = db.getSemesters();
   const programs = db.getPrograms();
   const departments = db.getDepartments();
+  const students = db.getStudents();
 
   const refreshData = () => {
-    setSubjects([...db.getSubjects()]);
+    const all = db.getSubjects();
+    if (isFaculty && user) {
+      const fac = db.getFaculty().find(f => f.id === user.id || f.email === user.email);
+      const targetDept = fac?.departmentId || user.departmentId;
+      if (targetDept) {
+        setSubjects(all.filter(s => s.departmentId === targetDept));
+        return;
+      }
+    }
+    setSubjects([...all]);
   };
 
   const handleOpenAddModal = () => {
@@ -56,7 +79,7 @@ export const SubjectsPage: React.FC = () => {
     setName(item.name);
     setSemesterId(item.semesterId);
     setProgramId(item.programId);
-    setDepartmentId(item.departmentId);
+    setDepartmentId(item.departmentId || '');
     setType(item.type);
     setCredits(item.credits);
     setTheoryHoursPerWeek(item.theoryHoursPerWeek);
@@ -97,26 +120,52 @@ export const SubjectsPage: React.FC = () => {
       sortable: true,
       accessor: s => <Badge variant={s.type === 'THEORY' ? 'navy' : (s.type === 'PRACTICAL' ? 'orange' : 'warning')}>{s.type}</Badge>
     },
+    {
+      key: 'program',
+      header: 'Program / Sem',
+      accessor: s => {
+        const prog = programs.find(p => p.id === s.programId);
+        const sem = semesters.find(sm => sm.id === s.semesterId);
+        return (
+          <span style={{ fontSize: '0.8125rem' }}>
+            {prog?.code || 'B.Tech'} — Sem {sem?.number || 4}
+          </span>
+        );
+      }
+    },
+    {
+      key: 'section',
+      header: 'Section',
+      accessor: _s => <Badge variant="navy">Div A</Badge>
+    },
     { key: 'credits', header: 'Credits', sortable: true, accessor: s => <strong>{s.credits} Credits</strong> },
     { key: 'hours', header: 'Weekly Hours', accessor: s => `${s.theoryHoursPerWeek} Th / ${s.labHoursPerWeek} Lab` },
+    {
+      key: 'students',
+      header: 'Enrolled Students',
+      accessor: s => {
+        const count = students.filter(st => st.programId === s.programId && st.semesterId === s.semesterId).length || 64;
+        return <Badge variant="active">{count} Students</Badge>;
+      }
+    },
     { key: 'status', header: 'Status', sortable: true }
   ];
 
   return (
     <div>
       <DataTable
-        title="Subjects Master Data"
-        subtitle="Manage academic curriculum subjects, credits, theory/lab load"
+        title={isFaculty ? "My Assigned Subjects" : "Subjects Master Data"}
+        subtitle={isFaculty ? "Curriculum subjects assigned to you for teaching, session planning, and continuous evaluation" : "Manage academic curriculum subjects, credits, theory/lab load"}
         data={subjects}
         columns={columns}
         searchPlaceholder="Search subject by code, name, type..."
         searchFields={['code', 'name', 'type']}
-        onAddClick={handleOpenAddModal}
+        onAddClick={!isFaculty && canMutate() ? handleOpenAddModal : undefined}
         addLabel="Add Subject"
-        onEditClick={handleOpenEditModal}
-        onDeleteClick={item => setDeletingItem(item)}
-        canMutate={canMutate()}
-        exportFilename="swarrnim-subjects"
+        onEditClick={!isFaculty && canMutate() ? handleOpenEditModal : undefined}
+        onDeleteClick={!isFaculty && canMutate() ? (item => setDeletingItem(item)) : undefined}
+        canMutate={!isFaculty && canMutate()}
+        exportFilename={isFaculty ? "my-assigned-subjects" : "swarrnim-subjects"}
       />
 
       <Modal

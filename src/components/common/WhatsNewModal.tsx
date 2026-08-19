@@ -4,11 +4,12 @@ import { ERPNotification, NotificationModule } from '../../types';
 import { db } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
 import { Badge } from './Badge';
+import { notificationService } from '../../services/notificationService';
 
 interface WhatsNewModalProps {
   notifications: ERPNotification[];
   onClose: () => void;
-  onNavigateTab?: (tab: string) => void;
+  onNavigateTab?: (tab: string, params?: any) => void;
 }
 
 export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({ notifications, onClose, onNavigateTab }) => {
@@ -156,7 +157,7 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({ notifications, onC
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  {getModuleBadge(n.module)}
+                  {getModuleBadge(n.module as NotificationModule)}
                   <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                     <Clock size={12} /> {n.timestamp}
                   </span>
@@ -179,14 +180,19 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({ notifications, onC
                 {n.message}
               </p>
 
-              {n.linkTab && onNavigateTab && (
+              {onNavigateTab && (
                 <div style={{ marginTop: '0.25rem', display: 'flex', justifyContent: 'flex-end' }}>
                   <button
                     className="btn btn-secondary btn-sm"
                     style={{ fontSize: '0.75rem', padding: '0.25rem 0.65rem' }}
                     onClick={() => {
                       handleMarkRead(n.id);
-                      onNavigateTab(n.linkTab!);
+                      const target = notificationService.resolveNotificationTarget(n, user, role);
+                      if (target.tab) {
+                        onNavigateTab(target.tab, target.params);
+                      } else if (n.linkTab) {
+                        onNavigateTab(n.linkTab);
+                      }
                       onClose();
                     }}
                   >

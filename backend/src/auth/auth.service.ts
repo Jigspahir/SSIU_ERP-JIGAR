@@ -40,7 +40,8 @@ export class AuthService {
         },
       });
     } catch (e) {
-      this.logger.warn(`Database query failed during login check: ${e.message || e}`);
+      const errMsg = e instanceof Error ? e.message : String(e);
+      this.logger.warn(`Database query failed during login check: ${errMsg}`);
       throw new UnauthorizedException('Database service is currently offline or unreachable. Please start PostgreSQL on port 5432.');
     }
 
@@ -284,7 +285,8 @@ export class AuthService {
         this.logger.log(`Password reset token generated for ${user.erpId}: ${resetToken}`);
       }
     } catch (e) {
-      this.logger.warn(`Forgot password lookup failed: ${e.message || e}`);
+      const errMsg = e instanceof Error ? e.message : String(e);
+      this.logger.warn(`Forgot password lookup failed: ${errMsg}`);
     }
 
     return {

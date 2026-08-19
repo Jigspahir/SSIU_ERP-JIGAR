@@ -1,5 +1,16 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  CreateWorkDiaryDto,
+  UpdateWorkDiaryDto,
+  SubmitWorkDiaryDto,
+  FacultyReviewDto,
+  HodReviewDto,
+  ApproveWorkDiaryDto,
+  RejectWorkDiaryDto,
+  WorkDiaryQueryDto,
+  WorkDiaryStatusEnum,
+} from './dto/work-diary.dto';
 
 function parseDateSafe(dateInput?: string | Date): Date | undefined {
   if (!dateInput) return undefined;
@@ -29,7 +40,736 @@ function normalizePriority(p?: string): string {
 export class WorkManagementService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ── 1. Dashboard Aggregation ─────────────────────────────────────────────
+  // ── 1. Work Diary Core & Workflow ────────────────────────────────────────
+
+  /**
+   * Create a new Work Diary entry (either as DRAFT or directly SUBMITTED)
+   */
+  async createDiaryEntry(user: any, data: CreateWorkDiaryDto, forceDraft = false) {
+    const userId = user.id;
+    const safeWorkDate = parseDateSafe(data.workDate) || new Date();
+    
+    // Auto-resolve departmentId and instituteId from user's faculty profile if omitted
+    let departmentId = data.departmentId || user.faculty?.departmentId;
+    let instituteId = data.instituteId || user.faculty?.instituteId;
+
+    if (!departmentId || !instituteId) {
+      const userRecord = await this.prisma.user.findUnique({
+        where: { id: userId },
+        include: { faculty: { select: { departmentId: true, instituteId: true } } },
+      });
+      if (userRecord?.faculty) {
+        departmentId = departmentId || userRecord.faculty.departmentId;
+        instituteId = instituteId || userRecord.faculty.instituteId;
+      }
+    }
+
+    const initialStatus = forceDraft
+      ? WorkDiaryStatusEnum.DRAFT
+      : (data.status?.toUpperCase() || WorkDiaryStatusEnum.DRAFT);
+
+    const isSubmitted = initialStatus === WorkDiaryStatusEnum.SUBMITTED;
+
+    const diary = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.workDiary.create({
+        data: {
+          userId,
+          workTitle: data.workTitle,
+          description: data.description,
+          category: data.category?.toUpperCase() || 'GENERAL',
+          workDate: safeWorkDate,
+          startTime: data.startTime,
+          endTime: data.endTime,
+          priority: normalizePriority(data.priority),
+          status: initialStatus,
+          relatedModule: data.relatedModule,
+          relatedPerson: data.relatedPerson,
+          relatedDepartment: data.relatedDepartment,
+          relatedInstitute: data.relatedInstitute,
+          departmentId,
+          instituteId,
+          remarks: data.remarks,
+          submittedAt: isSubmitted ? new Date() : null,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              erpId: true,
+              username: true,
+              faculty: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  designation: true,
+                  departmentId: true,
+                  instituteId: true,
+                },
+              },
+            },
+          },
+          history: true,
+        },
+      });
+
+      // Record initial history
+      await tx.workDiaryHistory.create({
+        data: {
+          workDiaryId: created.id,
+          action: isSubmitted ? 'SUBMITTED' : (initialStatus === WorkDiaryStatusEnum.DRAFT ? 'SAVED_DRAFT' : 'CREATED'),
+          fromStatus: null,
+          toStatus: initialStatus,
+          performedBy: user.username || user.erpId || userId,
+          comments: isSubmitted ? 'Work diary submitted for review' : 'Work diary entry created',
+        },
+      });
+
+      return created;
+    });
+
+    return diary;
+  }
+
+  /**
+   * Save work diary as draft shortcut
+   */
+  async saveDraft(user: any, data: CreateWorkDiaryDto) {
+    return this.createDiaryEntry(user, data, true);
+  }
+
+  /**
+   * Submit an existing work diary (transitions DRAFT -> SUBMITTED)
+   */
+  async submitDiaryEntry(user: any, id: string, data?: SubmitWorkDiaryDto) {
+    const diary = await this.getDiaryEntryById(user, id);
+
+    if (diary.userId !== user.id && user.authorityLevel > 2) {
+      throw new ForbiddenException('Only the diary owner or an administrator can submit this work diary.');
+    }
+
+    if (diary.status === WorkDiaryStatusEnum.APPROVED) {
+      throw new BadRequestException('This work diary is already approved and cannot be resubmitted.');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.workDiary.update({
+        where: { id },
+        data: {
+          status: WorkDiaryStatusEnum.SUBMITTED,
+          submittedAt: new Date(),
+          remarks: data?.submissionRemarks ? `${diary.remarks ? diary.remarks + ' | ' : ''}Submission: ${data.submissionRemarks}` : diary.remarks,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              erpId: true,
+              username: true,
+              faculty: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  designation: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      await tx.workDiaryHistory.create({
+        data: {
+          workDiaryId: id,
+          action: 'SUBMITTED',
+          fromStatus: diary.status,
+          toStatus: WorkDiaryStatusEnum.SUBMITTED,
+          performedBy: user.username || user.erpId || user.id,
+          comments: data?.submissionRemarks || 'Work diary submitted for faculty and HOD review',
+        },
+      });
+
+      return result;
+    });
+
+    return updated;
+  }
+
+  /**
+   * Update work diary content
+   */
+  async updateDiaryEntry(user: any, id: string, data: UpdateWorkDiaryDto) {
+    const diary = await this.getDiaryEntryById(user, id);
+
+    // Ownership check: only owner or Admin can update content
+    const isOwner = diary.userId === user.id;
+    const isAdmin = user.authorityLevel <= 2;
+
+    if (!isOwner && !isAdmin) {
+      throw new ForbiddenException('You do not have permission to modify this work diary.');
+    }
+
+    // If already approved, locked unless admin
+    if (diary.status === WorkDiaryStatusEnum.APPROVED && !isAdmin) {
+      throw new BadRequestException('Approved work diary entries are locked and cannot be edited.');
+    }
+
+    const updateData: any = {};
+    if (data.workTitle !== undefined) updateData.workTitle = data.workTitle;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.category !== undefined) updateData.category = data.category.toUpperCase();
+    if (data.workDate !== undefined) updateData.workDate = parseDateSafe(data.workDate);
+    if (data.startTime !== undefined) updateData.startTime = data.startTime;
+    if (data.endTime !== undefined) updateData.endTime = data.endTime;
+    if (data.priority !== undefined) updateData.priority = normalizePriority(data.priority);
+    if (data.status !== undefined) updateData.status = data.status.toUpperCase();
+    if (data.relatedModule !== undefined) updateData.relatedModule = data.relatedModule;
+    if (data.relatedPerson !== undefined) updateData.relatedPerson = data.relatedPerson;
+    if (data.relatedDepartment !== undefined) updateData.relatedDepartment = data.relatedDepartment;
+    if (data.relatedInstitute !== undefined) updateData.relatedInstitute = data.relatedInstitute;
+    if (data.departmentId !== undefined) updateData.departmentId = data.departmentId;
+    if (data.instituteId !== undefined) updateData.instituteId = data.instituteId;
+    if (data.remarks !== undefined) updateData.remarks = data.remarks;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.workDiary.update({
+        where: { id },
+        data: updateData,
+        include: {
+          user: {
+            select: {
+              id: true,
+              erpId: true,
+              username: true,
+              faculty: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  designation: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      await tx.workDiaryHistory.create({
+        data: {
+          workDiaryId: id,
+          action: 'UPDATED',
+          fromStatus: diary.status,
+          toStatus: updateData.status || diary.status,
+          performedBy: user.username || user.erpId || user.id,
+          comments: 'Work diary details updated',
+        },
+      });
+
+      return result;
+    });
+
+    return updated;
+  }
+
+  /**
+   * Faculty response & review step (SUBMITTED -> FACULTY_REVIEW / HOD_REVIEW)
+   */
+  async facultyReview(user: any, id: string, data: FacultyReviewDto) {
+    const diary = await this.getDiaryEntryById(user, id);
+
+    // Verify reviewer authority (Faculty, Mentor, HOD, Admin)
+    if (user.authorityLevel > 5) {
+      throw new ForbiddenException('Faculty or Mentor review authority required.');
+    }
+
+    const nextStatus = data.nextStatus
+      ? data.nextStatus.toUpperCase()
+      : WorkDiaryStatusEnum.HOD_REVIEW;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.workDiary.update({
+        where: { id },
+        data: {
+          status: nextStatus,
+          facultyComments: data.facultyComments,
+          facultyReviewedAt: new Date(),
+          facultyReviewedById: user.id,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              erpId: true,
+              username: true,
+              faculty: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  designation: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      await tx.workDiaryHistory.create({
+        data: {
+          workDiaryId: id,
+          action: 'FACULTY_REVIEWED',
+          fromStatus: diary.status,
+          toStatus: nextStatus,
+          performedBy: user.username || user.erpId || user.id,
+          comments: data.facultyComments,
+        },
+      });
+
+      return result;
+    });
+
+    return updated;
+  }
+
+  /**
+   * HOD Review step (HOD_REVIEW -> APPROVED / REJECTED / HOD_REVIEW)
+   */
+  async hodReview(user: any, id: string, data: HodReviewDto) {
+    const diary = await this.getDiaryEntryById(user, id);
+
+    // HOD or higher authority required (level <= 4)
+    if (user.authorityLevel > 4) {
+      throw new ForbiddenException('HOD or Academic Executive review authority required.');
+    }
+
+    const decision = data.decision ? data.decision.toUpperCase() : WorkDiaryStatusEnum.APPROVED;
+    const isApproved = decision === WorkDiaryStatusEnum.APPROVED;
+    const isRejected = decision === WorkDiaryStatusEnum.REJECTED;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.workDiary.update({
+        where: { id },
+        data: {
+          status: decision,
+          hodComments: data.hodComments,
+          hodReviewedAt: new Date(),
+          hodReviewedById: user.id,
+          ...(isApproved ? { approvedAt: new Date(), approvedById: user.id } : {}),
+          ...(isRejected ? { rejectedAt: new Date(), rejectedById: user.id, rejectionReason: data.hodComments } : {}),
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              erpId: true,
+              username: true,
+              faculty: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  designation: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      await tx.workDiaryHistory.create({
+        data: {
+          workDiaryId: id,
+          action: isApproved ? 'APPROVED' : (isRejected ? 'REJECTED' : 'HOD_REVIEWED'),
+          fromStatus: diary.status,
+          toStatus: decision,
+          performedBy: user.username || user.erpId || user.id,
+          comments: data.hodComments,
+        },
+      });
+
+      return result;
+    });
+
+    return updated;
+  }
+
+  /**
+   * Approve Work Diary directly (HOD, Principal, Super Admin)
+   */
+  async approveDiaryEntry(user: any, id: string, data?: ApproveWorkDiaryDto) {
+    const diary = await this.getDiaryEntryById(user, id);
+
+    if (user.authorityLevel > 4) {
+      throw new ForbiddenException('Only HOD, Principal, or University Administrators can approve work diaries.');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.workDiary.update({
+        where: { id },
+        data: {
+          status: WorkDiaryStatusEnum.APPROVED,
+          approvedAt: new Date(),
+          approvedById: user.id,
+          hodComments: data?.approvalRemarks || diary.hodComments || 'Approved',
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              erpId: true,
+              username: true,
+              faculty: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  designation: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      await tx.workDiaryHistory.create({
+        data: {
+          workDiaryId: id,
+          action: 'APPROVED',
+          fromStatus: diary.status,
+          toStatus: WorkDiaryStatusEnum.APPROVED,
+          performedBy: user.username || user.erpId || user.id,
+          comments: data?.approvalRemarks || 'Work diary approved',
+        },
+      });
+
+      return result;
+    });
+
+    return updated;
+  }
+
+  /**
+   * Reject Work Diary with reason
+   */
+  async rejectDiaryEntry(user: any, id: string, data: RejectWorkDiaryDto) {
+    const diary = await this.getDiaryEntryById(user, id);
+
+    if (user.authorityLevel > 4) {
+      throw new ForbiddenException('Only HOD, Principal, or University Administrators can reject work diaries.');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.workDiary.update({
+        where: { id },
+        data: {
+          status: WorkDiaryStatusEnum.REJECTED,
+          rejectedAt: new Date(),
+          rejectedById: user.id,
+          rejectionReason: data.rejectionReason,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              erpId: true,
+              username: true,
+              faculty: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  designation: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      await tx.workDiaryHistory.create({
+        data: {
+          workDiaryId: id,
+          action: 'REJECTED',
+          fromStatus: diary.status,
+          toStatus: WorkDiaryStatusEnum.REJECTED,
+          performedBy: user.username || user.erpId || user.id,
+          comments: `Rejection reason: ${data.rejectionReason}`,
+        },
+      });
+
+      return result;
+    });
+
+    return updated;
+  }
+
+  /**
+   * Get complete chronological history of a work diary entry
+   */
+  async getDiaryHistory(user: any, id: string) {
+    await this.getDiaryEntryById(user, id);
+
+    return this.prisma.workDiaryHistory.findMany({
+      where: { workDiaryId: id },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  /**
+   * Get Work Diary entries with full pagination, search, and multi-dimensional filtering
+   */
+  async getDiaryEntries(user: any, query?: WorkDiaryQueryDto) {
+    const page = Math.max(1, Number(query?.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(query?.limit) || 10));
+    const skip = (page - 1) * limit;
+
+    const safeDate = query?.date ? parseDateSafe(query.date) : undefined;
+    const safeStartDate = query?.startDate ? parseDateSafe(query.startDate) : undefined;
+    const safeEndDate = query?.endDate ? parseDateSafe(query.endDate) : undefined;
+
+    const where: any = {};
+
+    // ── RBAC Scope Resolution:
+    const isExecutive = user.authorityLevel <= 2; // Super Admin, Principal, Registrar
+    const isHOD = user.authorityLevel === 4 || user.role === 'HOD';
+
+    if (query?.facultyId) {
+      where.userId = query.facultyId;
+    } else if (query?.allDepartments && (isExecutive || isHOD)) {
+      // HOD or Executive requesting department/institute view
+      if (isHOD && user.faculty?.departmentId && !isExecutive) {
+        where.departmentId = user.faculty.departmentId;
+      }
+    } else if (isExecutive) {
+      // Admin without specific user filter can view all
+    } else if (isHOD && query?.departmentId) {
+      where.departmentId = query.departmentId;
+    } else {
+      // Default: regular faculty sees their own entries
+      where.userId = user.id;
+    }
+
+    // ── Date Filters:
+    if (safeDate) {
+      where.workDate = safeDate;
+    } else if (safeStartDate || safeEndDate) {
+      where.workDate = {};
+      if (safeStartDate) where.workDate.gte = safeStartDate;
+      if (safeEndDate) where.workDate.lte = safeEndDate;
+    }
+
+    // ── Department & Institute Filters:
+    if (query?.departmentId) {
+      where.departmentId = query.departmentId;
+    }
+    if (query?.instituteId) {
+      where.instituteId = query.instituteId;
+    }
+
+    // ── Status, Category & Priority Filters:
+    if (query?.status && query.status !== 'ALL') {
+      where.status = query.status.toUpperCase();
+    }
+    if (query?.category && query.category !== 'ALL') {
+      where.category = query.category.toUpperCase();
+    }
+    if (query?.priority && query.priority !== 'ALL') {
+      where.priority = query.priority.toUpperCase();
+    }
+
+    // ── Full-Text Search:
+    if (query?.search?.trim()) {
+      const q = query.search.trim();
+      where.OR = [
+        { workTitle: { contains: q, mode: 'insensitive' } },
+        { description: { contains: q, mode: 'insensitive' } },
+        { remarks: { contains: q, mode: 'insensitive' } },
+        { relatedPerson: { contains: q, mode: 'insensitive' } },
+        { relatedDepartment: { contains: q, mode: 'insensitive' } },
+        { relatedInstitute: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    const [total, data] = await Promise.all([
+      this.prisma.workDiary.count({ where }),
+      this.prisma.workDiary.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { workDate: 'desc' },
+        include: {
+          user: {
+            select: {
+              id: true,
+              erpId: true,
+              username: true,
+              faculty: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                  designation: true,
+                  departmentId: true,
+                  instituteId: true,
+                },
+              },
+            },
+          },
+          history: {
+            take: 3,
+            orderBy: { createdAt: 'desc' },
+          },
+        },
+      }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    };
+  }
+
+  /**
+   * Get single Work Diary entry by ID with authorization check
+   */
+  async getDiaryEntryById(user: any, id: string) {
+    const entry = await this.prisma.workDiary.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            erpId: true,
+            username: true,
+            faculty: {
+              select: {
+                firstName: true,
+                lastName: true,
+                designation: true,
+                departmentId: true,
+                instituteId: true,
+              },
+            },
+          },
+        },
+        history: {
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+
+    if (!entry) {
+      throw new NotFoundException('Work Diary entry not found.');
+    }
+
+    // Permission check: owner, faculty/mentor of same department, HOD, or Administrator (level <= 2)
+    const isOwner = entry.userId === user.id;
+    const isAdmin = user.authorityLevel <= 2;
+    const isSameDepartmentFaculty = user.authorityLevel <= 5 && 
+                                    user.faculty?.departmentId && 
+                                    entry.departmentId &&
+                                    user.faculty.departmentId === entry.departmentId;
+    const isHOD = (user.authorityLevel <= 4 || user.role === 'HOD');
+
+    if (!isOwner && !isAdmin && !isSameDepartmentFaculty && !isHOD) {
+      throw new ForbiddenException('You do not have permission to view this Work Diary entry.');
+    }
+
+    return entry;
+  }
+
+  /**
+   * Delete Work Diary entry (allowed for DRAFT or REJECTED by owner, or Admin)
+   */
+  async deleteDiaryEntry(user: any, id: string) {
+    const entry = await this.getDiaryEntryById(user, id);
+
+    const isOwner = entry.userId === user.id;
+    const isAdmin = user.authorityLevel <= 2;
+
+    if (!isOwner && !isAdmin) {
+      throw new ForbiddenException('You do not have permission to delete this Work Diary entry.');
+    }
+
+    if (entry.status === WorkDiaryStatusEnum.APPROVED && !isAdmin) {
+      throw new BadRequestException('Approved work diary entries cannot be deleted.');
+    }
+
+    await this.prisma.workDiary.delete({
+      where: { id },
+    });
+
+    return { success: true, message: 'Work Diary entry deleted successfully.' };
+  }
+
+  /**
+   * Dashboard Statistics for Work Diary
+   */
+  async getDiaryDashboardStats(user: any, departmentId?: string, instituteId?: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const where: any = {};
+    const isExecutive = user.authorityLevel <= 2;
+    const isHOD = user.authorityLevel === 4 || user.role === 'HOD';
+
+    if (departmentId && (isHOD || isExecutive)) {
+      where.departmentId = departmentId;
+    } else if (instituteId && isExecutive) {
+      where.instituteId = instituteId;
+    } else if (isHOD && user.faculty?.departmentId) {
+      where.departmentId = user.faculty.departmentId;
+    } else if (!isExecutive) {
+      where.userId = user.id;
+    }
+
+    const [
+      total,
+      drafts,
+      submitted,
+      facultyReview,
+      hodReview,
+      approved,
+      rejected,
+      overdueEntries,
+      todaysEntries,
+    ] = await Promise.all([
+      this.prisma.workDiary.count({ where }),
+      this.prisma.workDiary.count({ where: { ...where, status: WorkDiaryStatusEnum.DRAFT } }),
+      this.prisma.workDiary.count({ where: { ...where, status: WorkDiaryStatusEnum.SUBMITTED } }),
+      this.prisma.workDiary.count({ where: { ...where, status: WorkDiaryStatusEnum.FACULTY_REVIEW } }),
+      this.prisma.workDiary.count({ where: { ...where, status: WorkDiaryStatusEnum.HOD_REVIEW } }),
+      this.prisma.workDiary.count({ where: { ...where, status: WorkDiaryStatusEnum.APPROVED } }),
+      this.prisma.workDiary.count({ where: { ...where, status: WorkDiaryStatusEnum.REJECTED } }),
+      this.prisma.workDiary.count({
+        where: {
+          ...where,
+          OR: [
+            { status: 'OVERDUE' },
+            { workDate: { lt: today }, status: { in: [WorkDiaryStatusEnum.DRAFT, WorkDiaryStatusEnum.SUBMITTED] } },
+          ],
+        },
+      }),
+      this.prisma.workDiary.count({ where: { ...where, workDate: today } }),
+    ]);
+
+    return {
+      total,
+      drafts,
+      submitted,
+      underReview: submitted + facultyReview + hodReview,
+      facultyReview,
+      hodReview,
+      approved,
+      rejected,
+      overdue: overdueEntries,
+      todayCount: todaysEntries,
+    };
+  }
+
+  // ── 2. Dashboard Aggregation ─────────────────────────────────────────────
 
   async getWorkDashboard(userId: string) {
     const today = new Date();
@@ -46,23 +786,19 @@ export class WorkManagementService {
       recentDiary,
       quickNotes,
     ] = await Promise.all([
-      // Today's tasks
       this.prisma.workTask.findMany({
         where: { userId, dueDate: today, status: { not: 'COMPLETED' } },
         orderBy: { priority: 'desc' },
       }),
-      // Overdue tasks
       this.prisma.workTask.findMany({
         where: { userId, dueDate: { lt: today }, status: { not: 'COMPLETED' } },
         orderBy: { dueDate: 'asc' },
       }),
-      // Upcoming tasks (with next action dates)
       this.prisma.workTask.findMany({
         where: { userId, dueDate: { gt: today }, status: { not: 'COMPLETED' } },
         orderBy: { dueDate: 'asc' },
         take: 10,
       }),
-      // Today's meetings
       this.prisma.personalMeeting.findMany({
         where: {
           meetingDate: today,
@@ -70,7 +806,6 @@ export class WorkManagementService {
         },
         orderBy: { startTime: 'asc' },
       }),
-      // Upcoming meetings
       this.prisma.personalMeeting.findMany({
         where: {
           meetingDate: { gt: today },
@@ -79,25 +814,21 @@ export class WorkManagementService {
         orderBy: { meetingDate: 'asc' },
         take: 5,
       }),
-      // Appointments
       this.prisma.personalAppointment.findMany({
         where: { userId, appointmentDate: { gte: today }, status: 'SCHEDULED' },
         orderBy: { appointmentDate: 'asc' },
         take: 5,
       }),
-      // Follow-ups
       this.prisma.workFollowUp.findMany({
         where: { userId, status: { in: ['PENDING', 'FOLLOW_UP_TODAY'] } },
         orderBy: { nextFollowUpDate: 'asc' },
         take: 5,
       }),
-      // Recent Work Diary
       this.prisma.workDiary.findMany({
         where: { userId },
         orderBy: { workDate: 'desc' },
         take: 5,
       }),
-      // Quick Notes
       this.prisma.personalNote.findMany({
         where: { userId },
         orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
@@ -105,7 +836,6 @@ export class WorkManagementService {
       }),
     ]);
 
-    // Calculate Summary Counts
     const [completedTasksCount, pendingTasksCount] = await Promise.all([
       this.prisma.workTask.count({ where: { userId, status: 'COMPLETED' } }),
       this.prisma.workTask.count({ where: { userId, status: { in: ['TODO', 'IN_PROGRESS'] } } }),
@@ -128,55 +858,6 @@ export class WorkManagementService {
         scheduledMeetings: todaysMeetings.length + upcomingMeetings.length,
       },
     };
-  }
-
-  // ── 2. Daily Work Diary ──────────────────────────────────────────────────
-
-  async createDiaryEntry(userId: string, data: {
-    workTitle: string;
-    description?: string;
-    category?: string;
-    workDate: string;
-    startTime?: string;
-    endTime?: string;
-    priority?: string;
-    status?: string;
-    relatedModule?: string;
-    relatedPerson?: string;
-    relatedDepartment?: string;
-    relatedInstitute?: string;
-    remarks?: string;
-  }) {
-    const safeWorkDate = parseDateSafe(data.workDate) || new Date();
-    return this.prisma.workDiary.create({
-      data: {
-        userId,
-        workTitle: data.workTitle,
-        description: data.description,
-        category: data.category || 'GENERAL',
-        workDate: safeWorkDate,
-        startTime: data.startTime,
-        endTime: data.endTime,
-        priority: normalizePriority(data.priority),
-        status: data.status || 'COMPLETED',
-        relatedModule: data.relatedModule,
-        relatedPerson: data.relatedPerson,
-        relatedDepartment: data.relatedDepartment,
-        relatedInstitute: data.relatedInstitute,
-        remarks: data.remarks,
-      },
-    });
-  }
-
-  async getDiaryEntries(userId: string, date?: string) {
-    const safeDate = parseDateSafe(date);
-    return this.prisma.workDiary.findMany({
-      where: {
-        userId,
-        ...(safeDate ? { workDate: safeDate } : {}),
-      },
-      orderBy: { workDate: 'desc' },
-    });
   }
 
   // ── 3. Task Management & Next Action ─────────────────────────────────────

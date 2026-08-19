@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Modal } from '../common/Modal';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
 import { ApprovalOfficeType, ApprovalPriority, ApprovalRequestCategory } from '../../types';
-import { FileUp, Send, AlertCircle } from 'lucide-react';
+import { 
+  getPermittedApprovalCategories, 
+  getPermittedTargetOffices, 
+  canUserAccessApprovalCategory 
+} from '../../services/securityService';
+import { FileUp, Send, AlertCircle, ShieldCheck } from 'lucide-react';
 
 interface ApprovalRequestModalProps {
   isOpen: boolean;
@@ -11,25 +16,86 @@ interface ApprovalRequestModalProps {
   onSuccess: () => void;
 }
 
+// Category display label helper
+const CATEGORY_LABELS: Record<ApprovalRequestCategory, string> = {
+  BONAFIDE_CERTIFICATE: 'Bonafide Certificate',
+  TRANSCRIPT_DEGREE: 'Official Transcript & Degree Verification',
+  FEE_CONCESSION: 'Fee Concession & Scholarship Application',
+  HOSTEL_NO_DUES: 'Hostel No-Dues & Clearance Certificate',
+  RE_EVALUATION: 'Exam Re-evaluation & Answer Script Verification',
+  NO_OBJECTION_CERTIFICATE: 'No Objection Certificate (NOC)',
+  LEAVE_APPLICATION: 'Academic Duty / Medical Leave Application',
+  RESEARCH_GRANT: 'Research & Project Grant Sanction',
+  EVENT_PERMISSION: 'Institutional Event & Seminar Permission',
+  INFRASTRUCTURE_MAINTENANCE: 'Campus Infrastructure & Maintenance Requisition',
+  GENERAL_ADMINISTRATIVE: 'General Administrative Approval'
+};
+
+const OFFICE_LABELS: Record<ApprovalOfficeType, string> = {
+  STUDENT_SECTION: 'Student Section & Certificates',
+  EXAM_CELL: 'Examination Controller Office',
+  HOSTEL_ADMIN: 'Hostel Administration & Warden Desk',
+  TRANSPORT_ADMIN: 'Transport Office',
+  MAINTENANCE_ADMIN: 'Estate & Maintenance Office',
+  FINANCE_CELL: 'Finance & Accounts Office',
+  REGISTRAR: 'Registrar Office',
+  UNIVERSITY_ADMIN: 'Vice Chancellor / University Admin',
+  IQAC: 'IQAC Quality Assurance Cell',
+  HOD_ACADEMIC: 'Department HOD Desk',
+  LIBRARY_ADMIN: 'Library Administration'
+};
+
 export const ApprovalRequestModal: React.FC<ApprovalRequestModalProps> = ({
   isOpen,
   onClose,
   onSuccess
 }) => {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+
+  const permittedCategories = useMemo(() => {
+    return getPermittedApprovalCategories(role);
+  }, [role]);
+
+  const [category, setCategory] = useState<ApprovalRequestCategory>(() => 
+    permittedCategories[0] || 'BONAFIDE_CERTIFICATE'
+  );
   
-  const [category, setCategory] = useState<ApprovalRequestCategory>('BONAFIDE_CERTIFICATE');
+  const permittedOffices = useMemo(() => {
+    return getPermittedTargetOffices(category, role);
+  }, [category, role]);
+
+  const [targetOffice, setTargetOffice] = useState<ApprovalOfficeType>(() => 
+    permittedOffices[0] || 'STUDENT_SECTION'
+  );
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [targetOffice, setTargetOffice] = useState<ApprovalOfficeType>('STUDENT_SECTION');
   const [priority, setPriority] = useState<ApprovalPriority>('MEDIUM');
   const [deadlineDate, setDeadlineDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
     return d.toISOString().split('T')[0];
   });
+  const [amount, setAmount] = useState<string>('');
+  const [financialEstimateSummary, setFinancialEstimateSummary] = useState<string>('');
   const [fileName, setFileName] = useState('');
   const [remarks, setRemarks] = useState('');
+
+  useEffect(() => {
+    if (!canUserAccessApprovalCategory(category, role)) {
+      if (permittedCategories.length > 0) {
+        setCategory(permittedCategories[0]);
+      }
+    }
+  }, [role, permittedCategories, category]);
+
+  useEffect(() => {
+    if (!permittedOffices.includes(targetOffice)) {
+      if (permittedOffices.length > 0) {
+        setTargetOffice(permittedOffices[0]);
+      }
+    }
+  }, [category, role, targetOffice, permittedOffices]);
 
   if (!user) return null;
 
@@ -37,6 +103,11 @@ export const ApprovalRequestModal: React.FC<ApprovalRequestModalProps> = ({
     e.preventDefault();
     if (!title.trim() || !description.trim()) {
       alert('Please provide a title and detailed description for your request.');
+      return;
+    }
+
+    if (!canUserAccessApprovalCategory(category, role)) {
+      alert('403 Forbidden: You do not have permission to submit requests in this category.');
       return;
     }
 
@@ -51,37 +122,46 @@ export const ApprovalRequestModal: React.FC<ApprovalRequestModalProps> = ({
       }
     ] : [];
 
-    db.addApprovalRequest({
-      applicantId: user.id,
-      applicantName: user.name,
-      applicantRole: user.role,
-      applicantEmail: user.email,
-      applicantPhone: user.phone || '+91 98765 43210',
-      applicantEnrollmentOrEmpId: user.enrollmentNo || user.employeeId || 'ID-GENERIC',
-      departmentId: user.departmentId,
-      instituteId: user.instituteId,
-      category,
-      title: title.trim(),
-      description: description.trim(),
-      priority,
-      targetOffice,
-      currentOffice: targetOffice,
-      status: 'PENDING',
-      deadlineDate,
-      attachments
-    }, remarks.trim() || `Submitted request ${title.trim()} to ${targetOffice}`);
+    const parsedAmount = amount.trim() ? parseFloat(amount.trim()) : undefined;
 
-    onSuccess();
-    onClose();
+    try {
+      db.addApprovalRequest({
+        applicantId: user.id,
+        applicantName: user.name,
+        applicantRole: user.role,
+        applicantEmail: user.email,
+        applicantPhone: user.phone || '+91 98765 43210',
+        applicantEnrollmentOrEmpId: user.enrollmentNo || user.employeeId || 'ID-GENERIC',
+        departmentId: user.departmentId,
+        departmentName: user.departmentId ? 'Department of ' + user.departmentId : undefined,
+        instituteId: user.instituteId,
+        category,
+        title: title.trim(),
+        description: description.trim(),
+        priority,
+        targetOffice,
+        currentOffice: targetOffice,
+        amount: parsedAmount,
+        financialEstimateSummary: financialEstimateSummary.trim() || (parsedAmount ? `Estimated amount: ₹${parsedAmount.toLocaleString('en-IN')}` : undefined),
+        status: 'PENDING',
+        deadlineDate,
+        attachments
+      }, remarks.trim() || `Submitted request ${title.trim()} to ${targetOffice}`, user, role);
+
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      alert(err.message || 'Submission failed.');
+    }
   };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Submit New Central Approval Request" maxWidth="760px">
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         <div style={{ background: 'var(--bg-surface-hover)', padding: '0.875rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', gap: '0.5rem', alignItems: 'center', fontSize: '0.84375rem', color: 'var(--text-muted)' }}>
-          <AlertCircle size={18} color="var(--brand-orange)" />
+          <ShieldCheck size={18} color="var(--brand-orange)" />
           <div>
-            Request submitted by <strong>{user.name}</strong> ({user.role}). It will be routed directly to the selected target office workflow desk.
+            Request submitted by <strong>{user.name}</strong> (<span style={{ color: 'var(--brand-navy)', fontWeight: 700 }}>{user.role}</span>). Form options are strictly filtered according to your role authorizations.
           </div>
         </div>
 
@@ -94,17 +174,11 @@ export const ApprovalRequestModal: React.FC<ApprovalRequestModalProps> = ({
               onChange={e => setCategory(e.target.value as ApprovalRequestCategory)}
               required
             >
-              <option value="BONAFIDE_CERTIFICATE">Bonafide Certificate</option>
-              <option value="TRANSCRIPT_DEGREE">Transcript / Degree Marksheet</option>
-              <option value="FEE_CONCESSION">Fee Concession / Installment</option>
-              <option value="HOSTEL_NO_DUES">Hostel Clearance &amp; No-Dues</option>
-              <option value="RE_EVALUATION">Exam Script Re-evaluation</option>
-              <option value="NO_OBJECTION_CERTIFICATE">NOC Certificate Request</option>
-              <option value="LEAVE_APPLICATION">Faculty / Student Leave Sanction</option>
-              <option value="RESEARCH_GRANT">Research Grant / Project Sanction</option>
-              <option value="EVENT_PERMISSION">Event / Guest Seminar Clearance</option>
-              <option value="INFRASTRUCTURE_MAINTENANCE">Maintenance Work Order</option>
-              <option value="GENERAL_ADMINISTRATIVE">General Administrative Proposal</option>
+              {permittedCategories.map(cat => (
+                <option key={cat} value={cat}>
+                  {CATEGORY_LABELS[cat] || cat}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -116,17 +190,11 @@ export const ApprovalRequestModal: React.FC<ApprovalRequestModalProps> = ({
               onChange={e => setTargetOffice(e.target.value as ApprovalOfficeType)}
               required
             >
-              <option value="REGISTRAR">Registrar Office</option>
-              <option value="UNIVERSITY_ADMIN">Vice Chancellor / Admin</option>
-              <option value="IQAC">IQAC Quality Assurance Cell</option>
-              <option value="EXAM_CELL">Examination Controller Office</option>
-              <option value="STUDENT_SECTION">Student Section &amp; Certificates</option>
-              <option value="HOSTEL_ADMIN">Hostel Warden Office</option>
-              <option value="LIBRARY_ADMIN">Library Administration</option>
-              <option value="TRANSPORT_ADMIN">Transport Office</option>
-              <option value="MAINTENANCE_ADMIN">Estate &amp; Maintenance Office</option>
-              <option value="HOD_ACADEMIC">Department HOD Desk</option>
-              <option value="FINANCE_CELL">Finance &amp; Accounts Office</option>
+              {permittedOffices.map(off => (
+                <option key={off} value={off}>
+                  {OFFICE_LABELS[off] || off}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -178,6 +246,31 @@ export const ApprovalRequestModal: React.FC<ApprovalRequestModalProps> = ({
               value={deadlineDate}
               onChange={e => setDeadlineDate(e.target.value)}
               required
+            />
+          </div>
+        </div>
+
+        <div className="grid-2">
+          <div>
+            <label className="form-label" style={{ fontWeight: 700 }}>Financial Estimate / Amount (INR, if applicable)</label>
+            <input
+              type="number"
+              className="form-input"
+              placeholder="e.g. 50000"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              min="0"
+            />
+          </div>
+
+          <div>
+            <label className="form-label" style={{ fontWeight: 700 }}>Financial Budget Summary (Optional)</label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="e.g. Department Fund / Co-sponsored Budget"
+              value={financialEstimateSummary}
+              onChange={e => setFinancialEstimateSummary(e.target.value)}
             />
           </div>
         </div>

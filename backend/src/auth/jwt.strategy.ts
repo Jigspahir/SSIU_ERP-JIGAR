@@ -66,14 +66,32 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     const primaryRole = user.userRoles[0]?.role;
+    const roleCodes = user.userRoles.map((ur) => ur.role?.code).filter(Boolean);
+    if (primaryRole?.code && !roleCodes.includes(primaryRole.code)) {
+      roleCodes.push(primaryRole.code);
+    }
+
+    const firstName = user.faculty?.firstName || user.student?.firstName;
+    const lastName = user.faculty?.lastName || user.student?.lastName;
+    const email = user.faculty?.email || user.student?.email;
+    const departmentId = user.faculty?.departmentId || user.student?.departmentId;
+    const instituteId = user.faculty?.instituteId || user.student?.instituteId;
 
     return {
       id: user.id,
       erpId: user.erpId,
       username: user.username,
+      email,
+      firstName,
+      lastName,
       accountStatus: user.accountStatus,
       role: primaryRole?.code || 'USER',
+      roles: roleCodes.length > 0 ? roleCodes : ['USER'],
       authorityLevel: primaryRole?.authorityLevel || 10,
+      departmentId,
+      instituteId,
+      studentId: user.student?.id,
+      facultyId: user.faculty?.id,
       userRoles: user.userRoles,
       student: user.student,
       faculty: user.faculty,

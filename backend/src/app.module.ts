@@ -49,6 +49,20 @@ import { CommunicationModule } from './communication/communication.module';
 import { StudentServicesModule } from './student-services/student-services.module';
 // Admission & Enrollment Management
 import { AdmissionModule } from './admission/admission.module';
+// Phase 1A: AI Academic Risk Prediction
+import { AcademicRiskModule } from './academic-risk/academic-risk.module';
+// EDP Duty & Academic Inspection Surveillance
+import { EdpModule } from './edp/edp.module';
+// Centralized University Notesheet Engine
+import { NoteSheetModule } from './notesheet/notesheet.module';
+// Phase 6: Centralized Bulk Excel Import System
+import { BulkImportModule } from './bulk-import/bulk-import.module';
+// Student Mentor Assignment & Advisory System
+import { MentorAssignmentModule } from './mentor-assignment/mentor-assignment.module';
+// Student Feedback & Suggestion System
+import { FeedbackModule } from './feedback/feedback.module';
+// Document Master & International Student Documents
+import { DocumentsModule } from './documents/documents.module';
 
 @Module({
   imports: [
@@ -104,6 +118,20 @@ import { AdmissionModule } from './admission/admission.module';
     StudentServicesModule,
     // Admission & Enrollment
     AdmissionModule,
+    // Phase 1A: AI Academic Risk Prediction
+    AcademicRiskModule,
+    // EDP Duty Management
+    EdpModule,
+    // Centralized University Notesheet Engine
+    NoteSheetModule,
+    // Phase 6: Centralized Bulk Excel Import System
+    BulkImportModule,
+    // Student Mentor Assignment & Advisory System
+    MentorAssignmentModule,
+    // Student Feedback & Suggestion System
+    FeedbackModule,
+    // Centralized Document Master & International Documents
+    DocumentsModule,
   ],
 })
 export class AppModule {}

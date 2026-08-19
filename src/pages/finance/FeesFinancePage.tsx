@@ -6,16 +6,34 @@ import { StatCard } from '../../components/common/StatCard';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { FeeReceiptModal } from '../../components/finance/FeeReceiptModal';
 import { DashboardReportModal } from '../../components/reports/DashboardReportModal';
+import { FeeHeadManagementTab } from '../../components/finance/FeeHeadManagementTab';
+import { FeeStructureManagementTab } from '../../components/finance/FeeStructureManagementTab';
+import { FeeAssignmentTab } from '../../components/finance/FeeAssignmentTab';
+import { StudentFeeAccountModal } from '../../components/finance/StudentFeeAccountModal';
+import { FeeInvoiceManagementTab } from '../../components/finance/FeeInvoiceManagementTab';
+import { FeeInvoiceViewModal } from '../../components/finance/FeeInvoiceViewModal';
+import { OnlinePaymentModal } from '../../components/finance/OnlinePaymentModal';
+import { FeeQueryModal } from '../../components/finance/FeeQueryModal';
+import { FeeQueryResolveModal } from '../../components/finance/FeeQueryResolveModal';
+import { feeQueryService } from '../../services/feeQueryService';
+import { FeeQuery } from '../../types/feeQuery';
 import { 
-  FeeStructure, StudentFeeRecord, FeePaymentTransaction, PaymentMode, FeePaymentStatus 
+  FeeStructure, StudentFeeRecord, FeeInvoice, FeePaymentTransaction, PaymentMode, FeePaymentStatus 
 } from '../../types';
 import { 
   IndianRupee, CreditCard, FileText, CheckCircle2, Clock, 
   AlertTriangle, Plus, Search, Download, Printer, Trash2, ShieldAlert,
-  Calendar, RotateCcw, ShieldCheck, Check, RefreshCw
+  Calendar, RotateCcw, ShieldCheck, Check, RefreshCw, Eye,
+  AlertCircle, XCircle, HelpCircle, MessageSquare
 } from 'lucide-react';
+import { exportToExcel } from '../../services/exportService';
 
-export const FeesFinancePage: React.FC = () => {
+interface FeesFinancePageProps {
+  initialStudentTab?: 'MY_FEES' | 'PAYMENT_HISTORY' | 'FEE_QUERIES';
+  initialRecordId?: string;
+}
+
+export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudentTab = 'MY_FEES', initialRecordId }) => {
   const { user, role } = useAuth();
 
   const programs = db.getPrograms();
@@ -26,7 +44,32 @@ export const FeesFinancePage: React.FC = () => {
 
   const financeStats = db.getFinanceOverviewStats();
 
-  const [activeTab, setActiveTab] = useState<'DIRECTORY' | 'STRUCTURES' | 'TRANSACTIONS'>('DIRECTORY');
+  const feeHeads = db.getFeeHeads();
+  const [activeTab, setActiveTab] = useState<'FEE_HEADS' | 'STRUCTURES' | 'ASSIGNMENT' | 'INVOICES' | 'DIRECTORY' | 'TRANSACTIONS' | 'LATE_FEES' | 'FAILED_PAYMENTS' | 'FEE_QUERIES'>('FEE_HEADS');
+  const [studentTab, setStudentTab] = useState<'MY_FEES' | 'PAYMENT_HISTORY' | 'FEE_QUERIES'>(initialStudentTab);
+
+  React.useEffect(() => {
+    if (initialStudentTab) {
+      setStudentTab(initialStudentTab);
+    }
+  }, [initialStudentTab]);
+
+  React.useEffect(() => {
+    if (initialRecordId) {
+      const matchFee = feeRecords.find(f => f.id === initialRecordId || f.studentId === initialRecordId || f.enrollmentNo === initialRecordId);
+      if (matchFee) {
+        setViewingFeeRecord(matchFee);
+      }
+    }
+  }, [initialRecordId, feeRecords]);
+  const [isFeeQueryModalOpen, setIsFeeQueryModalOpen] = useState(false);
+  const [resolvingFeeQuery, setResolvingFeeQuery] = useState<FeeQuery | null>(null);
+  const [feeQueryFilterCategory, setFeeQueryFilterCategory] = useState('ALL');
+  const [feeQueryFilterStatus, setFeeQueryFilterStatus] = useState('ALL');
+  const [feeQuerySearch, setFeeQuerySearch] = useState('');
+  const [viewingFeeRecord, setViewingFeeRecord] = useState<StudentFeeRecord | null>(null);
+  const [viewingStudentInvoice, setViewingStudentInvoice] = useState<FeeInvoice | null>(null);
+  const [payingInvoice, setPayingInvoice] = useState<FeeInvoice | null>(null);
 
   // Filters State for Admin Directory
   const [selectedProgFilter, setSelectedProgFilter] = useState('ALL');
@@ -218,7 +261,13 @@ export const FeesFinancePage: React.FC = () => {
     e.preventDefault();
     const total = Number(structTuition) + Number(structLab) + Number(structDev) + Number(structHostel) + Number(structExam);
 
+    const progObj = programs.find(p => p.id === structProgId);
+    const semObj = semesters.find(s => s.id === structSemId);
+
     db.addEntity<FeeStructure>('feeStructures', {
+      structureCode: `FS-${progObj?.code || 'PRG'}-${semObj?.code || 'SEM'}-2026-V1`,
+      name: `${progObj?.name || 'Program'} ${semObj?.code || 'Semester'} Fee`,
+      academicYearCode: '2026-27',
       programId: structProgId,
       semesterId: structSemId,
       academicYearId: 'ay-2024',
@@ -263,19 +312,28 @@ export const FeesFinancePage: React.FC = () => {
   };
 
   const handleExportCSVReport = () => {
-    let csv = 'Receipt No,Student Name,Enrollment No,Date,Payment Mode,Transaction Ref,Amount,Status\n';
-    paymentTransactions.forEach(t => {
-      csv += `"${t.receiptNo}","${t.studentName}","${t.enrollmentNo}","${t.paymentDate}","${t.paymentMode}","${t.transactionId}",${t.paidAmount},"${t.status || 'SUCCESS'}"\n`;
-    });
+    const headers = ['Receipt No', 'Student Name', 'Enrollment No', 'Date', 'Payment Mode', 'Transaction Ref', 'Amount (₹)', 'Status'];
+    const rows = paymentTransactions.map(t => [
+      t.receiptNo,
+      t.studentName,
+      t.enrollmentNo,
+      t.paymentDate,
+      t.paymentMode,
+      t.transactionId,
+      t.paidAmount,
+      t.status || 'SUCCESS'
+    ]);
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Fee_Transactions_Report_${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    exportToExcel(
+      `Fee_Transactions_Report_${new Date().toISOString().split('T')[0]}`,
+      headers,
+      rows,
+      { departmentName: 'Accounts & Finance Department' },
+      {
+        name: user?.name || 'Accounts Head',
+        role: (role as any) || 'SUPER_ADMIN'
+      }
+    );
   };
 
   const getStatusBadge = (status: FeePaymentStatus) => {
@@ -310,216 +368,512 @@ export const FeesFinancePage: React.FC = () => {
 
     const paidPct = studentFee ? Math.round((studentFee.paidAmount / Math.max(1, studentFee.totalAmount)) * 100) : 0;
     const { daysOverdue, lateFee } = getLateFeeCalculation(studentFee);
+    const studentQueries = feeQueryService.getScopedQueries(user, role);
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+        {/* Student Portal Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
-              Student Fee Payment Portal
+            <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <IndianRupee size={28} style={{ color: 'var(--brand-orange)' }} />
+              Student Fees, Payment &amp; Accounts Portal
             </h2>
             <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-              Semester-wise fee breakdown, online payment gateway, and official downloadable receipts
+              Semester-wise fee breakdown, online payment gateway, verified downloadable receipts, and direct Accounts fee query desk
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button 
-              className="btn btn-primary"
-              onClick={() => handleOpenStudentOnlinePayment(studentFee, 'SEMESTER')}
-            >
-              <CreditCard size={16} /> Pay Semester Fees Online
-            </button>
-            <button 
-              className="btn btn-navy"
-              onClick={() => handleOpenStudentOnlinePayment(studentFee, 'EXAM')}
-            >
-              <IndianRupee size={16} /> Pay Exam Fee (₹1,200)
-            </button>
-          </div>
-        </div>
-
-        {/* Semester Selection Filter */}
-        <div className="card" style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
-            Select Academic Semester:
-          </span>
+          {/* Subtabs for Student */}
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {semesters.map(s => (
-              <button
-                key={s.id}
-                className={`btn btn-sm ${studentSelectedSem === s.id ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setStudentSelectedSem(s.id)}
-              >
-                {s.code} (Sem {s.number})
-              </button>
-            ))}
+            <button 
+              className={`btn ${studentTab === 'MY_FEES' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setStudentTab('MY_FEES')}
+            >
+              <FileText size={16} /> My Fees &amp; Demands
+            </button>
+            <button 
+              className={`btn ${studentTab === 'PAYMENT_HISTORY' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setStudentTab('PAYMENT_HISTORY')}
+            >
+              <Clock size={16} /> Payment History &amp; Receipts ({studentTxs.length})
+            </button>
+            <button 
+              className={`btn ${studentTab === 'FEE_QUERIES' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setStudentTab('FEE_QUERIES')}
+            >
+              <HelpCircle size={16} /> Fee Queries ({studentQueries.length})
+            </button>
           </div>
         </div>
 
-        {/* Student KPI Cards */}
-        <div className="grid-4">
-          <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid var(--brand-navy)' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>TOTAL FEE DEMAND</div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--brand-navy)', marginTop: '0.25rem' }}>
-              ₹{studentFee?.totalAmount.toLocaleString()}
-            </div>
-            <div style={{ fontSize: '0.78125rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Semester 4 Demand</div>
-          </div>
-
-          <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid #10B981' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>PAID SETTLED AMOUNT</div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 900, color: '#10B981', marginTop: '0.25rem' }}>
-              ₹{studentFee?.paidAmount.toLocaleString()}
-            </div>
-            <div style={{ fontSize: '0.78125rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Verified Gateway Receipts</div>
-          </div>
-
-          <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid var(--brand-orange)' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>PENDING BALANCE</div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 900, color: 'var(--brand-orange)', marginTop: '0.25rem' }}>
-              ₹{studentFee?.pendingAmount.toLocaleString()}
-            </div>
-            <div style={{ fontSize: '0.78125rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Due Date: {studentFee?.dueDate}</div>
-          </div>
-
-          <div className="card" style={{ padding: '1.5rem', borderLeft: '4px solid #8B5CF6' }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>STATUS &amp; LATE FEE</div>
-            <div style={{ marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              {getStatusBadge(studentFee?.status || 'PENDING')}
-              {lateFee > 0 && <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#EF4444' }}>+₹{lateFee} Late</span>}
-            </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
-              {daysOverdue > 0 ? `${daysOverdue} Days Overdue (₹50/day)` : 'No Late Penalties'}
-            </div>
-          </div>
-        </div>
-
-        {/* Fee Component Breakdown & Online Payment Quick Control */}
-        <div className="grid-2">
-          <div className="card" style={{ padding: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <FileText size={18} color="var(--brand-orange)" /> Semester Fee Components Breakdown
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Tuition Fee:</span>
-                <strong>₹{studentFee?.tuitionFee.toLocaleString()}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Lab &amp; Computing Fee:</span>
-                <strong>₹{studentFee?.labFee.toLocaleString()}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Campus Development Fee:</span>
-                <strong>₹{studentFee?.developmentFee.toLocaleString()}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Hostel &amp; Mess Deposit:</span>
-                <strong>₹{(studentFee?.hostelFee || 0).toLocaleString()}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Mid-Sem Exam Registration Fee:</span>
-                <strong>₹{(studentFee?.examFee || 1200).toLocaleString()}</strong>
-              </div>
-              {lateFee > 0 && (
-                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-light)', paddingBottom: '0.5rem', color: '#EF4444' }}>
-                  <span>Late Fee Penalty ({daysOverdue} Days Overdue):</span>
-                  <strong>+₹{lateFee.toLocaleString()}</strong>
+        {/* ────────────────────────────────────────────────────────────────────────── */}
+        {/* SUBTAB 1: MY FEES */}
+        {/* ────────────────────────────────────────────────────────────────────────── */}
+        {studentTab === 'MY_FEES' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            
+            {/* Action Bar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+              {/* Semester Selection Filter */}
+              <div className="card" style={{ padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', margin: 0, flex: 1 }}>
+                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
+                  Select Academic Semester:
+                </span>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {semesters.map(s => (
+                    <button
+                      key={s.id}
+                      className={`btn btn-sm ${studentSelectedSem === s.id ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setStudentSelectedSem(s.id)}
+                    >
+                      {s.code} (Sem {s.number})
+                    </button>
+                  ))}
                 </div>
-              )}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, fontSize: '1.05rem', color: 'var(--brand-navy)', paddingTop: '0.25rem' }}>
-                <span>TOTAL DEMAND DUE:</span>
-                <span>₹{(studentFee?.totalAmount || 0) + lateFee}</span>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button 
+                  className="btn btn-primary"
+                  onClick={() => handleOpenStudentOnlinePayment(studentFee, 'SEMESTER')}
+                >
+                  <CreditCard size={16} /> Pay Semester Fees (₹{studentFee?.pendingAmount.toLocaleString()})
+                </button>
+                <button 
+                  className="btn btn-navy"
+                  onClick={() => handleOpenStudentOnlinePayment(studentFee, 'EXAM')}
+                >
+                  <IndianRupee size={16} /> Pay Exam Fee (₹1,200)
+                </button>
               </div>
             </div>
-          </div>
 
-          <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <ShieldCheck size={18} color="#10B981" /> Payment Status &amp; Progress
+            {/* Student KPI Cards */}
+            <div className="grid-5" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+              <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--brand-navy)' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>TOTAL FEES</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--brand-navy)', marginTop: '0.25rem' }}>
+                  ₹{studentFee?.totalAmount.toLocaleString()}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Assigned Semester Base</div>
+              </div>
+
+              <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #10B981' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>PAID SETTLED</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#10B981', marginTop: '0.25rem' }}>
+                  ₹{studentFee?.paidAmount.toLocaleString()}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Gateway Verified</div>
+              </div>
+
+              <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--brand-orange)' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>PENDING DUE</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--brand-orange)', marginTop: '0.25rem' }}>
+                  ₹{studentFee?.pendingAmount.toLocaleString()}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Due: {studentFee?.dueDate}</div>
+              </div>
+
+              <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #EF4444' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>OVERDUE LATE FEE</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: lateFee > 0 ? '#EF4444' : 'var(--brand-navy)', marginTop: '0.25rem' }}>
+                  {lateFee > 0 ? `+₹${lateFee.toLocaleString()}` : '₹0'}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                  {daysOverdue > 0 ? `${daysOverdue} Days Overdue` : 'No Penalties'}
+                </div>
+              </div>
+
+              <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #8B5CF6' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>TOTAL PAYABLE NOW</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#8B5CF6', marginTop: '0.25rem' }}>
+                  ₹{(studentFee ? studentFee.pendingAmount + lateFee : 0).toLocaleString()}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Calculated by Backend</div>
+              </div>
+            </div>
+
+            {/* Fee-Wise Breakdown Table as Required by Section 1 */}
+            <div className="card" style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <FileText size={18} color="var(--brand-orange)" /> Itemized Semester Fee Heads &amp; Breakdown
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Academic Year: <strong>2026-27</strong> • Semester: <strong>Semester 4</strong>
+                </span>
+              </div>
+
+              <div className="table-responsive">
+                <table className="table" style={{ fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr>
+                      <th>Fee Head</th>
+                      <th>Academic Year</th>
+                      <th>Semester</th>
+                      <th style={{ textAlign: 'right' }}>Original Amount</th>
+                      <th style={{ textAlign: 'right' }}>Concession</th>
+                      <th style={{ textAlign: 'right' }}>Late Fee</th>
+                      <th style={{ textAlign: 'right' }}>Total Payable</th>
+                      <th style={{ textAlign: 'right' }}>Paid Amount</th>
+                      <th style={{ textAlign: 'right' }}>Pending Amount</th>
+                      <th>Due Date</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>Tuition Fee</strong></td>
+                      <td>2026-27</td>
+                      <td>Sem 4</td>
+                      <td style={{ textAlign: 'right' }}>₹{studentFee?.tuitionFee.toLocaleString()}</td>
+                      <td style={{ textAlign: 'right', color: '#10B981' }}>-₹0</td>
+                      <td style={{ textAlign: 'right', color: lateFee > 0 ? '#EF4444' : 'inherit' }}>+₹{lateFee > 0 ? Math.round(lateFee * 0.6) : 0}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{(studentFee?.tuitionFee || 0) + (lateFee > 0 ? Math.round(lateFee * 0.6) : 0)}</td>
+                      <td style={{ textAlign: 'right', color: '#10B981', fontWeight: 600 }}>₹{Math.min(studentFee?.paidAmount || 0, studentFee?.tuitionFee || 0).toLocaleString()}</td>
+                      <td style={{ textAlign: 'right', color: 'var(--brand-orange)', fontWeight: 700 }}>₹{Math.max(0, (studentFee?.tuitionFee || 0) - (studentFee?.paidAmount || 0))}</td>
+                      <td>{studentFee?.dueDate}</td>
+                      <td><Badge variant={studentFee?.paidAmount && studentFee.paidAmount >= (studentFee?.tuitionFee || 0) ? 'success' : 'gold'}>{studentFee?.paidAmount && studentFee.paidAmount >= (studentFee?.tuitionFee || 0) ? 'PAID' : 'PARTIALLY_PAID'}</Badge></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Lab &amp; Computing Infrastructure Fee</strong></td>
+                      <td>2026-27</td>
+                      <td>Sem 4</td>
+                      <td style={{ textAlign: 'right' }}>₹{studentFee?.labFee.toLocaleString()}</td>
+                      <td style={{ textAlign: 'right', color: '#10B981' }}>-₹0</td>
+                      <td style={{ textAlign: 'right', color: lateFee > 0 ? '#EF4444' : 'inherit' }}>+₹{lateFee > 0 ? Math.round(lateFee * 0.2) : 0}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{(studentFee?.labFee || 0) + (lateFee > 0 ? Math.round(lateFee * 0.2) : 0)}</td>
+                      <td style={{ textAlign: 'right', color: '#10B981', fontWeight: 600 }}>₹{studentFee?.status === 'PAID' ? studentFee.labFee : 0}</td>
+                      <td style={{ textAlign: 'right', color: 'var(--brand-orange)', fontWeight: 700 }}>₹{studentFee?.status === 'PAID' ? 0 : studentFee?.labFee}</td>
+                      <td>{studentFee?.dueDate}</td>
+                      <td><Badge variant={studentFee?.status === 'PAID' ? 'success' : 'gold'}>{studentFee?.status === 'PAID' ? 'PAID' : 'PENDING'}</Badge></td>
+                    </tr>
+                    <tr>
+                      <td><strong>Campus Development Fee</strong></td>
+                      <td>2026-27</td>
+                      <td>Sem 4</td>
+                      <td style={{ textAlign: 'right' }}>₹{studentFee?.developmentFee.toLocaleString()}</td>
+                      <td style={{ textAlign: 'right', color: '#10B981' }}>-₹0</td>
+                      <td style={{ textAlign: 'right', color: lateFee > 0 ? '#EF4444' : 'inherit' }}>+₹{lateFee > 0 ? Math.round(lateFee * 0.2) : 0}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{(studentFee?.developmentFee || 0) + (lateFee > 0 ? Math.round(lateFee * 0.2) : 0)}</td>
+                      <td style={{ textAlign: 'right', color: '#10B981', fontWeight: 600 }}>₹{studentFee?.status === 'PAID' ? studentFee.developmentFee : 0}</td>
+                      <td style={{ textAlign: 'right', color: 'var(--brand-orange)', fontWeight: 700 }}>₹{studentFee?.status === 'PAID' ? 0 : studentFee?.developmentFee}</td>
+                      <td>{studentFee?.dueDate}</td>
+                      <td><Badge variant={studentFee?.status === 'PAID' ? 'success' : 'gold'}>{studentFee?.status === 'PAID' ? 'PAID' : 'PENDING'}</Badge></td>
+                    </tr>
+                    {studentFee?.hostelFee && studentFee.hostelFee > 0 ? (
+                      <tr>
+                        <td><strong>Hostel &amp; Dining Fee</strong></td>
+                        <td>2026-27</td>
+                        <td>Sem 4</td>
+                        <td style={{ textAlign: 'right' }}>₹{studentFee.hostelFee.toLocaleString()}</td>
+                        <td style={{ textAlign: 'right', color: '#10B981' }}>-₹0</td>
+                        <td style={{ textAlign: 'right' }}>+₹0</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{studentFee.hostelFee.toLocaleString()}</td>
+                        <td style={{ textAlign: 'right', color: '#10B981', fontWeight: 600 }}>₹{studentFee.hostelFee.toLocaleString()}</td>
+                        <td style={{ textAlign: 'right', color: 'var(--brand-orange)', fontWeight: 700 }}>₹0</td>
+                        <td>{studentFee.dueDate}</td>
+                        <td><Badge variant="success">PAID</Badge></td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ backgroundColor: '#F8FAFC', fontWeight: 800, borderTop: '2px solid var(--border-color)' }}>
+                      <td colSpan={3}>TOTAL SUMMARY DEMAND</td>
+                      <td style={{ textAlign: 'right' }}>₹{studentFee?.totalAmount.toLocaleString()}</td>
+                      <td style={{ textAlign: 'right', color: '#10B981' }}>-₹0</td>
+                      <td style={{ textAlign: 'right', color: lateFee > 0 ? '#EF4444' : 'inherit' }}>+₹{lateFee.toLocaleString()}</td>
+                      <td style={{ textAlign: 'right', color: '#8B5CF6' }}>₹{(studentFee ? studentFee.totalAmount + lateFee : 0).toLocaleString()}</td>
+                      <td style={{ textAlign: 'right', color: '#10B981' }}>₹{studentFee?.paidAmount.toLocaleString()}</td>
+                      <td style={{ textAlign: 'right', color: 'var(--brand-orange)' }}>₹{(studentFee ? studentFee.pendingAmount + lateFee : 0).toLocaleString()}</td>
+                      <td>{studentFee?.dueDate}</td>
+                      <td>{getStatusBadge(studentFee?.status || 'PENDING')}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            {/* Official Fee Invoices & Demand Notices */}
+            <div className="card" style={{ padding: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <FileText size={18} color="var(--brand-orange)" /> My Official Fee Invoices &amp; Demand Notices
               </h3>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-                <span>Fee Settlement Ratio</span>
-                <span style={{ color: 'var(--brand-orange)' }}>{paidPct}%</span>
+              <div className="table-responsive">
+                <table className="table" style={{ fontSize: '0.825rem' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc' }}>
+                      <th style={{ padding: '0.75rem' }}>Invoice Number</th>
+                      <th style={{ padding: '0.75rem' }}>Invoice Date</th>
+                      <th style={{ padding: '0.75rem' }}>Due Date</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'right' }}>Invoiced Amount</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center' }}>Status</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center' }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {db.getFeeInvoicesByStudentId(studentId).length === 0 ? (
+                      <tr>
+                        <td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                          No official fee demand notices issued for your account yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      db.getFeeInvoicesByStudentId(studentId).map(inv => {
+                        const lateFeeInfo = db.getInvoiceLateFeeInfo(inv.id);
+                        return (
+                          <tr key={inv.id} style={{ background: lateFeeInfo.isOverdue ? '#fff9f9' : undefined }}>
+                            <td style={{ padding: '0.75rem', fontFamily: 'monospace', fontWeight: 800, color: '#1e40af' }}>
+                              {inv.invoiceNumber}
+                              {lateFeeInfo.isOverdue && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem' }}>
+                                  <AlertCircle size={12} color="#ef4444" />
+                                  <span style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 600 }}>{lateFeeInfo.overdueDays} days overdue</span>
+                                </div>
+                              )}
+                            </td>
+                            <td style={{ padding: '0.75rem' }}>{inv.invoiceDate}</td>
+                            <td style={{ padding: '0.75rem', fontWeight: 700, color: lateFeeInfo.isOverdue ? '#ef4444' : '#b91c1c' }}>{inv.dueDate}</td>
+                            <td style={{ padding: '0.75rem', textAlign: 'right', fontFamily: 'monospace', fontWeight: 800 }}>
+                              ₹{Number(inv.totalAmount).toLocaleString('en-IN')}
+                              {lateFeeInfo.lateFeeAmount > 0 && (
+                                <div style={{ fontSize: '0.7rem', color: '#ef4444', marginTop: '0.2rem' }}>+₹{lateFeeInfo.lateFeeAmount.toLocaleString()} late fee</div>
+                              )}
+                            </td>
+                            <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                              <Badge variant={inv.status === 'ISSUED' ? 'success' : inv.status === 'CANCELLED' ? 'danger' : inv.status === 'OVERDUE' ? 'danger' : 'gold'}>
+                                {inv.status}
+                              </Badge>
+                            </td>
+                            <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                              <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+                                <button
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => setViewingStudentInvoice(inv)}
+                                >
+                                  <Eye size={13} /> View
+                                </button>
+                                {(inv.status === 'ISSUED' || inv.status === 'PARTIALLY_PAID' || inv.status === 'OVERDUE') && (
+                                  <button
+                                    className="btn btn-primary btn-sm"
+                                    onClick={() => setPayingInvoice(inv)}
+                                  >
+                                    <CreditCard size={13} /> {lateFeeInfo.isOverdue ? 'Pay + Late Fee' : 'Pay Now'}
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
               </div>
-              <div style={{ height: '14px', borderRadius: '7px', backgroundColor: 'var(--border-light)', overflow: 'hidden', marginBottom: '1.25rem' }}>
-                <div style={{ width: `${paidPct}%`, height: '100%', backgroundColor: paidPct === 100 ? '#10B981' : 'var(--brand-orange)', transition: 'width 0.3s ease' }} />
-              </div>
+            </div>
+          </div>
+        )}
 
-              <div style={{ background: 'var(--bg-surface-hover)', padding: '0.85rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', fontSize: '0.8125rem', lineHeight: 1.5, marginBottom: '1rem' }}>
-                <div style={{ fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '0.2rem' }}>
-                  🔒 Secure University Payment Gateway
-                </div>
-                Payments made online generate instant computerized GST-compliant receipts verified by Swarrnim Accounts Office.
+        {/* ────────────────────────────────────────────────────────────────────────── */}
+        {/* SUBTAB 2: PAYMENT HISTORY & RECEIPTS */}
+        {/* ────────────────────────────────────────────────────────────────────────── */}
+        {studentTab === 'PAYMENT_HISTORY' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="card" style={{ padding: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '1.25rem' }}>
+                Complete Payment Transaction History &amp; Official Receipts
+              </h3>
+
+              <div className="table-responsive">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Receipt No</th>
+                      <th>Payment Date</th>
+                      <th>Type</th>
+                      <th>Payment Mode</th>
+                      <th>Gateway Ref</th>
+                      <th>Amount Paid</th>
+                      <th>Status</th>
+                      <th>Receipt Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {studentTxs.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                          No payment transactions recorded for your account yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      studentTxs.map(tx => (
+                        <tr key={tx.id}>
+                          <td><code style={{ fontWeight: 700, color: 'var(--brand-orange)' }}>{tx.receiptNo}</code></td>
+                          <td>{tx.paymentDate}</td>
+                          <td><Badge variant="navy">{tx.feeType || 'TUITION'}</Badge></td>
+                          <td><Badge variant="orange">{tx.paymentMode}</Badge></td>
+                          <td><code>{tx.transactionId}</code></td>
+                          <td style={{ fontWeight: 800, color: tx.status === 'REFUNDED' ? '#EF4444' : '#10B981' }}>
+                            ₹{tx.paidAmount.toLocaleString()}
+                          </td>
+                          <td>
+                            <Badge variant={tx.status === 'SUCCESS' || !tx.status ? 'active' : tx.status === 'REFUNDED' ? 'inactive' : 'danger'}>
+                              {tx.status || 'SUCCESS'}
+                            </Badge>
+                          </td>
+                          <td>
+                            <button className="btn btn-sm btn-secondary" onClick={() => setSelectedTransactionForReceipt(tx)}>
+                              <FileText size={14} /> View Receipt
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => handleOpenStudentOnlinePayment(studentFee, 'SEMESTER')}>
-                <CreditCard size={16} /> Pay Pending Balance (₹{studentFee?.pendingAmount.toLocaleString()})
+            {/* Failed Payment History (Student View) */}
+            {(() => {
+              const failedTxs = db.getFailedPayments(studentId);
+              if (failedTxs.length === 0) return null;
+              return (
+                <div className="card" style={{ padding: '1.5rem', border: '1.5px solid #fecaca' }}>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#b91c1c', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <XCircle size={18} color="#ef4444" /> Failed Payment Attempts
+                  </h3>
+                  <div style={{ background: '#fff9f9', border: '1px solid #fecaca', borderRadius: '8px', padding: '0.85rem 1rem', marginBottom: '1rem', fontSize: '0.8125rem', lineHeight: 1.6 }}>
+                    <strong>Note:</strong> These payments were <strong>not processed</strong>. Your fee account balance and invoice status are unchanged. You can safely retry payment.
+                  </div>
+                  <div className="table-responsive">
+                    <table className="table" style={{ fontSize: '0.8125rem' }}>
+                      <thead>
+                        <tr>
+                          <th>Transaction No.</th>
+                          <th>Date</th>
+                          <th>Amount</th>
+                          <th>Failure Reason</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {failedTxs.map(tx => (
+                          <tr key={tx.id}>
+                            <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{tx.transactionNo}</td>
+                            <td>{tx.paymentDate}</td>
+                            <td style={{ fontWeight: 800, color: '#ef4444' }}>₹{Number(tx.paidAmount).toLocaleString('en-IN')}</td>
+                            <td>
+                              <div style={{ color: '#92400e', background: '#fef3c7', padding: '0.2rem 0.6rem', borderRadius: '4px', display: 'inline-block', fontSize: '0.75rem' }}>
+                                {db.getFriendlyFailureReason(tx.failureReason)}
+                              </div>
+                            </td>
+                            <td>
+                              <button
+                                className="btn btn-primary btn-sm"
+                                onClick={() => {
+                                  const invForRetry = db.getFeeInvoices().find((i: any) => i.id === tx.invoiceId);
+                                  if (invForRetry) setPayingInvoice(invForRetry);
+                                }}
+                              >
+                                <RefreshCw size={13} /> Retry Payment
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* ────────────────────────────────────────────────────────────────────────── */}
+        {/* SUBTAB 3: FEE QUERIES (Accounts Directorate) */}
+        {/* ────────────────────────────────────────────────────────────────────────── */}
+        {studentTab === 'FEE_QUERIES' && (
+          <div className="card" style={{ padding: '1.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', margin: 0 }}>
+                  Accounts &amp; Fee Inquiry Desk
+                </h3>
+                <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', margin: '0.2rem 0 0 0' }}>
+                  Direct communication with the University Accounts Directorate for fee concessions, missing payments, and refund disputes
+                </p>
+              </div>
+
+              <button className="btn btn-primary" onClick={() => setIsFeeQueryModalOpen(true)}>
+                <Plus size={16} /> Submit New Fee Query
               </button>
             </div>
-          </div>
-        </div>
 
-        {/* Transaction History & Receipt Action */}
-        <div className="card" style={{ padding: '1.5rem' }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '1.25rem' }}>
-            Complete Payment Transaction History &amp; Official Receipts
-          </h3>
-
-          <div className="table-responsive">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Receipt No</th>
-                  <th>Payment Date</th>
-                  <th>Type</th>
-                  <th>Payment Mode</th>
-                  <th>Gateway Ref</th>
-                  <th>Amount Paid</th>
-                  <th>Status</th>
-                  <th>Receipt Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {studentTxs.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
-                      No payment transactions recorded for your account yet.
-                    </td>
-                  </tr>
-                ) : (
-                  studentTxs.map(tx => (
-                    <tr key={tx.id}>
-                      <td><code style={{ fontWeight: 700, color: 'var(--brand-orange)' }}>{tx.receiptNo}</code></td>
-                      <td>{tx.paymentDate}</td>
-                      <td><Badge variant="navy">{tx.feeType || 'TUITION'}</Badge></td>
-                      <td><Badge variant="orange">{tx.paymentMode}</Badge></td>
-                      <td><code>{tx.transactionId}</code></td>
-                      <td style={{ fontWeight: 800, color: tx.status === 'REFUNDED' ? '#EF4444' : '#10B981' }}>
-                        ₹{tx.paidAmount.toLocaleString()}
-                      </td>
-                      <td>
-                        <Badge variant={tx.status === 'SUCCESS' || !tx.status ? 'active' : tx.status === 'REFUNDED' ? 'inactive' : 'danger'}>
-                          {tx.status || 'SUCCESS'}
-                        </Badge>
-                      </td>
-                      <td>
-                        <button className="btn btn-primary btn-sm" onClick={() => setSelectedTransactionForReceipt(tx)}>
-                          <FileText size={14} /> Download Receipt
-                        </button>
-                      </td>
+            {studentQueries.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+                <HelpCircle size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
+                <p style={{ fontSize: '1rem', fontWeight: 600 }}>No fee queries submitted.</p>
+                <p style={{ fontSize: '0.85rem' }}>If you have any discrepancy regarding fee amounts, late fees, or online payments, click Submit New Fee Query.</p>
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table" style={{ fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr>
+                      <th>Query ID</th>
+                      <th>Category</th>
+                      <th>Subject</th>
+                      <th>Priority</th>
+                      <th>Date</th>
+                      <th>Status</th>
+                      <th>Accounts Resolution</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {studentQueries.map(q => (
+                      <tr key={q.id}>
+                        <td style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{q.queryNo}</td>
+                        <td><Badge variant="navy">{q.category.replace(/_/g, ' ')}</Badge></td>
+                        <td>
+                          <strong>{q.subject}</strong>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {q.description}
+                          </div>
+                        </td>
+                        <td>
+                          <Badge variant={q.priority === 'URGENT' ? 'danger' : q.priority === 'HIGH' ? 'warning' : 'navy'}>
+                            {q.priority}
+                          </Badge>
+                        </td>
+                        <td>{new Date(q.createdAt).toLocaleDateString()}</td>
+                        <td>
+                          <Badge variant={q.status === 'RESOLVED' ? 'success' : q.status === 'UNDER_REVIEW' ? 'active' : q.status === 'REJECTED' ? 'danger' : 'gold'}>
+                            {q.status.replace(/_/g, ' ')}
+                          </Badge>
+                        </td>
+                        <td>
+                          {q.resolutionSummary ? (
+                            <div style={{ fontSize: '0.8rem', color: 'var(--brand-green)', fontWeight: 600 }}>
+                              {q.resolutionSummary}
+                              {q.assignedAccountsHandlerName && (
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>By: {q.assignedAccountsHandlerName}</div>
+                              )}
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Assigned to Accounts Directorate</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
         {/* Student Online Payment Modal */}
         {isOnlinePaymentModalOpen && selectedRecordForPayment && (
@@ -588,39 +942,24 @@ export const FeesFinancePage: React.FC = () => {
 
                     {onlinePayMode === 'Online UPI' && (
                       <div className="form-group">
-                        <label className="form-label">Virtual Payment Address (VPA / UPI ID) *</label>
-                        <input type="text" className="form-input" value={upiId} onChange={e => setUpiId(e.target.value)} placeholder="username@upi" required />
+                        <label className="form-label">UPI ID *</label>
+                        <input 
+                          type="text" 
+                          className="form-input" 
+                          value={upiId} 
+                          onChange={e => setUpiId(e.target.value)} 
+                          placeholder="e.g. name@okhdfcbank" 
+                          required 
+                        />
                       </div>
                     )}
-
-                    {onlinePayMode === 'Credit/Debit Card' && (
-                      <div className="form-group">
-                        <label className="form-label">Card Number &amp; Expiry *</label>
-                        <input type="text" className="form-input" value={cardNumber} onChange={e => setCardNumber(e.target.value)} required />
-                      </div>
-                    )}
-
-                    {onlinePayMode === 'Net Banking' && (
-                      <div className="form-group">
-                        <label className="form-label">Select Banking Partner *</label>
-                        <select className="form-select" value={bankName} onChange={e => setBankName(e.target.value)}>
-                          <option value="HDFC Bank">HDFC Bank NetBanking</option>
-                          <option value="State Bank of India">State Bank of India (SBI)</option>
-                          <option value="ICICI Bank">ICICI Bank Internet Banking</option>
-                          <option value="Axis Bank">Axis Bank NetBanking</option>
-                        </select>
-                      </div>
-                    )}
-
-                    <div style={{ background: 'var(--bg-surface-hover)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <ShieldCheck size={16} color="#10B981" />
-                      <span>Zero transaction surcharge applied. Receipt auto-generated on completion.</span>
-                    </div>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                      <button type="button" className="btn btn-secondary" onClick={() => setIsOnlinePaymentModalOpen(false)}>Cancel</button>
+                      <button type="button" className="btn btn-secondary" onClick={() => setIsOnlinePaymentModalOpen(false)}>
+                        Cancel
+                      </button>
                       <button type="submit" className="btn btn-primary">
-                        Proceed to Pay ₹{onlinePayAmount.toLocaleString()}
+                        Pay ₹{onlinePayAmount.toLocaleString()} Now
                       </button>
                     </div>
                   </form>
@@ -661,6 +1000,17 @@ export const FeesFinancePage: React.FC = () => {
           transaction={selectedTransactionForReceipt}
           feeRecord={studentFee}
         />
+
+        {/* Student Fee Query Modal */}
+        {isFeeQueryModalOpen && (
+          <FeeQueryModal
+            isOpen={isFeeQueryModalOpen}
+            onClose={() => setIsFeeQueryModalOpen(false)}
+            onSuccess={() => {
+              setIsFeeQueryModalOpen(false);
+            }}
+          />
+        )}
       </div>
     );
   }
@@ -725,12 +1075,12 @@ export const FeesFinancePage: React.FC = () => {
       </div>
 
       {/* Sub-Navigation Tabs */}
-      <div className="card" style={{ padding: '0.75rem 1rem', display: 'flex', gap: '0.5rem' }}>
+      <div className="card" style={{ padding: '0.75rem 1rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
         <button
-          className={`btn btn-sm ${activeTab === 'DIRECTORY' ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => setActiveTab('DIRECTORY')}
+          className={`btn btn-sm ${activeTab === 'FEE_HEADS' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('FEE_HEADS')}
         >
-          Student Fee Directory ({feeRecords.length})
+          Fee Head Master ({feeHeads.length})
         </button>
         <button
           className={`btn btn-sm ${activeTab === 'STRUCTURES' ? 'btn-primary' : 'btn-secondary'}`}
@@ -739,12 +1089,57 @@ export const FeesFinancePage: React.FC = () => {
           Fee Structures ({feeStructures.length})
         </button>
         <button
+          className={`btn btn-sm ${activeTab === 'ASSIGNMENT' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('ASSIGNMENT')}
+        >
+          Fee Assignment
+        </button>
+        <button
+          className={`btn btn-sm ${activeTab === 'INVOICES' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('INVOICES')}
+        >
+          Fee Invoices
+        </button>
+        <button
+          className={`btn btn-sm ${activeTab === 'DIRECTORY' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('DIRECTORY')}
+        >
+          Student Fee Directory ({feeRecords.length})
+        </button>
+        <button
           className={`btn btn-sm ${activeTab === 'TRANSACTIONS' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveTab('TRANSACTIONS')}
         >
           Payment Transactions ({paymentTransactions.length})
         </button>
+        <button
+          className={`btn btn-sm ${activeTab === 'LATE_FEES' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('LATE_FEES')}
+          style={{ borderColor: '#f87171' }}
+        >
+          <AlertTriangle size={13} style={{ marginRight: '0.25rem', verticalAlign: 'text-bottom' }} />
+          Overdue & Late Fees
+        </button>
+        <button
+          className={`btn btn-sm ${activeTab === 'FAILED_PAYMENTS' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('FAILED_PAYMENTS')}
+          style={{ borderColor: '#fbbf24' }}
+        >
+          <XCircle size={13} style={{ marginRight: '0.25rem', verticalAlign: 'text-bottom' }} />
+          Failed Payments
+        </button>
+        <button
+          className={`btn btn-sm ${activeTab === 'FEE_QUERIES' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('FEE_QUERIES')}
+          style={{ borderColor: 'var(--brand-orange)' }}
+        >
+          <HelpCircle size={13} style={{ marginRight: '0.25rem', verticalAlign: 'text-bottom' }} />
+          Fee Queries ({db.getFeeQueries().length})
+        </button>
       </div>
+
+      {/* Sub-Tab 0: Fee Head Master */}
+      {activeTab === 'FEE_HEADS' && <FeeHeadManagementTab />}
 
       {/* Sub-Tab 1: Student Fee Directory */}
       {activeTab === 'DIRECTORY' && (
@@ -826,6 +1221,9 @@ export const FeesFinancePage: React.FC = () => {
                         <td>{getStatusBadge(rec.status)}</td>
                         <td>
                           <div style={{ display: 'flex', gap: '0.4rem' }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setViewingFeeRecord(rec)}>
+                              View Ledger
+                            </button>
                             <button className="btn btn-primary btn-sm" onClick={() => handleOpenRecordPayment(rec)}>
                               Record Payment
                             </button>
@@ -845,42 +1243,13 @@ export const FeesFinancePage: React.FC = () => {
       )}
 
       {/* Sub-Tab 2: Fee Structures */}
-      {activeTab === 'STRUCTURES' && (
-        <div className="grid-2">
-          {feeStructures.map(fs => {
-            const prog = db.getProgramById(fs.programId);
-            const sem = db.getSemesterById(fs.semesterId);
+      {activeTab === 'STRUCTURES' && <FeeStructureManagementTab />}
 
-            return (
-              <div key={fs.id} className="card card-hover" style={{ padding: '1.5rem', borderLeft: '4px solid var(--brand-navy)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <Badge variant="orange">{prog?.code} • {sem?.code}</Badge>
-                  <Badge variant="active">{fs.status}</Badge>
-                </div>
+      {/* Sub-Tab 3: Student Fee Assignment (Phase 3) */}
+      {activeTab === 'ASSIGNMENT' && <FeeAssignmentTab />}
 
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '1rem' }}>
-                  ₹{fs.totalAmount.toLocaleString()} <span style={{ fontSize: '0.84375rem', fontWeight: 500, color: 'var(--text-muted)' }}>/ Semester</span>
-                </h3>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.84375rem', color: 'var(--text-muted)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Tuition Fee:</span> <strong>₹{fs.tuitionFee.toLocaleString()}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Lab &amp; Equipment Fee:</span> <strong>₹{fs.labFee.toLocaleString()}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Development Fee:</span> <strong>₹{fs.developmentFee.toLocaleString()}</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Hostel Fee:</span> <strong>₹{(fs.hostelFee || 0).toLocaleString()}</strong>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {/* Sub-Tab 4: Fee Invoices / Demands (Phase 4) */}
+      {activeTab === 'INVOICES' && <FeeInvoiceManagementTab />}
 
       {/* Sub-Tab 3: Payment Transactions Log & Refund Action */}
       {activeTab === 'TRANSACTIONS' && (
@@ -935,6 +1304,368 @@ export const FeesFinancePage: React.FC = () => {
             </table>
           </div>
         </div>
+      )}
+
+      {/* Phase 7 — Sub-Tab: Overdue Invoices & Late Fee Rules */}
+      {activeTab === 'LATE_FEES' && (() => {
+        const allInvoices = db.getFeeInvoices ? db.getFeeInvoices() : [];
+        const now = new Date();
+        const overdueInvoices = allInvoices.filter((inv: any) =>
+          inv.dueDate && new Date(inv.dueDate) < now && ['ISSUED', 'PARTIALLY_PAID', 'OVERDUE'].includes(inv.status)
+        );
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+            {/* Overdue Stats Banner */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+              <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #ef4444' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>OVERDUE INVOICES</div>
+                <div style={{ fontSize: '1.75rem', fontWeight: 900, color: '#ef4444' }}>{overdueInvoices.length}</div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Past due date with balance</div>
+              </div>
+              <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #f97316' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>TOTAL OUTSTANDING</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#f97316' }}>
+                  ₹{overdueInvoices.reduce((sum: number, inv: any) => sum + Number(inv.totalAmount), 0).toLocaleString('en-IN')}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Across all overdue accounts</div>
+              </div>
+              <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #8b5cf6' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>LATE FEE ACCRUED</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: '#8b5cf6' }}>
+                  ₹{overdueInvoices.reduce((sum: number, inv: any) => sum + Number(inv.lateFeeAmount || 0), 0).toLocaleString('en-IN')}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Based on applied late fee rules</div>
+              </div>
+            </div>
+
+            {/* Overdue Invoices Table */}
+            <div className="card" style={{ padding: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <AlertTriangle size={18} color="#ef4444" /> Overdue Invoice Summary
+              </h3>
+              {overdueInvoices.length === 0 ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <CheckCircle2 size={40} color="#10b981" style={{ margin: '0 auto 1rem', display: 'block' }} />
+                  <div style={{ fontWeight: 700 }}>No overdue invoices!</div>
+                  <div style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>All invoices are within their due dates.</div>
+                </div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table" style={{ fontSize: '0.8125rem' }}>
+                    <thead>
+                      <tr>
+                        <th>Invoice #</th>
+                        <th>Student</th>
+                        <th>Due Date</th>
+                        <th>Days Overdue</th>
+                        <th style={{ textAlign: 'right' }}>Invoice Total</th>
+                        <th style={{ textAlign: 'right' }}>Late Fee</th>
+                        <th style={{ textAlign: 'right' }}>Total Payable</th>
+                        <th style={{ textAlign: 'center' }}>Status</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {overdueInvoices.map((inv: any) => {
+                        const dueDate = new Date(inv.dueDate);
+                        const daysOverdue = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+                        const lateFee = Number(inv.lateFeeAmount || 0);
+                        const totalPayable = Number(inv.totalAmount) + lateFee;
+                        return (
+                          <tr key={inv.id} style={{ background: daysOverdue > 30 ? '#fff5f5' : undefined }}>
+                            <td><code style={{ fontWeight: 700, color: '#1e40af', fontSize: '0.8rem' }}>{inv.invoiceNumber}</code></td>
+                            <td style={{ fontWeight: 600 }}>{inv.studentName || inv.studentId}</td>
+                            <td style={{ color: '#ef4444', fontWeight: 700 }}>{inv.dueDate}</td>
+                            <td>
+                              <span style={{
+                                padding: '0.2rem 0.5rem',
+                                borderRadius: '99px',
+                                fontSize: '0.75rem',
+                                fontWeight: 800,
+                                background: daysOverdue > 30 ? '#fee2e2' : '#fff3cd',
+                                color: daysOverdue > 30 ? '#dc2626' : '#92400e',
+                              }}>
+                                {daysOverdue} days
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 700 }}>₹{Number(inv.totalAmount).toLocaleString('en-IN')}</td>
+                            <td style={{ textAlign: 'right', fontFamily: 'monospace', color: lateFee > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: lateFee > 0 ? 800 : 400 }}>
+                              {lateFee > 0 ? `+₹${lateFee.toLocaleString('en-IN')}` : '—'}
+                            </td>
+                            <td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 900, color: '#b91c1c' }}>₹{totalPayable.toLocaleString('en-IN')}</td>
+                            <td style={{ textAlign: 'center' }}>
+                              <Badge variant="danger">{inv.status}</Badge>
+                            </td>
+                            <td>
+                              <button className="btn btn-sm btn-secondary" onClick={() => setViewingStudentInvoice(inv)}>
+                                <Eye size={13} /> View
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Late Fee Rules Info Panel */}
+            <div className="card" style={{ padding: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Clock size={18} color="var(--brand-orange)" /> Late Fee Calculation Rules
+              </h3>
+              <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', fontSize: '0.875rem', lineHeight: 1.7 }}>
+                <strong>🔒 Backend-Enforced:</strong> Late fee rules are configured and calculated entirely on the server side using the <code>LateFeeService</code>.
+                The available rule types are: <strong>PER_DAY</strong> (₹X per overdue day), <strong>FIXED</strong> (flat penalty), <strong>PERCENTAGE</strong> (% of invoice/outstanding), and <strong>ONE_TIME</strong> (single charge).
+                A configurable <strong>grace period</strong> (days after due date before late fee begins) and a <strong>maximum cap</strong> are supported.
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+                {[
+                  { type: 'PER_DAY', label: 'Per Day', desc: '₹X per day after grace period. Increases with time.', color: '#3b82f6', bg: '#eff6ff' },
+                  { type: 'FIXED', label: 'Fixed Penalty', desc: 'One-time flat fee triggered after due date. Constant.', color: '#8b5cf6', bg: '#f5f3ff' },
+                  { type: 'PERCENTAGE', label: 'Percentage', desc: 'X% of invoice or outstanding balance. Capped at max.', color: '#f97316', bg: '#fff7ed' },
+                  { type: 'ONE_TIME', label: 'One Time', desc: 'Applied once when due date passes. Never reapplied.', color: '#10b981', bg: '#ecfdf5' },
+                ].map(r => (
+                  <div key={r.type} style={{ background: r.bg, border: `1.5px solid ${r.color}30`, borderRadius: '8px', padding: '1rem' }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 900, color: r.color, letterSpacing: '0.05em', marginBottom: '0.5rem' }}>{r.type}</div>
+                    <div style={{ fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '0.25rem' }}>{r.label}</div>
+                    <div style={{ fontSize: '0.78125rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{r.desc}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: '#f8fafc', borderRadius: '8px', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                <strong>API Endpoints:</strong>
+                <code style={{ display: 'block', margin: '0.5rem 0', color: 'var(--brand-navy)' }}>
+                  GET /api/v1/late-fee-rules · POST /api/v1/late-fee-rules · PATCH /api/v1/late-fee-rules/:id/status
+                </code>
+                <code style={{ display: 'block', color: 'var(--brand-navy)' }}>
+                  GET /api/v1/fee-invoices/:id/late-fee · POST /api/v1/fee-invoices/:id/recalculate-late-fee
+                </code>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Phase 7 — Sub-Tab: Failed Payments Report */}
+      {activeTab === 'FAILED_PAYMENTS' && (() => {
+        const allFailedTxs = db.getFailedPayments();
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+            {/* Safety Banner */}
+            <div style={{ background: '#fefce8', border: '1.5px solid #fde047', borderRadius: '10px', padding: '1rem 1.25rem', display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+              <AlertCircle size={22} color="#d97706" style={{ flexShrink: 0, marginTop: '0.1rem' }} />
+              <div>
+                <div style={{ fontWeight: 800, color: '#92400e', marginBottom: '0.25rem' }}>Failed Payment Safety Guarantee</div>
+                <div style={{ fontSize: '0.8125rem', color: '#92400e', lineHeight: 1.6 }}>
+                  A failed payment <strong>NEVER</strong> reduces a student's outstanding fee, marks an invoice as paid, generates a receipt, or updates the student fee account.
+                  All failed transaction records are stored for audit and retry purposes only.
+                  Gateway-reported failure status is always <strong>verified server-side</strong> before recording.
+                </div>
+              </div>
+            </div>
+
+            {/* Failed Transactions Table */}
+            <div className="card" style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                  <XCircle size={18} color="#ef4444" /> Failed Payment Transactions ({allFailedTxs.length})
+                </h3>
+              </div>
+
+              {allFailedTxs.length === 0 ? (
+                <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <CheckCircle2 size={40} color="#10b981" style={{ margin: '0 auto 1rem', display: 'block' }} />
+                  <div style={{ fontWeight: 700 }}>No failed payments on record.</div>
+                  <div style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>All recent payment attempts were successful.</div>
+                </div>
+              ) : (
+                <div className="table-responsive">
+                  <table className="table" style={{ fontSize: '0.8125rem' }}>
+                    <thead>
+                      <tr>
+                        <th>Transaction #</th>
+                        <th>Date & Time</th>
+                        <th>Invoice</th>
+                        <th>Student</th>
+                        <th>Gateway</th>
+                        <th style={{ textAlign: 'right' }}>Amount</th>
+                        <th>Failure Reason</th>
+                        <th style={{ textAlign: 'center' }}>Invoice Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allFailedTxs.map((tx: any) => {
+                        const invoice = db.getFeeInvoices ? db.getFeeInvoices().find((i: any) => i.id === tx.invoiceId) : null;
+                        return (
+                          <tr key={tx.id} style={{ background: '#fff9f9' }}>
+                            <td><code style={{ fontWeight: 700, color: '#ef4444', fontSize: '0.78rem' }}>{tx.transactionNumber}</code></td>
+                            <td style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{new Date(tx.createdAt).toLocaleString('en-IN')}</td>
+                            <td><code style={{ color: '#1e40af', fontWeight: 600 }}>{invoice?.invoiceNumber || tx.invoiceId}</code></td>
+                            <td style={{ fontWeight: 600 }}>{tx.studentId}</td>
+                            <td><Badge variant="orange">{tx.gateway || 'RAZORPAY'}</Badge></td>
+                            <td style={{ textAlign: 'right', fontFamily: 'monospace', fontWeight: 800, color: '#ef4444' }}>₹{Number(tx.amount).toLocaleString('en-IN')}</td>
+                            <td>
+                              <div style={{ maxWidth: '200px', fontSize: '0.75rem', color: '#92400e', background: '#fef3c7', padding: '0.2rem 0.6rem', borderRadius: '4px' }}>
+                                {tx.failureReason || 'UNKNOWN'}
+                              </div>
+                            </td>
+                            <td style={{ textAlign: 'center' }}>
+                              <Badge variant={invoice?.status === 'PAID' ? 'active' : invoice?.status === 'CANCELLED' ? 'danger' : 'inactive'}>
+                                {invoice?.status || 'UNCHANGED'}
+                              </Badge>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Sub-Tab 8: Fee Queries Resolution Queue */}
+      {activeTab === 'FEE_QUERIES' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* Filter Bar */}
+          <div className="card" style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '260px' }}>
+              <Search size={18} color="var(--text-muted)" />
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Search by student name, enrollment no, or query ID..."
+                value={feeQuerySearch}
+                onChange={e => setFeeQuerySearch(e.target.value)}
+                style={{ maxWidth: '360px' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <select className="form-select" style={{ width: '180px' }} value={feeQueryFilterStatus} onChange={e => setFeeQueryFilterStatus(e.target.value)}>
+                <option value="ALL">All Statuses</option>
+                <option value="SUBMITTED">Submitted</option>
+                <option value="UNDER_REVIEW">Under Review</option>
+                <option value="RESOLVED">Resolved</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
+
+              <select className="form-select" style={{ width: '200px' }} value={feeQueryFilterCategory} onChange={e => setFeeQueryFilterCategory(e.target.value)}>
+                <option value="ALL">All Query Categories</option>
+                <option value="SEMESTER_FEE">Semester Fee</option>
+                <option value="EXAM_FEE">Exam Fee</option>
+                <option value="BACKLOG_FEE">Backlog Fee</option>
+                <option value="LATE_FEE">Late Fee</option>
+                <option value="PAYMENT_ISSUE">Payment Issue</option>
+                <option value="REFUND">Fee Refund</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Fee Queries Table */}
+          <div className="card" style={{ padding: '1.5rem' }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '1.25rem' }}>
+              Accounts Directorate Fee Resolution Desk
+            </h3>
+
+            {db.getFeeQueries().length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+                <HelpCircle size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
+                <p style={{ fontSize: '1rem', fontWeight: 600 }}>No fee queries filed yet.</p>
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table" style={{ fontSize: '0.85rem' }}>
+                  <thead>
+                    <tr>
+                      <th>Query ID</th>
+                      <th>Student Info</th>
+                      <th>Category</th>
+                      <th>Subject &amp; Inquiry</th>
+                      <th>Priority</th>
+                      <th>Date</th>
+                      <th>Status</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {db.getFeeQueries()
+                      .filter(q => {
+                        const matchesStatus = feeQueryFilterStatus === 'ALL' || q.status === feeQueryFilterStatus;
+                        const matchesCat = feeQueryFilterCategory === 'ALL' || q.category === feeQueryFilterCategory;
+                        const matchesSearch = q.studentName.toLowerCase().includes(feeQuerySearch.toLowerCase()) ||
+                                              q.enrollmentNo.toLowerCase().includes(feeQuerySearch.toLowerCase()) ||
+                                              q.queryNo.toLowerCase().includes(feeQuerySearch.toLowerCase()) ||
+                                              q.subject.toLowerCase().includes(feeQuerySearch.toLowerCase());
+                        return matchesStatus && matchesCat && matchesSearch;
+                      })
+                      .map(q => (
+                        <tr key={q.id}>
+                          <td style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{q.queryNo}</td>
+                          <td>
+                            <strong>{q.studentName}</strong>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              {q.enrollmentNo} • {q.departmentName}
+                            </div>
+                          </td>
+                          <td><Badge variant="navy">{q.category.replace(/_/g, ' ')}</Badge></td>
+                          <td>
+                            <strong>{q.subject}</strong>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {q.description}
+                            </div>
+                            {q.claimedAmount && (
+                              <div style={{ fontSize: '0.75rem', color: 'var(--brand-orange)', fontWeight: 600 }}>
+                                Claimed Amount: ₹{q.claimedAmount.toLocaleString()}
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            <Badge variant={q.priority === 'URGENT' ? 'danger' : q.priority === 'HIGH' ? 'warning' : 'navy'}>
+                              {q.priority}
+                            </Badge>
+                          </td>
+                          <td>{new Date(q.createdAt).toLocaleDateString()}</td>
+                          <td>
+                            <Badge variant={q.status === 'RESOLVED' ? 'success' : q.status === 'UNDER_REVIEW' ? 'active' : q.status === 'REJECTED' ? 'danger' : 'gold'}>
+                              {q.status.replace(/_/g, ' ')}
+                            </Badge>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button
+                              className="btn btn-sm btn-primary"
+                              onClick={() => setResolvingFeeQuery(q)}
+                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                            >
+                              Resolve / Review
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Fee Query Resolve Modal */}
+      {resolvingFeeQuery && (
+        <FeeQueryResolveModal
+          query={resolvingFeeQuery}
+          isOpen={Boolean(resolvingFeeQuery)}
+          onClose={() => setResolvingFeeQuery(null)}
+          onSuccess={() => {
+            setResolvingFeeQuery(null);
+          }}
+        />
       )}
 
       {/* Record Payment Modal */}
@@ -1085,6 +1816,32 @@ export const FeesFinancePage: React.FC = () => {
         }}
         user={user}
         role={role}
+      />
+
+      {/* Student Fee Account / Ledger Breakdown Modal (Phase 3) */}
+      <StudentFeeAccountModal
+        isOpen={!!viewingFeeRecord}
+        onClose={() => setViewingFeeRecord(null)}
+        feeRecord={viewingFeeRecord}
+      />
+
+      {/* Student Fee Invoice View Modal (Phase 4) */}
+      <FeeInvoiceViewModal
+        isOpen={!!viewingStudentInvoice}
+        onClose={() => setViewingStudentInvoice(null)}
+        invoice={viewingStudentInvoice}
+        onPayNow={(inv) => setPayingInvoice(inv)}
+      />
+
+      {/* Online Fee Payment Modal (Phase 5) */}
+      <OnlinePaymentModal
+        isOpen={!!payingInvoice}
+        onClose={() => setPayingInvoice(null)}
+        invoice={payingInvoice}
+        onPaymentSuccess={() => {
+          // Force re-render of student and admin fee records
+          setPayingInvoice(null);
+        }}
       />
     </div>
   );

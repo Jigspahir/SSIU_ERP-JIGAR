@@ -51,8 +51,16 @@ export const TimetablePage: React.FC = () => {
     }
   };
 
-  // Filter entries for active day tab
-  const dayEntries = timetableEntries.filter(t => t.dayOfWeek === activeDay);
+  // Filter entries for active day tab & role
+  const dayEntries = timetableEntries.filter(t => {
+    if (t.dayOfWeek !== activeDay) return false;
+    if (role === 'FACULTY' && user) {
+      const fac = facultyList.find(f => f.id === user.id || f.email === user.email);
+      const facId = fac?.id || user.id;
+      return t.facultyId === facId || t.facultyId === user.id;
+    }
+    return true;
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

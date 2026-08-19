@@ -71,6 +71,9 @@ export const AcademicHierarchyFilterBar: React.FC<AcademicHierarchyFilterBarProp
     onFilterChange(nextState);
   };
 
+  // Check if selected institute has departments
+  const hasDepartments = filters.instituteId === 'ALL' || filteredDepartments.length > 0;
+
   return (
     <div
       style={{
@@ -93,32 +96,34 @@ export const AcademicHierarchyFilterBar: React.FC<AcademicHierarchyFilterBarProp
           value={filters.instituteId}
           onChange={e => handleChange('instituteId', e.target.value)}
         >
-          <option value="ALL">All Institutes</option>
+          <option value="ALL">All Institutes / Schools</option>
           {institutes.map(inst => (
             <option key={inst.id} value={inst.id}>
-              {inst.code} - {inst.name}
+              {inst.name} ({inst.code})
             </option>
           ))}
         </select>
       </div>
 
-      {/* Department Filter */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-        <GitFork size={15} color="var(--brand-navy)" />
-        <select
-          className="form-select"
-          style={{ width: 'auto', fontSize: '0.8125rem', padding: '0.35rem 0.65rem' }}
-          value={filters.departmentId}
-          onChange={e => handleChange('departmentId', e.target.value)}
-        >
-          <option value="ALL">All Departments</option>
-          {filteredDepartments.map(dept => (
-            <option key={dept.id} value={dept.id}>
-              {dept.code} - {dept.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Department Filter (Only shown if applicable) */}
+      {hasDepartments && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+          <GitFork size={15} color="var(--brand-navy)" />
+          <select
+            className="form-select"
+            style={{ width: 'auto', fontSize: '0.8125rem', padding: '0.35rem 0.65rem' }}
+            value={filters.departmentId}
+            onChange={e => handleChange('departmentId', e.target.value)}
+          >
+            <option value="ALL">All Departments</option>
+            {filteredDepartments.map(dept => (
+              <option key={dept.id} value={dept.id}>
+                {dept.name} ({dept.code})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Program Filter */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -129,10 +134,10 @@ export const AcademicHierarchyFilterBar: React.FC<AcademicHierarchyFilterBarProp
           value={filters.programId}
           onChange={e => handleChange('programId', e.target.value)}
         >
-          <option value="ALL">All Programs</option>
+          <option value="ALL">All Programs / Courses</option>
           {filteredPrograms.map(prog => (
             <option key={prog.id} value={prog.id}>
-              {prog.code} ({prog.degreeType})
+              {prog.name} ({prog.code})
             </option>
           ))}
         </select>

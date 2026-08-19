@@ -1,12 +1,34 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
+import {
+  CreateLeadDto,
+  UpdateLeadDto,
+  AssignLeadDto,
+  UpdateLeadStatusDto,
+  RecordFollowUpDto,
+  CreateApplicationDto,
+  DocumentAttachmentDto,
+  VerifyDocumentDto,
+  VerifyApplicationDto,
+  ApproveAdmissionDto,
+  RejectAdmissionDto,
+  EnrollStudentDto,
+  LeadQueryDto,
+  ApplicationQueryDto,
+  LeadStatusEnum,
+} from './dto/admission.dto';
 
 @Injectable()
 export class AdmissionService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // Helper: Generate unique application/inquiry numbers
   private generateNumber(prefix: string) {
     const timestamp = Date.now().toString().slice(-6);
     const random = Math.floor(1000 + Math.random() * 9000);
@@ -21,7 +43,6 @@ export class AdmissionService {
     });
 
     if (cycles.length === 0) {
-      // Seed default admission cycle if empty
       const defaultCycle = await this.prisma.admissionCycle.create({
         data: {
           code: 'ADM-2026-REGULAR',
@@ -62,21 +83,9 @@ export class AdmissionService {
     });
   }
 
-  // ── 2. Leads & Inquiries ──────────────────────────────────────────────────
+  // ── 2. Lead Generation & Management ───────────────────────────────────────
 
-  async createInquiry(data: {
-    applicantName: string;
-    mobile: string;
-    email?: string;
-    city?: string;
-    state?: string;
-    interestedInstituteId?: string;
-    interestedProgramId?: string;
-    source?: string;
-    counsellorUserId?: string;
-    nextFollowUpDate?: string;
-    remarks?: string;
-  }) {
+  async createInquiry(data: CreateLeadDto) {
     const inqNo = this.generateNumber('INQ');
 
     return this.prisma.admissionInquiry.create({
@@ -93,33 +102,142 @@ export class AdmissionService {
         counsellorUserId: data.counsellorUserId,
         nextFollowUpDate: data.nextFollowUpDate ? new Date(data.nextFollowUpDate) : undefined,
         remarks: data.remarks,
-        status: 'NEW',
+        status: LeadStatusEnum.NEW,
       },
     });
   }
 
-  async getInquiries(counsellorUserId?: string, status?: string) {
-    return this.prisma.admissionInquiry.findMany({
-      where: {
-        ...(counsellorUserId ? { counsellorUserId } : {}),
-        ...(status ? { status: status.toUpperCase() } : {}),
+  async getInquiries(user: any, query?: LeadQueryDto) {
+    const page = Math.max(1, Number(query?.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(query?.limit) || 10));
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+
+    // RBAC: If user is Counselor / non-admin, filter by assigned counselor if specified or required
+    if (user.role === 'COUNSELLOR' || (user.authorityLevel > 4 && user.role !== 'SUPER_ADMIN')) {
+      where.counsellorUserId = user.id;
+    } else if (query?.counsellorUserId) {
+      where.counsellorUserId = query.counsellorUserId;
+    }
+
+    if (query?.status) where.status = query.status.toUpperCase();
+    if (query?.source) where.source = query.source.toUpperCase();
+    if (query?.interestedProgramId) where.interestedProgramId = query.interestedProgramId;
+    if (query?.interestedInstituteId) where.interestedInstituteId = query.interestedInstituteId;
+
+    if (query?.startDate || query?.endDate) {
+      where.inquiryDate = {};
+      if (query.startDate) where.inquiryDate.gte = new Date(query.startDate);
+      if (query.endDate) where.inquiryDate.lte = new Date(query.endDate);
+    }
+
+    if (query?.search?.trim()) {
+      const q = query.search.trim();
+      where.OR = [
+        { applicantName: { contains: q, mode: 'insensitive' } },
+        { inquiryNo: { contains: q, mode: 'insensitive' } },
+        { mobile: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+        { city: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    const [total, data] = await Promise.all([
+      this.prisma.admissionInquiry.count({ where }),
+      this.prisma.admissionInquiry.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          counsellings: { orderBy: { counsellingDate: 'desc' }, take: 2 },
+          applications: { select: { id: true, applicationNo: true, status: true } },
+        },
+        orderBy: { inquiryDate: 'desc' },
+      }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
       },
+    };
+  }
+
+  async getInquiryById(id: string) {
+    const inquiry = await this.prisma.admissionInquiry.findUnique({
+      where: { id },
       include: {
         counsellings: { orderBy: { counsellingDate: 'desc' } },
-        applications: { select: { id: true, applicationNo: true, status: true } },
+        applications: {
+          include: {
+            admissionCycle: true,
+            documents: true,
+            enrollment: true,
+          },
+        },
       },
-      orderBy: { inquiryDate: 'desc' },
+    });
+    if (!inquiry) throw new NotFoundException('Inquiry / Lead not found.');
+    return inquiry;
+  }
+
+  async updateInquiry(id: string, dto: UpdateLeadDto) {
+    await this.getInquiryById(id);
+
+    return this.prisma.admissionInquiry.update({
+      where: { id },
+      data: {
+        applicantName: dto.applicantName,
+        mobile: dto.mobile,
+        email: dto.email,
+        city: dto.city,
+        state: dto.state,
+        interestedInstituteId: dto.interestedInstituteId,
+        interestedProgramId: dto.interestedProgramId,
+        source: dto.source?.toUpperCase(),
+        status: dto.status?.toUpperCase(),
+        counsellorUserId: dto.counsellorUserId,
+        nextFollowUpDate: dto.nextFollowUpDate ? new Date(dto.nextFollowUpDate) : undefined,
+        remarks: dto.remarks,
+      },
     });
   }
 
-  async recordCounselling(data: {
-    inquiryId: string;
-    counsellorUserId: string;
-    discussionPoints: string;
-    applicantNeed?: string;
-    nextFollowUpDate?: string;
-    remarks?: string;
-  }) {
+  async assignLead(id: string, dto: AssignLeadDto) {
+    await this.getInquiryById(id);
+
+    return this.prisma.admissionInquiry.update({
+      where: { id },
+      data: {
+        counsellorUserId: dto.counsellorUserId,
+        status: LeadStatusEnum.CONTACTED,
+        remarks: dto.remarks,
+      },
+    });
+  }
+
+  async updateLeadStatus(id: string, dto: UpdateLeadStatusDto) {
+    await this.getInquiryById(id);
+
+    return this.prisma.admissionInquiry.update({
+      where: { id },
+      data: {
+        status: dto.status.toUpperCase(),
+        remarks: dto.remarks,
+      },
+    });
+  }
+
+  async recordCounselling(data: RecordFollowUpDto, counsellorUserId: string) {
     const inquiry = await this.prisma.admissionInquiry.findUnique({ where: { id: data.inquiryId } });
     if (!inquiry) throw new NotFoundException('Inquiry not found.');
 
@@ -127,7 +245,7 @@ export class AdmissionService {
       const record = await tx.counsellingRecord.create({
         data: {
           inquiryId: data.inquiryId,
-          counsellorUserId: data.counsellorUserId,
+          counsellorUserId,
           discussionPoints: data.discussionPoints,
           applicantNeed: data.applicantNeed,
           nextFollowUpDate: data.nextFollowUpDate ? new Date(data.nextFollowUpDate) : undefined,
@@ -138,7 +256,7 @@ export class AdmissionService {
       await tx.admissionInquiry.update({
         where: { id: data.inquiryId },
         data: {
-          status: 'COUNSELLING',
+          status: LeadStatusEnum.FOLLOW_UP,
           nextFollowUpDate: data.nextFollowUpDate ? new Date(data.nextFollowUpDate) : inquiry.nextFollowUpDate,
         },
       });
@@ -147,39 +265,45 @@ export class AdmissionService {
     });
   }
 
-  // ── 3. Applications ───────────────────────────────────────────────────────
+  async getFollowUpHistory(inquiryId: string) {
+    await this.getInquiryById(inquiryId);
+    return this.prisma.counsellingRecord.findMany({
+      where: { inquiryId },
+      orderBy: { counsellingDate: 'desc' },
+    });
+  }
 
-  async createApplication(data: {
-    inquiryId?: string;
-    admissionCycleId: string;
-    instituteId: string;
-    programId: string;
-    admissionType?: string;
-    firstName: string;
-    middleName?: string;
-    lastName: string;
-    email: string;
-    mobile: string;
-    gender?: string;
-    dateOfBirth?: string;
-    category?: string;
-    city?: string;
-    state?: string;
-    address?: string;
-    qualifyingExam?: string;
-    qualifyingBoard?: string;
-    passingYear?: number;
-    percentage?: number;
-    documents?: { documentType: string; documentUrl: string }[];
-  }) {
+  // ── 3. Applications & Documents ───────────────────────────────────────────
+
+  async createApplication(data: CreateApplicationDto) {
     const appNo = this.generateNumber('APP');
+
+    // Auto resolve active cycle if not provided
+    let cycleId = data.admissionCycleId;
+    if (!cycleId) {
+      const cycle = await this.prisma.admissionCycle.findFirst({ where: { status: 'ACTIVE' } });
+      if (cycle) cycleId = cycle.id;
+      else {
+        const newCycle = await this.prisma.admissionCycle.create({
+          data: {
+            code: 'ADM-2026-REG',
+            academicYearCode: '2026-27',
+            name: 'Regular Admissions 2026-27',
+            startDate: new Date('2026-04-01'),
+            endDate: new Date('2026-09-30'),
+            status: 'ACTIVE',
+          },
+        });
+        cycleId = newCycle.id;
+      }
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const app = await tx.admissionApplication.create({
         data: {
           applicationNo: appNo,
           inquiryId: data.inquiryId,
-          admissionCycleId: data.admissionCycleId,
+          admissionCycleId: cycleId!,
           instituteId: data.instituteId,
           programId: data.programId,
           admissionType: data.admissionType || 'REGULAR',
@@ -207,13 +331,13 @@ export class AdmissionService {
             })),
           },
         },
-        include: { documents: true },
+        include: { documents: true, admissionCycle: true },
       });
 
       if (data.inquiryId) {
         await tx.admissionInquiry.update({
           where: { id: data.inquiryId },
-          data: { status: 'CONVERTED' },
+          data: { status: LeadStatusEnum.APPLIED },
         });
       }
 
@@ -221,21 +345,62 @@ export class AdmissionService {
     });
   }
 
-  async getApplications(filters?: { instituteId?: string; programId?: string; status?: string }) {
-    return this.prisma.admissionApplication.findMany({
-      where: {
-        ...(filters?.instituteId ? { instituteId: filters.instituteId } : {}),
-        ...(filters?.programId ? { programId: filters.programId } : {}),
-        ...(filters?.status ? { status: filters.status.toUpperCase() } : {}),
+  async getApplications(query?: ApplicationQueryDto) {
+    const page = Math.max(1, Number(query?.page) || 1);
+    const limit = Math.max(1, Math.min(100, Number(query?.limit) || 10));
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (query?.instituteId) where.instituteId = query.instituteId;
+    if (query?.programId) where.programId = query.programId;
+    if (query?.status) where.status = query.status.toUpperCase();
+
+    if (query?.startDate || query?.endDate) {
+      where.submissionDate = {};
+      if (query.startDate) where.submissionDate.gte = new Date(query.startDate);
+      if (query.endDate) where.submissionDate.lte = new Date(query.endDate);
+    }
+
+    if (query?.search?.trim()) {
+      const q = query.search.trim();
+      where.OR = [
+        { applicationNo: { contains: q, mode: 'insensitive' } },
+        { firstName: { contains: q, mode: 'insensitive' } },
+        { lastName: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+        { mobile: { contains: q, mode: 'insensitive' } },
+      ];
+    }
+
+    const [total, data] = await Promise.all([
+      this.prisma.admissionApplication.count({ where }),
+      this.prisma.admissionApplication.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          admissionCycle: true,
+          documents: true,
+          approvals: true,
+          enrollment: true,
+        },
+        orderBy: { submissionDate: 'desc' },
+      }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
       },
-      include: {
-        admissionCycle: true,
-        documents: true,
-        approvals: true,
-        enrollment: true,
-      },
-      orderBy: { submissionDate: 'desc' },
-    });
+    };
   }
 
   async getApplicationById(id: string) {
@@ -253,6 +418,19 @@ export class AdmissionService {
     return app;
   }
 
+  async uploadApplicationDocument(applicationId: string, doc: DocumentAttachmentDto) {
+    await this.getApplicationById(applicationId);
+
+    return this.prisma.admissionApplicationDocument.create({
+      data: {
+        applicationId,
+        documentType: doc.documentType,
+        documentUrl: doc.documentUrl,
+        status: 'UPLOADED',
+      },
+    });
+  }
+
   async verifyDocument(documentId: string, verifiedByUserId: string, isApproved: boolean, remarks?: string) {
     const doc = await this.prisma.admissionApplicationDocument.findUnique({ where: { id: documentId } });
     if (!doc) throw new NotFoundException('Document not found.');
@@ -267,9 +445,34 @@ export class AdmissionService {
     });
   }
 
-  async approveApplication(id: string, approverUserId: string, roleCode: string, comments?: string) {
-    const app = await this.prisma.admissionApplication.findUnique({ where: { id } });
-    if (!app) throw new NotFoundException('Application not found.');
+  async verifyApplication(id: string, verifiedByUserId: string, dto: VerifyApplicationDto) {
+    const app = await this.getApplicationById(id);
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.admissionApplication.update({
+        where: { id },
+        data: {
+          status: dto.isVerified ? 'VERIFIED' : 'DOCUMENT_QUERY',
+          verifiedByUserId,
+          verifiedAt: new Date(),
+          remarks: dto.remarks,
+        },
+        include: { documents: true },
+      });
+
+      if (app.inquiryId && dto.isVerified) {
+        await tx.admissionInquiry.update({
+          where: { id: app.inquiryId },
+          data: { status: LeadStatusEnum.VERIFIED },
+        });
+      }
+
+      return updated;
+    });
+  }
+
+  async approveApplication(id: string, approverUserId: string, roleCode: string, dto?: ApproveAdmissionDto) {
+    const app = await this.getApplicationById(id);
 
     return this.prisma.$transaction(async (tx) => {
       await tx.admissionApproval.create({
@@ -278,24 +481,58 @@ export class AdmissionService {
           approverRole: roleCode,
           approverUserId,
           status: 'APPROVED',
-          comments,
+          comments: dto?.comments || 'Application approved by admissions authority',
         },
       });
 
-      return tx.admissionApplication.update({
+      const updated = await tx.admissionApplication.update({
         where: { id },
         data: {
           status: 'APPROVED',
           approvedByUserId: approverUserId,
           approvedAt: new Date(),
+          remarks: dto?.comments,
         },
       });
+
+      if (app.inquiryId) {
+        await tx.admissionInquiry.update({
+          where: { id: app.inquiryId },
+          data: { status: LeadStatusEnum.ADMITTED },
+        });
+      }
+
+      return updated;
+    });
+  }
+
+  async rejectApplication(id: string, rejectorUserId: string, dto: RejectAdmissionDto) {
+    const app = await this.getApplicationById(id);
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.admissionApplication.update({
+        where: { id },
+        data: {
+          status: 'REJECTED',
+          rejectionReason: dto.rejectionReason,
+          approvedByUserId: rejectorUserId,
+          approvedAt: new Date(),
+        },
+      });
+
+      if (app.inquiryId) {
+        await tx.admissionInquiry.update({
+          where: { id: app.inquiryId },
+          data: { status: LeadStatusEnum.REJECTED },
+        });
+      }
+
+      return updated;
     });
   }
 
   async confirmFeePayment(id: string, feeAmount: number, receiptNo: string) {
-    const app = await this.prisma.admissionApplication.findUnique({ where: { id } });
-    if (!app) throw new NotFoundException('Application not found.');
+    const app = await this.getApplicationById(id);
 
     return this.prisma.admissionApplication.update({
       where: { id },
@@ -308,9 +545,9 @@ export class AdmissionService {
     });
   }
 
-  // ── 4. Enrollment & Student Master Creation ──────────────────────────────
+  // ── 4. Student Conversion & Institutional Enrollment ──────────────────────
 
-  async enrollStudent(applicationId: string, enrolledByUserId: string, batchId?: string, divisionId?: string) {
+  async enrollStudent(applicationId: string, enrolledByUserId: string, dto?: EnrollStudentDto) {
     const app = await this.prisma.admissionApplication.findUnique({
       where: { id: applicationId },
       include: { enrollment: true },
@@ -318,8 +555,8 @@ export class AdmissionService {
     if (!app) throw new NotFoundException('Application not found.');
     if (app.enrollment) throw new ConflictException('Student already enrolled for this application.');
 
-    // 1. Resolve Batch & Division if not provided
-    let targetBatchId = batchId;
+    // 1. Resolve Academic Batch
+    let targetBatchId = dto?.batchId;
     if (!targetBatchId) {
       const batch = await this.prisma.batch.findFirst({
         where: { programId: app.programId },
@@ -329,9 +566,9 @@ export class AdmissionService {
     }
 
     if (!targetBatchId) {
-      // Create fallback batch for this program
-      const academicYear = await this.prisma.academicYear.findFirst({ where: { isCurrent: true } }) || 
-        await this.prisma.academicYear.findFirst();
+      const academicYear =
+        (await this.prisma.academicYear.findFirst({ where: { isCurrent: true } })) ||
+        (await this.prisma.academicYear.findFirst());
       const newBatch = await this.prisma.batch.create({
         data: {
           code: `BATCH-2026-${app.programId.slice(0, 4).toUpperCase()}`,
@@ -345,11 +582,15 @@ export class AdmissionService {
       targetBatchId = newBatch.id;
     }
 
-    const enrollmentNo = `2026SSIU${Math.floor(100000 + Math.random() * 900000)}`;
+    // 2. Generate Standardized Enrollment Number and ERP ID
+    const enrollmentNo = dto?.customEnrollmentNo || `2026SSIU${Math.floor(100000 + Math.random() * 900000)}`;
     const erpId = `STU${Math.floor(100000 + Math.random() * 900000)}`;
 
     return this.prisma.$transaction(async (tx) => {
-      // 2. Create Student in Student Master
+      // 3. Create Student in Master
+      const program = await tx.program.findUnique({ where: { id: app.programId } });
+      const departmentId = program?.departmentId || '';
+
       const student = await tx.student.create({
         data: {
           erpId,
@@ -362,14 +603,14 @@ export class AdmissionService {
           dateOfBirth: app.dateOfBirth,
           gender: app.gender,
           instituteId: app.instituteId,
-          departmentId: (await tx.program.findUnique({ where: { id: app.programId } }))?.departmentId || '',
-          batchId: targetBatchId,
-          currentDivisionId: divisionId,
+          departmentId,
+          batchId: targetBatchId!,
+          currentDivisionId: dto?.divisionId,
           status: 'ACTIVE',
         },
       });
 
-      // 3. Create User Account for Student login
+      // 4. Create User Account for Student login
       const passwordHash = await bcrypt.hash('Student@123', 10);
       const studentRole = await tx.role.findUnique({ where: { code: 'STUDENT' } });
 
@@ -380,31 +621,40 @@ export class AdmissionService {
           passwordHash,
           accountStatus: 'ACTIVE',
           studentId: student.id,
-          userRoles: studentRole ? {
-            create: {
-              roleId: studentRole.id,
-              scopeType: 'OWN',
-            },
-          } : undefined,
+          userRoles: studentRole
+            ? {
+                create: {
+                  roleId: studentRole.id,
+                  scopeType: 'OWN',
+                },
+              }
+            : undefined,
         },
       });
 
-      // 4. Create Enrollment record
+      // 5. Create Enrollment record
       const enrollment = await tx.enrollment.create({
         data: {
           applicationId: app.id,
           studentId: student.id,
           enrollmentNo,
-          academicYearCode: '2026-27',
+          academicYearCode: dto?.academicYearCode || '2026-27',
           enrolledBy: enrolledByUserId,
         },
       });
 
-      // 5. Update Application status
+      // 6. Update Application & Inquiry status
       await tx.admissionApplication.update({
         where: { id: app.id },
         data: { status: 'ENROLLED' },
       });
+
+      if (app.inquiryId) {
+        await tx.admissionInquiry.update({
+          where: { id: app.inquiryId },
+          data: { status: LeadStatusEnum.ENROLLED },
+        });
+      }
 
       return {
         enrollment,
@@ -414,43 +664,99 @@ export class AdmissionService {
     });
   }
 
-  // ── 5. Reports & Funnel ───────────────────────────────────────────────────
+  // ── 5. Reports & Funnel Analytics ─────────────────────────────────────────
 
   async getAdmissionDashboardMetrics() {
     const [
       totalInquiries,
+      newLeads,
+      contactedLeads,
+      followUpLeads,
+      appliedLeads,
       totalApplications,
       underVerification,
-      pendingApproval,
       approved,
       rejected,
-      feePending,
-      confirmed,
       enrolled,
     ] = await Promise.all([
       this.prisma.admissionInquiry.count(),
+      this.prisma.admissionInquiry.count({ where: { status: LeadStatusEnum.NEW } }),
+      this.prisma.admissionInquiry.count({ where: { status: LeadStatusEnum.CONTACTED } }),
+      this.prisma.admissionInquiry.count({ where: { status: LeadStatusEnum.FOLLOW_UP } }),
+      this.prisma.admissionInquiry.count({ where: { status: LeadStatusEnum.APPLIED } }),
       this.prisma.admissionApplication.count(),
       this.prisma.admissionApplication.count({ where: { status: 'UNDER_VERIFICATION' } }),
-      this.prisma.admissionApplication.count({ where: { status: 'APPROVAL_PENDING' } }),
       this.prisma.admissionApplication.count({ where: { status: 'APPROVED' } }),
       this.prisma.admissionApplication.count({ where: { status: 'REJECTED' } }),
-      this.prisma.admissionApplication.count({ where: { status: 'APPROVED', isFeePaid: false } }),
-      this.prisma.admissionApplication.count({ where: { status: 'ADMISSION_CONFIRMED' } }),
       this.prisma.admissionApplication.count({ where: { status: 'ENROLLED' } }),
     ]);
 
     return {
       funnel: {
         totalInquiries,
+        newLeads,
+        contactedLeads,
+        followUpLeads,
+        appliedLeads,
         totalApplications,
         underVerification,
-        pendingApproval,
         approved,
         rejected,
-        feePending,
-        confirmed,
         enrolled,
+        conversionRate: totalInquiries > 0 ? Number(((enrolled / totalInquiries) * 100).toFixed(2)) : 0,
       },
     };
+  }
+
+  async getProgramAdmissionsReport() {
+    const applications = await this.prisma.admissionApplication.findMany({
+      include: { admissionCycle: true },
+    });
+
+    const progMap = new Map<string, any>();
+
+    for (const app of applications) {
+      const pId = app.programId;
+      if (!progMap.has(pId)) {
+        const prog = await this.prisma.program.findUnique({ where: { id: pId } });
+        progMap.set(pId, {
+          programId: pId,
+          programName: prog?.name || 'Program',
+          applied: 0,
+          approved: 0,
+          enrolled: 0,
+          rejected: 0,
+        });
+      }
+      const data = progMap.get(pId);
+      data.applied++;
+      if (app.status === 'APPROVED' || app.status === 'ADMISSION_CONFIRMED') data.approved++;
+      if (app.status === 'ENROLLED') data.enrolled++;
+      if (app.status === 'REJECTED') data.rejected++;
+    }
+
+    return Array.from(progMap.values());
+  }
+
+  async getSourceEffectivenessReport() {
+    const inquiries = await this.prisma.admissionInquiry.findMany();
+    const sourceMap = new Map<string, { source: string; total: number; converted: number }>();
+
+    for (const inq of inquiries) {
+      const src = inq.source || 'OTHER';
+      if (!sourceMap.has(src)) {
+        sourceMap.set(src, { source: src, total: 0, converted: 0 });
+      }
+      const s = sourceMap.get(src)!;
+      s.total++;
+      if (inq.status === LeadStatusEnum.ENROLLED || inq.status === LeadStatusEnum.ADMITTED) {
+        s.converted++;
+      }
+    }
+
+    return Array.from(sourceMap.values()).map((s) => ({
+      ...s,
+      conversionRate: s.total > 0 ? Number(((s.converted / s.total) * 100).toFixed(2)) : 0,
+    }));
   }
 }

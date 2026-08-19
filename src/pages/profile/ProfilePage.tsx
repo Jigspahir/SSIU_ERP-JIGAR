@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Badge } from '../../components/common/Badge';
 import { User, ShieldCheck, Mail, Phone, Lock, Save, CheckCircle2, Award, FileText, Check, XCircle, Upload, AlertCircle, RefreshCw, FolderCheck } from 'lucide-react';
 import { db } from '../../services/db';
+import { mentorAssignmentService } from '../../services/mentorAssignmentService';
 import { Student } from '../../types';
 import { StudentDocumentsSection } from '../../components/profile/StudentDocumentsSection';
 
@@ -288,6 +289,147 @@ export const ProfilePage: React.FC = () => {
         </div>
       </div>
       )}
+
+      {/* --- Assigned Faculty Mentor Section: Student-Only --- */}
+      {role === 'STUDENT' && (() => {
+        const student = studentRecord || (db.getStudents()[0]);
+        const activeMentor = student ? mentorAssignmentService.getActiveMentorForStudent(student.id) : null;
+        return (
+          <div className="card" style={{ padding: '1.75rem', borderLeft: '4px solid var(--brand-navy)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                  <ShieldCheck size={22} color="var(--brand-navy)" /> Assigned Faculty Mentor
+                </h3>
+                <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                  Your assigned academic mentor and counselor
+                </p>
+              </div>
+              <Badge variant={activeMentor ? 'gold' : 'danger'}>
+                {activeMentor ? 'ACTIVE MENTOR' : 'UNASSIGNED'}
+              </Badge>
+            </div>
+
+            {activeMentor ? (
+              <div className="grid-3" style={{ gap: '1.25rem', fontSize: '0.84375rem' }}>
+                <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>FACULTY NAME</span>
+                  <strong style={{ fontSize: '1rem', color: 'var(--brand-navy)' }}>{activeMentor.mentorName}</strong>
+                </div>
+                <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>EMPLOYEE ID</span>
+                  <code style={{ fontWeight: 700, color: 'var(--brand-orange)', fontSize: '0.9rem' }}>{activeMentor.mentorEmployeeId}</code>
+                </div>
+                <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>DEPARTMENT</span>
+                  <strong>{activeMentor.departmentName || 'Computer Engineering'}</strong>
+                </div>
+                <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>OFFICIAL EMAIL</span>
+                  <strong style={{ color: 'var(--brand-navy)' }}>{activeMentor.mentorEmail || 'faculty@university.edu'}</strong>
+                </div>
+                <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>CONTACT PHONE</span>
+                  <strong>{activeMentor.mentorPhone || '+91 98250 11001'}</strong>
+                </div>
+                <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
+                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>ASSIGNMENT DATE</span>
+                  <span>{new Date(activeMentor.assignedDate).toLocaleDateString()}</span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ color: '#EF4444', fontSize: '0.875rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <AlertCircle size={16} /> No faculty mentor currently assigned. Please contact your department HOD.
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* --- Faculty Academic & Employment Details Section --- */}
+      {role === 'FACULTY' && (() => {
+        const facRecord = db.getFaculty().find(f => f.id === user?.id || f.email === user?.email);
+        const mySubjects = db.getSubjects().filter(s => s.departmentId === (facRecord?.departmentId || user?.departmentId));
+        return (
+          <div className="card" style={{ padding: '1.75rem', borderLeft: '4px solid var(--brand-orange)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                  <Award size={22} color="var(--brand-orange)" /> Faculty Academic &amp; Employment Profile
+                </h3>
+                <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                  Official university appointment, department allocation, and teaching responsibilities
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <Badge variant="navy">READ ONLY (AUTHORIZED HR MASTER)</Badge>
+                {((facRecord as any)?.isMentor || Boolean((user as any).isMentor)) && <Badge variant="gold">ASSIGNED MENTOR</Badge>}
+              </div>
+            </div>
+
+            <div className="grid-3" style={{ gap: '1.25rem', fontSize: '0.84375rem' }}>
+              <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>EMPLOYEE ID</span>
+                <code style={{ fontWeight: 700, color: 'var(--brand-orange)', fontSize: '1rem' }}>{facRecord?.employeeId || user.employeeId || 'FAC-001'}</code>
+              </div>
+              <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>DESIGNATION</span>
+                <strong style={{ fontSize: '1rem', color: 'var(--brand-navy)' }}>{facRecord?.designation || 'Assistant Professor'}</strong>
+              </div>
+              <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>DEPARTMENT</span>
+                <strong>{department?.name || 'Department of Computer Science & Engineering'}</strong>
+              </div>
+              <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>INSTITUTE</span>
+                <strong>{institute?.name || 'Swarrnim Institute of Technology'}</strong>
+              </div>
+              <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>ACADEMIC YEAR</span>
+                <strong>2025-2026 (Even Semester)</strong>
+              </div>
+              <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
+                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>ASSIGNED SUBJECTS</span>
+                <strong style={{ color: 'var(--brand-orange)' }}>{mySubjects.length} Curriculum Courses</strong>
+              </div>
+            </div>
+
+            {mySubjects.length > 0 && (
+              <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+                <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '0.5rem' }}>Active Teaching Subjects:</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {mySubjects.map(sub => (
+                    <span key={sub.id} style={{ padding: '0.35rem 0.75rem', background: '#F1F5F9', borderRadius: '6px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--brand-navy)' }}>
+                      <strong>{sub.code}:</strong> {sub.name} ({sub.credits} Credits • {sub.type})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Mentor Responsibilities Details */}
+            {(() => {
+              const { students: mentees } = mentorAssignmentService.getAssignments({}, user);
+              if (mentees.length > 0 || (facRecord as any)?.isMentor) {
+                return (
+                  <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <div>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Award size={16} color="var(--brand-gold)" /> Designated Official Academic Mentor
+                      </div>
+                      <div style={{ fontSize: '0.78125rem', color: 'var(--text-muted)' }}>
+                        Currently mentoring and counseling <strong>{mentees.length} assigned students</strong> for AY 2025-2026.
+                      </div>
+                    </div>
+                    <Badge variant="gold">{mentees.length} Assigned Mentees</Badge>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+          </div>
+        );
+      })()}
 
       <div className="grid-2">
         {/* Profile Info Form */}

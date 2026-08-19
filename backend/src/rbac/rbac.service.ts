@@ -252,7 +252,7 @@ export class RbacService {
     }
 
     const activeRoles = user.userRoles.map((ur) => ur.role);
-    if (activeRoles.some((r) => r.code === 'SYSTEM_ADMIN')) {
+    if (activeRoles.some((r) => r.code === 'SYSTEM_ADMIN' || r.code === 'SUPER_ADMIN')) {
       return { granted: true, userAuthorityLevel: 100, userScope: 'UNIVERSITY' };
     }
 

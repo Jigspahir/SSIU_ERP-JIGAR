@@ -145,6 +145,17 @@ export class UpdateAttendancePolicyDto {
   @Max(100)
   requiredPercentage?: number;
 
+  @ApiPropertyOptional({ example: 60 })
+  @IsOptional()
+  @IsNumber()
+  @Min(40)
+  @Max(100)
+  condonationFloorPct?: number;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  isCondonationAllowed?: boolean;
+
   @ApiPropertyOptional({ example: 80 })
   @IsOptional()
   @IsNumber()
@@ -164,4 +175,136 @@ export class UpdateAttendancePolicyDto {
   @IsOptional()
   @IsNumber()
   allowCorrectionDays?: number;
+}
+
+export enum AttendanceApplicationReasonEnum {
+  MEDICAL = 'MEDICAL',
+  UNIVERSITY_ACTIVITY = 'UNIVERSITY_ACTIVITY',
+  OFFICIAL_DUTY = 'OFFICIAL_DUTY',
+  ACADEMIC_ACTIVITY = 'ACADEMIC_ACTIVITY',
+  OTHER = 'OTHER'
+}
+
+export enum AttendanceApprovalStatusEnum {
+  SUBMITTED_TO_FACULTY = 'SUBMITTED_TO_FACULTY',
+  FACULTY_APPROVED = 'FACULTY_APPROVED',
+  FACULTY_REJECTED = 'FACULTY_REJECTED',
+  WITH_MENTOR = 'WITH_MENTOR',
+  MENTOR_APPROVED = 'MENTOR_APPROVED',
+  MENTOR_REJECTED = 'MENTOR_REJECTED',
+  WITH_HOD = 'WITH_HOD',
+  HOD_APPROVED = 'HOD_APPROVED',
+  HOD_REJECTED = 'HOD_REJECTED',
+  WITH_HOI = 'WITH_HOI',
+  HOI_APPROVED = 'HOI_APPROVED',
+  HOI_REJECTED = 'HOI_REJECTED',
+  MORE_INFORMATION_REQUIRED = 'MORE_INFORMATION_REQUIRED',
+  FINAL_APPROVED = 'FINAL_APPROVED',
+  EXAM_ELIGIBLE = 'EXAM_ELIGIBLE',
+  CLOSED = 'CLOSED'
+}
+
+export class CreateAttendanceApplicationDto {
+  @ApiProperty({ example: 'sub-dbms', description: 'Subject ID with attendance shortage (< 75%)' })
+  @IsString()
+  @IsNotEmpty()
+  subjectId: string;
+
+  @ApiProperty({ enum: AttendanceApplicationReasonEnum, example: AttendanceApplicationReasonEnum.MEDICAL })
+  @IsEnum(AttendanceApplicationReasonEnum)
+  reason: AttendanceApplicationReasonEnum;
+
+  @ApiProperty({ example: 'Hospitalized due to viral infection from 10th to 18th July. Doctor certificate attached.' })
+  @IsString()
+  @IsNotEmpty()
+  description: string;
+
+  @ApiPropertyOptional({ example: 'https://cdn.ssiu.edu/documents/medical_cert.pdf' })
+  @IsOptional()
+  @IsString()
+  supportingDocumentUrl?: string;
+
+  @ApiPropertyOptional({ example: 'Doctor_Medical_Certificate.pdf' })
+  @IsOptional()
+  @IsString()
+  supportingDocumentName?: string;
+}
+
+export class AttendanceReviewActionDto {
+  @ApiProperty({ enum: ['APPROVE', 'REJECT', 'REQUEST_MORE_INFO'], example: 'APPROVE' })
+  @IsString()
+  @IsNotEmpty()
+  decision: 'APPROVE' | 'REJECT' | 'REQUEST_MORE_INFO';
+
+  @ApiProperty({ example: 'Verified medical documentation and doctor fitness certificate. Approved for condonation.' })
+  @IsString()
+  @IsNotEmpty()
+  remarks: string;
+}
+
+export class AttendanceApplicationQueryDto {
+  @ApiPropertyOptional({ example: 'dept-1' })
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+
+  @ApiPropertyOptional({ example: 'prog-1' })
+  @IsOptional()
+  @IsString()
+  programId?: string;
+
+  @ApiPropertyOptional({ example: 'sem-4' })
+  @IsOptional()
+  @IsString()
+  semesterId?: string;
+
+  @ApiPropertyOptional({ example: 'sub-dbms' })
+  @IsOptional()
+  @IsString()
+  subjectId?: string;
+
+  @ApiPropertyOptional({ enum: AttendanceApprovalStatusEnum })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiPropertyOptional({ example: 'Jigar' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ example: 1 })
+  @IsOptional()
+  page?: number;
+
+  @ApiPropertyOptional({ example: 20 })
+  @IsOptional()
+  limit?: number;
+}
+
+export class AttendanceEligibilityQueryDto {
+  @ApiPropertyOptional({ example: 'dept-1' })
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+
+  @ApiPropertyOptional({ example: 'prog-1' })
+  @IsOptional()
+  @IsString()
+  programId?: string;
+
+  @ApiPropertyOptional({ example: 'sem-4' })
+  @IsOptional()
+  @IsString()
+  semesterId?: string;
+
+  @ApiPropertyOptional({ enum: ['ALL', 'ELIGIBLE', 'SHORTAGE', 'CONDONED'], example: 'ALL' })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiPropertyOptional({ example: '240101001' })
+  @IsOptional()
+  @IsString()
+  search?: string;
 }

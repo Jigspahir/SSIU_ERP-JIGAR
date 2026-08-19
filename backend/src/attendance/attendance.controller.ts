@@ -1,11 +1,16 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { Response } from 'express';
 import { AttendanceService } from './attendance.service';
 import { 
   CreateAttendanceSessionDto, 
   CreateAttendanceCorrectionDto, 
   ReviewAttendanceCorrectionDto, 
-  UpdateAttendancePolicyDto 
+  UpdateAttendancePolicyDto,
+  CreateAttendanceApplicationDto,
+  AttendanceReviewActionDto,
+  AttendanceApplicationQueryDto,
+  AttendanceEligibilityQueryDto
 } from './dto/attendance.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RbacGuard } from '../rbac/rbac.guard';
@@ -99,7 +104,67 @@ export class AttendanceController {
 
   @Patch('policy')
   @ApiOperation({ summary: 'Update attendance policy threshold configuration' })
-  updatePolicy(@Body() dto: UpdateAttendancePolicyDto) {
-    return this.attendanceService.updatePolicy(dto);
+  updatePolicy(@Body() dto: UpdateAttendancePolicyDto, @Req() req: any) {
+    return this.attendanceService.updatePolicy(dto, req.user);
+  }
+
+  // ─── 4-TIER SEQUENTIAL ATTENDANCE CONDONATION APPROVAL WORKFLOW ───────────
+
+  @Post('applications')
+  @ApiOperation({ summary: 'Student creates attendance condonation application for shortage (< 75%)' })
+  createApplication(@Body() dto: CreateAttendanceApplicationDto, @Req() req: any) {
+    return this.attendanceService.createAttendanceApplication(dto, req.user);
+  }
+
+  @Get('applications')
+  @ApiOperation({ summary: 'Get role-scoped attendance applications queue (Student, Faculty, Mentor, HOD, HOI)' })
+  getApplications(@Query() query: AttendanceApplicationQueryDto, @Req() req: any) {
+    return this.attendanceService.getApplicationsQueue(query, req.user);
+  }
+
+  @Get('applications/:id')
+  @ApiOperation({ summary: 'Get attendance application details and audit timeline' })
+  getApplicationById(@Param('id') id: string, @Req() req: any) {
+    return this.attendanceService.getApplicationById(id, req.user);
+  }
+
+  @Post('applications/:id/faculty-review')
+  @ApiOperation({ summary: 'Step 1: Subject Faculty review (Approve -> Mentor, Reject, More Info)' })
+  facultyReview(@Param('id') id: string, @Body() dto: AttendanceReviewActionDto, @Req() req: any) {
+    return this.attendanceService.facultyReview(id, dto, req.user);
+  }
+
+  @Post('applications/:id/mentor-review')
+  @ApiOperation({ summary: 'Step 2: Student Mentor review (Approve -> HOD, Reject, More Info)' })
+  mentorReview(@Param('id') id: string, @Body() dto: AttendanceReviewActionDto, @Req() req: any) {
+    return this.attendanceService.mentorReview(id, dto, req.user);
+  }
+
+  @Post('applications/:id/hod-review')
+  @ApiOperation({ summary: 'Step 3: Department HOD review (Approve -> HOI, Reject, More Info)' })
+  hodReview(@Param('id') id: string, @Body() dto: AttendanceReviewActionDto, @Req() req: any) {
+    return this.attendanceService.hodReview(id, dto, req.user);
+  }
+
+  @Post('applications/:id/hoi-review')
+  @ApiOperation({ summary: 'Step 4: Institute HOI (Principal) final review (Grant Exam Eligibility / Reject)' })
+  hoiReview(@Param('id') id: string, @Body() dto: AttendanceReviewActionDto, @Req() req: any) {
+    return this.attendanceService.hoiReview(id, dto, req.user);
+  }
+
+  @Get('eligibility-matrix')
+  @ApiOperation({ summary: 'Institutional Exam Eligibility Matrix for Exam Controller / Staff' })
+  getEligibilityMatrix(@Query() query: AttendanceEligibilityQueryDto, @Req() req: any) {
+    return this.attendanceService.getExamEligibilityMatrix(query, req.user);
+  }
+
+  @Get('reports/export-xlsx')
+  @ApiOperation({ summary: 'Export official attendance and exam eligibility report to Excel (.xlsx)' })
+  async exportReportXlsx(@Query() query: AttendanceEligibilityQueryDto, @Req() req: any, @Res() res: Response) {
+    const buffer = await this.attendanceService.exportAttendanceReportXlsx(query, req.user);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="SSIU_Attendance_Exam_Eligibility_${Date.now()}.xlsx"`);
+    res.send(buffer);
   }
 }
+

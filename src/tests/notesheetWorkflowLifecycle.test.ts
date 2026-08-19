@@ -1,0 +1,225 @@
+declare const process: any;
+
+import { db } from '../services/db';
+import { User, NoteSheet } from '../types';
+
+let totalTests = 0;
+let totalPassed = 0;
+let totalFailed = 0;
+
+function assert(condition: boolean, testName: string, detail?: string): void {
+  totalTests++;
+  if (condition) {
+    console.log(`  ✓ PASS: ${testName}`);
+    totalPassed++;
+  } else {
+    console.error(`  ✗ FAIL: ${testName} ${detail ? `(${detail})` : ''}`);
+    totalFailed++;
+  }
+}
+
+export async function runNotesheetWorkflowLifecycleTests(): Promise<void> {
+  console.log('\n========================================================================');
+  console.log('TEST SUITE: NOTESHEET MULTI-STAGE APPROVE & FORWARD WORKFLOW LIFECYCLE');
+  console.log('========================================================================\n');
+
+  db.resetToDefaultSeed();
+
+  const facultyUser: User = {
+    id: 'usr-fac-cse-101',
+    name: 'Prof. Ananya Sharma',
+    email: 'ananya.sharma@swarrnim.edu.in',
+    role: 'FACULTY',
+    instituteId: 'inst-sit',
+    departmentId: 'Computer Engineering',
+    status: 'ACTIVE',
+    createdAt: ''
+  };
+
+  const hodUser: User = {
+    id: 'usr-hod-cse-101',
+    name: 'Dr. Rajesh Patel',
+    email: 'hod.cse@swarrnim.edu.in',
+    role: 'HOD',
+    instituteId: 'inst-sit',
+    departmentId: 'Computer Engineering',
+    status: 'ACTIVE',
+    createdAt: ''
+  };
+
+  const hoiUser: User = {
+    id: 'usr-hoi-sit-101',
+    name: 'Dr. D. M. Patel',
+    email: 'principal.sit@swarrnim.edu.in',
+    role: 'PRINCIPAL',
+    instituteId: 'inst-sit',
+    status: 'ACTIVE',
+    createdAt: ''
+  };
+
+  const dyRegUser: User = {
+    id: 'usr-dyreg-sit-101',
+    name: 'Dr. Deputy Registrar',
+    email: 'dyregistrar@swarrnim.edu.in',
+    role: 'DEPUTY_REGISTRAR',
+    instituteId: 'inst-sit',
+    status: 'ACTIVE',
+    createdAt: ''
+  };
+
+  const registrarUser: User = {
+    id: 'usr-reg-univ-101',
+    name: 'Dr. Sanjay Patel',
+    email: 'registrar@swarrnim.edu.in',
+    role: 'REGISTRAR',
+    status: 'ACTIVE',
+    createdAt: ''
+  };
+
+  // Seed scope for dyRegUser
+  db.assignDeputyRegistrarScope({
+    userId: dyRegUser.id,
+    instituteId: 'inst-sit',
+    departmentIds: ['dept-cse', 'Computer Engineering', 'ALL'],
+    assignedByUser: registrarUser
+  });
+
+  // ─── STEP 1: FACULTY CREATES & SUBMITS NOTESHEET ───────────────────────────
+  console.log('\n--- Step 1: Faculty creates & submits Notesheet ---');
+  const newNote = db.createNoteSheet({
+    subject: 'AI & Robotics Lab Modernization Proposal',
+    department: 'Computer Engineering',
+    category: 'Academic',
+    proposal: 'Procurement of advanced GPU workstations for deep learning coursework.',
+    purposeJustification: 'Mandatory for upcoming semester curriculum and research projects.',
+    financialRequirement: false
+  }, facultyUser, false);
+
+  assert(Boolean(newNote && newNote.id), '1.1 Notesheet created with unique ID');
+  assert(newNote.status === 'PENDING_HOD', `1.2 Initial status is PENDING_HOD (actual: ${newNote.status})`);
+  assert(newNote.currentOffice === 'HOD', `1.3 Current office is HOD (actual: ${newNote.currentOffice})`);
+
+  // ─── STEP 2: HOD RECEIVES & ENDORSES (APPROVES & FORWARDS) ────────────────
+  console.log('\n--- Step 2: HOD Pending With Me & Intermediate Endorsement ---');
+  const hodPendingBefore = db.getPendingWithMeNotesheets(hodUser, 'HOD');
+  assert(hodPendingBefore.some(n => n.id === newNote.id), '2.1 HOD sees newly submitted Notesheet in Pending With Me');
+
+  // HOD executes APPROVE action
+  db.processNoteSheetAction(
+    newNote.id,
+    'APPROVE',
+    'Recommended and approved at Department level. Forwarding to Principal Office.',
+    undefined,
+    hodUser
+  );
+
+  const noteAfterHod = db.getNoteSheets().find(n => n.id === newNote.id)!;
+  assert(noteAfterHod.status !== 'APPROVED', `2.2 CRITICAL: Notesheet is NOT marked APPROVED at intermediate HOD stage (status: ${noteAfterHod.status})`);
+  assert(noteAfterHod.status === 'PENDING_HOI', `2.3 Notesheet advanced to PENDING_HOI (actual: ${noteAfterHod.status})`);
+  assert(noteAfterHod.currentOffice === 'HOI', `2.4 Current office advanced to HOI (actual: ${noteAfterHod.currentOffice})`);
+
+  const hodPendingAfter = db.getPendingWithMeNotesheets(hodUser, 'HOD');
+  assert(!hodPendingAfter.some(n => n.id === newNote.id), '2.5 HOD no longer has Notesheet in Pending With Me');
+
+  // ─── STEP 3: HOI (PRINCIPAL) RECEIVES & ENDORSES (APPROVES & FORWARDS) ────
+  console.log('\n--- Step 3: HOI (Principal) Pending With Me & Intermediate Endorsement ---');
+  const hoiPendingBefore = db.getPendingWithMeNotesheets(hoiUser, 'PRINCIPAL');
+  assert(hoiPendingBefore.some(n => n.id === newNote.id), '3.1 HOI (Principal) sees forwarded Notesheet in Pending With Me');
+
+  // HOI executes APPROVE action -> Advances to DEPUTY_REGISTRAR (Mandatory)
+  db.processNoteSheetAction(
+    newNote.id,
+    'APPROVE',
+    'Strongly endorsed for university sanction. Forwarding to Deputy Registrar Office.',
+    undefined,
+    hoiUser
+  );
+
+  const noteAfterHoi = db.getNoteSheets().find(n => n.id === newNote.id)!;
+  assert(noteAfterHoi.status !== 'APPROVED', `3.2 CRITICAL: Notesheet is NOT marked APPROVED at intermediate HOI stage (status: ${noteAfterHoi.status})`);
+  assert(noteAfterHoi.status === 'PENDING_DEPUTY_REGISTRAR', `3.3 Notesheet advanced to PENDING_DEPUTY_REGISTRAR (actual: ${noteAfterHoi.status})`);
+  assert(noteAfterHoi.currentOffice === 'DEPUTY_REGISTRAR', `3.4 Current office advanced to DEPUTY_REGISTRAR (actual: ${noteAfterHoi.currentOffice})`);
+
+  const hoiPendingAfter = db.getPendingWithMeNotesheets(hoiUser, 'PRINCIPAL');
+  assert(!hoiPendingAfter.some(n => n.id === newNote.id), '3.5 HOI no longer has Notesheet in Pending With Me');
+
+  const regPendingDuringDyReg = db.getPendingWithMeNotesheets(registrarUser, 'REGISTRAR');
+  assert(!regPendingDuringDyReg.some(n => n.id === newNote.id), '3.6 Registrar does NOT see Notesheet while pending with Deputy Registrar');
+
+  // ─── STEP 4: DEPUTY REGISTRAR REVIEWS & FORWARDS TO REGISTRAR ─────────────
+  console.log('\n--- Step 4: Deputy Registrar Pending With Me & Intermediate Endorsement ---');
+  const dyRegPendingBefore = db.getPendingWithMeNotesheets(dyRegUser, 'DEPUTY_REGISTRAR');
+  assert(dyRegPendingBefore.some(n => n.id === newNote.id), '4.1 Deputy Registrar sees Notesheet in Pending With Me');
+
+  // Deputy Registrar executes APPROVE action
+  db.processNoteSheetAction(
+    newNote.id,
+    'APPROVE',
+    'Verified compliance and administrative requirements. Recommended to Registrar.',
+    undefined,
+    dyRegUser
+  );
+
+  const noteAfterDyReg = db.getNoteSheets().find(n => n.id === newNote.id)!;
+  assert(noteAfterDyReg.status !== 'APPROVED', `4.2 Notesheet is NOT marked APPROVED at intermediate Deputy Registrar stage`);
+  assert(noteAfterDyReg.status === 'PENDING_REGISTRAR', `4.3 Notesheet advanced to PENDING_REGISTRAR (actual: ${noteAfterDyReg.status})`);
+  assert(noteAfterDyReg.currentOffice === 'REGISTRAR', `4.4 Current office advanced to REGISTRAR (actual: ${noteAfterDyReg.currentOffice})`);
+
+  const dyRegPendingAfter = db.getPendingWithMeNotesheets(dyRegUser, 'DEPUTY_REGISTRAR');
+  assert(!dyRegPendingAfter.some(n => n.id === newNote.id), '4.5 Deputy Registrar pending count cleared');
+
+  // ─── STEP 5: REGISTRAR (FINAL AUTHORITY) REVIEWS & FINAL APPROVES ─────────
+  console.log('\n--- Step 5: Registrar Pending With Me & Final Approval ---');
+  const regPendingBefore = db.getPendingWithMeNotesheets(registrarUser, 'REGISTRAR');
+  assert(regPendingBefore.some(n => n.id === newNote.id), '5.1 Registrar sees Notesheet in Pending With Me');
+
+  // Registrar executes APPROVE action (Terminal Stage)
+  db.processNoteSheetAction(
+    newNote.id,
+    'APPROVE',
+    'Sanctioned and approved by Registrar.',
+    undefined,
+    registrarUser
+  );
+
+  const noteAfterReg = db.getNoteSheets().find(n => n.id === newNote.id)!;
+  assert(noteAfterReg.status === 'APPROVED', `5.2 Notesheet is marked APPROVED upon completion by final authority (actual: ${noteAfterReg.status})`);
+  assert(noteAfterReg.decision === 'APPROVED', `5.3 Notesheet decision is APPROVED`);
+  assert(noteAfterReg.currentOffice === 'COMPLETED', `5.4 Notesheet currentOffice is COMPLETED`);
+  assert(noteAfterReg.approvedByName === registrarUser.name, `5.5 ApprovedByName set to ${registrarUser.name}`);
+
+  const regPendingAfter = db.getPendingWithMeNotesheets(registrarUser, 'REGISTRAR');
+  assert(!regPendingAfter.some(n => n.id === newNote.id), '5.6 Completed Notesheet cleared from Pending With Me queue');
+
+  // ─── STEP 6: VERIFY AUDIT MOVEMENT TRAIL ──────────────────────────────────
+  console.log('\n--- Step 6: Verify Movement History Chain ---');
+  assert(noteAfterReg.movements.length >= 5, `6.1 Complete movement audit trail recorded (${noteAfterReg.movements.length} steps)`);
+
+  const mvtHod = noteAfterReg.movements.find(m => m.fromUser.includes('HOD') || m.fromUser.includes('Dr. Rajesh Patel'));
+  assert(Boolean(mvtHod && mvtHod.action === 'FORWARD'), '6.2 HOD step recorded as FORWARD in movement history');
+
+  const mvtHoi = noteAfterReg.movements.find(m => m.fromUser.includes('HOI') || m.fromUser.includes('Dr. D. M. Patel'));
+  assert(Boolean(mvtHoi && mvtHoi.action === 'FORWARD'), '6.3 HOI step recorded as FORWARD in movement history');
+
+  const mvtDyReg = noteAfterReg.movements.find(m => m.fromUserRole === 'DEPUTY_REGISTRAR' || m.fromUser.includes('Deputy Registrar'));
+  assert(Boolean(mvtDyReg && mvtDyReg.action === 'FORWARD'), '6.4 Deputy Registrar step recorded as FORWARD in movement history');
+
+  const mvtReg = noteAfterReg.movements.find(m => m.fromUserRole === 'REGISTRAR' || m.fromUserId === registrarUser.id || (m.fromUser.includes('REGISTRAR') && !m.fromUser.includes('DEPUTY')));
+  assert(Boolean(mvtReg && mvtReg.action === 'APPROVE'), '6.5 Registrar step recorded as APPROVE in movement history');
+
+  // ─── SUMMARY ───────────────────────────────────────────────────────────────
+  console.log('\n========================================================================');
+  console.log(`WORKFLOW LIFECYCLE TEST RESULTS: ${totalPassed} PASSED, ${totalFailed} FAILED out of ${totalTests} tests`);
+  console.log('========================================================================\n');
+
+  if (totalFailed > 0 && typeof process !== 'undefined' && process.exit) {
+    process.exit(1);
+  }
+}
+
+if (typeof window === 'undefined' && typeof process !== 'undefined') {
+  runNotesheetWorkflowLifecycleTests().catch(err => {
+    console.error('Fatal test execution error:', err);
+    process.exit(1);
+  });
+}

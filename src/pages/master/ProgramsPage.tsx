@@ -54,7 +54,7 @@ export const ProgramsPage: React.FC = () => {
     setEditingItem(item);
     setCode(item.code);
     setName(item.name);
-    setDepartmentId(item.departmentId);
+    setDepartmentId(item.departmentId || '');
     setDegreeType(item.degreeType);
     setDurationYears(item.durationYears);
     setTotalSemesters(item.totalSemesters);

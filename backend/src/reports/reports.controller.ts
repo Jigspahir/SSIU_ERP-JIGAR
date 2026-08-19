@@ -1,6 +1,17 @@
-import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Query,
+  Req,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ReportsService } from './reports.service';
+import { GenerateReportDto } from './dto/central-report.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RbacGuard } from '../rbac/rbac.guard';
 import { RequirePermission } from '../rbac/require-permission.decorator';
@@ -11,6 +22,13 @@ import { RequirePermission } from '../rbac/require-permission.decorator';
 @UseGuards(JwtAuthGuard, RbacGuard)
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
+
+  @Post('generate')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Universal Centralized Report Generation & Multi-format Exporter' })
+  generateReport(@Req() req: any, @Body() dto: GenerateReportDto) {
+    return this.reportsService.generateReport(req.user, dto);
+  }
 
   @Get('students')
   @RequirePermission('STUDENT', 'VIEW')

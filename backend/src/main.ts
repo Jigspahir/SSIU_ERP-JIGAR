@@ -22,6 +22,20 @@ async function bootstrap() {
     }),
   );
 
+  // Payload Size Limits & Anti-DOS Protection
+  const express = require('express');
+  app.use(express.json({ limit: '25mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+
+  // Security Headers Middleware
+  app.use((req: any, res: any, next: any) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    next();
+  });
+
   // Enable CORS for SSIU ERP Frontend
   app.enableCors({
     origin: true,

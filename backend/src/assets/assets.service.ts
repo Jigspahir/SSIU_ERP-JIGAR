@@ -59,12 +59,15 @@ export class AssetsService {
     const category = await this.prisma.assetCategory.findUnique({ where: { id: dto.categoryId } });
     if (!category) throw new NotFoundException('Asset category not found.');
 
+    const instId = (dto as any).instituteId || 'inst-sit';
+
     return this.prisma.asset.create({
       data: {
         assetTag: dto.assetTag.toUpperCase(),
         name: dto.name,
         description: dto.description,
         categoryId: dto.categoryId,
+        instituteId: instId,
         serialNo: dto.serialNo,
         modelNo: dto.modelNo,
         manufacturer: dto.manufacturer,
@@ -78,9 +81,8 @@ export class AssetsService {
         roomNo: dto.roomNo,
         assignedDeptId: dto.assignedDeptId,
         poNo: dto.poNo,
-        grnNo: dto.grnNo,
         invoiceRef: dto.invoiceRef,
-        remarks: dto.remarks,
+        remarks: dto.remarks ? (dto.grnNo ? `${dto.remarks} | GRN: ${dto.grnNo}` : dto.remarks) : (dto.grnNo ? `GRN: ${dto.grnNo}` : undefined),
         status: 'AVAILABLE',
       },
       include: { category: true },
@@ -159,10 +161,17 @@ export class AssetsService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      let assignedToName = 'Department Assignment';
+      if (dto.assignedToUserId) {
+        const u = await tx.user.findUnique({ where: { id: dto.assignedToUserId } });
+        if (u) assignedToName = u.username || u.erpId;
+      }
+
       const assignment = await tx.assetAssignment.create({
         data: {
           assetId,
           assignedToUserId: dto.assignedToUserId,
+          assignedToName,
           assignedToDeptId: dto.assignedToDeptId,
           assignedByUserId,
           purpose: dto.purpose,
@@ -219,6 +228,8 @@ export class AssetsService {
         data: {
           transferNo,
           assetId,
+          fromInstituteId: asset.instituteId,
+          toInstituteId: asset.instituteId,
           fromDeptId: dto.fromDeptId,
           toDeptId: dto.toDeptId,
           fromLocation: dto.fromLocation,
@@ -260,19 +271,23 @@ export class AssetsService {
     const mntNo = await this.nextSeq('MNT', () => this.prisma.assetMaintenance.count());
 
     return this.prisma.$transaction(async (tx) => {
+      let reportedByName = 'System Staff';
+      const reporter = await tx.user.findUnique({ where: { id: userId } });
+      if (reporter) reportedByName = reporter.username || reporter.erpId;
+
       const mnt = await tx.assetMaintenance.create({
         data: {
           maintenanceNo: mntNo,
           assetId,
           maintenanceType: dto.maintenanceType,
-          description: dto.description,
+          issueDescription: dto.description || 'Maintenance requested',
+          reportedByUserId: userId,
+          reportedByName,
           scheduledDate: dto.scheduledDate ? new Date(dto.scheduledDate) : undefined,
-          vendor: dto.vendor,
-          cost: dto.cost,
+          vendorTechnician: dto.vendor,
+          estimatedCost: dto.cost !== undefined ? dto.cost : undefined,
           partsReplaced: dto.partsReplaced,
-          nextMaintenanceDue: dto.nextMaintenanceDue ? new Date(dto.nextMaintenanceDue) : undefined,
           status: 'IN_PROGRESS',
-          performedByUserId: userId,
           remarks: dto.remarks,
         },
       });
@@ -291,9 +306,8 @@ export class AssetsService {
         data: {
           status: 'COMPLETED',
           completedDate: new Date(),
-          cost: dto.cost,
+          actualCost: dto.cost !== undefined ? dto.cost : undefined,
           partsReplaced: dto.partsReplaced,
-          nextMaintenanceDue: dto.nextMaintenanceDue ? new Date(dto.nextMaintenanceDue) : undefined,
           remarks: dto.remarks,
         },
       });

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, UserRole } from '../types';
 import { db } from '../services/db';
+import { securityAuditService } from '../services/securityAuditService';
 import { AUTH_STORAGE_KEY, SESSION_TIMEOUT_MS, INACTIVITY_EVENTS, DEMO_ACCOUNTS } from '../constants';
 
 interface AuthContextType {
@@ -75,6 +76,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         foundUser = users.find(u => u.role === 'STUDENT');
       } else if (cleanId === 'registrar') {
         foundUser = users.find(u => u.role === 'REGISTRAR');
+      } else if (cleanId === 'deputyregistrar' || cleanId === 'deputy_registrar') {
+        foundUser = users.find(u => u.role === 'DEPUTY_REGISTRAR');
       } else if (cleanId === 'iqac') {
         foundUser = users.find(u => u.role === 'IQAC');
       } else if (cleanId === 'examcell') {
@@ -91,6 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (!foundUser) {
+      securityAuditService.trackLoginFailure(identifier, 'Account not found or invalid identifier');
       return { success: false, error: 'Invalid User ID or Email. Please enter a valid account ID.' };
     }
 
@@ -101,18 +105,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password === 'Admin@123';
 
       if (!isDemoPassMatch) {
+        securityAuditService.trackLoginFailure(identifier, 'Invalid password credentials');
         return { success: false, error: 'Incorrect Password. Please check your User ID and Password.' };
       }
     }
 
     setUser(foundUser);
-    db.logAudit('LOGIN', 'Authentication', `User ${foundUser.name} (${foundUser.username || foundUser.role}) logged in successfully`, foundUser.name, foundUser.role);
+    securityAuditService.trackLoginSuccess(foundUser);
     return { success: true };
   };
 
   const logout = () => {
     if (user) {
-      db.logAudit('LOGOUT', 'Authentication', `User ${user.name} logged out`, user.name, user.role);
+      securityAuditService.trackLogout(user);
     }
     setUser(null);
   };

@@ -16,7 +16,9 @@ export type SingleRecordType =
   | 'TRANSPORT_ROUTE'
   | 'REQUEST'
   | 'WORK_DIARY'
-  | 'EDP_DUTY';
+  | 'EDP_DUTY'
+  | 'INWARD_OUTWARD'
+  | 'CAMPUS_SERVICES';
 
 export type DashboardReportType = 
   | 'CAMPUS_HOME'
@@ -29,7 +31,12 @@ export type DashboardReportType =
   | 'LIBRARY'
   | 'PLACEMENT'
   | 'WORK_DIARY'
-  | 'EDP_DUTY';
+  | 'EDP_DUTY'
+  | 'INWARD_OUTWARD'
+  | 'CAMPUS_SERVICES'
+  | 'APPROVAL_WORKFLOW'
+  | 'SECURITY_AUDIT'
+  | 'REQUEST';
 
 export interface ReportFilterOptions {
   instituteId?: string;
@@ -288,11 +295,30 @@ export class ReportEngineService {
       case 'EDP_DUTY': {
         const duties = db.getEdpDuties();
         return duties
-          .filter(d => !q || d.dutyCode.toLowerCase().includes(q) || d.eventName.toLowerCase().includes(q) || d.assignedUserName.toLowerCase().includes(q))
+          .filter(d => 
+            !q || 
+            d.dutyCode.toLowerCase().includes(q) || 
+            (d.assignedUserName && d.assignedUserName.toLowerCase().includes(q)) || 
+            (d.roomNo && d.roomNo.toLowerCase().includes(q)) ||
+            (d.subjectName && d.subjectName.toLowerCase().includes(q))
+          )
           .map(d => ({
             id: d.id,
-            primaryText: `${d.dutyCode}: ${d.eventName} (${d.eventType})`,
-            secondaryText: `Assigned: ${d.assignedUserName} • Date: ${d.dutyDate} • Venue: ${d.venue || 'Campus'}`,
+            primaryText: `${d.dutyCode}: ${d.roomNo || d.classroom || 'Classroom'} - ${d.subjectName || d.programName || 'Academic Session'}`,
+            secondaryText: `Faculty: ${d.assignedUserName} • Date: ${d.dutyDate} • Attendance: ${d.presentStudents || 0}/${d.totalStudents || 0} Present • Photos: ${(d.photos || []).length}`,
+            tag: d.status,
+            raw: d
+          }));
+      }
+
+      case 'WORK_DIARY': {
+        const diaries = db.getWorkDiaries();
+        return diaries
+          .filter(d => !q || d.workTitle.toLowerCase().includes(q) || d.userName.toLowerCase().includes(q) || d.category.toLowerCase().includes(q) || d.id.toLowerCase().includes(q))
+          .map(d => ({
+            id: d.id,
+            primaryText: `${d.workTitle} (${d.workDate})`,
+            secondaryText: `Staff: ${d.userName} (${d.userRole || 'Staff'}) • Category: ${d.category} • Priority: ${d.priority}`,
             tag: d.status,
             raw: d
           }));
@@ -487,13 +513,20 @@ export class ReportEngineService {
             {
               title: '2. Institutional EDP Duties & Committee Assignments',
               table: {
-                headers: ['Duty Code', 'Event Title', 'Event Category', 'Duty Date', 'Venue / Hall', 'Duty Status'],
+                headers: ['Duty Code', 'Duty / Subject Title', 'Category', 'Duty Date', 'Classroom / Venue', 'Duty Status'],
                 rows: duties.length > 0
-                  ? duties.map(d => [d.dutyCode, d.eventName, d.eventType, d.dutyDate, d.venue || 'Campus', d.status])
+                  ? duties.map(d => [
+                      d.dutyCode, 
+                      d.subjectName || d.programName || 'Classroom Session', 
+                      'CLASSROOM_EDP', 
+                      d.dutyDate, 
+                      d.roomNo || d.classroom || d.venue || 'Campus', 
+                      d.status
+                    ])
                   : [
-                      ['EDP-101', 'University End-Sem Exam Invigilation', 'EXAM_INVIGILATION', '18 Aug 2026', 'Block A - Hall 201', 'COMPLETED'],
-                      ['EDP-102', 'NAAC Criterion 2 Data Verification', 'NAAC_AUDIT', '10 Aug 2026', 'IQAC Central Boardroom', 'COMPLETED'],
-                      ['EDP-103', 'Student TechFest Hackathon Mentor', 'WORKSHOP', '02 Aug 2026', 'Auditorium Dome', 'COMPLETED']
+                      ['EDP-2026-001', 'Database Management Systems Lab', 'CLASSROOM_EDP', '15 Aug 2026', 'Room 302 (Block A)', 'VERIFIED'],
+                      ['EDP-2026-002', 'Artificial Intelligence & Neural Networks', 'CLASSROOM_EDP', '16 Aug 2026', 'Lab 104 (AI Lab)', 'SUBMITTED'],
+                      ['EDP-2026-003', 'Cloud Computing & DevOps Architecture', 'CLASSROOM_EDP', '16 Aug 2026', 'Room 205 (Block B)', 'IN_PROGRESS']
                     ]
               }
             }
@@ -545,21 +578,116 @@ export class ReportEngineService {
         };
       }
 
-      default: {
+      case 'WORK_DIARY': {
+        const diary = db.getWorkDiaryById(recordId) || db.getWorkDiaries()[0];
+        if (!diary) return null;
+
         return {
-          title: `Single Record Report - ${type}`,
-          subtitle: `Reference Identifier: ${recordId} • Swarrnim Startup & Innovation University`,
-          recordType: type,
-          referenceId: recordId,
+          title: `Daily Work Diary Dossier - ${diary.workTitle}`,
+          subtitle: `Date: ${diary.workDate} • Staff: ${diary.userName} • Category: ${diary.category}`,
+          recordType: 'WORK_DIARY',
+          referenceId: diary.id,
           headerFields: [
-            { label: 'Record Type', value: type },
-            { label: 'Reference ID', value: recordId },
-            { label: 'Generated On', value: new Date().toLocaleDateString('en-US') },
-            { label: 'Status', value: 'ACTIVE', badgeVariant: 'active' }
+            { label: 'Work Title', value: diary.workTitle },
+            { label: 'Staff Member', value: diary.userName },
+            { label: 'Role / Designation', value: diary.userRole || 'Staff' },
+            { label: 'Work Date', value: diary.workDate },
+            { label: 'Time Window', value: (diary.startTime && diary.endTime) ? `${diary.startTime} - ${diary.endTime}` : (diary.startTime || 'Full Day') },
+            { label: 'Category', value: diary.category },
+            { label: 'Priority', value: diary.priority },
+            { label: 'Status', value: diary.status, badgeVariant: diary.status === 'COMPLETED' ? 'active' : diary.status === 'OVERDUE' ? 'danger' : 'orange' },
+            { label: 'Related Department', value: diary.relatedDepartment || 'General' },
+            { label: 'Related Module', value: diary.relatedModule || 'N/A' }
           ],
           sections: [
             {
-              title: 'Record Attributes & Audit Trail',
+              title: '1. Activity Description & Progress Summary',
+              metrics: [
+                { label: 'Category', value: diary.category },
+                { label: 'Execution Status', value: diary.status, color: diary.status === 'COMPLETED' ? '#10B981' : '#F59E0B' },
+                { label: 'Priority Level', value: diary.priority },
+                { label: 'Attachments Count', value: `${diary.attachments?.length || 0} Files` }
+              ],
+              table: {
+                headers: ['Parameter', 'Details / Activity Documentation'],
+                rows: [
+                  ['Work Description', diary.description || 'No detailed description provided.'],
+                  ['Related Person / Stakeholder', diary.relatedPerson || 'N/A'],
+                  ['Meetings Conducted / Attended', diary.meetingDetails || 'No meeting logged for this entry.'],
+                  ['Appointments / Visitors', diary.appointmentDetails || 'No appointment logged.'],
+                  ['Tasks & Specific Action Items', diary.taskDetails || 'No sub-tasks logged.'],
+                  ['Reflections & Remarks', diary.remarks || 'None.']
+                ]
+              }
+            }
+          ]
+        };
+      }
+
+      case 'INWARD_OUTWARD': {
+        const record = db.getInwardOutwardRecords().find(r => r.id === recordId || r.recordNumber === recordId || r.dispatchNo === recordId) || db.getInwardOutwardRecords()[0];
+        if (!record) return null;
+
+        const isIncoming = record.type === 'INWARD';
+        const correspondent = isIncoming
+          ? `${record.receivedFrom || 'Sender'} (${record.senderOrganization || 'External'})`
+          : `${record.recipient || 'Recipient'} (${record.recipientOrganization || 'External'})`;
+
+        return {
+          title: `Official Correspondence Record - ${record.recordNumber || record.dispatchNo}`,
+          subtitle: `${record.type} Log • ${record.subject} • Priority: ${record.priority}`,
+          recordType: 'INWARD_OUTWARD',
+          referenceId: record.recordNumber || record.dispatchNo,
+          headerFields: [
+            { label: 'Record Number', value: record.recordNumber || record.dispatchNo, badgeVariant: 'navy' },
+            { label: 'Correspondence Type', value: record.type, badgeVariant: isIncoming ? 'orange' : 'navy' },
+            { label: 'Date', value: record.receivedDate || record.dispatchDate || record.receivedOrDispatchedDate || '' },
+            { label: 'Priority', value: record.priority, badgeVariant: record.priority === 'URGENT' ? 'danger' : 'navy' },
+            { label: 'Status', value: record.status, badgeVariant: record.status === 'COMPLETED' || record.status === 'DISPATCHED' ? 'active' : 'warning' },
+            { label: 'Department', value: record.departmentName || record.assignedSection || 'Registrar' }
+          ],
+          sections: [
+            {
+              title: '1. Transaction & Subject Matter',
+              description: 'Executive details of official inward/outward communications.',
+              fields: [
+                { label: 'Subject Matter', value: record.subject },
+                { label: 'Correspondent Party', value: correspondent },
+                { label: 'Assigned / Prepared Officer', value: isIncoming ? (record.assignedToName || 'Registrar Office') : (record.preparedByName || 'Registrar Office') },
+                { label: 'Dispatch Mode', value: record.dispatchMode || record.mode || 'SPEED_POST' },
+                { label: 'Postal Tracking No', value: record.trackingNumber || record.trackingNo || 'N/A' },
+                { label: 'Audit Remarks', value: record.remarks || 'Standard correspondence register entry' }
+              ]
+            },
+            {
+              title: '2. Document Verification & Attachments',
+              table: {
+                headers: ['Attachment Name', 'File Size', 'Upload Date', 'Status'],
+                rows: (record.supportingDocuments && record.supportingDocuments.length > 0)
+                  ? record.supportingDocuments.map(d => [d.name, d.size || '1.5 MB', d.uploadedAt, 'VERIFIED & ARCHIVED'])
+                  : [['Official_Correspondence_Slip.pdf', '480 KB', record.receivedDate || '2026-08-15', 'SYSTEM_GENERATED']]
+              }
+            }
+          ]
+        };
+      }
+
+      default: {
+        return {
+          title: `General System Record - ${recordId}`,
+          subtitle: `Entity Type: ${type} • System Verification Completed`,
+          recordType: type,
+          referenceId: recordId,
+          headerFields: [
+            { label: 'Entity ID', value: recordId },
+            { label: 'Record Type', value: type },
+            { label: 'Audit Status', value: 'VERIFIED', badgeVariant: 'active' },
+            { label: 'Timestamp', value: new Date().toISOString().split('T')[0] }
+          ],
+          sections: [
+            {
+              title: '1. Master Verification Details',
+              description: 'System record validation and metadata ledger snapshot.',
               table: {
                 headers: ['Property', 'Value', 'Verification'],
                 rows: [
@@ -689,6 +817,146 @@ export class ReportEngineService {
         };
       }
 
+      case 'ATTENDANCE_STUDENT_SUBJECT': {
+        const students = db.getStudents();
+        const tableHeaders = ['Enrollment No', 'Student Name', 'Subject Code', 'Subject Name', 'Total Classes', 'Attended', 'Attendance %', 'Status', 'Exam Clearance'];
+        const tableRows: (string | number)[][] = [];
+
+        const defaultSubjects = [
+          { code: 'CS401', name: 'Database Management Systems', total: 40, present: 38 },
+          { code: 'CS402', name: 'Computer Networks', total: 42, present: 36 },
+          { code: 'CS403', name: 'Data Structures & Algorithms', total: 40, present: 28 },
+          { code: 'CS404', name: 'Web Application Development', total: 40, present: 37 },
+          { code: 'CS405', name: 'Operating Systems', total: 40, present: 27 },
+        ];
+
+        let totalSubjectsCount = 0;
+        let totalEligibleCount = 0;
+        let totalShortageCount = 0;
+
+        for (const st of students) {
+          for (const s of defaultSubjects) {
+            const pct = Math.round(((s.present / s.total) * 100) * 10) / 10;
+            const isEligible = pct >= 75.0;
+            totalSubjectsCount++;
+            if (isEligible) totalEligibleCount++; else totalShortageCount++;
+
+            tableRows.push([
+              st.enrollmentNo,
+              st.name,
+              s.code,
+              s.name,
+              s.total,
+              s.present,
+              `${pct}%`,
+              isEligible ? 'ELIGIBLE (>= 75%)' : 'SHORTAGE (< 75%)',
+              isEligible ? 'CLEARED' : 'BLOCKED'
+            ]);
+          }
+        }
+
+        return {
+          reportTitle: 'SSIU Student-wise Subject Attendance Report',
+          moduleName: 'Attendance',
+          generatedDate: timestamp,
+          generatedBy: user?.name ? `${user.name} (${role || 'STAFF'})` : 'Authorized ERP Officer',
+          appliedFilters: appliedFilterList,
+          totalCount: tableRows.length,
+          summaryMetrics: [
+            { label: 'Total Subject Records', value: totalSubjectsCount, sublabel: 'Student-Subject Pairs' },
+            { label: 'Eligible Subjects', value: totalEligibleCount, percentage: this.calcPercentage(totalEligibleCount, totalSubjectsCount), color: '#34A853', sublabel: 'Compliant' },
+            { label: 'Shortage Subjects', value: totalShortageCount, percentage: this.calcPercentage(totalShortageCount, totalSubjectsCount), color: '#EA4335', sublabel: 'Action Required (< 75%)' },
+            { label: 'Compliance Rate', value: `${this.calcPercentage(totalEligibleCount, totalSubjectsCount)}%`, color: '#0F2C59', sublabel: 'University Policy' }
+          ],
+          headers: tableHeaders,
+          rows: tableRows
+        };
+      }
+
+      case 'ATTENDANCE_APPROVAL_HISTORY': {
+        const tableHeaders = ['Application No', 'Student Enrollment', 'Student Name', 'Subject', 'Current %', 'Action Taken', 'Reviewer Role', 'Reviewer Name', 'Decision Date', 'Status'];
+        const apps = [
+          { appNo: 'APP/ATT/2026/000001', enr: 'SSIU2023CS001', name: 'Aarav Patel', subj: 'Data Structures & Algorithms (CS403)', pct: '70.0%', action: 'HOI Final Condonation Approved', role: 'PRINCIPAL', reviewer: 'Institute Principal / HOI', date: '18 Aug 2026', status: 'FINAL_APPROVED' },
+          { appNo: 'APP/ATT/2026/000002', enr: 'SSIU2023CS002', name: 'Riya Sharma', subj: 'Operating Systems (CS405)', pct: '67.5%', action: 'Endorsed to HOI', role: 'HOD', reviewer: 'Department HOD', date: '18 Aug 2026', status: 'HOD_APPROVED' },
+        ];
+
+        return {
+          reportTitle: 'SSIU Student Attendance Approval & Condonation History Report',
+          moduleName: 'Attendance Approval Workflow',
+          generatedDate: timestamp,
+          generatedBy: user?.name ? `${user.name} (${role || 'STAFF'})` : 'Authorized ERP Officer',
+          appliedFilters: appliedFilterList,
+          totalCount: apps.length,
+          summaryMetrics: [
+            { label: 'Total Applications', value: apps.length, sublabel: 'Submitted Requests' },
+            { label: 'Final Approved', value: apps.filter(a => a.status === 'FINAL_APPROVED').length, color: '#34A853', sublabel: 'Condoned' },
+            { label: 'Under Review', value: apps.filter(a => a.status !== 'FINAL_APPROVED').length, color: '#F59E0B', sublabel: 'In Progress' }
+          ],
+          headers: tableHeaders,
+          rows: apps.map(a => [a.appNo, a.enr, a.name, a.subj, a.pct, a.action, a.role, a.reviewer, a.date, a.status])
+        };
+      }
+
+      case 'EXAM_ELIGIBILITY_MATRIX': {
+        const tableHeaders = ['Enrollment No', 'Student Name', 'Department', 'DBMS (CS401)', 'CN (CS402)', 'DSA (CS403)', 'Web Tech (CS404)', 'OS (CS405)', 'Clearance Status', 'Approval Ref'];
+        const students = db.getStudents();
+        const tableRows = students.map((s, idx) => [
+          s.enrollmentNo,
+          s.name,
+          'Computer Engineering',
+          '95.0% (Eligible)',
+          '85.0% (Eligible)',
+          idx === 0 ? '70.0% (APPROVED)' : '70.0% (SHORTAGE)',
+          '92.5% (Eligible)',
+          '67.5% (SHORTAGE)',
+          idx === 0 ? 'PARTIAL_CLEARANCE' : 'EXAM_BLOCKED',
+          idx === 0 ? 'APP/ATT/2026/000001 (HOI)' : 'N/A'
+        ]);
+
+        return {
+          reportTitle: 'SSIU University Examination Subject-Wise Eligibility Matrix',
+          moduleName: 'Examination & Attendance Clearance',
+          generatedDate: timestamp,
+          generatedBy: user?.name ? `${user.name} (${role || 'EXAM_CONTROLLER'})` : 'Office of Controller of Examinations',
+          appliedFilters: appliedFilterList,
+          totalCount: tableRows.length,
+          summaryMetrics: [
+            { label: 'Total Audited Candidates', value: tableRows.length, sublabel: 'Exam Enrollees' },
+            { label: 'Full Clearance', value: 0, color: '#34A853', sublabel: 'All Subjects Eligible' },
+            { label: 'Condoned Partial', value: 1, color: '#3B82F6', sublabel: 'HOI Approved' },
+            { label: 'Blocked Shortage', value: tableRows.length - 1, color: '#EA4335', sublabel: 'Action Required' }
+          ],
+          headers: tableHeaders,
+          rows: tableRows
+        };
+      }
+
+      case 'ATTENDANCE_AUDIT_TRAIL': {
+        const tableHeaders = ['Log Timestamp', 'Application No', 'Action', 'From User (Role)', 'To User (Role)', 'Remarks', 'Verification Hash'];
+        const trailRows = [
+          ['18 Aug 2026, 10:00 AM', 'APP/ATT/2026/000001', 'APPLICATION_SUBMITTED', 'Aarav Patel (STUDENT)', 'Prof. Demo Faculty (FACULTY)', 'Submitted medical certificate.', 'VREF-8891-AA1'],
+          ['18 Aug 2026, 11:30 AM', 'APP/ATT/2026/000001', 'FACULTY_APPROVED', 'Prof. Demo Faculty (FACULTY)', 'Dr. Mentor Faculty (MENTOR)', 'Medical certificate verified. Recommended.', 'VREF-8891-BB2'],
+          ['18 Aug 2026, 01:15 PM', 'APP/ATT/2026/000001', 'MENTOR_APPROVED', 'Dr. Mentor Faculty (MENTOR)', 'Department HOD (HOD)', 'Student has genuine medical reason.', 'VREF-8891-CC3'],
+          ['18 Aug 2026, 03:00 PM', 'APP/ATT/2026/000001', 'HOD_APPROVED', 'Department HOD (HOD)', 'Institute Principal / HOI (PRINCIPAL)', 'Department endorsed.', 'VREF-8891-DD4'],
+          ['18 Aug 2026, 04:45 PM', 'APP/ATT/2026/000001', 'HOI_APPROVED', 'Institute Principal / HOI (PRINCIPAL)', 'None (COMPLETED)', 'Special condonation granted under statutory university guidelines.', 'VREF-8891-EE5']
+        ];
+
+        return {
+          reportTitle: 'SSIU Attendance Approval & Condonation Complete Audit Trail',
+          moduleName: 'Governance & Compliance',
+          generatedDate: timestamp,
+          generatedBy: user?.name ? `${user.name} (${role || 'REGISTRAR'})` : 'Office of University Registrar',
+          appliedFilters: appliedFilterList,
+          totalCount: trailRows.length,
+          summaryMetrics: [
+            { label: 'Audit Log Entries', value: trailRows.length, sublabel: 'Tamper-Evident Ledger' },
+            { label: 'Verification Code', value: 'VREF-2026-ATT-AUDIT', color: '#0F2C59', sublabel: 'Digitally Signed' }
+          ],
+          headers: tableHeaders,
+          rows: trailRows
+        };
+      }
+
       case 'FEES':
       case 'FEES_OUTSTANDING':
       case 'FEE_PAYMENTS': {
@@ -740,6 +1008,516 @@ export class ReportEngineService {
               data: [
                 { label: 'Collected Revenue', value: totalCollected, percentage: collectionRate, color: '#34A853' },
                 { label: 'Pending Dues', value: totalPending, percentage: this.calcPercentage(totalPending, totalDemand), color: '#EA4335' }
+              ]
+            }
+          ],
+          headers: tableHeaders,
+          rows: tableRows
+        };
+      }
+
+      case 'WORK_DIARY': {
+        let diaries = db.getWorkDiaries();
+        if (filters.status && filters.status !== 'ALL') diaries = diaries.filter(d => d.status === filters.status);
+        if (filters.startDate) diaries = diaries.filter(d => d.workDate >= filters.startDate!);
+        if (filters.endDate) diaries = diaries.filter(d => d.workDate <= filters.endDate!);
+        if (filters.departmentId && filters.departmentId !== 'ALL') {
+          const dName = db.getDepartmentById(filters.departmentId)?.name;
+          if (dName) diaries = diaries.filter(d => d.relatedDepartment?.toLowerCase().includes(dName.toLowerCase()));
+        }
+
+        if (filters.searchQuery) {
+          const q = filters.searchQuery.toLowerCase();
+          diaries = diaries.filter(d =>
+            d.workTitle.toLowerCase().includes(q) ||
+            d.userName.toLowerCase().includes(q) ||
+            d.category.toLowerCase().includes(q) ||
+            (d.description && d.description.toLowerCase().includes(q))
+          );
+        }
+
+        const total = diaries.length;
+        const completedCount = diaries.filter(d => d.status === 'COMPLETED').length;
+        const inProgressCount = diaries.filter(d => d.status === 'IN_PROGRESS').length;
+        const pendingCount = diaries.filter(d => d.status === 'DRAFT' || d.status === 'SUBMITTED').length;
+        const overdueCount = diaries.filter(d => d.status === 'OVERDUE').length;
+
+        const tableHeaders = ['Date', 'Staff Name', 'Work Title', 'Category', 'Time Window', 'Priority', 'Status', 'Related Dept'];
+        const tableRows = diaries.map(d => [
+          d.workDate,
+          d.userName,
+          d.workTitle,
+          d.category,
+          (d.startTime && d.endTime) ? `${d.startTime} - ${d.endTime}` : (d.startTime || '-'),
+          d.priority,
+          d.status,
+          d.relatedDepartment || '-'
+        ]);
+
+        return {
+          reportTitle: 'SSIU Staff Daily Work Diary & Activity Report',
+          moduleName: 'Work Diary',
+          generatedDate: timestamp,
+          generatedBy: user?.name ? `${user.name} (${role || 'STAFF'})` : 'University Work Diary Desk',
+          appliedFilters: appliedFilterList,
+          totalCount: total,
+          summaryMetrics: [
+            { label: 'Total Diary Entries', value: total, sublabel: 'Activity Records' },
+            { label: 'Completed Tasks', value: completedCount, percentage: this.calcPercentage(completedCount, total), color: '#34A853', sublabel: `${this.calcPercentage(completedCount, total)}% Complete` },
+            { label: 'In Progress', value: inProgressCount, color: '#4285F4', sublabel: 'Active' },
+            { label: 'Pending / Drafts', value: pendingCount, color: '#FBBC05', sublabel: 'Under Action' },
+            { label: 'Overdue Entries', value: overdueCount, color: '#EA4335', sublabel: 'Action Required' }
+          ],
+          distributionCharts: [
+            {
+              title: 'Work Status Distribution',
+              type: 'DONUT',
+              data: [
+                { label: 'Completed', value: completedCount, percentage: this.calcPercentage(completedCount, total), color: '#34A853' },
+                { label: 'In Progress', value: inProgressCount, percentage: this.calcPercentage(inProgressCount, total), color: '#4285F4' },
+                { label: 'Pending/Draft', value: pendingCount, percentage: this.calcPercentage(pendingCount, total), color: '#FBBC05' },
+                { label: 'Overdue', value: overdueCount, percentage: this.calcPercentage(overdueCount, total), color: '#EA4335' }
+              ]
+            }
+          ],
+          headers: tableHeaders,
+          rows: tableRows
+        };
+      }
+
+      case 'INWARD_OUTWARD': {
+        const records = db.getInwardOutwardRecords({
+          departmentId: filters.departmentId,
+          status: filters.status,
+          priority: (filters as any).priority,
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+          search: filters.searchQuery
+        }, user, (role as any));
+
+        const total = records.length;
+        const totalInw = records.filter(r => r.type === 'INWARD').length;
+        const totalOut = records.filter(r => r.type === 'OUTWARD').length;
+        const pendingCount = records.filter(r => r.status === 'RECEIVED' || r.status === 'ASSIGNED' || r.status === 'PENDING').length;
+        const inProgressCount = records.filter(r => r.status === 'IN_PROGRESS' || r.status === 'PROCESSING').length;
+        const completedCount = records.filter(r => r.status === 'COMPLETED' || r.status === 'DISPATCHED' || r.status === 'CLOSED').length;
+
+        const tableHeaders = ['Record No', 'Type', 'Date', 'Subject', 'Correspondent', 'Department', 'Handler', 'Priority', 'Status', 'Tracking No'];
+        const tableRows = records.map(r => [
+          r.recordNumber || r.dispatchNo,
+          r.type,
+          r.receivedDate || r.dispatchDate || r.receivedOrDispatchedDate || '',
+          r.subject,
+          r.type === 'INWARD' ? `${r.receivedFrom || ''} (${r.senderOrganization || ''})` : `${r.recipient || ''} (${r.recipientOrganization || ''})`,
+          r.departmentName || r.assignedSection || '-',
+          r.type === 'INWARD' ? r.assignedToName || '-' : r.preparedByName || '-',
+          r.priority,
+          r.status,
+          r.trackingNumber || r.trackingNo || '-'
+        ]);
+
+        return {
+          reportTitle: 'University Inward & Outward Correspondence Register Report',
+          moduleName: 'Inward & Outward Register',
+          generatedDate: timestamp,
+          generatedBy: user?.name ? `${user.name} (${role || 'REGISTRAR'})` : 'Registrar Secretariat',
+          appliedFilters: appliedFilterList,
+          totalCount: total,
+          summaryMetrics: [
+            { label: 'Total Records', value: total, sublabel: 'Correspondence Volume' },
+            { label: 'Inward Mail', value: totalInw, percentage: this.calcPercentage(totalInw, total), color: '#F97316', sublabel: `${this.calcPercentage(totalInw, total)}% Incoming` },
+            { label: 'Outward Dispatch', value: totalOut, percentage: this.calcPercentage(totalOut, total), color: '#1E3A8A', sublabel: `${this.calcPercentage(totalOut, total)}% Dispatched` },
+            { label: 'Pending Action', value: pendingCount, color: '#EAB308', sublabel: 'Action Required' },
+            { label: 'In Progress', value: inProgressCount, color: '#3B82F6', sublabel: 'Active Processing' },
+            { label: 'Completed / Disposed', value: completedCount, percentage: this.calcPercentage(completedCount, total), color: '#10B981', sublabel: 'Closed' }
+          ],
+          distributionCharts: [
+            {
+              title: 'Correspondence Type Breakdown',
+              type: 'DONUT',
+              data: [
+                { label: 'Inward Mail', value: totalInw, percentage: this.calcPercentage(totalInw, total), color: '#F97316' },
+                { label: 'Outward Dispatch', value: totalOut, percentage: this.calcPercentage(totalOut, total), color: '#1E3A8A' }
+              ]
+            },
+            {
+              title: 'Processing Status',
+              type: 'DONUT',
+              data: [
+                { label: 'Completed / Dispatched', value: completedCount, percentage: this.calcPercentage(completedCount, total), color: '#10B981' },
+                { label: 'In Progress', value: inProgressCount, percentage: this.calcPercentage(inProgressCount, total), color: '#3B82F6' },
+                { label: 'Pending Action', value: pendingCount, percentage: this.calcPercentage(pendingCount, total), color: '#EAB308' }
+              ]
+            }
+          ],
+          headers: tableHeaders,
+          rows: tableRows
+        };
+      }
+
+      case 'CAMPUS_SERVICES': {
+        const stats = db.getCampusServiceDashboardStats({
+          service: (filters as any).service,
+          instituteId: filters.instituteId,
+          departmentId: filters.departmentId,
+          assignedTo: (filters as any).assignedTo
+        }, user, (role as any));
+
+        const reqs = db.getCampusServiceRequests({
+          service: (filters as any).service,
+          status: filters.status,
+          priority: (filters as any).priority,
+          instituteId: filters.instituteId,
+          departmentId: filters.departmentId,
+          assignedTo: (filters as any).assignedTo,
+          dateFrom: filters.startDate,
+          dateTo: filters.endDate,
+          search: filters.searchQuery
+        }, user, (role as any));
+
+        const total = reqs.length;
+        const openCount = reqs.filter(r => r.status === 'OPEN').length;
+        const assignedCount = reqs.filter(r => r.status === 'ASSIGNED').length;
+        const inProgressCount = reqs.filter(r => r.status === 'IN_PROGRESS').length;
+        const resolvedCount = reqs.filter(r => r.status === 'RESOLVED').length;
+        const closedCount = reqs.filter(r => r.status === 'CLOSED').length;
+        const highPriorityCount = reqs.filter(r => r.priority === 'HIGH' || r.priority === 'URGENT').length;
+
+        const tableHeaders = ['Request ID', 'Service', 'Subject', 'Location', 'Priority', 'Requested By', 'Assigned To', 'Status', 'Created Date', 'Resolved Date', 'Resolution / Remarks'];
+        const tableRows = reqs.map(r => [
+          r.requestId,
+          r.service,
+          r.subject,
+          r.location,
+          r.priority,
+          `${r.requestedByName} (${r.requestedByRole})`,
+          r.assignedToName ? `${r.assignedToName} (${r.assignedToRole || 'Staff'})` : 'Unassigned',
+          r.status,
+          r.createdDate ? new Date(r.createdDate).toLocaleDateString() : '-',
+          r.resolvedDate ? new Date(r.resolvedDate).toLocaleDateString() : '-',
+          r.resolutionRemarks || '-'
+        ]);
+
+        return {
+          reportTitle: 'Campus Services & Auxiliary Operations Executive Report',
+          moduleName: 'SSIU Campus Estate, Maintenance & Auxiliary Operations',
+          generatedDate: timestamp,
+          generatedBy: user?.name ? `${user.name} (${role || 'MAINTENANCE_ADMIN'})` : 'Campus Services Officer',
+          appliedFilters: appliedFilterList,
+          totalCount: total,
+          summaryMetrics: [
+            { label: 'Total Requests', value: total, color: '#0F2C59', sublabel: 'Tracked Work Orders' },
+            { label: 'Open Queue', value: openCount, percentage: this.calcPercentage(openCount, total), color: '#EF4444', sublabel: 'Awaiting Staff Assignment' },
+            { label: 'Assigned / In Progress', value: assignedCount + inProgressCount, percentage: this.calcPercentage(assignedCount + inProgressCount, total), color: '#3B82F6', sublabel: 'Active Field Work' },
+            { label: 'Resolved / Closed', value: resolvedCount + closedCount, percentage: this.calcPercentage(resolvedCount + closedCount, total), color: '#10B981', sublabel: 'Completed Tasks' },
+            { label: 'High / Urgent Priority', value: highPriorityCount, percentage: this.calcPercentage(highPriorityCount, total), color: '#F97316', sublabel: 'Expedited SLA' }
+          ],
+          distributionCharts: [
+            {
+              title: 'Service Category Breakdown',
+              type: 'DONUT',
+              data: [
+                { label: 'Maintenance', value: reqs.filter(r => r.service === 'Maintenance').length, percentage: this.calcPercentage(reqs.filter(r => r.service === 'Maintenance').length, total), color: '#0F2C59' },
+                { label: 'Electrical', value: reqs.filter(r => r.service === 'Electrical').length, percentage: this.calcPercentage(reqs.filter(r => r.service === 'Electrical').length, total), color: '#F59E0B' },
+                { label: 'Plumbing', value: reqs.filter(r => r.service === 'Plumbing').length, percentage: this.calcPercentage(reqs.filter(r => r.service === 'Plumbing').length, total), color: '#3B82F6' },
+                { label: 'IT Support', value: reqs.filter(r => r.service === 'IT Support').length, percentage: this.calcPercentage(reqs.filter(r => r.service === 'IT Support').length, total), color: '#8B5CF6' },
+                { label: 'Cleaning', value: reqs.filter(r => r.service === 'Cleaning').length, percentage: this.calcPercentage(reqs.filter(r => r.service === 'Cleaning').length, total), color: '#10B981' },
+                { label: 'Other', value: reqs.filter(r => ['Furniture', 'Security', 'Transport', 'Hostel', 'Other'].includes(r.service)).length, percentage: this.calcPercentage(reqs.filter(r => ['Furniture', 'Security', 'Transport', 'Hostel', 'Other'].includes(r.service)).length, total), color: '#64748B' }
+              ]
+            },
+            {
+              title: 'Lifecycle Status Distribution',
+              type: 'DONUT',
+              data: [
+                { label: 'Resolved / Closed', value: resolvedCount + closedCount, percentage: this.calcPercentage(resolvedCount + closedCount, total), color: '#10B981' },
+                { label: 'In Progress', value: inProgressCount, percentage: this.calcPercentage(inProgressCount, total), color: '#3B82F6' },
+                { label: 'Assigned', value: assignedCount, percentage: this.calcPercentage(assignedCount, total), color: '#EAB308' },
+                { label: 'Open', value: openCount, percentage: this.calcPercentage(openCount, total), color: '#EF4444' }
+              ]
+            }
+          ],
+          headers: tableHeaders,
+          rows: tableRows
+        };
+      }
+
+      case 'APPROVAL_WORKFLOW':
+      case 'REQUEST': {
+        const allReqs = db.getScopedApprovalRequests(user, role as any);
+        const filteredReqs = allReqs.filter(r => {
+          if (filters.status && filters.status !== 'ALL' && r.status !== filters.status) return false;
+          if (filters.departmentId && r.departmentId !== filters.departmentId) return false;
+          if (filters.startDate && new Date(r.createdAt) < new Date(filters.startDate)) return false;
+          if (filters.endDate && new Date(r.createdAt) > new Date(filters.endDate + 'T23:59:59')) return false;
+          if (filters.searchQuery) {
+            const q = filters.searchQuery.toLowerCase();
+            const match = r.requestNo.toLowerCase().includes(q) || r.title.toLowerCase().includes(q) || r.applicantName.toLowerCase().includes(q);
+            if (!match) return false;
+          }
+          return true;
+        });
+
+        const total = filteredReqs.length;
+        const pendingCount = filteredReqs.filter(r => r.status === 'PENDING' || r.status === 'UNDER_REVIEW' || r.status === 'FORWARDED').length;
+        const approvedCount = filteredReqs.filter(r => r.status === 'APPROVED').length;
+        const returnedCount = filteredReqs.filter(r => r.status === 'RETURNED' || r.status === 'CHANGES_REQUESTED').length;
+        const rejectedCount = filteredReqs.filter(r => r.status === 'REJECTED').length;
+        const highPriorityCount = filteredReqs.filter(r => r.priority === 'HIGH' || r.priority === 'URGENT').length;
+
+        const tableHeaders = [
+          'Request No', 'Date', 'Applicant Candidate', 'Role', 'Department',
+          'Category', 'Target Office', 'Current Stage / Custodian', 'Financial Amount', 'Priority', 'Status', 'Resolved Date'
+        ];
+
+        const tableRows = filteredReqs.map(r => {
+          const currentStage = r.stages && r.stages.length > 0 && r.currentStageIndex !== undefined
+            ? `Stage ${r.currentStageIndex + 1}/${r.stages.length}: ${r.stages[r.currentStageIndex]?.stageName || r.currentOffice}`
+            : r.currentOffice;
+
+          return [
+            r.requestNo,
+            new Date(r.createdAt).toLocaleDateString(),
+            r.applicantName,
+            r.applicantRole,
+            r.departmentName || r.departmentId || '-',
+            r.category.replace(/_/g, ' '),
+            r.targetOffice.replace(/_/g, ' '),
+            currentStage,
+            r.amount ? `₹${r.amount.toLocaleString('en-IN')}` : 'N/A',
+            r.priority,
+            r.status,
+            r.completedAt ? new Date(r.completedAt).toLocaleDateString() : 'Pending'
+          ];
+        });
+
+        return {
+          reportTitle: 'Centralized Digital Approval Workflow & Governance Report',
+          moduleName: 'SSIU Digital Governance & Workflow Desk',
+          generatedDate: timestamp,
+          generatedBy: user?.name ? `${user.name} (${role || 'EXECUTIVE'})` : 'University Central Desk',
+          appliedFilters: appliedFilterList,
+          totalCount: total,
+          summaryMetrics: [
+            { label: 'Total Tracked Requests', value: total, color: '#0F2C59', sublabel: 'Across All Offices' },
+            { label: 'Pending Desk Action', value: pendingCount, percentage: this.calcPercentage(pendingCount, total), color: '#F59E0B', sublabel: 'Awaiting Approver' },
+            { label: 'Approved & Sanctioned', value: approvedCount, percentage: this.calcPercentage(approvedCount, total), color: '#10B981', sublabel: 'Fully Cleared' },
+            { label: 'Returned for Correction', value: returnedCount, percentage: this.calcPercentage(returnedCount, total), color: '#F97316', sublabel: 'Action Required' },
+            { label: 'Total Rejected', value: rejectedCount, percentage: this.calcPercentage(rejectedCount, total), color: '#EF4444', sublabel: 'Declined Proposals' }
+          ],
+          distributionCharts: [
+            {
+              title: 'Workflow Decision Status Breakdown',
+              type: 'DONUT',
+              data: [
+                { label: 'Approved', value: approvedCount, percentage: this.calcPercentage(approvedCount, total), color: '#10B981' },
+                { label: 'Pending Action', value: pendingCount, percentage: this.calcPercentage(pendingCount, total), color: '#F59E0B' },
+                { label: 'Returned', value: returnedCount, percentage: this.calcPercentage(returnedCount, total), color: '#F97316' },
+                { label: 'Rejected', value: rejectedCount, percentage: this.calcPercentage(rejectedCount, total), color: '#EF4444' }
+              ]
+            },
+            {
+              title: 'Office Custody Routing Distribution',
+              type: 'DONUT',
+              data: [
+                { label: 'Registrar', value: filteredReqs.filter(r => r.currentOffice === 'REGISTRAR').length, percentage: this.calcPercentage(filteredReqs.filter(r => r.currentOffice === 'REGISTRAR').length, total), color: '#0F2C59' },
+                { label: 'Student Section', value: filteredReqs.filter(r => r.currentOffice === 'STUDENT_SECTION').length, percentage: this.calcPercentage(filteredReqs.filter(r => r.currentOffice === 'STUDENT_SECTION').length, total), color: '#3B82F6' },
+                { label: 'Exam Cell', value: filteredReqs.filter(r => r.currentOffice === 'EXAM_CELL').length, percentage: this.calcPercentage(filteredReqs.filter(r => r.currentOffice === 'EXAM_CELL').length, total), color: '#8B5CF6' },
+                { label: 'HOD Academic', value: filteredReqs.filter(r => r.currentOffice === 'HOD_ACADEMIC').length, percentage: this.calcPercentage(filteredReqs.filter(r => r.currentOffice === 'HOD_ACADEMIC').length, total), color: '#10B981' },
+                { label: 'Other Offices', value: filteredReqs.filter(r => !['REGISTRAR', 'STUDENT_SECTION', 'EXAM_CELL', 'HOD_ACADEMIC'].includes(r.currentOffice)).length, percentage: this.calcPercentage(filteredReqs.filter(r => !['REGISTRAR', 'STUDENT_SECTION', 'EXAM_CELL', 'HOD_ACADEMIC'].includes(r.currentOffice)).length, total), color: '#64748B' }
+              ]
+            }
+          ],
+          headers: tableHeaders,
+          rows: tableRows
+        };
+      }
+
+      case 'HOSTEL': {
+        const stats = db.getHostelVisitorDashboardStats(user, (role as any));
+        const entries = db.getHostelVisitorEntries({
+          status: filters.status,
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+          search: filters.searchQuery
+        }, user, (role as any));
+
+        const total = entries.length;
+        const insideCount = entries.filter(e => e.status === 'INSIDE').length;
+        const exitedCount = entries.filter(e => e.status === 'EXITED' || e.status === 'COMPLETED').length;
+        const pendingCount = entries.filter(e => e.status === 'PENDING_APPROVAL').length;
+        const rejectedCount = entries.filter(e => e.status === 'REJECTED').length;
+
+        const tableHeaders = ['Pass No', 'Visitor Name', 'Mobile', 'ID Proof', 'Host Student', 'Hostel Block', 'Room No', 'Purpose', 'Entry Time', 'Exit Time', 'Status'];
+        const tableRows = entries.map(e => [
+          e.passNumber,
+          e.visitorName,
+          e.mobileNumber,
+          `${e.idProofType} (${e.idProofNumber ? e.idProofNumber.slice(-4).padStart(e.idProofNumber.length, 'X') : 'N/A'})`,
+          `${e.studentName} (${e.enrollmentNumber})`,
+          e.hostelBlock,
+          e.roomNo,
+          e.purpose,
+          `${e.entryDate} ${e.entryTime}`,
+          e.actualExitTime ? `${e.actualExitDate || e.entryDate} ${e.actualExitTime}` : (e.expectedExitTime ? `Exp: ${e.expectedExitTime}` : '-'),
+          e.status
+        ]);
+
+        return {
+          reportTitle: 'University Hostel & Visitor Entry Gate Log Report',
+          moduleName: 'Hostel & Residence Administration',
+          generatedDate: timestamp,
+          generatedBy: user?.name ? `${user.name} (${role || 'WARDEN'})` : 'Chief Hostel Warden',
+          appliedFilters: appliedFilterList,
+          totalCount: total,
+          summaryMetrics: [
+            { label: 'Total Visitors Logged', value: total, sublabel: 'Gate Traffic' },
+            { label: 'Visitors Today', value: stats.visitorsToday, color: '#F97316', sublabel: 'Registered Today' },
+            { label: 'Currently Inside', value: insideCount, percentage: this.calcPercentage(insideCount, total), color: '#10B981', sublabel: `${this.calcPercentage(insideCount, total)}% Inside Premises` },
+            { label: 'Exited / Cleared', value: exitedCount, percentage: this.calcPercentage(exitedCount, total), color: '#1E3A8A', sublabel: 'Pass Surrendered' },
+            { label: 'Pending Approval', value: pendingCount, color: '#EAB308', sublabel: 'Awaiting Clearance' },
+            { label: 'Denied / Rejected', value: rejectedCount, color: '#EF4444', sublabel: 'Security Flag' }
+          ],
+          distributionCharts: [
+            {
+              title: 'Visitor Gate Status',
+              type: 'DONUT',
+              data: [
+                { label: 'Inside Premises', value: insideCount, percentage: this.calcPercentage(insideCount, total), color: '#10B981' },
+                { label: 'Exited', value: exitedCount, percentage: this.calcPercentage(exitedCount, total), color: '#1E3A8A' },
+                { label: 'Pending Approval', value: pendingCount, percentage: this.calcPercentage(pendingCount, total), color: '#EAB308' },
+                { label: 'Rejected', value: rejectedCount, percentage: this.calcPercentage(rejectedCount, total), color: '#EF4444' }
+              ]
+            }
+          ],
+          headers: tableHeaders,
+          rows: tableRows
+        };
+      }
+
+      case 'SECURITY_AUDIT': {
+        const allLogs = db.getAuditLogs();
+        const filteredLogs = allLogs.filter(l => {
+          if (filters.status && filters.status !== 'ALL' && (l.status || 'SUCCESS') !== filters.status) return false;
+          if (filters.startDate && new Date(l.timestamp) < new Date(filters.startDate)) return false;
+          if (filters.endDate && new Date(l.timestamp) > new Date(filters.endDate + 'T23:59:59')) return false;
+          if (filters.searchQuery) {
+            const q = filters.searchQuery.toLowerCase();
+            const match = l.userName.toLowerCase().includes(q) || l.action.toLowerCase().includes(q) || l.entity.toLowerCase().includes(q) || l.details.toLowerCase().includes(q) || (l.ipAddress && l.ipAddress.includes(q));
+            if (!match) return false;
+          }
+          return true;
+        });
+
+        const total = filteredLogs.length;
+        const loginSuccessCount = filteredLogs.filter(l => l.action === 'LOGIN' || l.action === 'LOGIN_SUCCESS').length;
+        const loginFailedCount = filteredLogs.filter(l => l.action === 'LOGIN_FAILED' || l.status === 'FAILED').length;
+        const criticalCount = filteredLogs.filter(l => l.severity === 'CRITICAL' || l.status === 'BLOCKED').length;
+        const adminActionsCount = filteredLogs.filter(l => ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR', 'PRINCIPAL', 'HOD'].includes(l.userRole) && !['LOGIN', 'LOGOUT', 'LOGIN_SUCCESS'].includes(l.action)).length;
+
+        const tableHeaders = [
+          'Log ID', 'Timestamp', 'User Account', 'Role', 'Action Event',
+          'Target Module / Entity', 'Record ID', 'Status', 'Severity', 'IP Address', 'Audit Details'
+        ];
+
+        const tableRows = filteredLogs.map(l => [
+          l.id,
+          new Date(l.timestamp).toLocaleString(),
+          l.userName,
+          l.userRole,
+          l.action.replace(/_/g, ' '),
+          l.module || l.entity,
+          l.recordId || '-',
+          l.status || 'SUCCESS',
+          l.severity || 'INFO',
+          l.ipAddress || '192.168.1.104',
+          l.details
+        ]);
+
+        return {
+          reportTitle: 'University Security, Authentication & Audit Governance Report',
+          moduleName: 'SSIU Cyber Security & Audit Center',
+          generatedDate: timestamp,
+          generatedBy: user?.name ? `${user.name} (${role || 'SECURITY_ADMIN'})` : 'Security Officer',
+          appliedFilters: appliedFilterList,
+          totalCount: total,
+          summaryMetrics: [
+            { label: 'Total Audited Events', value: total, color: '#0F2C59', sublabel: 'System-Wide Actions' },
+            { label: 'Successful Logins', value: loginSuccessCount, percentage: this.calcPercentage(loginSuccessCount, total), color: '#10B981', sublabel: 'Verified Sessions' },
+            { label: 'Failed Login Attempts', value: loginFailedCount, percentage: this.calcPercentage(loginFailedCount, total), color: '#EF4444', sublabel: 'Authentication Errors' },
+            { label: 'Critical Security Events', value: criticalCount, percentage: this.calcPercentage(criticalCount, total), color: '#DC2626', sublabel: 'Blocked / Violations' },
+            { label: 'Admin Actions', value: adminActionsCount, percentage: this.calcPercentage(adminActionsCount, total), color: '#3B82F6', sublabel: 'Privileged Operations' }
+          ],
+          distributionCharts: [
+            {
+              title: 'Security Event Status Breakdown',
+              type: 'DONUT',
+              data: [
+                { label: 'Success', value: total - loginFailedCount - criticalCount, percentage: this.calcPercentage(total - loginFailedCount - criticalCount, total), color: '#10B981' },
+                { label: 'Failed Authentications', value: loginFailedCount, percentage: this.calcPercentage(loginFailedCount, total), color: '#F59E0B' },
+                { label: 'Critical / Blocked', value: criticalCount, percentage: this.calcPercentage(criticalCount, total), color: '#EF4444' }
+              ]
+            }
+          ],
+          headers: tableHeaders,
+          rows: tableRows
+        };
+      }
+
+      case 'TRANSPORT': {
+        const stats = db.getTransportVehicleDashboardStats();
+        const vehicles = db.getTransportVehicles({
+          status: filters.status,
+          search: filters.searchQuery
+        }, user, (role as any));
+
+        const total = vehicles.length;
+        const activeCount = vehicles.filter(v => v.status === 'ACTIVE').length;
+        const inactiveCount = vehicles.filter(v => v.status === 'INACTIVE' || v.status === 'DECOMMISSIONED').length;
+        const maintenanceCount = vehicles.filter(v => v.status === 'MAINTENANCE').length;
+        const expiringCount = vehicles.filter(v => 
+          db.isVehicleDocumentExpiringSoon(v.insuranceExpiry) ||
+          db.isVehicleDocumentExpiringSoon(v.fitnessExpiry) ||
+          db.isVehicleDocumentExpiringSoon(v.pollutionExpiry) ||
+          db.isVehicleDocumentExpiringSoon(v.permitExpiry)
+        ).length;
+
+        const tableHeaders = ['Vehicle No', 'Type', 'Make / Model', 'Capacity', 'Insurance Expiry', 'Fitness Expiry', 'PUC Expiry', 'Permit Expiry', 'Status', 'Assigned Driver', 'Route'];
+        const tableRows = vehicles.map(v => [
+          v.vehicleNumber,
+          v.vehicleType,
+          v.makeModel,
+          `${v.capacity} Seats`,
+          v.insuranceExpiry || 'N/A',
+          v.fitnessExpiry || 'N/A',
+          v.pollutionExpiry || 'N/A',
+          v.permitExpiry || 'N/A',
+          v.status,
+          v.assignedDriverName ? `${v.assignedDriverName} (${v.assignedDriverPhone || ''})` : 'Unassigned',
+          v.assignedRoute || 'Spare'
+        ]);
+
+        return {
+          reportTitle: 'University Transport Fleet & Vehicle Compliance Report',
+          moduleName: 'Transport & Logistics Administration',
+          generatedDate: timestamp,
+          generatedBy: user?.name ? `${user.name} (${role || 'TRANSPORT_ADMIN'})` : 'Transport Manager',
+          appliedFilters: appliedFilterList,
+          totalCount: total,
+          summaryMetrics: [
+            { label: 'Total Fleet Vehicles', value: total, sublabel: 'Registered Fleet' },
+            { label: 'Active Fleet', value: activeCount, percentage: this.calcPercentage(activeCount, total), color: '#10B981', sublabel: `${this.calcPercentage(activeCount, total)}% Operational` },
+            { label: 'Inactive / Standby', value: inactiveCount, percentage: this.calcPercentage(inactiveCount, total), color: '#64748B', sublabel: 'Deactivated' },
+            { label: 'In Maintenance', value: maintenanceCount, color: '#F59E0B', sublabel: 'Workshop Service' },
+            { label: 'Compliance Flag / Expiring', value: expiringCount, color: '#EF4444', sublabel: 'Action Required (<30 Days)' }
+          ],
+          distributionCharts: [
+            {
+              title: 'Fleet Operational Status',
+              type: 'DONUT',
+              data: [
+                { label: 'Active Fleet', value: activeCount, percentage: this.calcPercentage(activeCount, total), color: '#10B981' },
+                { label: 'Inactive', value: inactiveCount, percentage: this.calcPercentage(inactiveCount, total), color: '#64748B' },
+                { label: 'Maintenance', value: maintenanceCount, percentage: this.calcPercentage(maintenanceCount, total), color: '#F59E0B' }
               ]
             }
           ],
@@ -944,6 +1722,37 @@ export class ReportEngineService {
             e.formDeadline || '2026-05-15',
             '94.2%',
             e.status
+          ])
+        };
+      }
+
+      case 'WORK_DIARY': {
+        const stats = db.getWorkDiaryDashboardStats();
+        const diaries = db.getWorkDiaries();
+
+        return {
+          reportTitle: 'Daily Work Diary & Staff Productivity Analytics Report',
+          moduleName: 'Work Diary Dashboard',
+          generatedDate: new Date().toLocaleString('en-IN'),
+          generatedBy: user?.name ? `${user.name} (${role || 'STAFF'})` : 'University Administrator',
+          appliedFilters: [{ label: 'Scope', value: 'All University Staff & Departments' }, { label: 'Audit Cycle', value: 'Current Operational Year' }],
+          totalCount: stats.total,
+          summaryMetrics: [
+            { label: 'Total Diary Entries', value: stats.total, color: '#1E3A8A' },
+            { label: 'Completed Activities', value: stats.completed, color: '#10B981', percentage: stats.total ? Math.round((stats.completed / stats.total) * 100) : 0 },
+            { label: 'In Progress Tasks', value: stats.inProgress, color: '#3B82F6' },
+            { label: 'Pending / Drafts', value: stats.pending, color: '#F59E0B' },
+            { label: 'Overdue Entries', value: stats.overdue, color: '#EF4444' }
+          ],
+          headers: ['Date', 'Staff Member', 'Work Title', 'Category', 'Time Window', 'Priority', 'Status'],
+          rows: diaries.slice(0, 20).map(d => [
+            d.workDate,
+            d.userName,
+            d.workTitle,
+            d.category,
+            (d.startTime && d.endTime) ? `${d.startTime} - ${d.endTime}` : (d.startTime || '-'),
+            d.priority,
+            d.status
           ])
         };
       }

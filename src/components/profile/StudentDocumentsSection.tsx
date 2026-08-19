@@ -1,18 +1,40 @@
-import React, { useState, useEffect } from 'react';
-import { Student, StudentDocument, STANDARD_STUDENT_DOCUMENTS } from '../../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Student } from '../../types';
 import { db } from '../../services/db';
+import { documentMasterService } from '../../services/documentMasterService';
 import { useAuth } from '../../context/AuthContext';
 import { fileStorage } from '../../services/fileStorage';
 import { Badge } from '../common/Badge';
-import { 
-  FileText, Upload, Download, Eye, CheckCircle2, XCircle, AlertCircle, 
-  Lock, Unlock, RefreshCw, Trash2, Edit3, ShieldCheck, Check, AlertTriangle, Plus, Search, Filter
+import {
+  DocumentCategory,
+  DocumentMasterItem,
+  StudentAcademicDocumentItem,
+  StudentDocumentVersionItem
+} from '../../types/documentMaster';
+import {
+  FileText, Upload, Download, Eye, CheckCircle2, XCircle, AlertCircle,
+  Lock, Unlock, RefreshCw, Trash2, Edit3, ShieldCheck, Check, AlertTriangle,
+  Plus, Search, Filter, Globe, Clock, History, Calendar, Info
 } from 'lucide-react';
 
 interface StudentDocumentsSectionProps {
   student: Student;
   onRefresh?: () => void;
 }
+
+const CATEGORY_TABS: { id: DocumentCategory | 'ALL'; label: string }[] = [
+  { id: 'ALL', label: 'All Documents' },
+  { id: 'ACADEMIC', label: 'Academic' },
+  { id: 'IDENTITY', label: 'Identity' },
+  { id: 'ADMISSION', label: 'Admission' },
+  { id: 'INTERNATIONAL_STUDENT', label: 'International' },
+  { id: 'UNIVERSITY_RECORD', label: 'University Records' },
+  { id: 'INTERNSHIP_TRAINING', label: 'Internship' },
+  { id: 'MEDICAL', label: 'Medical' },
+  { id: 'FINANCIAL_SCHOLARSHIP', label: 'Financial' },
+  { id: 'COMPLETION_EXIT', label: 'Completion & Exit' },
+  { id: 'OTHER', label: 'Other' }
+];
 
 export const StudentDocumentsSection: React.FC<StudentDocumentsSectionProps> = ({
   student,
@@ -21,105 +43,186 @@ export const StudentDocumentsSection: React.FC<StudentDocumentsSectionProps> = (
   if (!student) return null;
 
   const { user, role } = useAuth();
-  const isAdmin = role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'REGISTRAR' || role === 'STUDENT_SECTION' || role === 'PRINCIPAL' || role === 'HOD';
+  const isAdmin = role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'REGISTRAR' || role === 'STUDENT_SECTION' || role === 'PRINCIPAL' || role === 'HOD' || role === 'FACULTY';
   const isStudent = role === 'STUDENT';
 
-  const [documents, setDocuments] = useState<StudentDocument[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedCategoryTab, setSelectedCategoryTab] = useState<DocumentCategory | 'ALL'>('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  // Modals state
-  const [uploadModalDoc, setUploadModalDoc] = useState<{ title: string; category: StudentDocument['category']; existingDoc?: StudentDocument } | null>(null);
-  const [previewDoc, setPreviewDoc] = useState<StudentDocument | null>(null);
-  const [rejectModalDoc, setRejectModalDoc] = useState<StudentDocument | null>(null);
+  // Modals
+  const [uploadModalDoc, setUploadModalDoc] = useState<{ master: DocumentMasterItem; existingDoc?: StudentAcademicDocumentItem } | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ master: DocumentMasterItem; doc: StudentAcademicDocumentItem } | null>(null);
+  const [historyDoc, setHistoryDoc] = useState<{ master: DocumentMasterItem; doc: StudentAcademicDocumentItem; versions: StudentDocumentVersionItem[] } | null>(null);
+  const [rejectModalDoc, setRejectModalDoc] = useState<StudentAcademicDocumentItem | null>(null);
   const [rejectionReasonInput, setRejectionReasonInput] = useState<string>('');
 
-  // Form input state for upload modal
-  const [docTitle, setDocTitle] = useState<string>('');
-  const [docCategory, setDocCategory] = useState<StudentDocument['category']>('ACADEMIC');
+  // Upload modal inputs
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [issueDate, setIssueDate] = useState<string>('');
+  const [expiryDate, setExpiryDate] = useState<string>('');
+  const [uploadRemarks, setUploadRemarks] = useState<string>('');
   const [uploading, setUploading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
 
-  const loadDocuments = () => {
-    if (!student?.id) return;
-    const list = db.getStudentDocumentsByStudentId(student.id);
-    setDocuments(list);
-    if (onRefresh) onRefresh();
+  // ABC ID Submission / Verification State
+  const [abcModalOpen, setAbcModalOpen] = useState(false);
+  const [abcInput, setAbcInput] = useState(student.abcId || '');
+  const [abcRemarksInput, setAbcRemarksInput] = useState(student.abcIdRemarks || '');
+  const [abcError, setAbcError] = useState('');
+  const [abcRejectModalOpen, setAbcRejectModalOpen] = useState(false);
+  const [abcRejectionReason, setAbcRejectionReason] = useState('');
+
+  // Handle ABC ID Input with auto 4-4-4 hyphenation
+  const handleAbcInputChange = (val: string) => {
+    const raw = val.replace(/\D/g, '').slice(0, 12);
+    let formatted = raw;
+    if (raw.length > 8) {
+      formatted = `${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`;
+    } else if (raw.length > 4) {
+      formatted = `${raw.slice(0, 4)}-${raw.slice(4)}`;
+    }
+    setAbcInput(formatted);
+    setAbcError('');
   };
 
-  useEffect(() => {
-    if (student?.id) {
-      loadDocuments();
-    }
-  }, [student?.id]);
-
-  // Combine standard 13 documents with student's current documents
-  const documentRows = STANDARD_STUDENT_DOCUMENTS.map(stdDoc => {
-    const uploadedDoc = documents.find(d => 
-      d.title.toLowerCase().trim() === stdDoc.title.toLowerCase().trim() ||
-      d.title.toLowerCase().includes(stdDoc.title.toLowerCase().slice(0, 8))
-    );
-    return {
-      standard: stdDoc,
-      uploadedDoc: uploadedDoc || null
-    };
-  });
-
-  // Custom uploaded documents that are not in standard 13 list
-  const customDocs = documents.filter(d => 
-    !STANDARD_STUDENT_DOCUMENTS.some(std => 
-      d.title.toLowerCase().trim() === std.title.toLowerCase().trim() ||
-      d.title.toLowerCase().includes(std.title.toLowerCase().slice(0, 8))
-    )
-  );
-
-  // Filter & search logic
-  const filteredStandardRows = documentRows.filter(row => {
-    const titleMatch = row.standard.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                       row.standard.description.toLowerCase().includes(searchQuery.toLowerCase());
-    if (!titleMatch) return false;
-
-    if (filterStatus === 'ALL') return true;
-    if (filterStatus === 'NOT_UPLOADED') return !row.uploadedDoc;
-    if (!row.uploadedDoc) return false;
-    return row.uploadedDoc.status === filterStatus;
-  });
-
-  const filteredCustomDocs = customDocs.filter(d => {
-    const titleMatch = d.title.toLowerCase().includes(searchQuery.toLowerCase());
-    if (!titleMatch) return false;
-    if (filterStatus === 'ALL') return true;
-    if (filterStatus === 'NOT_UPLOADED') return false;
-    return d.status === filterStatus;
-  });
-
-  // Statistics calculation
-  const totalStandard = STANDARD_STUDENT_DOCUMENTS.length;
-  const uploadedCount = documentRows.filter(r => r.uploadedDoc).length + customDocs.length;
-  const verifiedCount = documentRows.filter(r => r.uploadedDoc?.status === 'VERIFIED').length + customDocs.filter(d => d.status === 'VERIFIED').length;
-  const pendingCount = documentRows.filter(r => r.uploadedDoc?.status === 'PENDING_VERIFICATION').length + customDocs.filter(d => d.status === 'PENDING_VERIFICATION').length;
-  const rejectedCount = documentRows.filter(r => r.uploadedDoc?.status === 'REJECTED').length + customDocs.filter(d => d.status === 'REJECTED').length;
-
-  // Handlers
-  const handleOpenUploadModal = (title: string, category: StudentDocument['category'], existingDoc?: StudentDocument) => {
-    // Check permission for Student: Locked documents cannot be re-uploaded by student
-    if (isStudent && existingDoc && existingDoc.isLocked && existingDoc.status === 'VERIFIED') {
-      alert('🔒 This document is VERIFIED and PERMANENTLY LOCKED by the Admin. You cannot modify or re-upload a verified document.');
+  const handleSaveAbcId = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = abcInput.replace(/\D/g, '');
+    if (clean.length !== 12) {
+      setAbcError('ABC ID must be exactly 12 digits (e.g. 1234-5678-9012).');
       return;
     }
 
-    setUploadModalDoc({ title, category, existingDoc });
-    setDocTitle(existingDoc ? existingDoc.title : title);
-    setDocCategory(existingDoc ? existingDoc.category : category);
+    const res = db.updateStudentAbcId(student.id, abcInput, { remarks: abcRemarksInput });
+    if (!res.success) {
+      setAbcError(res.error || 'Failed to update ABC ID.');
+      return;
+    }
+
+    setAbcModalOpen(false);
+    setRefreshKey(k => k + 1);
+    if (onRefresh) onRefresh();
+  };
+
+  const handleMentorVerifyAbcId = () => {
+    const res = db.verifyStudentAbcId(student.id, user?.id || 'fac-1', user?.name || 'Faculty Mentor', role || 'FACULTY_MENTOR');
+    if (!res.success) {
+      alert(res.error || 'Verification failed.');
+      return;
+    }
+    setRefreshKey(k => k + 1);
+    if (onRefresh) onRefresh();
+  };
+
+  const handleMentorRejectAbcId = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!abcRejectionReason.trim()) {
+      alert('Mandatory rejection reason required.');
+      return;
+    }
+
+    const res = db.rejectStudentAbcId(student.id, user?.id || 'fac-1', user?.name || 'Faculty Mentor', role || 'FACULTY_MENTOR', abcRejectionReason.trim());
+    if (!res.success) {
+      alert(res.error || 'Rejection failed.');
+      return;
+    }
+    setAbcRejectModalOpen(false);
+    setAbcRejectionReason('');
+    setRefreshKey(k => k + 1);
+    if (onRefresh) onRefresh();
+  };
+
+  // Dynamic applicable document resolution
+  const applicableItems = useMemo(() => {
+    return documentMasterService.getApplicableDocumentsForStudent(student);
+  }, [student, refreshKey]);
+
+  // Determine whether student is international
+  const isInternational = student.studentType === 'INTERNATIONAL' || 
+    (student as any).isInternational === true || 
+    (student.nationality && student.nationality.toUpperCase() !== 'INDIAN');
+
+  // Filter available tabs based on international status
+  const visibleTabs = useMemo(() => {
+    if (!isInternational) {
+      return CATEGORY_TABS.filter(t => t.id !== 'INTERNATIONAL_STUDENT');
+    }
+    return CATEGORY_TABS;
+  }, [isInternational]);
+
+  // Filter items based on search, tab, and status
+  const filteredItems = useMemo(() => {
+    return applicableItems.filter(item => {
+      // Category Tab filter
+      if (selectedCategoryTab !== 'ALL' && item.masterDoc.category !== selectedCategoryTab) {
+        return false;
+      }
+
+      // Status filter
+      if (filterStatus !== 'ALL' && item.status !== filterStatus) {
+        return false;
+      }
+
+      // Search Query
+      if (searchQuery.trim() !== '') {
+        const q = searchQuery.toLowerCase();
+        const matchesName = item.masterDoc.name.toLowerCase().includes(q);
+        const matchesCode = item.masterDoc.code.toLowerCase().includes(q);
+        const matchesSubcat = item.masterDoc.subcategory ? item.masterDoc.subcategory.toLowerCase().includes(q) : false;
+        const matchesFilename = item.uploadedDoc ? item.uploadedDoc.fileName.toLowerCase().includes(q) : false;
+        if (!matchesName && !matchesCode && !matchesSubcat && !matchesFilename) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [applicableItems, selectedCategoryTab, filterStatus, searchQuery]);
+
+  // Aggregate stats
+  const stats = useMemo(() => {
+    const total = applicableItems.length;
+    const requiredTotal = applicableItems.filter(i => i.masterDoc.required === 'REQUIRED').length;
+    const verified = applicableItems.filter(i => i.status === 'VERIFIED').length;
+    const pending = applicableItems.filter(i => i.status === 'PENDING_VERIFICATION').length;
+    const rejected = applicableItems.filter(i => i.status === 'REJECTED').length;
+    const expired = applicableItems.filter(i => i.status === 'EXPIRED').length;
+    const notUploaded = applicableItems.filter(i => i.status === 'NOT_UPLOADED').length;
+
+    const progressPct = requiredTotal > 0 ? Math.round((verified / requiredTotal) * 100) : 0;
+
+    return { total, requiredTotal, verified, pending, rejected, expired, notUploaded, progressPct };
+  }, [applicableItems]);
+
+  const handleOpenUploadModal = (master: DocumentMasterItem, existingDoc?: StudentAcademicDocumentItem) => {
+    if (isStudent && existingDoc && (existingDoc.isLocked || existingDoc.status === 'VERIFIED')) {
+      alert('🔒 This document is VERIFIED and PERMANENTLY LOCKED. Modification or replacement is not permitted.');
+      return;
+    }
+
+    setUploadModalDoc({ master, existingDoc });
     setSelectedFile(null);
+    setIssueDate(existingDoc?.issueDate ? existingDoc.issueDate.split('T')[0] : '');
+    setExpiryDate(existingDoc?.expiryDate ? existingDoc.expiryDate.split('T')[0] : '');
+    setUploadRemarks(existingDoc?.remarks || '');
     setErrorMsg('');
   };
 
   const handleSaveUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!docTitle) {
-      setErrorMsg('Please specify the document title.');
+    if (!uploadModalDoc) return;
+
+    const { master, existingDoc } = uploadModalDoc;
+
+    if (!selectedFile && !existingDoc) {
+      setErrorMsg('Please select a valid document file to upload.');
+      return;
+    }
+
+    if (master.expiryRequired && !expiryDate) {
+      setErrorMsg('Expiry date is mandatory for this document.');
       return;
     }
 
@@ -127,374 +230,557 @@ export const StudentDocumentsSection: React.FC<StudentDocumentsSectionProps> = (
     setErrorMsg('');
 
     try {
-      if (uploadModalDoc?.existingDoc) {
-        // Re-upload / Edit existing document
-        const existing = uploadModalDoc.existingDoc;
+      let fileUrl = existingDoc ? existingDoc.fileUrl : '';
+      let fileName = existingDoc ? existingDoc.fileName : '';
+      let fileSize = existingDoc ? existingDoc.fileSize : '';
+      let fileType = existingDoc ? existingDoc.fileType : 'application/pdf';
 
-        // If student is re-uploading, check locking rule
-        if (isStudent && existing.isLocked && existing.status === 'VERIFIED') {
-          setErrorMsg('This document is verified and locked.');
+      if (selectedFile) {
+        // Validate file type
+        const ext = selectedFile.name.split('.').pop()?.toLowerCase() || '';
+        if (master.allowedFileTypes && master.allowedFileTypes.length > 0) {
+          const isAllowed = master.allowedFileTypes.map(t => t.toLowerCase()).includes(ext);
+          if (!isAllowed) {
+            setErrorMsg(`Invalid file type (.${ext}). Allowed formats: ${master.allowedFileTypes.join(', ')}`);
+            setUploading(false);
+            return;
+          }
+        }
+
+        // Validate max file size
+        const sizeMb = selectedFile.size / (1024 * 1024);
+        if (sizeMb > master.maxFileSize) {
+          setErrorMsg(`File size (${sizeMb.toFixed(1)}MB) exceeds the maximum limit of ${master.maxFileSize}MB.`);
           setUploading(false);
           return;
         }
 
-        let fileUrl = existing.fileUrl;
-        let fileName = existing.fileName;
-        let fileSize = existing.fileSize;
-
-        if (selectedFile) {
-          fileUrl = await fileStorage.saveFile(selectedFile);
-          fileName = selectedFile.name;
-          fileSize = `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB`;
-        }
-
-        db.updateEntity<StudentDocument>('studentDocuments', existing.id, {
-          title: docTitle,
-          category: docCategory,
-          fileName,
-          fileSize,
-          fileUrl,
-          uploadDate: new Date().toISOString().split('T')[0],
-          status: 'PENDING_VERIFICATION',
-          isLocked: false,
-          remarks: isStudent ? 'Re-uploaded by student for Admin Verification' : 'Updated by Admin',
-          rejectionReason: undefined
-        }, `Re-uploaded document "${docTitle}" for ${student.name}`);
-      } else {
-        // New upload
-        if (!selectedFile) {
-          setErrorMsg('Please select a document file to upload (PDF / JPG / PNG).');
-          setUploading(false);
-          return;
-        }
-
-        const fileUrl = await fileStorage.saveFile(selectedFile);
-        const fileName = selectedFile.name;
-        const fileSize = `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB`;
-
-        db.addEntity<StudentDocument>('studentDocuments', {
-          studentId: student.id,
-          studentName: student.name,
-          enrollmentNo: student.enrollmentNo,
-          title: docTitle,
-          category: docCategory,
-          fileName,
-          fileSize,
-          fileUrl,
-          uploadDate: new Date().toISOString().split('T')[0],
-          status: 'PENDING_VERIFICATION',
-          isLocked: false,
-          remarks: isStudent ? 'Uploaded by student for Admin Verification' : 'Uploaded by Admin'
-        }, `Uploaded document "${docTitle}" for ${student.name}`);
+        fileUrl = await fileStorage.saveFile(selectedFile);
+        fileName = selectedFile.name;
+        fileSize = `${sizeMb.toFixed(2)} MB`;
+        fileType = selectedFile.type || 'application/pdf';
       }
 
-      loadDocuments();
+      documentMasterService.uploadStudentDocument({
+        student,
+        documentMasterId: master.id,
+        fileName,
+        fileSize,
+        fileUrl,
+        fileType,
+        issueDate: issueDate || undefined,
+        expiryDate: expiryDate || undefined,
+        remarks: uploadRemarks
+      });
+
+      setRefreshKey(k => k + 1);
       setUploadModalDoc(null);
-    } catch (err) {
-      console.error(err);
-      setErrorMsg('Failed to store document in secure storage.');
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to upload document.');
     } finally {
       setUploading(false);
     }
   };
 
-  const handleDownload = (doc: StudentDocument) => {
-    if (!doc.fileUrl) {
-      alert('Document file is unavailable.');
-      return;
+  const handleAdminVerify = (doc: StudentAcademicDocumentItem) => {
+    try {
+      documentMasterService.verifyDocument({
+        documentId: doc.id,
+        verifierUserId: user?.id || 'admin',
+        verifierName: user?.name || 'Authorized Verifier',
+        verifierRole: role || 'FACULTY_MENTOR',
+        remarks: `Approved and verified by ${user?.name || 'Mentor'} on ${new Date().toISOString().split('T')[0]}`
+      });
+      setRefreshKey(k => k + 1);
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      alert('Verification failed: ' + err.message);
     }
-    fileStorage.downloadFile(doc.fileUrl, doc.fileName || `${doc.title}.pdf`);
   };
 
-  // Admin Actions
-  const handleAdminVerify = (doc: StudentDocument) => {
-    db.updateEntity<StudentDocument>('studentDocuments', doc.id, {
-      status: 'VERIFIED',
-      isLocked: true, // Permanent lock after Admin verification
-      verifiedBy: user?.name || 'University Registrar Admin',
-      verifiedAt: new Date().toISOString().split('T')[0],
-      remarks: `Verified & permanently locked by ${user?.name || 'Admin'} on ${new Date().toISOString().split('T')[0]}`,
-      rejectionReason: undefined
-    }, `Verified & locked document "${doc.title}" for ${student.name}`);
-
-    loadDocuments();
-  };
-
-  const handleOpenAdminRejectModal = (doc: StudentDocument) => {
+  const handleOpenAdminRejectModal = (doc: StudentAcademicDocumentItem) => {
     setRejectModalDoc(doc);
-    setRejectionReasonInput(doc.rejectionReason || doc.remarks || '');
+    setRejectionReasonInput(doc.rejectionReason || '');
   };
 
   const handleConfirmAdminReject = (e: React.FormEvent) => {
     e.preventDefault();
     if (!rejectModalDoc || !rejectionReasonInput.trim()) {
-      alert('Please state a valid rejection reason.');
+      alert('Please provide a mandatory rejection reason.');
       return;
     }
 
-    const reason = rejectionReasonInput.trim();
-
-    db.updateEntity<StudentDocument>('studentDocuments', rejectModalDoc.id, {
-      status: 'REJECTED',
-      isLocked: false, // Unlocked so student can fix and re-upload!
-      remarks: `Rejected by Admin: ${reason}`,
-      rejectionReason: reason
-    }, `Rejected document "${rejectModalDoc.title}" for ${student.name}`);
-
-    loadDocuments();
-    setRejectModalDoc(null);
-    setRejectionReasonInput('');
-  };
-
-  const handleAdminUnlockOverride = (doc: StudentDocument) => {
-    if (!isAdmin) return;
-    if (confirm(`Admin Override: Unlock "${doc.title}" to allow student re-upload?`)) {
-      db.updateEntity<StudentDocument>('studentDocuments', doc.id, {
-        isLocked: false,
-        status: 'PENDING_VERIFICATION',
-        remarks: `Unlocked by ${user?.name} for student re-upload`
-      }, `Admin unlocked document "${doc.title}"`);
-      loadDocuments();
+    try {
+      documentMasterService.rejectDocument({
+        documentId: rejectModalDoc.id,
+        verifierUserId: user?.id || 'admin',
+        verifierName: user?.name || 'Authorized Verifier',
+        verifierRole: role || 'FACULTY_MENTOR',
+        rejectionReason: rejectionReasonInput.trim()
+      });
+      setRefreshKey(k => k + 1);
+      setRejectModalDoc(null);
+      setRejectionReasonInput('');
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      alert('Rejection failed: ' + err.message);
     }
   };
 
-  const handleDeleteDocument = (doc: StudentDocument) => {
-    if (isStudent && doc.isLocked && doc.status === 'VERIFIED') {
-      alert('🔒 Verified documents are permanently locked and cannot be deleted by students.');
+  const handleDownload = (doc: StudentAcademicDocumentItem) => {
+    if (!doc.fileUrl) {
+      alert('Document file is unavailable.');
       return;
     }
-
-    if (confirm(`Are you sure you want to delete "${doc.title}"?`)) {
-      db.deleteEntity('studentDocuments', doc.id, `Deleted document "${doc.title}" for ${student.name}`);
-      loadDocuments();
-    }
+    fileStorage.downloadFile(doc.fileUrl, doc.fileName || `${doc.documentName}.pdf`);
   };
 
-  const getStatusBadge = (doc: StudentDocument | null) => {
-    if (!doc) {
-      return <Badge variant="inactive"><AlertTriangle size={12} /> NOT UPLOADED</Badge>;
+  const getStatusBadge = (status: string, isLocked: boolean) => {
+    switch (status) {
+      case 'VERIFIED':
+        return <Badge variant="active" icon={<Lock size={12} />}>VERIFIED &amp; LOCKED</Badge>;
+      case 'REJECTED':
+        return <Badge variant="danger" icon={<XCircle size={12} />}>REJECTED (RE-UPLOAD REQUIRED)</Badge>;
+      case 'PENDING_VERIFICATION':
+        return <Badge variant="orange" icon={<Clock size={12} />}>PENDING VERIFICATION</Badge>;
+      case 'EXPIRED':
+        return <Badge variant="danger" icon={<AlertTriangle size={12} />}>EXPIRED</Badge>;
+      default:
+        return <Badge variant="inactive"><AlertTriangle size={12} /> NOT UPLOADED</Badge>;
     }
-    if (doc.status === 'VERIFIED') {
-      return <Badge variant="active" icon={<Lock size={12} />}>VERIFIED &amp; LOCKED</Badge>;
-    }
-    if (doc.status === 'REJECTED') {
-      return <Badge variant="danger" icon={<XCircle size={12} />}>REJECTED</Badge>;
-    }
-    return <Badge variant="orange" icon={<AlertCircle size={12} />}>PENDING VERIFICATION</Badge>;
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* Overview Statistics & Progress */}
-      <div className="card" style={{ padding: '1.25rem', background: 'linear-gradient(135deg, #0B192C 0%, #1E3E62 100%)', color: '#FFFFFF' }}>
+    <div className="space-y-6">
+      {/* Header Vault Banner */}
+      <div className="card" style={{ padding: '1.5rem', background: 'linear-gradient(135deg, #0B192C 0%, #1E3E62 100%)', color: '#FFFFFF' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <ShieldCheck size={22} color="var(--brand-orange)" /> Student Verification Documents Vault
-            </h3>
-            <p style={{ fontSize: '0.84375rem', color: '#94A3B8', marginTop: '0.2rem' }}>
-              Official credentials, identity proofs, marksheets, and government certificates required by Swarrnim University
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <ShieldCheck size={24} color="#F37023" />
+                Student Document Repository &amp; Compliance Vault
+              </h3>
+              {isInternational ? (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-400/40">
+                  <Globe className="w-3.5 h-3.5" /> International Student Profile
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-400/40">
+                  Domestic Student Profile
+                </span>
+              )}
+            </div>
+            <p style={{ fontSize: '0.84375rem', color: '#94A3B8', marginTop: '0.35rem' }}>
+              Single centralized repository sourced dynamically from University Document Master for {student.name} ({student.enrollmentNo})
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <button className="btn btn-primary" onClick={() => handleOpenUploadModal('', 'OTHER')}>
-              <Plus size={16} /> Upload Custom Document
-            </button>
-          </div>
+          <button
+            onClick={() => setRefreshKey(k => k + 1)}
+            className="btn btn-secondary btn-sm"
+            style={{ background: 'rgba(255,255,255,0.1)', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.2)' }}
+          >
+            <RefreshCw size={14} /> Refresh Vault
+          </button>
         </div>
 
-        {/* Audit / Policy Notice */}
-        <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.8125rem', color: '#CBD5E1' }}>
-          <Lock size={16} color="var(--brand-gold)" />
-          <span>
-            <strong>Locking Policy:</strong> Students can upload &amp; re-upload only <strong>Pending</strong> or <strong>Rejected</strong> documents. Once verified by Admin, documents are <strong>permanently locked</strong> 🔒.
-          </span>
-        </div>
-
-        {/* Progress Bar */}
-        <div style={{ marginTop: '1.25rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 700, marginBottom: '0.4rem', color: '#E2E8F0' }}>
-            <span>VERIFICATION PROGRESS: {verifiedCount} / {totalStandard} VERIFIED</span>
-            <span>{Math.round((verifiedCount / totalStandard) * 100)}% COMPLETE</span>
+        {/* Progress Metrics */}
+        <div style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8125rem', fontWeight: 700, marginBottom: '0.5rem', color: '#E2E8F0' }}>
+            <span>
+              MANDATORY VERIFICATION: {stats.verified} / {stats.requiredTotal} VERIFIED
+            </span>
+            <span>{stats.progressPct}% COMPLETE</span>
           </div>
-          <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.15)', borderRadius: '4px', overflow: 'hidden' }}>
-            <div style={{ width: `${Math.min(100, Math.round((verifiedCount / totalStandard) * 100))}%`, height: '100%', background: 'linear-gradient(90deg, #F37023 0%, #10B981 100%)', transition: 'width 0.4s ease' }} />
+          <div style={{ width: '100%', height: '10px', background: 'rgba(255,255,255,0.15)', borderRadius: '5px', overflow: 'hidden' }}>
+            <div
+              style={{
+                width: `${Math.min(100, stats.progressPct)}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #F37023 0%, #10B981 100%)',
+                transition: 'width 0.4s ease'
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginTop: '0.85rem', fontSize: '0.78125rem', color: '#CBD5E1' }}>
+            <span>📁 Total Applicable: <strong>{stats.total}</strong></span>
+            <span>⭐ Required: <strong>{stats.requiredTotal}</strong></span>
+            <span>🔒 Verified &amp; Locked: <strong style={{ color: '#10B981' }}>{stats.verified}</strong></span>
+            <span>⏳ Pending: <strong style={{ color: '#F37023' }}>{stats.pending}</strong></span>
+            {stats.rejected > 0 && <span>❌ Rejected: <strong style={{ color: '#EF4444' }}>{stats.rejected}</strong></span>}
+            {stats.expired > 0 && <span>⚠️ Expired: <strong style={{ color: '#F87171' }}>{stats.expired}</strong></span>}
           </div>
         </div>
       </div>
 
-      {/* Filter & Search Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', background: 'var(--bg-surface)', padding: '0.85rem 1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: '240px' }}>
-          <Search size={18} color="var(--text-muted)" />
+      {/* ─── DEDICATED ACADEMIC BANK OF CREDITS (ABC) ID CARD ─────────────────── */}
+      <div className="bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-purple-900/30 dark:from-blue-950/60 dark:to-purple-950/50 rounded-2xl p-5 border-2 border-indigo-500/30 dark:border-indigo-500/40 shadow-md relative overflow-hidden backdrop-blur-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3.5">
+            <div className="p-3 bg-indigo-600/20 dark:bg-indigo-500/20 text-indigo-400 rounded-xl border border-indigo-400/30 shrink-0">
+              <ShieldCheck className="w-6 h-6 text-indigo-400" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30">
+                  DOC-ACA-ABC-ID
+                </span>
+                <h4 className="font-bold text-base text-gray-900 dark:text-white flex items-center gap-2">
+                  Academic Bank of Credits (ABC) ID
+                </h4>
+                {student.abcIdStatus === 'VERIFIED' ? (
+                  <Badge variant="active" icon={<Lock size={12} />}>VERIFIED &amp; LOCKED</Badge>
+                ) : student.abcIdStatus === 'REJECTED' ? (
+                  <Badge variant="danger" icon={<XCircle size={12} />}>REJECTED (ACTION REQUIRED)</Badge>
+                ) : student.abcIdStatus === 'PENDING_VERIFICATION' ? (
+                  <Badge variant="orange" icon={<Clock size={12} />}>PENDING MENTOR VERIFICATION</Badge>
+                ) : (
+                  <Badge variant="inactive"><AlertTriangle size={12} /> NOT SUBMITTED</Badge>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-600 dark:text-gray-300">
+                Official 12-Digit DigiLocker / APAAR Academic Bank of Credits National Identifier. Required for all domestic &amp; international university students.
+              </p>
+
+              {/* ABC ID Number Display */}
+              <div className="flex items-center gap-4 flex-wrap pt-1 text-xs">
+                {student.abcId ? (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/70 dark:bg-gray-900/70 border border-indigo-300 dark:border-indigo-800">
+                    <span className="text-gray-500 dark:text-gray-400">ABC ID:</span>
+                    <span className="font-mono font-bold text-sm text-indigo-700 dark:text-indigo-300 tracking-wider">
+                      {student.abcId}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="text-amber-700 dark:text-amber-300 font-semibold flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4" />
+                    No ABC ID submitted yet. Please submit your 12-digit number.
+                  </div>
+                )}
+
+                {student.abcIdStatus === 'VERIFIED' && student.abcIdVerifiedByName && (
+                  <span className="text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Verified by Mentor {student.abcIdVerifiedByName} on {student.abcIdVerifiedAt ? new Date(student.abcIdVerifiedAt).toLocaleDateString() : 'Verified'}
+                  </span>
+                )}
+              </div>
+
+              {/* Rejection Alert */}
+              {student.abcIdStatus === 'REJECTED' && student.abcIdRejectionReason && (
+                <div className="mt-2.5 p-3 bg-rose-50 dark:bg-rose-950/60 rounded-xl border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-300">
+                  <div className="font-bold flex items-center gap-1.5 text-rose-900 dark:text-rose-200">
+                    <XCircle className="w-4 h-4 text-rose-600" />
+                    Mentor Rejection Reason:
+                  </div>
+                  <p className="mt-0.5 font-medium">{student.abcIdRejectionReason}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ABC ID Actions */}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap md:flex-nowrap">
+            {/* Student Action: Add / Update ABC ID */}
+            {student.abcIdStatus !== 'VERIFIED' ? (
+              <button
+                onClick={() => {
+                  setAbcInput(student.abcId || '');
+                  setAbcRemarksInput(student.abcIdRemarks || '');
+                  setAbcError('');
+                  setAbcModalOpen(true);
+                }}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm ${
+                  student.abcIdStatus === 'REJECTED'
+                    ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                    : student.abcId
+                    ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                }`}
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                {student.abcIdStatus === 'REJECTED'
+                  ? 'Correct & Resubmit ABC ID'
+                  : student.abcId
+                  ? 'Update ABC ID'
+                  : 'Add ABC ID'}
+              </button>
+            ) : (
+              <div className="px-3.5 py-2 rounded-xl text-xs font-semibold text-emerald-800 dark:text-emerald-300 bg-emerald-100/60 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                Locked (Verified)
+              </div>
+            )}
+
+            {/* Mentor / Faculty Verifier Actions */}
+            {isAdmin && student.abcId && (
+              <div className="flex items-center gap-1.5 pl-2 border-l border-gray-300 dark:border-gray-700">
+                {student.abcIdStatus !== 'VERIFIED' && (
+                  <button
+                    onClick={handleMentorVerifyAbcId}
+                    className="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition flex items-center gap-1.5 shadow-sm"
+                    title="Verify and Lock ABC ID"
+                  >
+                    <Check className="w-4 h-4" />
+                    Verify ABC ID
+                  </button>
+                )}
+
+                {student.abcIdStatus !== 'REJECTED' && (
+                  <button
+                    onClick={() => {
+                      setAbcRejectionReason(student.abcIdRejectionReason || '');
+                      setAbcRejectModalOpen(true);
+                    }}
+                    className="px-3 py-2.5 rounded-xl text-xs font-semibold bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 hover:bg-rose-200 transition flex items-center gap-1"
+                    title="Reject ABC ID with reason"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    Reject
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Category Tabs Bar */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl p-2 border border-gray-100 dark:border-gray-700 shadow-xs flex items-center gap-1.5 overflow-x-auto">
+        {visibleTabs.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setSelectedCategoryTab(tab.id)}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition ${
+              selectedCategoryTab === tab.id
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Filter & Search Toolbar */}
+      <div className="bg-white dark:bg-gray-800 p-3.5 rounded-xl border border-gray-100 dark:border-gray-700 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-1 min-w-[240px]">
+          <Search className="w-4 h-4 text-gray-400" />
           <input
             type="text"
-            className="form-input"
-            style={{ border: 'none', background: 'transparent', padding: '0.4rem', fontSize: '0.875rem' }}
-            placeholder="Search standard or custom document by name..."
+            placeholder="Search document name, code, subcategory..."
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full text-xs bg-transparent border-none focus:outline-none text-gray-900 dark:text-white"
           />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <Filter size={16} color="var(--text-muted)" />
-          <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-muted)' }}>Status:</span>
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-gray-400" />
           <select
-            className="form-select"
-            style={{ width: '180px', height: '36px', fontSize: '0.8125rem' }}
             value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value)}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200"
           >
-            <option value="ALL">All Documents ({totalStandard + customDocs.length})</option>
-            <option value="VERIFIED">Verified &amp; Locked ({verifiedCount})</option>
-            <option value="PENDING_VERIFICATION">Pending Verification ({pendingCount})</option>
-            <option value="REJECTED">Rejected ({rejectedCount})</option>
+            <option value="ALL">All Status</option>
+            <option value="VERIFIED">Verified &amp; Locked</option>
+            <option value="PENDING_VERIFICATION">Pending Verification</option>
+            <option value="REJECTED">Rejected (Action Required)</option>
+            <option value="EXPIRED">Expired</option>
             <option value="NOT_UPLOADED">Not Uploaded</option>
           </select>
         </div>
       </div>
 
-      {/* Standard 13 Mandatory Documents List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-        <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <FileText size={18} color="var(--brand-orange)" /> Standard Mandatory Documents Checklist ({STANDARD_STUDENT_DOCUMENTS.length})
-        </div>
-
-        {filteredStandardRows.length === 0 ? (
-          <div className="card" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            No documents matched your search filter.
+      {/* Dynamic Document Cards List */}
+      <div className="space-y-3.5">
+        {filteredItems.length === 0 ? (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-12 text-center border border-gray-100 dark:border-gray-700 text-gray-400">
+            <FileText className="w-12 h-12 mx-auto mb-2 text-gray-300 dark:text-gray-600" />
+            <p className="text-base font-semibold text-gray-700 dark:text-gray-300">No applicable documents found</p>
+            <p className="text-xs text-gray-400 mt-0.5">Try selecting another category tab or clearing search filters.</p>
           </div>
         ) : (
-          filteredStandardRows.map(({ standard, uploadedDoc }, idx) => {
-            const isVerified = uploadedDoc?.status === 'VERIFIED';
-            const isRejected = uploadedDoc?.status === 'REJECTED';
-            const isPending = uploadedDoc?.status === 'PENDING_VERIFICATION';
-
-            // Student Upload/Re-upload Permission Logic:
-            // Student can upload if not uploaded yet, or if status is PENDING or REJECTED.
-            // Student CANNOT upload if status is VERIFIED & locked!
-            const canStudentUpload = !isStudent || !uploadedDoc || !uploadedDoc.isLocked || isRejected || isPending;
+          filteredItems.map(({ masterDoc, uploadedDoc, status, isLocked, isExpired, isExpiringSoon, versions }, idx) => {
+            const isVerified = status === 'VERIFIED';
+            const isRejected = status === 'REJECTED';
+            const isPending = status === 'PENDING_VERIFICATION';
+            const canStudentUpload = !isStudent || !isLocked;
 
             return (
               <div
-                key={standard.title}
-                className="card"
+                key={masterDoc.id}
+                className="bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700 shadow-xs hover:shadow-md transition-all relative overflow-hidden"
                 style={{
-                  padding: '1.25rem',
-                  borderLeft: isVerified ? '4px solid #10B981' : isRejected ? '4px solid #EF4444' : isPending ? '4px solid var(--brand-orange)' : '4px solid var(--border-color)',
-                  background: 'var(--bg-surface)'
+                  borderLeft: isVerified
+                    ? '4px solid #10B981'
+                    : isRejected
+                    ? '4px solid #EF4444'
+                    : isExpired
+                    ? '4px solid #DC2626'
+                    : isPending
+                    ? '4px solid #F37023'
+                    : '4px solid #CBD5E1'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-                  <div style={{ flex: 1, minWidth: '280px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--brand-navy)' }}>
-                        {idx + 1}. {standard.title}
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                  <div className="flex-1 min-w-[280px]">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800">
+                        {masterDoc.code}
                       </span>
-                      <span style={{ fontSize: '0.75rem' }}><Badge variant="navy">{standard.category}</Badge></span>
-                      {standard.required && <span style={{ fontSize: '0.75rem' }}><Badge variant="orange">MANDATORY</Badge></span>}
-                      {getStatusBadge(uploadedDoc)}
+                      <h4 className="font-bold text-sm text-gray-900 dark:text-white">
+                        {masterDoc.name}
+                      </h4>
+                      {masterDoc.required === 'REQUIRED' && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300">
+                          MANDATORY
+                        </span>
+                      )}
+                      {masterDoc.internationalOnly && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 flex items-center gap-1">
+                          <Globe className="w-2.5 h-2.5" /> INTL
+                        </span>
+                      )}
+                      {getStatusBadge(status, isLocked)}
                     </div>
 
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
-                      {standard.description}
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {masterDoc.description || 'Official student document as per SSIU Document Master guidelines.'}
+                    </p>
+
+                    {/* Metadata Specs */}
+                    <div className="flex items-center gap-3 flex-wrap text-[11px] text-gray-500 dark:text-gray-400 mt-2">
+                      <span>Category: <strong className="text-gray-700 dark:text-gray-300">{masterDoc.category}</strong></span>
+                      {masterDoc.subcategory && (
+                        <span>Subcategory: <strong className="text-gray-700 dark:text-gray-300">{masterDoc.subcategory.replace(/_/g, ' ')}</strong></span>
+                      )}
+                      <span>Verified By: <strong className="text-indigo-600 dark:text-indigo-400">{masterDoc.verifiedByRole.replace(/_/g, ' ')}</strong></span>
+                      <span>Allowed: <strong className="text-gray-700 dark:text-gray-300">{masterDoc.allowedFileTypes.join(', ').toUpperCase()} ({masterDoc.maxFileSize}MB)</strong></span>
                     </div>
 
-                    {/* Upload Details */}
+                    {/* Current Uploaded Details */}
                     {uploadedDoc && (
-                      <div style={{ fontSize: '0.78125rem', color: 'var(--brand-navy-medium)', marginTop: '0.4rem', display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                      <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-900/60 rounded-xl border border-gray-100 dark:border-gray-700/60 text-xs flex flex-wrap items-center gap-x-4 gap-y-1.5 text-gray-700 dark:text-gray-300">
                         <span>📄 File: <strong>{uploadedDoc.fileName}</strong> ({uploadedDoc.fileSize})</span>
-                        <span>📅 Uploaded: <strong>{uploadedDoc.uploadDate}</strong></span>
-                        {uploadedDoc.verifiedBy && (
-                          <span>✔️ Verified by: <strong>{uploadedDoc.verifiedBy}</strong> on {uploadedDoc.verifiedAt}</span>
+                        <span>🔢 Version: <strong className="text-indigo-600 dark:text-indigo-400">v{uploadedDoc.currentVersion}</strong></span>
+                        <span>📅 Uploaded: <strong>{uploadedDoc.updatedAt.split('T')[0]}</strong></span>
+                        {uploadedDoc.expiryDate && (
+                          <span className={isExpired ? 'text-rose-600 font-bold' : isExpiringSoon ? 'text-amber-600 font-bold' : ''}>
+                            ⏰ Valid Until: <strong>{uploadedDoc.expiryDate.split('T')[0]}</strong> {isExpired && '(EXPIRED)'} {isExpiringSoon && '(EXPIRING SOON)'}
+                          </span>
+                        )}
+                        {uploadedDoc.verifiedByName && (
+                          <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
+                            ✔️ Verified by: {uploadedDoc.verifiedByName} on {uploadedDoc.verifiedAt?.split('T')[0]}
+                          </span>
                         )}
                       </div>
                     )}
 
-                    {/* REJECTION REASON ALERT BANNER */}
-                    {isRejected && (uploadedDoc.rejectionReason || uploadedDoc.remarks) && (
-                      <div
-                        style={{
-                          marginTop: '0.75rem',
-                          padding: '0.75rem 1rem',
-                          background: '#FEF2F2',
-                          border: '1px solid rgba(239,68,68,0.3)',
-                          borderRadius: 'var(--radius-sm)',
-                          color: '#B91C1C',
-                          fontSize: '0.8125rem',
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: '0.5rem'
-                        }}
-                      >
-                        <XCircle size={18} color="#EF4444" style={{ flexShrink: 0, marginTop: '0.1rem' }} />
-                        <div>
-                          <strong>Rejection Reason:</strong> {uploadedDoc.rejectionReason || uploadedDoc.remarks}
-                          <div style={{ marginTop: '0.2rem', fontSize: '0.75rem', color: '#991B1B' }}>
-                            💡 Action Required: Please review the rejection notes above, select a corrected file, and click <strong>"Re-upload Document"</strong> below.
-                          </div>
+                    {/* Rejection Alert Banner */}
+                    {isRejected && uploadedDoc && uploadedDoc.rejectionReason && (
+                      <div className="mt-3 p-3.5 bg-rose-50 dark:bg-rose-950/40 rounded-xl border border-rose-200 dark:border-rose-800 text-xs text-rose-800 dark:text-rose-300 space-y-1">
+                        <div className="font-bold flex items-center gap-1.5 text-rose-900 dark:text-rose-200">
+                          <XCircle className="w-4 h-4 text-rose-600" />
+                          Rejection Reason (Action Required):
                         </div>
+                        <p className="pl-5.5 font-medium">{uploadedDoc.rejectionReason}</p>
+                        <p className="pl-5.5 text-[11px] text-rose-600 dark:text-rose-400 pt-0.5">
+                          💡 Please review the verifier notes, select a corrected file, and click <strong>"Re-upload Document"</strong>. Your new file will be submitted as <strong>Version {uploadedDoc.currentVersion + 1}</strong>.
+                        </p>
                       </div>
                     )}
                   </div>
 
-                  {/* Actions Column */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    {/* View / Preview Button */}
+                  {/* Action Buttons Column */}
+                  <div className="flex items-center gap-2 flex-wrap md:flex-nowrap shrink-0">
+                    {/* View Preview */}
                     {uploadedDoc && (
-                      <button className="btn btn-secondary btn-sm" onClick={() => setPreviewDoc(uploadedDoc)} title="View / Preview Document">
-                        <Eye size={14} /> View/Preview
+                      <button
+                        onClick={() => setPreviewDoc({ master: masterDoc, doc: uploadedDoc })}
+                        className="px-3 py-2 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition flex items-center gap-1.5"
+                        title="View / Preview Document"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        Preview
                       </button>
                     )}
 
-                    {/* Download Button */}
+                    {/* Download */}
                     {uploadedDoc && (
-                      <button className="btn btn-secondary btn-sm" onClick={() => handleDownload(uploadedDoc)} title="Download Document File">
-                        <Download size={14} /> Download
+                      <button
+                        onClick={() => handleDownload(uploadedDoc)}
+                        className="px-3 py-2 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition flex items-center gap-1.5"
+                        title="Download Document"
+                      >
+                        <Download className="w-3.5 h-3.5" />
                       </button>
                     )}
 
-                    {/* Upload / Re-upload Button */}
+                    {/* Version History */}
+                    {uploadedDoc && versions && versions.length > 0 && (
+                      <button
+                        onClick={() => setHistoryDoc({ master: masterDoc, doc: uploadedDoc, versions })}
+                        className="px-3 py-2 rounded-xl text-xs font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 transition flex items-center gap-1.5"
+                        title="View Version History"
+                      >
+                        <History className="w-3.5 h-3.5" />
+                        v{uploadedDoc.currentVersion} History
+                      </button>
+                    )}
+
+                    {/* Upload / Re-upload button */}
                     {canStudentUpload ? (
                       <button
-                        className={`btn btn-sm ${uploadedDoc ? 'btn-primary' : 'btn-navy'}`}
-                        onClick={() => handleOpenUploadModal(standard.title, standard.category, uploadedDoc || undefined)}
+                        onClick={() => handleOpenUploadModal(masterDoc, uploadedDoc)}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                          uploadedDoc
+                            ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                            : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
+                        }`}
                       >
-                        <Upload size={14} /> {uploadedDoc ? 'Re-upload' : 'Upload'}
+                        <Upload className="w-3.5 h-3.5" />
+                        {uploadedDoc ? 'Re-upload' : 'Upload'}
                       </button>
                     ) : (
-                      <button className="btn btn-secondary btn-sm" disabled style={{ opacity: 0.6, cursor: 'not-allowed' }} title="Verified and Locked by Admin">
-                        <Lock size={14} color="#10B981" /> Locked
+                      <button
+                        disabled
+                        className="px-3.5 py-2 rounded-xl text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 opacity-80 cursor-not-allowed flex items-center gap-1.5"
+                        title="Document is verified and permanently locked by Admin"
+                      >
+                        <Lock className="w-3.5 h-3.5 text-emerald-600" />
+                        Locked
                       </button>
                     )}
 
-                    {/* ADMIN MANAGEMNET CONTROLS */}
+                    {/* Verifier Controls for Faculty / Mentor / Admin */}
                     {isAdmin && uploadedDoc && (
-                      <>
+                      <div className="flex items-center gap-1.5 pl-2 border-l border-gray-200 dark:border-gray-700">
                         {uploadedDoc.status !== 'VERIFIED' && (
-                          <button className="btn btn-primary btn-sm" onClick={() => handleAdminVerify(uploadedDoc)} title="Verify & Lock Document">
-                            <Check size={14} /> Verify &amp; Lock
+                          <button
+                            onClick={() => handleAdminVerify(uploadedDoc)}
+                            className="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition flex items-center gap-1"
+                            title="Verify and Lock Document"
+                          >
+                            <Check className="w-3.5 h-3.5" /> Verify &amp; Lock
                           </button>
                         )}
 
                         {uploadedDoc.status !== 'REJECTED' && (
-                          <button className="btn btn-secondary btn-sm" style={{ color: '#EF4444' }} onClick={() => handleOpenAdminRejectModal(uploadedDoc)} title="Reject Document with Reason">
-                            <XCircle size={14} /> Reject
+                          <button
+                            onClick={() => handleOpenAdminRejectModal(uploadedDoc)}
+                            className="px-3 py-2 rounded-xl text-xs font-semibold bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 hover:bg-rose-100 transition flex items-center gap-1"
+                            title="Reject Document with Reason"
+                          >
+                            <XCircle className="w-3.5 h-3.5" /> Reject
                           </button>
                         )}
-
-                        {uploadedDoc.isLocked && (
-                          <button className="btn btn-secondary btn-sm" onClick={() => handleAdminUnlockOverride(uploadedDoc)} title="Admin Override to Unlock">
-                            <Unlock size={14} /> Unlock
-                          </button>
-                        )}
-
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteDocument(uploadedDoc)} title="Delete Document">
-                          <Trash2 size={14} />
-                        </button>
-                      </>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -504,130 +790,111 @@ export const StudentDocumentsSection: React.FC<StudentDocumentsSectionProps> = (
         )}
       </div>
 
-      {/* Custom Uploaded Documents (If Any) */}
-      {filteredCustomDocs.length > 0 && (
-        <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Plus size={18} color="var(--brand-orange)" /> Custom &amp; Additional Uploaded Certificates ({filteredCustomDocs.length})
-          </div>
-
-          {filteredCustomDocs.map(doc => (
-            <div key={doc.id} className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--brand-navy-medium)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    {doc.title}
-                    {getStatusBadge(doc)}
-                  </div>
-                  <div style={{ fontSize: '0.78125rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                    Category: <strong>{doc.category}</strong> • File: {doc.fileName} ({doc.fileSize}) • Uploaded {doc.uploadDate}
-                  </div>
-                  {doc.rejectionReason && (
-                    <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.75rem', background: '#FEF2F2', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 'var(--radius-sm)', color: '#B91C1C', fontSize: '0.78125rem' }}>
-                      <strong>Rejection Reason:</strong> {doc.rejectionReason}
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <button className="btn btn-secondary btn-sm" onClick={() => setPreviewDoc(doc)}>
-                    <Eye size={14} /> Preview
-                  </button>
-                  <button className="btn btn-secondary btn-sm" onClick={() => handleDownload(doc)}>
-                    <Download size={14} /> Download
-                  </button>
-                  {isAdmin && (
-                    <>
-                      {doc.status !== 'VERIFIED' && (
-                        <button className="btn btn-primary btn-sm" onClick={() => handleAdminVerify(doc)}>
-                          <Check size={14} /> Verify &amp; Lock
-                        </button>
-                      )}
-                      <button className="btn btn-danger btn-sm" onClick={() => handleDeleteDocument(doc)}>
-                        <Trash2 size={14} />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* UPLOAD / RE-UPLOAD MODAL */}
       {uploadModalDoc && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 220, padding: '1rem' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '520px', padding: '1.75rem' }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Upload size={20} color="var(--brand-orange)" />
-              {uploadModalDoc.existingDoc ? `Re-upload "${uploadModalDoc.existingDoc.title}"` : `Upload Document: ${uploadModalDoc.title || 'New Document'}`}
-            </h3>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-100 dark:border-gray-700 space-y-4 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
+              <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Upload className="w-5 h-5 text-indigo-600" />
+                {uploadModalDoc.existingDoc ? `Re-upload: ${uploadModalDoc.master.name}` : `Upload Document: ${uploadModalDoc.master.name}`}
+              </h3>
+              <button onClick={() => setUploadModalDoc(null)} className="text-gray-400 hover:text-gray-600">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
 
             {errorMsg && (
-              <div style={{ padding: '0.75rem', background: '#FEF2F2', border: '1px solid rgba(239,68,68,0.3)', color: '#EF4444', borderRadius: 'var(--radius-sm)', fontSize: '0.8125rem', marginBottom: '1rem' }}>
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-xs rounded-xl border border-rose-200 dark:border-rose-800">
                 {errorMsg}
               </div>
             )}
 
-            <form onSubmit={handleSaveUpload} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="form-group">
-                <label className="form-label">Document Title *</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={docTitle}
-                  onChange={e => setDocTitle(e.target.value)}
-                  placeholder="e.g. Aadhaar Card, 10th Marksheet..."
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Document Category *</label>
-                <select
-                  className="form-select"
-                  value={docCategory}
-                  onChange={e => setDocCategory(e.target.value as any)}
-                >
-                  <option value="IDENTITY">IDENTITY (Aadhaar / Photo / Signature / PAN)</option>
-                  <option value="ACADEMIC">ACADEMIC (10th / 12th / Diploma / Graduation Marksheets)</option>
-                  <option value="ADMISSION">ADMISSION (TC / Migration Certificate)</option>
-                  <option value="CERTIFICATE">CERTIFICATE (Caste / Income / ABC ID / Passbook)</option>
-                  <option value="OTHER">OTHER CERTIFICATE</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">
-                  {uploadModalDoc.existingDoc ? 'Select New File to Replace (PDF / JPG / PNG)' : 'Select Document File (PDF / JPG / PNG) *'}
-                </label>
-                <input
-                  type="file"
-                  className="form-input"
-                  onChange={e => {
-                    if (e.target.files && e.target.files[0]) {
-                      setSelectedFile(e.target.files[0]);
-                    }
-                  }}
-                  accept=".pdf,.png,.jpg,.jpeg"
-                  required={!uploadModalDoc.existingDoc}
-                />
-                {selectedFile && (
-                  <div style={{ fontSize: '0.75rem', color: '#10B981', fontWeight: 600, marginTop: '0.35rem' }}>
-                    Selected File: {selectedFile.name} ({(selectedFile.size / (1024 * 1024)).toFixed(2)} MB)
+            <form onSubmit={handleSaveUpload} className="space-y-4">
+              <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-xl text-xs space-y-1">
+                <div className="text-gray-500">Document: <strong className="text-gray-800 dark:text-gray-200">{uploadModalDoc.master.name}</strong> ({uploadModalDoc.master.code})</div>
+                <div className="text-gray-500">Allowed Formats: <strong className="text-gray-800 dark:text-gray-200">{uploadModalDoc.master.allowedFileTypes.join(', ').toUpperCase()}</strong></div>
+                <div className="text-gray-500">Max Size: <strong className="text-gray-800 dark:text-gray-200">{uploadModalDoc.master.maxFileSize} MB</strong></div>
+                {uploadModalDoc.existingDoc && (
+                  <div className="text-indigo-600 dark:text-indigo-400 font-semibold pt-1">
+                    ℹ️ Uploading will preserve Version {uploadModalDoc.existingDoc.currentVersion} in history and create Version {uploadModalDoc.existingDoc.currentVersion + 1}.
                   </div>
                 )}
               </div>
 
-              <div style={{ background: '#FFFBEB', border: '1px solid rgba(245,158,11,0.3)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem', color: '#B45309' }}>
-                ℹ️ File is stored in secure encrypted IndexedDB storage. Maximum recommended file size is 10 MB.
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Select File ({uploadModalDoc.master.allowedFileTypes.join(', ').toUpperCase()}) *
+                </label>
+                <input
+                  type="file"
+                  required={!uploadModalDoc.existingDoc}
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setSelectedFile(e.target.files[0]);
+                    }
+                  }}
+                  className="w-full text-xs text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setUploadModalDoc(null)}>Cancel</button>
-                <button type="submit" className="btn btn-primary" disabled={uploading}>
-                  {uploading ? 'Storing Document...' : uploadModalDoc.existingDoc ? 'Save & Re-submit' : 'Upload File'}
+              {/* Expiry Date input if required */}
+              {uploadModalDoc.master.expiryRequired && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                      Issue Date
+                    </label>
+                    <input
+                      type="date"
+                      value={issueDate}
+                      onChange={(e) => setIssueDate(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-xs bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-rose-600 dark:text-rose-400 mb-1 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" /> Expiry Date *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={expiryDate}
+                      onChange={(e) => setExpiryDate(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-xs bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Remarks / Notes
+                </label>
+                <textarea
+                  rows={2}
+                  value={uploadRemarks}
+                  onChange={(e) => setUploadRemarks(e.target.value)}
+                  placeholder="Optional submission comments..."
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-xs bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <button
+                  type="button"
+                  onClick={() => setUploadModalDoc(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={uploading}
+                  className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md disabled:opacity-50"
+                >
+                  {uploading ? 'Encrypting & Uploading...' : uploadModalDoc.existingDoc ? 'Submit New Version' : 'Upload Document'}
                 </button>
               </div>
             </form>
@@ -635,94 +902,313 @@ export const StudentDocumentsSection: React.FC<StudentDocumentsSectionProps> = (
         </div>
       )}
 
-      {/* VIEW / PREVIEW MODAL */}
-      {previewDoc && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 230, padding: '1rem' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '640px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <FileText size={22} color="var(--brand-orange)" /> {previewDoc.title}
-                </h3>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  Student: {previewDoc.studentName} ({previewDoc.enrollmentNo})
+      {/* VERSION HISTORY MODAL */}
+      {historyDoc && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-gray-100 dark:border-gray-700 space-y-4 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
+              <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <History className="w-5 h-5 text-indigo-600" />
+                Version History: {historyDoc.master.name}
+              </h3>
+              <button onClick={() => setHistoryDoc(null)} className="text-gray-400 hover:text-gray-600">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+              {/* Current Active Version */}
+              <div className="p-3.5 bg-indigo-50/50 dark:bg-indigo-950/40 rounded-xl border border-indigo-200 dark:border-indigo-800 text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-indigo-700 dark:text-indigo-300">
+                    Version {historyDoc.doc.currentVersion} (Current Active)
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white">
+                    {historyDoc.doc.status}
+                  </span>
                 </div>
+                <div className="text-gray-600 dark:text-gray-300">File: {historyDoc.doc.fileName} ({historyDoc.doc.fileSize})</div>
+                <div className="text-gray-500 text-[11px]">Uploaded: {historyDoc.doc.updatedAt.split('T')[0]}</div>
               </div>
-              {getStatusBadge(previewDoc)}
-            </div>
 
-            {/* Document Image / File View Container */}
-            <div style={{ width: '100%', minHeight: '260px', borderRadius: 'var(--radius-md)', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.25rem', overflow: 'hidden', border: '1px solid var(--border-color)', position: 'relative' }}>
-              {previewDoc.fileUrl && (previewDoc.fileUrl.startsWith('http') || previewDoc.fileUrl.startsWith('data:image')) ? (
-                <img
-                  src={previewDoc.fileUrl}
-                  alt={previewDoc.title}
-                  style={{ maxWidth: '100%', maxHeight: '360px', objectFit: 'contain' }}
-                />
-              ) : (
-                <div style={{ textAlign: 'center', padding: '2.5rem' }}>
-                  <FileText size={54} color="var(--brand-navy-medium)" />
-                  <div style={{ fontWeight: 800, marginTop: '0.75rem', color: 'var(--brand-navy)', fontSize: '1rem' }}>{previewDoc.fileName}</div>
-                  <div style={{ fontSize: '0.78125rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>Digital University Verification Document ({previewDoc.fileSize})</div>
+              {/* Archived Versions */}
+              {historyDoc.versions.map((ver) => (
+                <div key={ver.id} className="p-3 bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-gray-800 dark:text-gray-200">
+                      Version {ver.versionNumber} (Archived)
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                      {ver.status}
+                    </span>
+                  </div>
+                  <div className="text-gray-600 dark:text-gray-400">File: {ver.fileName} ({ver.fileSize})</div>
+                  <div className="text-gray-500 text-[11px]">Archived On: {ver.uploadedAt.split('T')[0]}</div>
+                  {ver.rejectionReason && (
+                    <div className="text-[11px] text-rose-600 pt-0.5">
+                      Rejection Reason: {ver.rejectionReason}
+                    </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
 
-            {/* Document Metadata Details */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8125rem', background: 'var(--bg-surface-hover)', padding: '1rem', borderRadius: 'var(--radius-sm)', marginBottom: '1.25rem' }}>
-              <div><strong>Document Name:</strong> {previewDoc.title}</div>
-              <div><strong>Category:</strong> {previewDoc.category}</div>
-              <div><strong>File Name:</strong> {previewDoc.fileName} ({previewDoc.fileSize})</div>
-              <div><strong>Upload Date:</strong> {previewDoc.uploadDate}</div>
-              <div><strong>Verification Status:</strong> {previewDoc.status}</div>
-              {previewDoc.verifiedBy && (
-                <div><strong>Verified By:</strong> {previewDoc.verifiedBy} on {previewDoc.verifiedAt}</div>
-              )}
-              {previewDoc.rejectionReason && (
-                <div style={{ color: '#EF4444' }}><strong>Rejection Reason:</strong> {previewDoc.rejectionReason}</div>
-              )}
-              {previewDoc.remarks && (
-                <div><strong>Admin Remarks:</strong> {previewDoc.remarks}</div>
-              )}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-              <button className="btn btn-secondary" onClick={() => setPreviewDoc(null)}>Close Preview</button>
-              <button className="btn btn-primary" onClick={() => handleDownload(previewDoc)}>
-                <Download size={16} /> Download File
+            <div className="flex justify-end pt-2 border-t border-gray-100 dark:border-gray-700">
+              <button
+                type="button"
+                onClick={() => setHistoryDoc(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100"
+              >
+                Close History
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ADMIN REJECT MODAL WITH MANDATORY REASON INPUT */}
+      {/* PREVIEW MODAL */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-gray-100 dark:border-gray-700 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-indigo-600" />
+                  {previewDoc.master.name}
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Code: {previewDoc.master.code} • Version {previewDoc.doc.currentVersion}
+                </p>
+              </div>
+              {getStatusBadge(previewDoc.doc.status, previewDoc.doc.isLocked)}
+            </div>
+
+            <div className="w-full min-h-60 rounded-xl bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-6 border border-gray-200 dark:border-gray-700">
+              {previewDoc.doc.fileUrl && (previewDoc.doc.fileUrl.startsWith('http') || previewDoc.doc.fileUrl.startsWith('data:image')) ? (
+                <img
+                  src={previewDoc.doc.fileUrl}
+                  alt={previewDoc.doc.documentName}
+                  className="max-h-80 object-contain rounded-lg"
+                />
+              ) : (
+                <div className="text-center">
+                  <FileText className="w-16 h-16 mx-auto text-indigo-400 mb-2" />
+                  <div className="font-bold text-sm text-gray-800 dark:text-gray-200">{previewDoc.doc.fileName}</div>
+                  <div className="text-xs text-gray-400 mt-1">Digital SSIU Encrypted Document ({previewDoc.doc.fileSize})</div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-3 bg-gray-50 dark:bg-gray-900/60 rounded-xl text-xs space-y-1">
+              <div><strong>Document Name:</strong> {previewDoc.doc.documentName}</div>
+              <div><strong>File Name:</strong> {previewDoc.doc.fileName} ({previewDoc.doc.fileSize})</div>
+              <div><strong>Upload Date:</strong> {previewDoc.doc.updatedAt.split('T')[0]}</div>
+              {previewDoc.doc.expiryDate && (
+                <div><strong>Expiry Date:</strong> {previewDoc.doc.expiryDate.split('T')[0]}</div>
+              )}
+              {previewDoc.doc.verifiedByName && (
+                <div className="text-emerald-600"><strong>Verified By:</strong> {previewDoc.doc.verifiedByName} on {previewDoc.doc.verifiedAt?.split('T')[0]}</div>
+              )}
+              {previewDoc.doc.rejectionReason && (
+                <div className="text-rose-600"><strong>Rejection Reason:</strong> {previewDoc.doc.rejectionReason}</div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+              <button
+                type="button"
+                onClick={() => setPreviewDoc(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100"
+              >
+                Close Preview
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownload(previewDoc.doc)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADMIN REJECT MODAL */}
       {rejectModalDoc && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 230, padding: '1rem' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '480px', padding: '1.75rem' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <XCircle size={20} color="#EF4444" /> Reject Document Submission
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 dark:border-gray-700 space-y-4">
+            <h3 className="text-base font-bold text-rose-600 flex items-center gap-2">
+              <XCircle className="w-5 h-5" />
+              Reject Document: {rejectModalDoc.documentName}
             </h3>
-            <p style={{ fontSize: '0.84375rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-              State clear rejection notes for <strong>"{rejectModalDoc.title}"</strong> ({rejectModalDoc.studentName}). The student will see this reason and can re-upload.
+            <p className="text-xs text-gray-500">
+              State clear reasons for rejection. The student will be notified and required to re-upload.
             </p>
 
-            <form onSubmit={handleConfirmAdminReject} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="form-group">
-                <label className="form-label">Mandatory Rejection Reason *</label>
+            <form onSubmit={handleConfirmAdminReject} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Mandatory Rejection Reason *
+                </label>
                 <textarea
-                  className="form-input"
                   rows={4}
-                  placeholder="e.g. Scanned document is blurry / Mismatch in student name / Expired certificate. Please re-upload clear original."
-                  value={rejectionReasonInput}
-                  onChange={e => setRejectionReasonInput(e.target.value)}
                   required
+                  value={rejectionReasonInput}
+                  onChange={(e) => setRejectionReasonInput(e.target.value)}
+                  placeholder="e.g. Scanned copy is illegible / Mismatch in marksheet details..."
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-xs bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white"
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setRejectModalDoc(null)}>Cancel</button>
-                <button type="submit" className="btn btn-danger">Confirm Rejection</button>
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRejectModalDoc(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-md"
+                >
+                  Confirm Rejection
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* ABC ID SUBMISSION MODAL */}
+      {abcModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 dark:border-gray-700 space-y-4 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
+              <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-indigo-600" />
+                {student.abcId ? 'Update ABC ID Number' : 'Submit Academic Bank of Credits (ABC) ID'}
+              </h3>
+              <button onClick={() => setAbcModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {abcError && (
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-xs rounded-xl border border-rose-200 dark:border-rose-800">
+                {abcError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveAbcId} className="space-y-4">
+              <div className="p-3 bg-indigo-50/50 dark:bg-indigo-950/40 rounded-xl text-xs space-y-1 border border-indigo-200/60 dark:border-indigo-800/60">
+                <div className="font-semibold text-indigo-800 dark:text-indigo-300">
+                  ℹ️ 12-Digit Academic Identifier (DigiLocker / APAAR)
+                </div>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Please enter your 12-digit ABC ID. Once submitted, your Mentor will verify the ID, and upon verification it will be permanently locked.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  12-Digit ABC ID Number *
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 1234-5678-9012"
+                    value={abcInput}
+                    onChange={(e) => handleAbcInputChange(e.target.value)}
+                    maxLength={14}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 text-sm font-mono font-bold tracking-wider bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <span className="absolute right-3 top-2.5 text-xs text-gray-400 font-mono">
+                    {abcInput.replace(/\D/g, '').length} / 12
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Format: 12 numeric digits (hyphens auto-formatted).
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Submission Remarks (Optional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={abcRemarksInput}
+                  onChange={(e) => setAbcRemarksInput(e.target.value)}
+                  placeholder="e.g. Generated from DigiLocker portal..."
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-xs bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <button
+                  type="button"
+                  onClick={() => setAbcModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={abcInput.replace(/\D/g, '').length !== 12}
+                  className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md disabled:opacity-50"
+                >
+                  Submit for Verification
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ABC ID MENTOR REJECT MODAL */}
+      {abcRejectModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 dark:border-gray-700 space-y-4">
+            <h3 className="text-base font-bold text-rose-600 flex items-center gap-2">
+              <XCircle className="w-5 h-5" />
+              Reject ABC ID Submission
+            </h3>
+            <p className="text-xs text-gray-500">
+              Provide a clear reason for rejecting student {student.name}'s ABC ID ({student.abcId}). The student will be notified and prompted to correct the ID.
+            </p>
+
+            <form onSubmit={handleMentorRejectAbcId} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Mandatory Rejection Reason *
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  value={abcRejectionReason}
+                  onChange={(e) => setAbcRejectionReason(e.target.value)}
+                  placeholder="e.g. Invalid ABC ID number or mismatch with DigiLocker records..."
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-xs bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAbcRejectModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-700 dark:text-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-md"
+                >
+                  Confirm Rejection
+                </button>
               </div>
             </form>
           </div>

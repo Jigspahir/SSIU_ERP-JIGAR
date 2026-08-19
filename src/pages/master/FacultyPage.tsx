@@ -108,7 +108,7 @@ export const FacultyPage: React.FC = () => {
     setPhoto(item.photo || '');
     setDesignation(item.designation);
     setInstituteId(item.instituteId);
-    setDepartmentId(item.departmentId);
+    setDepartmentId(item.departmentId || '');
     setQualification(item.qualification);
     setSpecialization(item.specialization || '');
     setJoiningDate(item.joiningDate || '');

@@ -1,14 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { HeaderLogo } from './HeaderLogo';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Bell, Dot, LogOut } from 'lucide-react';
 import { 
-  LayoutDashboard, Building2, GraduationCap, Calendar, 
-  Layers, Bookmark, Users2, UserCheck, ShieldCheck, 
-  ChevronLeft, ChevronRight, User, BookOpen, Clock, FileText, FileCheck, CalendarDays,
-  IndianRupee, FolderCheck, BarChart3, Settings, FileSignature, Award, MessageSquare, HelpCircle,
-  Bell, Library, CheckSquare, Send, CalendarCheck, FileSpreadsheet, Rocket
-} from 'lucide-react';
-import { UserRole } from '../../types';
+  getRoleNavigationItems, NavItemConfig, 
+  STUDENT_NAVIGATION_STRUCTURE, FACULTY_NAVIGATION_STRUCTURE, MENTOR_NAVIGATION_STRUCTURE, HOD_NAVIGATION_STRUCTURE, PRINCIPAL_NAVIGATION_STRUCTURE, STUDENT_SECTION_NAVIGATION_STRUCTURE, REGISTRAR_NAVIGATION_STRUCTURE, DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE, StudentNavGroup, StudentNavSubItem 
+} from '../../constants/navigationConfig';
+import { mentorAssignmentService } from '../../services/mentorAssignmentService';
+import { db } from '../../services/db';
 
 interface SidebarProps {
   activeTab: string;
@@ -19,14 +18,6 @@ interface SidebarProps {
   setMobileOpen?: (open: boolean) => void;
 }
 
-interface NavItem {
-  id: string;
-  label: string;
-  icon: any;
-  allowedRoles: UserRole[];
-  category?: string;
-}
-
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   setActiveTab,
@@ -35,114 +26,116 @@ export const Sidebar: React.FC<SidebarProps> = ({
   mobileOpen = false,
   setMobileOpen
 }) => {
-  const { user, role } = useAuth();
+  const { user, role, logout } = useAuth();
+  const isStudent = role === 'STUDENT';
+  const isFaculty = role === 'FACULTY';
+  const isHOD = role === 'HOD';
+  const isPrincipal = role === 'PRINCIPAL';
+  const isStudentSection = role === 'STUDENT_SECTION';
+  const isRegistrar = role === 'REGISTRAR';
+  const isDeputyRegistrar = role === 'DEPUTY_REGISTRAR';
 
-  const allNavItems: Record<string, NavItem> = {
-    'dashboard': { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Main' },
-    
-    // Academic & Core
-    'calendar': { id: 'calendar', label: 'Academic', icon: CalendarDays, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Academic' },
-    'attendance': { id: 'attendance', label: 'Attendance', icon: UserCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Academic' },
-    'subjects': { id: 'subjects', label: 'Subjects', icon: BookOpen, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Academic' },
-    'timetable': { id: 'timetable', label: 'Timetable', icon: Clock, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Academic' },
-    'session-plan': { id: 'session-plan', label: 'Session Plan', icon: BookOpen, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Academic' },
-    'materials': { id: 'materials', label: 'Study Material', icon: FileText, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Academic' },
-    'assignments': { id: 'assignments', label: 'Assignments', icon: FileCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Academic' },
-    
-    // Exam & Marks
-    'exam-dashboard': { id: 'exam-dashboard', label: 'Examination', icon: BarChart3, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Examinations' },
-    'exam-marks': { id: 'exam-marks', label: 'Marks', icon: FileSpreadsheet, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'HOD', 'FACULTY'], category: 'Examinations' },
+  // Check if faculty is currently assigned as a mentor
+  const isMentor = React.useMemo(() => {
+    if (!isFaculty || !user) return false;
+    const assignments = mentorAssignmentService.getAssignments({}, user);
+    return Boolean((assignments.students && assignments.students.length > 0) || (user as any).isMentor);
+  }, [isFaculty, user]);
 
-    // Finance & Documents
-    'fees': { id: 'fees', label: 'Fees', icon: IndianRupee, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'STUDENT'], category: 'Finance & Admin' },
-    'hr': { id: 'hr', label: 'HR & Staff', icon: Users2, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'REGISTRAR', 'IQAC'], category: 'Finance & Admin' },
-    'crm': { id: 'crm', label: 'Documents', icon: FolderCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Finance & Admin' },
-    'certificates': { id: 'certificates', label: 'Certificates', icon: Award, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'STUDENT'], category: 'Finance & Admin' },
-    'requests': { id: 'requests', label: 'Requests Desk', icon: CheckSquare, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN'], category: 'Finance & Admin' },
+  const [mentorMode, setMentorMode] = useState(false);
 
-    // Mentorship & Support
-    'mentor': { id: 'mentor', label: 'Mentor', icon: UserCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Support & Campus' },
-    'tickets': { id: 'tickets', label: role === 'FACULTY' ? 'Student Queries' : 'Support Ticket', icon: HelpCircle, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Support & Campus' },
-    'feedback': { id: 'feedback', label: 'Feedback', icon: MessageSquare, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Support & Campus' },
+  // Auto-switch to mentor mode when activeTab is mentor-specific
+  useEffect(() => {
+    if (isMentor && (activeTab.startsWith('mentee-') || activeTab === 'mentor-profile')) {
+      setMentorMode(true);
+    }
+  }, [activeTab, isMentor]);
 
-    // Campus Services
-    'notices': { id: 'notices', label: 'Notices', icon: Bell, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Campus' },
-    'events': { id: 'events', label: 'Events', icon: CalendarCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'], category: 'Campus' },
-    'edp-duties': { id: 'edp-duties', label: 'EDP Duties', icon: CalendarCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN'], category: 'Campus' },
-    'incubation': { id: 'incubation', label: 'Incubation & Startups', icon: Rocket, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC'], category: 'Campus' },
-    'library': { id: 'library', label: 'Library', icon: Library, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'LIBRARY_ADMIN'], category: 'Campus' },
-    'notifications': { id: 'notifications', label: 'Notifications', icon: Bell, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN'], category: 'Campus' },
+  // State to manage expanded parent accordion items for all portals
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    'profile-group': false,
+    'university-group': true,
+    'institute-group': true,
+    'department-group': true,
+    'academic-group': true,
+    'academics-group': true,
+    'attendance-group': true,
+    'students-group': true,
+    'faculty-group': true,
+    'examination-group': false,
+    'records-group': false,
+    'requests-group': true,
+    'approvals-group': true,
+    'notices-group': false,
+    'documents-group': false,
+    'feedback-group': false,
+    'reports-group': false,
+    'mentees-group': true,
+    'services-group': true,
+    'fees-group': false,
+    'idcard-group': false,
+    'academic-records-group': false,
+    academic: true,
+    attendance: true,
+    examination: false,
+    students: false,
+    fees: false,
+    'student-section': false,
+    requests: false,
+    documents: false,
+    feedback: false
+  });
 
-    // Administration Offices Workspaces
-    'registrar': { id: 'registrar', label: 'Registrar Office', icon: FileCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR'], category: 'Administration' },
-    'iqac': { id: 'iqac', label: 'IQAC Cell', icon: Award, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'IQAC'], category: 'Administration' },
-    'exam-cell': { id: 'exam-cell', label: 'Exam Controller', icon: ShieldCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'EXAM_CELL'], category: 'Administration' },
-    'student-section': { id: 'student-section', label: 'Student Section', icon: FolderCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'STUDENT_SECTION'], category: 'Administration' },
-    'hostel-admin': { id: 'hostel-admin', label: 'Hostel Office', icon: Building2, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'HOSTEL_ADMIN'], category: 'Administration' },
-    'library-admin': { id: 'library-admin', label: 'Library Office', icon: Library, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'LIBRARY_ADMIN'], category: 'Administration' },
-    'transport-admin': { id: 'transport-admin', label: 'Transport Fleet', icon: Clock, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'TRANSPORT_ADMIN'], category: 'Administration' },
-    'maintenance-admin': { id: 'maintenance-admin', label: 'Maintenance Office', icon: Settings, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'MAINTENANCE_ADMIN'], category: 'Administration' },
+  // Auto-expand active parent group whenever activeTab changes
+  useEffect(() => {
+    const navStructure = isStudent 
+      ? STUDENT_NAVIGATION_STRUCTURE 
+      : (isRegistrar
+          ? REGISTRAR_NAVIGATION_STRUCTURE
+          : (isDeputyRegistrar
+              ? DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE
+              : (isStudentSection
+                  ? STUDENT_SECTION_NAVIGATION_STRUCTURE
+                  : (isPrincipal
+                      ? PRINCIPAL_NAVIGATION_STRUCTURE
+                      : (isHOD
+                          ? HOD_NAVIGATION_STRUCTURE
+                          : (isFaculty ? (mentorMode ? MENTOR_NAVIGATION_STRUCTURE : FACULTY_NAVIGATION_STRUCTURE) : null))))));
+    if (navStructure) {
+      navStructure.forEach(group => {
+        if (group.children) {
+          const isChildActive = group.children.some(
+            sub => sub.targetTab === activeTab || sub.id === activeTab
+          );
+          if (isChildActive) {
+            setOpenGroups(prev => ({ ...prev, [group.id]: true }));
+          }
+        }
+      });
+    }
+  }, [activeTab, isStudent, isFaculty, isHOD, isPrincipal, isStudentSection, isRegistrar, isDeputyRegistrar, mentorMode]);
 
-    // Master Hierarchy & User Directory for Admin
-    'students': { id: 'students', label: 'Students', icon: Users2, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'REGISTRAR', 'STUDENT_SECTION'], category: 'Master' },
-    'faculty': { id: 'faculty', label: 'Faculty', icon: UserCheck, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'REGISTRAR', 'IQAC'], category: 'Master' },
-    'departments': { id: 'departments', label: 'Departments', icon: Building2, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'REGISTRAR'], category: 'Master' },
-    'programs': { id: 'programs', label: 'Programs', icon: GraduationCap, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'REGISTRAR'], category: 'Master' },
-    'reports': { id: 'reports', label: 'Reports', icon: BarChart3, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC', 'EXAM_CELL'], category: 'System' },
-    'settings': { id: 'settings', label: 'Settings', icon: Settings, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN'], category: 'System' },
-    'note-sheets': { id: 'note-sheets', label: 'Note Sheets', icon: FileText, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN'], category: 'Administration' },
-    'profile': { id: 'profile', label: 'My Profile', icon: User, allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN'], category: 'System' }
+  const toggleGroup = (groupId: string) => {
+    setOpenGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }));
   };
 
-  // Exact Structure Definitions per Prompt
-  const studentOrderKeys = [
-    'dashboard', 'calendar', 'attendance', 'subjects', 'timetable', 'materials',
-    'assignments', 'exam-dashboard', 'fees', 'crm', 'certificates', 'requests', 'mentor',
-    'tickets', 'feedback', 'notices', 'events', 'library', 'notifications', 'profile'
-  ];
+  const canAccessPending = db.hasPendingWithMeAccess(user, role);
+  const canCreateNotesheet = db.hasNoteSheetPermission(user, role, 'NOTESHEET_CREATE');
+  const canViewNotesheet = db.hasNoteSheetPermission(user, role, 'NOTESHEET_VIEW');
 
-  const facultyOrderKeys = [
-    'dashboard', 'subjects', 'timetable', 'attendance', 'session-plan', 'materials',
-    'assignments', 'exam-marks', 'exam-dashboard', 'requests', 'edp-duties', 'tickets', 'mentor', 'feedback', 'note-sheets', 'profile'
-  ];
-
-  const adminOrderKeys = [
-    'dashboard', 'registrar', 'iqac', 'exam-cell', 'student-section', 'hostel-admin', 'library-admin', 'transport-admin', 'maintenance-admin',
-    'students', 'faculty', 'departments', 'programs', 'subjects',
-    'calendar', 'attendance', 'exam-dashboard', 'fees', 'crm', 'certificates',
-    'requests', 'edp-duties', 'tickets', 'feedback', 'notices', 'events', 'reports', 'settings', 'note-sheets', 'profile'
-  ];
-
-  let orderKeys = adminOrderKeys;
-  if (role === 'STUDENT') {
-    orderKeys = studentOrderKeys;
-  } else if (role === 'FACULTY') {
-    orderKeys = facultyOrderKeys;
-  } else if (role === 'REGISTRAR') {
-    orderKeys = ['dashboard', 'registrar', 'requests', 'edp-duties', 'students', 'faculty', 'departments', 'programs', 'notices', 'reports', 'note-sheets', 'profile'];
-  } else if (role === 'IQAC') {
-    orderKeys = ['dashboard', 'iqac', 'requests', 'edp-duties', 'faculty', 'feedback', 'reports', 'note-sheets', 'profile'];
-  } else if (role === 'EXAM_CELL') {
-    orderKeys = ['dashboard', 'exam-cell', 'exam-dashboard', 'requests', 'edp-duties', 'students', 'reports', 'note-sheets', 'profile'];
-  } else if (role === 'STUDENT_SECTION') {
-    orderKeys = ['dashboard', 'student-section', 'requests', 'edp-duties', 'students', 'certificates', 'notifications', 'note-sheets', 'profile'];
-  } else if (role === 'HOSTEL_ADMIN') {
-    orderKeys = ['dashboard', 'hostel-admin', 'requests', 'edp-duties', 'students', 'tickets', 'notifications', 'note-sheets', 'profile'];
-  } else if (role === 'LIBRARY_ADMIN') {
-    orderKeys = ['dashboard', 'library-admin', 'requests', 'library', 'students', 'note-sheets', 'profile'];
-  } else if (role === 'TRANSPORT_ADMIN') {
-    orderKeys = ['dashboard', 'transport-admin', 'requests', 'students', 'note-sheets', 'profile'];
-  } else if (role === 'MAINTENANCE_ADMIN') {
-    orderKeys = ['dashboard', 'maintenance-admin', 'requests', 'tickets', 'note-sheets', 'profile'];
-  }
-
-  const visibleItems: NavItem[] = orderKeys
-    .map(key => allNavItems[key])
-    .filter((item): item is NavItem => Boolean(item));
-
+  const visibleItems: NavItemConfig[] = getRoleNavigationItems(role).filter(i => {
+    if (i.id === 'notesheet-pending') return canAccessPending;
+    if (i.id === 'notesheet-create') return canCreateNotesheet;
+    if (i.id.startsWith('notesheet-')) return canViewNotesheet;
+    return true;
+  });
   const categories = Array.from(new Set(visibleItems.map(i => i.category || 'General')));
 
   const handleNavClick = (id: string) => {
+    if (id === 'logout') {
+      logout();
+      return;
+    }
     setActiveTab(id);
     if (setMobileOpen) {
       setMobileOpen(false);
@@ -176,6 +169,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           flexShrink: 0
         }}
       >
+        {/* Sidebar Header & Toggle */}
         <div
           style={{
             padding: collapsed ? '1.25rem 0.5rem' : '1.25rem 1.5rem',
@@ -210,132 +204,411 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {!collapsed && (
-          <div
-            style={{
-              margin: '0.6rem 1.25rem 0.2rem 1.25rem',
-              padding: '0.35rem 0.75rem',
-              backgroundColor: 'rgba(245,166,35,0.12)',
-              border: '1px solid rgba(245,166,35,0.3)',
-              borderRadius: 'var(--radius-full)',
-              color: 'var(--brand-gold)',
-              fontSize: '0.6875rem',
-              fontWeight: 800,
-              letterSpacing: '0.5px',
-              textTransform: 'uppercase',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.4rem'
-            }}
-          >
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#F5A623', boxShadow: '0 0 6px #F5A623' }}></span>
-            <span>⚡ DEMO MODE ACTIVE</span>
+          <div style={{ margin: '0.6rem 1.25rem 0.2rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <div
+              style={{
+                padding: '0.35rem 0.75rem',
+                backgroundColor: 'rgba(245,166,35,0.12)',
+                border: '1px solid rgba(245,166,35,0.3)',
+                borderRadius: 'var(--radius-full)',
+                color: 'var(--brand-gold)',
+                fontSize: '0.6875rem',
+                fontWeight: 800,
+                letterSpacing: '0.5px',
+                textTransform: 'uppercase',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.4rem'
+              }}
+            >
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#F5A623', boxShadow: '0 0 6px #F5A623' }}></span>
+              <span>⚡ {isStudent ? 'STUDENT PORTAL' : (isRegistrar ? 'REGISTRAR OFFICE PORTAL' : (isDeputyRegistrar ? 'DEPUTY REGISTRAR PORTAL' : (isStudentSection ? 'STUDENT SECTION PORTAL' : (isPrincipal ? 'PRINCIPAL / HOI PORTAL' : (isHOD ? 'HOD PORTAL' : (isFaculty ? (mentorMode ? 'MENTOR PORTAL' : 'FACULTY PORTAL') : 'DEMO MODE ACTIVE'))))))}</span>
+            </div>
+
+            {isFaculty && isMentor && (
+              <div style={{ display: 'flex', gap: '0.3rem' }}>
+                <button
+                  onClick={() => { setMentorMode(false); setActiveTab('dashboard'); }}
+                  style={{
+                    flex: 1,
+                    padding: '0.25rem 0.4rem',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    borderRadius: '4px',
+                    border: '1px solid ' + (!mentorMode ? 'var(--brand-orange)' : 'rgba(255,255,255,0.15)'),
+                    backgroundColor: !mentorMode ? 'var(--brand-orange)' : 'rgba(255,255,255,0.05)',
+                    color: !mentorMode ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  Faculty View
+                </button>
+                <button
+                  onClick={() => { setMentorMode(true); setActiveTab('mentee-list'); }}
+                  style={{
+                    flex: 1,
+                    padding: '0.25rem 0.4rem',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    borderRadius: '4px',
+                    border: '1px solid ' + (mentorMode ? 'var(--brand-gold)' : 'rgba(255,255,255,0.15)'),
+                    backgroundColor: mentorMode ? 'var(--brand-gold)' : 'rgba(255,255,255,0.05)',
+                    color: mentorMode ? 'var(--brand-navy)' : 'rgba(255,255,255,0.6)',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  Mentor View
+                </button>
+              </div>
+            )}
           </div>
         )}
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '1rem 0.5rem' : '1.25rem 1rem' }}>
-          {categories.map(cat => {
-            const itemsInCat = visibleItems.filter(i => (i.category || 'General') === cat);
-            if (itemsInCat.length === 0) return null;
+        {/* Navigation Items Container */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '1rem 0.5rem' : '1.25rem 0.85rem' }}>
+          {(isStudent || isFaculty || isHOD || isPrincipal || isRegistrar || isDeputyRegistrar || isStudentSection) ? (
+            /* ─────────────────────────────────────────────────────────────
+               STRUCTURED MENU WITH ACCORDIONS (Student, Faculty, Mentor, HOD, Principal, Registrar & Section)
+               ───────────────────────────────────────────────────────────── */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              {(isStudent ? STUDENT_NAVIGATION_STRUCTURE : (isRegistrar ? REGISTRAR_NAVIGATION_STRUCTURE : (isDeputyRegistrar ? DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE : (isStudentSection ? STUDENT_SECTION_NAVIGATION_STRUCTURE : (isPrincipal ? PRINCIPAL_NAVIGATION_STRUCTURE : (isHOD ? HOD_NAVIGATION_STRUCTURE : (mentorMode ? MENTOR_NAVIGATION_STRUCTURE : FACULTY_NAVIGATION_STRUCTURE))))))).map((rawGroup, idx) => {
+                // If faculty and not mentor, filter out mentor-only items (e.g. pending-verification)
+                let group = rawGroup;
+                if (isFaculty && !isMentor && !mentorMode && group.children) {
+                  group = {
+                    ...group,
+                    children: group.children.filter(c => c.targetTab !== 'pending-verification')
+                  };
+                }
 
-            return (
-              <div key={cat} style={{ marginBottom: '1.5rem' }}>
-                {!collapsed && cat !== 'Main' && (
-                  <div
-                    style={{
-                      fontSize: '0.6875rem',
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      letterSpacing: '1.2px',
-                      color: 'var(--brand-gold)',
-                      marginBottom: '0.5rem',
-                      paddingLeft: '0.75rem',
-                      opacity: 0.9
-                    }}
-                  >
-                    {cat}
-                  </div>
-                )}
+                const Icon = group.icon;
+                const hasChildren = group.children && group.children.length > 0;
+                const isGroupExpanded = Boolean(openGroups[group.id]);
+                
+                // Group is active if activeTab is equal to defaultTab OR any child targetTab
+                const isChildTabActive = hasChildren && group.children!.some(
+                  sub => sub.targetTab === activeTab || sub.id === activeTab
+                );
+                const isDirectActive = activeTab === group.id || activeTab === group.defaultTab;
+                const isParentActive = isChildTabActive || isDirectActive;
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                  {itemsInCat.map(item => {
-                    const Icon = item.icon;
-                    const isActive = activeTab === item.id;
-
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => handleNavClick(item.id)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.75rem',
-                          padding: collapsed ? '0.75rem' : '0.625rem 0.75rem',
-                          justifyContent: collapsed ? 'center' : 'flex-start',
+                if (!hasChildren) {
+                  // Direct Top-Level Link
+                  return (
+                    <button
+                      key={group.id}
+                      onClick={() => handleNavClick(group.defaultTab)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.75rem',
+                        padding: collapsed ? '0.75rem' : '0.625rem 0.75rem',
+                        justifyContent: collapsed ? 'center' : 'flex-start',
                         borderRadius: 'var(--radius-md)',
                         border: 'none',
-                        background: isActive
+                        background: isParentActive
                           ? 'linear-gradient(90deg, var(--brand-orange) 0%, #D95300 100%)'
                           : 'transparent',
-                        color: isActive ? '#FFFFFF' : 'rgba(255,255,255,0.75)',
-                        fontWeight: isActive ? 700 : 500,
+                        color: isParentActive ? '#FFFFFF' : 'rgba(255,255,255,0.8)',
+                        fontWeight: isParentActive ? 700 : 500,
                         fontSize: '0.875rem',
                         cursor: 'pointer',
                         transition: 'all var(--transition-fast)',
-                        boxShadow: isActive ? '0 4px 12px rgba(243, 112, 35, 0.3)' : 'none'
+                        boxShadow: isParentActive ? '0 4px 12px rgba(243, 112, 35, 0.3)' : 'none',
+                        width: '100%',
+                        textAlign: 'left'
                       }}
-                      title={collapsed ? item.label : undefined}
+                      title={collapsed ? group.label : undefined}
                     >
-                      <Icon size={18} style={{ color: isActive ? '#FFFFFF' : 'var(--brand-gold)' }} />
-                      {!collapsed && <span>{item.label}</span>}
+                      <Icon size={18} style={{ color: isParentActive ? '#FFFFFF' : 'var(--brand-gold)', flexShrink: 0 }} />
+                      {!collapsed && (
+                        <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {group.label}
+                        </span>
+                      )}
                     </button>
                   );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                }
 
-      <div
-        style={{
-          padding: collapsed ? '1rem 0.5rem' : '1rem 1.25rem',
-          borderTop: '1px solid rgba(255,255,255,0.08)',
-          backgroundColor: 'rgba(0,0,0,0.15)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem'
-        }}
-      >
-        <div
-          style={{
-            width: '36px',
-            height: '36px',
-            borderRadius: '50%',
-            backgroundColor: 'var(--brand-orange)',
-            color: '#FFFFFF',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 800,
-            fontSize: '0.875rem'
-          }}
-        >
-          {user?.name?.charAt(0) || 'U'}
+                // Accordion Parent Group with Sub-items
+                return (
+                  <div key={group.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                    <button
+                      onClick={() => {
+                        if (collapsed) {
+                          setCollapsed(false);
+                          setOpenGroups(prev => ({ ...prev, [group.id]: true }));
+                        } else {
+                          toggleGroup(group.id);
+                        }
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: collapsed ? '0.75rem' : '0.625rem 0.75rem',
+                        borderRadius: 'var(--radius-md)',
+                        border: 'none',
+                        background: isParentActive && !isGroupExpanded
+                          ? 'rgba(243, 112, 35, 0.25)'
+                          : isParentActive
+                          ? 'rgba(255,255,255,0.06)'
+                          : 'transparent',
+                        color: isParentActive ? '#FFFFFF' : 'rgba(255,255,255,0.85)',
+                        fontWeight: isParentActive ? 700 : 600,
+                        fontSize: '0.875rem',
+                        cursor: 'pointer',
+                        transition: 'all var(--transition-fast)',
+                        width: '100%'
+                      }}
+                      title={collapsed ? group.label : undefined}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', overflow: 'hidden' }}>
+                        <Icon size={18} style={{ color: isParentActive ? 'var(--brand-orange)' : 'var(--brand-gold)', flexShrink: 0 }} />
+                        {!collapsed && (
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {group.label}
+                          </span>
+                        )}
+                      </div>
+                      {!collapsed && (
+                        <span style={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center' }}>
+                          {isGroupExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                        </span>
+                      )}
+                    </button>
+
+                    {/* Sub-items List */}
+                    {!collapsed && isGroupExpanded && (
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.15rem',
+                        paddingLeft: '1.75rem',
+                        borderLeft: '1px solid rgba(255,255,255,0.12)',
+                        marginLeft: '1.25rem',
+                        marginTop: '0.15rem',
+                        marginBottom: '0.35rem'
+                      }}>
+                        {group.children!
+                          .filter(sub => {
+                            if (sub.id === 'notesheet-pending' || sub.targetTab === 'notesheet-pending') {
+                              return canAccessPending;
+                            }
+                            if (sub.id === 'notesheet-create' || sub.targetTab === 'notesheet-create') {
+                              return canCreateNotesheet;
+                            }
+                            if (sub.id.startsWith('notesheet-') || sub.targetTab.startsWith('notesheet-')) {
+                              return canViewNotesheet;
+                            }
+                            return true;
+                          })
+                          .map(sub => {
+                          const isSubActive = activeTab === sub.targetTab || activeTab === sub.id;
+
+                          return (
+                            <button
+                              key={sub.id}
+                              onClick={() => handleNavClick(sub.targetTab)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                padding: '0.45rem 0.65rem',
+                                borderRadius: 'var(--radius-sm)',
+                                border: 'none',
+                                background: isSubActive
+                                  ? 'linear-gradient(90deg, var(--brand-orange) 0%, #D95300 100%)'
+                                  : 'transparent',
+                                color: isSubActive ? '#FFFFFF' : 'rgba(255,255,255,0.7)',
+                                fontWeight: isSubActive ? 700 : 500,
+                                fontSize: '0.8125rem',
+                                cursor: 'pointer',
+                                transition: 'all var(--transition-fast)',
+                                textAlign: 'left',
+                                boxShadow: isSubActive ? '0 2px 8px rgba(243, 112, 35, 0.3)' : 'none'
+                              }}
+                            >
+                              <span style={{
+                                width: '4px',
+                                height: '4px',
+                                borderRadius: '50%',
+                                backgroundColor: isSubActive ? '#FFFFFF' : 'rgba(255,255,255,0.4)'
+                              }}></span>
+                              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {sub.label}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Logout Action in menu list */}
+              <button
+                onClick={() => logout()}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: collapsed ? '0.75rem' : '0.625rem 0.75rem',
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  borderRadius: 'var(--radius-md)',
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#EF4444',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  transition: 'all var(--transition-fast)',
+                  width: '100%',
+                  textAlign: 'left',
+                  marginTop: '0.5rem'
+                }}
+                title={collapsed ? "Logout" : undefined}
+              >
+                <LogOut size={18} style={{ color: '#EF4444', flexShrink: 0 }} />
+                {!collapsed && (
+                  <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    Logout
+                  </span>
+                )}
+              </button>
+            </div>
+          ) : (
+            /* ─────────────────────────────────────────────────────────────
+               OTHER ROLES: STANDARD ROLE-ORDERED CATEGORY NAVIGATION
+               ───────────────────────────────────────────────────────────── */
+            categories.map(cat => {
+              const itemsInCat = visibleItems.filter(i => (i.category || 'General') === cat);
+              if (itemsInCat.length === 0) return null;
+
+              return (
+                <div key={cat} style={{ marginBottom: '1.5rem' }}>
+                  {!collapsed && cat !== 'Main' && (
+                    <div
+                      style={{
+                        fontSize: '0.6875rem',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '1.2px',
+                        color: 'var(--brand-gold)',
+                        marginBottom: '0.5rem',
+                        paddingLeft: '0.75rem',
+                        opacity: 0.9
+                      }}
+                    >
+                      {cat}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                    {itemsInCat.map(item => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.id;
+
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => handleNavClick(item.id)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            padding: collapsed ? '0.75rem' : '0.625rem 0.75rem',
+                            justifyContent: collapsed ? 'center' : 'flex-start',
+                            borderRadius: 'var(--radius-md)',
+                            border: 'none',
+                            background: isActive
+                              ? 'linear-gradient(90deg, var(--brand-orange) 0%, #D95300 100%)'
+                              : 'transparent',
+                            color: isActive ? '#FFFFFF' : 'rgba(255,255,255,0.75)',
+                            fontWeight: isActive ? 700 : 500,
+                            fontSize: '0.875rem',
+                            cursor: 'pointer',
+                            transition: 'all var(--transition-fast)',
+                            boxShadow: isActive ? '0 4px 12px rgba(243, 112, 35, 0.3)' : 'none'
+                          }}
+                          title={collapsed ? item.label : undefined}
+                        >
+                          <Icon size={18} style={{ color: isActive ? '#FFFFFF' : 'var(--brand-gold)' }} />
+                          {!collapsed && <span>{item.label}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
 
-        {!collapsed && (
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-            <div style={{ fontSize: '0.875rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {user?.name || 'User'}
-            </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--brand-gold)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {role}
-            </div>
+        {/* Sidebar Footer User Info */}
+        <div
+          style={{
+            padding: collapsed ? '1rem 0.5rem' : '1rem 1.25rem',
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            backgroundColor: 'rgba(0,0,0,0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
+          }}
+        >
+          <div
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              backgroundColor: 'var(--brand-orange)',
+              color: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 800,
+              fontSize: '0.875rem'
+            }}
+          >
+            {user?.name?.charAt(0) || 'U'}
           </div>
-        )}
-      </div>
-    </aside>
-  </>
+
+          {!collapsed && (
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <div style={{ fontSize: '0.875rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {user?.name || 'User'}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--brand-gold)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {role}
+              </div>
+            </div>
+          )}
+
+          {!collapsed && (
+            <button
+              onClick={() => logout()}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'rgba(255,255,255,0.6)',
+                cursor: 'pointer',
+                padding: '4px',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="Logout"
+            >
+              <LogOut size={16} />
+            </button>
+          )}
+        </div>
+      </aside>
+    </>
   );
 };
