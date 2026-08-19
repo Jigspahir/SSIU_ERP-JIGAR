@@ -130,6 +130,17 @@ export async function runNotesheetVisibilityAndAccessTests(): Promise<void> {
     createdAt: new Date().toISOString()
   };
 
+  const vp: User = {
+    id: 'user-vp',
+    name: 'Vp SSIU',
+    email: 'vp@swarrnim.edu.in',
+    role: 'VICE_PRESIDENT',
+    instituteId: 'inst-1',
+    departmentId: 'ADMIN',
+    status: 'ACTIVE',
+    createdAt: new Date().toISOString()
+  };
+
   // ─── 1. CREATION & ISOLATION (Faculty A creates 2 notesheets) ────────────────
   console.log('--- 1. Creation & Visibility Isolation ---');
   
@@ -241,20 +252,29 @@ export async function runNotesheetVisibilityAndAccessTests(): Promise<void> {
   const reg_Pending1 = db.getPendingWithMeNotesheets(registrar, 'REGISTRAR');
   assert(reg_Pending1.some(n => n.id === ns1.id), '5.5 Registrar now has NS1 in Pending With Me');
 
-  // ─── 6. REGISTRAR FINAL APPROVAL ──────────────────────────────────────────
-  console.log('\n--- 6. Registrar Final Approval & Completion ---');
-  db.processNoteSheetAction(ns1.id, 'APPROVE', 'Final Sanction Granted', undefined, registrar, 'COMPLETED', { approvedAmount: 150000 });
+  // ─── 6. REGISTRAR FORWARDS TO VP & VP FINAL APPROVAL ─────────────────────
+  console.log('\n--- 6. Registrar Forwards & Vice President Final Approval ---');
+  db.processNoteSheetAction(ns1.id, 'APPROVE', 'Registrar Endorsed & Forwarded', undefined, registrar);
+
+  const reg_Pending2 = db.getPendingWithMeNotesheets(registrar, 'REGISTRAR');
+  assert(!reg_Pending2.some(n => n.id === ns1.id), '6.0 Registrar Pending is 0 after forwarding');
+
+  const vp_Pending = db.getPendingWithMeNotesheets(vp, 'VICE_PRESIDENT');
+  assert(vp_Pending.some(n => n.id === ns1.id), '6.1 Vice President now has NS1 in Pending With Me');
+
+  db.processNoteSheetAction(ns1.id, 'APPROVE', 'Vice President Final Sanction Granted', undefined, vp, 'COMPLETED', { approvedAmount: 150000 });
 
   const finalNs = db.getNoteSheets().find(n => n.id === ns1.id)!;
-  assert(finalNs.status === 'APPROVED', '6.1 Final Status is APPROVED');
-  assert(finalNs.currentOffice === 'COMPLETED', '6.2 Final currentOffice is COMPLETED');
+  assert(finalNs.status === 'APPROVED', '6.2 Final Status is APPROVED');
+  assert(finalNs.currentOffice === 'COMPLETED', '6.3 Final currentOffice is COMPLETED');
 
   // All pending counts must become 0
-  assert(!db.getPendingWithMeNotesheets(facultyA, 'FACULTY').some(n => n.id === ns1.id), '6.3 Faculty A Pending is 0');
-  assert(!db.getPendingWithMeNotesheets(hodCse, 'HOD').some(n => n.id === ns1.id), '6.4 HOD CSE Pending is 0');
-  assert(!db.getPendingWithMeNotesheets(hoiSit, 'PRINCIPAL').some(n => n.id === ns1.id), '6.5 HOI SIT Pending is 0');
-  assert(!db.getPendingWithMeNotesheets(dyRegSit, 'DEPUTY_REGISTRAR').some(n => n.id === ns1.id), '6.6 Deputy Registrar Pending is 0');
-  assert(!db.getPendingWithMeNotesheets(registrar, 'REGISTRAR').some(n => n.id === ns1.id), '6.7 Registrar Pending is 0');
+  assert(!db.getPendingWithMeNotesheets(facultyA, 'FACULTY').some(n => n.id === ns1.id), '6.4 Faculty A Pending is 0');
+  assert(!db.getPendingWithMeNotesheets(hodCse, 'HOD').some(n => n.id === ns1.id), '6.5 HOD CSE Pending is 0');
+  assert(!db.getPendingWithMeNotesheets(hoiSit, 'PRINCIPAL').some(n => n.id === ns1.id), '6.6 HOI SIT Pending is 0');
+  assert(!db.getPendingWithMeNotesheets(dyRegSit, 'DEPUTY_REGISTRAR').some(n => n.id === ns1.id), '6.7 Deputy Registrar Pending is 0');
+  assert(!db.getPendingWithMeNotesheets(registrar, 'REGISTRAR').some(n => n.id === ns1.id), '6.8 Registrar Pending is 0');
+  assert(!db.getPendingWithMeNotesheets(vp, 'VICE_PRESIDENT').some(n => n.id === ns1.id), '6.9 Vice President Pending is 0');
 
   // ─── 7. WORKFLOW PARTICIPANTS POST-APPROVAL ACCESS ─────────────────────────
   console.log('\n--- 7. Post-Approval Authorized Access ---');
@@ -263,8 +283,9 @@ export async function runNotesheetVisibilityAndAccessTests(): Promise<void> {
   assert(db.getAuthorizedNotesheetsForUser(hoiSit, 'PRINCIPAL').some(n => n.id === ns1.id), '7.3 Participant HOI SIT can view completed Notesheet');
   assert(db.getAuthorizedNotesheetsForUser(dyRegSit, 'DEPUTY_REGISTRAR').some(n => n.id === ns1.id), '7.4 Participant Deputy Registrar can view completed Notesheet');
   assert(db.getAuthorizedNotesheetsForUser(registrar, 'REGISTRAR').some(n => n.id === ns1.id), '7.5 Approver Registrar can view completed Notesheet');
-  assert(!db.getAuthorizedNotesheetsForUser(facultyB, 'FACULTY').some(n => n.id === ns1.id), '7.5 Unrelated Faculty B CANNOT view completed Notesheet');
-  assert(!db.getAuthorizedNotesheetsForUser(hodMech, 'HOD').some(n => n.id === ns1.id), '7.6 Unrelated HOD Mech CANNOT view completed Notesheet');
+  assert(db.getAuthorizedNotesheetsForUser(vp, 'VICE_PRESIDENT').some(n => n.id === ns1.id), '7.6 Approver VP can view completed Notesheet');
+  assert(!db.getAuthorizedNotesheetsForUser(facultyB, 'FACULTY').some(n => n.id === ns1.id), '7.7 Unrelated Faculty B CANNOT view completed Notesheet');
+  assert(!db.getAuthorizedNotesheetsForUser(hodMech, 'HOD').some(n => n.id === ns1.id), '7.8 Unrelated HOD Mech CANNOT view completed Notesheet');
 
   // ─── 8. FINANCIAL NOTESHEET SCOPE ──────────────────────────────────────────
   console.log('\n--- 8. Financial Notesheet Scoping ---');

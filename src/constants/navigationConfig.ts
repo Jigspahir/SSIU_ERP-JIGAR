@@ -24,7 +24,7 @@ export const ALL_NAV_ITEMS: Record<string, NavItemConfig> = {
     id: 'dashboard',
     label: 'Dashboard',
     icon: LayoutDashboard,
-    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN', 'ACCOUNTS_ADMIN'],
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN', 'ACCOUNTS_ADMIN'],
     category: 'Main'
   },
 
@@ -1909,10 +1909,134 @@ export const DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   }
 ];
 
+export const VICE_PRESIDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
+  {
+    id: 'dashboard',
+    label: 'Executive Dashboard',
+    icon: LayoutDashboard,
+    defaultTab: 'dashboard'
+  },
+  COMMON_NOTESHEET_NAV_GROUP,
+  {
+    id: 'governance-group',
+    label: 'University Governance',
+    icon: Building2,
+    defaultTab: 'institutes',
+    children: [
+      { id: 'institutes', label: 'Institutes', targetTab: 'institutes' },
+      { id: 'departments', label: 'Departments', targetTab: 'departments' },
+      { id: 'programs', label: 'Programs & Courses', targetTab: 'programs' },
+      { id: 'academic-years', label: 'Academic Years', targetTab: 'academic-years' }
+    ]
+  },
+  {
+    id: 'academics-group',
+    label: 'Students & Academics',
+    icon: GraduationCap,
+    defaultTab: 'students',
+    children: [
+      { id: 'students', label: 'Student Directory', targetTab: 'students' },
+      { id: 'faculty', label: 'Faculty Directory', targetTab: 'faculty' },
+      { id: 'mentorship', label: 'Mentor Oversight', targetTab: 'mentor-assignment' },
+      { id: 'attendance', label: 'Attendance Oversight', targetTab: 'attendance' }
+    ]
+  },
+  {
+    id: 'exams-group',
+    label: 'Examinations',
+    icon: Award,
+    defaultTab: 'exam-dashboard',
+    children: [
+      { id: 'exam-dashboard', label: 'Exam Overview', targetTab: 'exam-dashboard' },
+      { id: 'exam-schedule', label: 'Exam Schedules', targetTab: 'exam-schedule' },
+      { id: 'exam-results', label: 'Results & Marksheets', targetTab: 'result-management' }
+    ]
+  },
+  {
+    id: 'finance-group',
+    label: 'Finance & Accounts',
+    icon: IndianRupee,
+    defaultTab: 'fees',
+    children: [
+      { id: 'fees', label: 'Fee Collection', targetTab: 'fees' },
+      { id: 'fee-structure', label: 'Fee Structures', targetTab: 'fee-structure' },
+      { id: 'accounts', label: 'Accounts Workspace', targetTab: 'accounts' }
+    ]
+  },
+  {
+    id: 'campus-group',
+    label: 'Campus & Facilities',
+    icon: Layers,
+    defaultTab: 'hostel',
+    children: [
+      { id: 'hostel', label: 'Hostel Management', targetTab: 'hostel' },
+      { id: 'infrastructure', label: 'Infrastructure & Labs', targetTab: 'maintenance' },
+      { id: 'inventory', label: 'Inventory & Assets', targetTab: 'inventory-assets' }
+    ]
+  },
+  {
+    id: 'services-group',
+    label: 'Student Services & Desk',
+    icon: Users2,
+    defaultTab: 'student-requests',
+    children: [
+      { id: 'student-requests', label: 'Student Requests', targetTab: 'student-requests' },
+      { id: 'support-tickets', label: 'Support & Complaints', targetTab: 'support-tickets' },
+      { id: 'certificates', label: 'Document Services', targetTab: 'certificates' }
+    ]
+  },
+  {
+    id: 'hr-group',
+    label: 'Human Resources',
+    icon: UserCheck,
+    defaultTab: 'hr',
+    children: [
+      { id: 'hr', label: 'Staff Overview', targetTab: 'hr' },
+      { id: 'leave', label: 'Leave Management', targetTab: 'leave' }
+    ]
+  },
+  {
+    id: 'audit-group',
+    label: 'Audit & Activity',
+    icon: ShieldCheck,
+    defaultTab: 'security-audit'
+  },
+  {
+    id: 'reports',
+    label: 'University Reports',
+    icon: BarChart3,
+    defaultTab: 'reports'
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    icon: Bell,
+    defaultTab: 'notifications'
+  },
+  {
+    id: 'profile',
+    label: 'My Profile',
+    icon: User,
+    defaultTab: 'profile'
+  }
+];
+
 /**
  * Strict Role-Based Menu Sequences
  */
 export const ROLE_NAV_ORDER: Record<string, string[]> = {
+  VICE_PRESIDENT: [
+    'dashboard',
+    'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'notesheet-history',
+    'institutes', 'departments', 'programs', 'academic-years', 'batches', 'semesters', 'divisions', 'subjects',
+    'students', 'student-profile', 'faculty', 'mentor-assignment', 'attendance',
+    'exam-dashboard', 'exams', 'exam-schedule', 'exam-forms', 'exam-eligibility', 'result-management', 'marksheet',
+    'fees', 'fee-structure', 'accounts',
+    'hostel', 'maintenance', 'inventory-assets',
+    'student-requests', 'support-tickets', 'certificates', 'student-section',
+    'hr', 'leave',
+    'security-audit', 'reports', 'notifications', 'profile'
+  ],
   DEPUTY_REGISTRAR: [
     'dashboard',
     'reg-uni-institutes', 'reg-uni-departments', 'reg-uni-programs', 'reg-academic-year',
@@ -2068,7 +2192,7 @@ export const getRoleNavigationItems = (role?: UserRole | null): NavItemConfig[] 
 
 export const isTabPermittedForRole = (tab: string, role?: UserRole | null): boolean => {
   if (!role) return false;
-  if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') return true;
+  if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'VICE_PRESIDENT' || role === 'PROVOST' || role === 'PRESIDENT') return true;
   const allowedList = ROLE_NAV_ORDER[role] || [];
   return allowedList.includes(tab);
 };

@@ -120,6 +120,15 @@ export const LoginPage: React.FC = () => {
       bg: '#FFF1F2'
     },
     {
+      role: 'VICE_PRESIDENT',
+      title: 'Vice President',
+      userId: 'vp',
+      pass: 'Admin@123',
+      icon: ShieldCheck,
+      color: '#7C3AED',
+      bg: '#F5F3FF'
+    },
+    {
       role: 'SUPER_ADMIN',
       title: 'University Super Admin',
       userId: 'admin',

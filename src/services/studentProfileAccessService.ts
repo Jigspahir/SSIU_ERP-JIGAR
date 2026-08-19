@@ -114,7 +114,7 @@ export class StudentProfileAccessService {
     }
 
     // University-level authorities have university-wide access
-    if (['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR'].includes(role)) {
+    if (['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 'PROVOST', 'PRESIDENT', 'REGISTRAR'].includes(role)) {
       return true;
     }
 
@@ -143,6 +143,16 @@ export class StudentProfileAccessService {
       const sDept = student.departmentId;
       if (!uDept || !sDept) return uInstMatch;
       return uInstMatch && (uDept === sDept || uDept.toUpperCase() === sDept.toUpperCase());
+    }
+
+    // Mentor: Strictly authorized ONLY for actively assigned mentees within department & institute scope
+    if (role === 'MENTOR') {
+      const activeMentor = mentorAssignmentService.getActiveMentorForStudent(student.id);
+      const isAssigned = (Boolean(activeMentor) && activeMentor?.mentorFacultyId === user.id) || student.mentorId === user.id;
+      if (!isAssigned) return false;
+      if (user.instituteId && student.instituteId && user.instituteId !== student.instituteId) return false;
+      if (user.departmentId && student.departmentId && user.departmentId !== student.departmentId) return false;
+      return true;
     }
 
     // Faculty: Department students, subject students, or assigned mentees
@@ -388,9 +398,9 @@ export class StudentProfileAccessService {
     // Determine RBAC allowed sections
     const allowedSections: StudentProfileData['allowedSections'] = ['OVERVIEW', 'PERSONAL', 'ACADEMIC'];
 
-    if (['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'STUDENT_SECTION'].includes(role)) {
+    if (['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 'PROVOST', 'PRESIDENT', 'PRINCIPAL', 'HOD', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'STUDENT_SECTION'].includes(role)) {
       allowedSections.push('DOCUMENTS', 'ATTENDANCE', 'EXAMINATIONS', 'FEES', 'REQUESTS', 'NOTESHEETS', 'VERIFICATION_HISTORY', 'AUDIT_HISTORY');
-    } else if (role === 'FACULTY') {
+    } else if (role === 'FACULTY' || role === 'MENTOR') {
       allowedSections.push('DOCUMENTS', 'ATTENDANCE', 'EXAMINATIONS', 'REQUESTS');
     } else if (role === 'EXAM_CELL') {
       allowedSections.push('DOCUMENTS', 'ATTENDANCE', 'EXAMINATIONS', 'REQUESTS');
@@ -442,7 +452,7 @@ export class StudentProfileAccessService {
       return allDocs.filter(d => d.category === 'ACADEMIC' || d.category === 'IDENTITY' || d.category === 'CERTIFICATE');
     }
 
-    if (role === 'FACULTY' && user.id !== student.mentorId) {
+    if ((role === 'FACULTY' || role === 'MENTOR') && user.id !== student.mentorId) {
       return allDocs.filter(d => d.category === 'ACADEMIC' || d.category === 'CERTIFICATE');
     }
 

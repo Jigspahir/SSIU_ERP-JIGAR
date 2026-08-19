@@ -72,6 +72,7 @@ import { AccountsWorkspacePage } from './pages/admin-offices/AccountsWorkspacePa
 import { SystemSettingsPage } from './pages/settings/SystemSettingsPage';
 import { SecurityAuditCenterPage } from './pages/admin-offices/SecurityAuditCenterPage';
 import { NoteSheetPage } from './pages/admin-offices/NoteSheetPage';
+import { NoteSheetVerificationPage } from './pages/public/NoteSheetVerificationPage';
 import { InwardOutwardRegisterPage } from './pages/admin-offices/InwardOutwardRegisterPage';
 import { WorkDiaryPage } from './pages/campus/WorkDiaryPage';
 import { InventoryAssetPage } from './pages/campus/InventoryAssetPage';
@@ -597,6 +598,10 @@ const MainAppContent: React.FC = () => {
         return <NoteSheetPage initialTab="REGISTER" initialRecordId={tabParams?.recordId || tabParams?.notesheetId} initialAction={tabParams?.actionType} />;
       case 'reg-notesheets':
         return <NoteSheetPage initialTab={tabParams?.initialTab || "DASHBOARD"} initialRecordId={tabParams?.recordId || tabParams?.notesheetId} initialAction={tabParams?.actionType} />;
+      case 'reg-notesheet-verify':
+      case 'verify-notesheet':
+      case 'notesheet-verification':
+        return <NoteSheetPage initialTab="VERIFICATION" initialRecordId={tabParams?.recordId || tabParams?.notesheetId} initialAction={tabParams?.actionType} />;
       case 'reg-requests-pending':
       case 'reg-requests-escalated':
       case 'reg-requests-assigned':
@@ -865,6 +870,8 @@ const MainAppContent: React.FC = () => {
         return role !== 'STUDENT' ? <NoteSheetPage initialTab="CLOSED" initialRecordId={tabParams?.recordId || tabParams?.notesheetId} initialAction={tabParams?.actionType} /> : <Dashboard setActiveTab={setActiveTab} />;
       case 'notesheet-history':
         return role !== 'STUDENT' ? <NoteSheetPage initialTab="REGISTER" initialRecordId={tabParams?.recordId || tabParams?.notesheetId} initialAction={tabParams?.actionType} /> : <Dashboard setActiveTab={setActiveTab} />;
+      case 'notesheet-verify':
+        return <NoteSheetPage initialTab="VERIFICATION" initialRecordId={tabParams?.recordId || tabParams?.notesheetId} initialAction={tabParams?.actionType} />;
       case 'inward-outward':
         return role !== 'STUDENT' ? <InwardOutwardRegisterPage initialRecordId={tabParams?.recordId} /> : <Dashboard setActiveTab={setActiveTab} />;
       case 'work-diary':

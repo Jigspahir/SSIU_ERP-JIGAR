@@ -76,6 +76,20 @@ export async function runNotesheetWorkflowLifecycleTests(): Promise<void> {
     createdAt: ''
   };
 
+  const vpUser: User = {
+    id: 'user-vp',
+    name: 'Vp SSIU',
+    email: 'vp@swarrnim.edu.in',
+    role: 'VICE_PRESIDENT',
+    status: 'ACTIVE',
+    createdAt: ''
+  };
+
+  // Register users in state
+  db.updateState(state => {
+    state.users = [facultyUser, hodUser, hoiUser, dyRegUser, registrarUser, vpUser];
+  }, 'Register test users');
+
   // Seed scope for dyRegUser
   db.assignDeputyRegistrarScope({
     userId: dyRegUser.id,
@@ -168,44 +182,68 @@ export async function runNotesheetWorkflowLifecycleTests(): Promise<void> {
   const dyRegPendingAfter = db.getPendingWithMeNotesheets(dyRegUser, 'DEPUTY_REGISTRAR');
   assert(!dyRegPendingAfter.some(n => n.id === newNote.id), '4.5 Deputy Registrar pending count cleared');
 
-  // ─── STEP 5: REGISTRAR (FINAL AUTHORITY) REVIEWS & FINAL APPROVES ─────────
-  console.log('\n--- Step 5: Registrar Pending With Me & Final Approval ---');
+  // ─── STEP 5: REGISTRAR REVIEWS & FORWARDS TO VICE PRESIDENT ─────────────
+  console.log('\n--- Step 5: Registrar Pending With Me & Forward to Vice President ---');
   const regPendingBefore = db.getPendingWithMeNotesheets(registrarUser, 'REGISTRAR');
   assert(regPendingBefore.some(n => n.id === newNote.id), '5.1 Registrar sees Notesheet in Pending With Me');
 
-  // Registrar executes APPROVE action (Terminal Stage)
+  // Registrar executes APPROVE action (forward to VP)
   db.processNoteSheetAction(
     newNote.id,
     'APPROVE',
-    'Sanctioned and approved by Registrar.',
+    'Registrar Endorsement granted. Submitted for Vice President final sanction.',
     undefined,
     registrarUser
   );
 
   const noteAfterReg = db.getNoteSheets().find(n => n.id === newNote.id)!;
-  assert(noteAfterReg.status === 'APPROVED', `5.2 Notesheet is marked APPROVED upon completion by final authority (actual: ${noteAfterReg.status})`);
-  assert(noteAfterReg.decision === 'APPROVED', `5.3 Notesheet decision is APPROVED`);
-  assert(noteAfterReg.currentOffice === 'COMPLETED', `5.4 Notesheet currentOffice is COMPLETED`);
-  assert(noteAfterReg.approvedByName === registrarUser.name, `5.5 ApprovedByName set to ${registrarUser.name}`);
+  assert(noteAfterReg.status === 'PENDING_VICE_PRESIDENT', `5.2 Notesheet advanced to PENDING_VICE_PRESIDENT (actual: ${noteAfterReg.status})`);
+  assert(noteAfterReg.currentOffice === 'VICE_PRESIDENT', `5.3 Notesheet currentOffice advanced to VICE_PRESIDENT`);
 
   const regPendingAfter = db.getPendingWithMeNotesheets(registrarUser, 'REGISTRAR');
-  assert(!regPendingAfter.some(n => n.id === newNote.id), '5.6 Completed Notesheet cleared from Pending With Me queue');
+  assert(!regPendingAfter.some(n => n.id === newNote.id), '5.4 Notesheet cleared from Registrar Pending With Me queue');
 
-  // ─── STEP 6: VERIFY AUDIT MOVEMENT TRAIL ──────────────────────────────────
-  console.log('\n--- Step 6: Verify Movement History Chain ---');
-  assert(noteAfterReg.movements.length >= 5, `6.1 Complete movement audit trail recorded (${noteAfterReg.movements.length} steps)`);
+  // ─── STEP 6: VICE PRESIDENT (FINAL AUTHORITY) REVIEWS & FINAL APPROVES ────
+  console.log('\n--- Step 6: Vice President Pending With Me & Final Sanction ---');
+  const vpPendingBefore = db.getPendingWithMeNotesheets(vpUser, 'VICE_PRESIDENT');
+  assert(vpPendingBefore.some(n => n.id === newNote.id), '6.1 Vice President sees Notesheet in Pending With Me');
 
-  const mvtHod = noteAfterReg.movements.find(m => m.fromUser.includes('HOD') || m.fromUser.includes('Dr. Rajesh Patel'));
-  assert(Boolean(mvtHod && mvtHod.action === 'FORWARD'), '6.2 HOD step recorded as FORWARD in movement history');
+  // Vice President executes APPROVE action (Terminal Stage)
+  db.processNoteSheetAction(
+    newNote.id,
+    'APPROVE',
+    'Final sanction and approval accorded by Vice President.',
+    undefined,
+    vpUser
+  );
 
-  const mvtHoi = noteAfterReg.movements.find(m => m.fromUser.includes('HOI') || m.fromUser.includes('Dr. D. M. Patel'));
-  assert(Boolean(mvtHoi && mvtHoi.action === 'FORWARD'), '6.3 HOI step recorded as FORWARD in movement history');
+  const noteFinal = db.getNoteSheets().find(n => n.id === newNote.id)!;
+  assert(noteFinal.status === 'APPROVED', `6.2 Notesheet is marked APPROVED upon completion by final authority (actual: ${noteFinal.status})`);
+  assert(noteFinal.decision === 'APPROVED', `6.3 Notesheet decision is APPROVED`);
+  assert(noteFinal.currentOffice === 'COMPLETED', `6.4 Notesheet currentOffice is COMPLETED`);
+  assert(noteFinal.approvedByName === vpUser.name, `6.5 ApprovedByName set to ${vpUser.name}`);
 
-  const mvtDyReg = noteAfterReg.movements.find(m => m.fromUserRole === 'DEPUTY_REGISTRAR' || m.fromUser.includes('Deputy Registrar'));
-  assert(Boolean(mvtDyReg && mvtDyReg.action === 'FORWARD'), '6.4 Deputy Registrar step recorded as FORWARD in movement history');
+  const vpPendingAfter = db.getPendingWithMeNotesheets(vpUser, 'VICE_PRESIDENT');
+  assert(!vpPendingAfter.some(n => n.id === newNote.id), '6.6 Completed Notesheet cleared from Vice President Pending With Me queue');
 
-  const mvtReg = noteAfterReg.movements.find(m => m.fromUserRole === 'REGISTRAR' || m.fromUserId === registrarUser.id || (m.fromUser.includes('REGISTRAR') && !m.fromUser.includes('DEPUTY')));
-  assert(Boolean(mvtReg && mvtReg.action === 'APPROVE'), '6.5 Registrar step recorded as APPROVE in movement history');
+  // ─── STEP 7: VERIFY AUDIT MOVEMENT TRAIL ──────────────────────────────────
+  console.log('\n--- Step 7: Verify Movement History Chain ---');
+  assert(noteFinal.movements.length >= 6, `7.1 Complete movement audit trail recorded (${noteFinal.movements.length} steps)`);
+
+  const mvtHod = noteFinal.movements.find(m => m.fromUser.includes('HOD') || m.fromUser.includes('Dr. Rajesh Patel'));
+  assert(Boolean(mvtHod && mvtHod.action === 'FORWARD'), '7.2 HOD step recorded as FORWARD in movement history');
+
+  const mvtHoi = noteFinal.movements.find(m => m.fromUser.includes('HOI') || m.fromUser.includes('Dr. D. M. Patel'));
+  assert(Boolean(mvtHoi && mvtHoi.action === 'FORWARD'), '7.3 HOI step recorded as FORWARD in movement history');
+
+  const mvtDyReg = noteFinal.movements.find(m => m.fromUserRole === 'DEPUTY_REGISTRAR' || m.fromUser.includes('Deputy Registrar'));
+  assert(Boolean(mvtDyReg && mvtDyReg.action === 'FORWARD'), '7.4 Deputy Registrar step recorded as FORWARD in movement history');
+
+  const mvtReg = noteFinal.movements.find(m => m.fromUserRole === 'REGISTRAR' || m.fromUserId === registrarUser.id || (m.fromUser.includes('REGISTRAR') && !m.fromUser.includes('DEPUTY')));
+  assert(Boolean(mvtReg && mvtReg.action === 'FORWARD'), '7.5 Registrar step recorded as FORWARD in movement history');
+
+  const mvtVP = noteFinal.movements.find(m => m.fromUserRole === 'VICE_PRESIDENT' || m.fromUserId === vpUser.id || m.fromUser.includes('VICE_PRESIDENT'));
+  assert(Boolean(mvtVP && mvtVP.action === 'APPROVE'), '7.6 Vice President step recorded as APPROVE in movement history');
 
   // ─── SUMMARY ───────────────────────────────────────────────────────────────
   console.log('\n========================================================================');

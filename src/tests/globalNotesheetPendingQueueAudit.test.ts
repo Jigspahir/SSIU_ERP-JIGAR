@@ -106,6 +106,16 @@ const registrarUser: User = {
   createdAt: '2026-01-01'
 };
 
+const vicePresidentUser: User = {
+  id: 'user-vp',
+  name: 'Vp SSIU',
+  email: 'vp@swarrnim.edu.in',
+  role: 'VICE_PRESIDENT',
+  instituteId: 'inst-1',
+  status: 'ACTIVE',
+  createdAt: '2026-01-01'
+};
+
 const financeOfficer: User = {
   id: 'fin-officer-user',
   name: 'Finance & Accounts Officer',
@@ -160,7 +170,7 @@ const iqacDirectorUser: User = {
 db.updateState(state => {
   state.users = [
     facultyCSE, hodCSE, hodMechanical, principalSIT, principalPharmacy,
-    dyRegistrarSIT, dyRegistrarPharmacy, registrarUser, financeOfficer,
+    dyRegistrarSIT, dyRegistrarPharmacy, registrarUser, vicePresidentUser, financeOfficer,
     examCellOfficer, studentSectionOfficer, hostelAdminUser, iqacDirectorUser
   ];
   state.deputyRegistrarScopes = [
@@ -174,8 +184,11 @@ db.updateState(state => {
       departmentIds: ['dept-1', 'dept-2'],
       departmentNames: ['Computer Engineering', 'Mechanical Engineering'],
       isUniversalInstituteScope: true,
+      assignedByUserId: 'reg-univ-user',
       assignedBy: 'Registrar',
       assignedAt: '2026-01-01',
+      createdAt: '2026-01-01',
+      updatedAt: '2026-01-01',
       status: 'ACTIVE'
     },
     {
@@ -188,8 +201,11 @@ db.updateState(state => {
       departmentIds: ['dept-pharm-1'],
       departmentNames: ['Pharmacy Practice'],
       isUniversalInstituteScope: true,
+      assignedByUserId: 'reg-univ-user',
       assignedBy: 'Registrar',
       assignedAt: '2026-01-01',
+      createdAt: '2026-01-01',
+      updatedAt: '2026-01-01',
       status: 'ACTIVE'
     }
   ];
@@ -215,7 +231,7 @@ const nsCreated = db.createNoteSheet({
   items: [
     { id: 'item-1', itemName: 'AI Deep Learning Workstation', description: 'i7 14th Gen, RTX 4070, 32GB RAM', quantity: 1, unit: 'Set', rate: 120000, amount: 120000 }
   ]
-}, facultyCSE, false, 'ACADEMIC');
+}, facultyCSE, false);
 
 assert(Boolean(nsCreated.id), '1.1 Notesheet created successfully');
 assert(nsCreated.status === 'PENDING_HOD', `1.2 Initial status is PENDING_HOD (actual: ${nsCreated.status})`);
@@ -317,20 +333,31 @@ assert(dyRegSitPending4.length === 0, '4.3 Deputy Registrar SIT pending count cl
 assert(regPending4.length === 1 && regPending4[0].id === nsCreated.id, '4.4 Registrar has exactly 1 pending Notesheet');
 
 // ============================================================================
-// STAGE 5: REGISTRAR EXECUTES FINAL APPROVAL & NOTIFICATIONS
+// STAGE 5: REGISTRAR FORWARDS & VICE PRESIDENT EXECUTES FINAL APPROVAL
 // ============================================================================
-console.log('\n--- Step 5: Registrar Executes Final Approval ---');
+console.log('\n--- Step 5: Registrar Forwards & Vice President Executes Final Approval ---');
+
+db.processNoteSheetAction(
+  nsCreated.id,
+  'APPROVE',
+  'Endorsed. Forwarded for Vice President final sanction.',
+  undefined,
+  registrarUser
+);
+
+assert(db.getPendingNotesheetsForUser(registrarUser, 'REGISTRAR').filter(n => n.id === nsCreated.id).length === 0, '5.0 Registrar pending cleared to 0');
+assert(db.getPendingNotesheetsForUser(vicePresidentUser, 'VICE_PRESIDENT').filter(n => n.id === nsCreated.id).length === 1, '5.1 Vice President has 1 pending Notesheet');
 
 db.processNoteSheetAction(
   nsCreated.id,
   'APPROVE',
   'Sanctioned and Approved under Academic Computing Infrastructure grant.',
   undefined,
-  registrarUser,
+  vicePresidentUser,
   'COMPLETED',
   { approvedAmount: 120000, approvedAmountRemarks: 'Full sanction approved' }
 );
-const nsFinalApproved = db.getScopedNoteSheets(registrarUser, 'REGISTRAR').find(n => n.id === nsCreated.id)!;
+const nsFinalApproved = db.getScopedNoteSheets(vicePresidentUser, 'VICE_PRESIDENT').find(n => n.id === nsCreated.id)!;
 
 assert(nsFinalApproved.status === 'APPROVED', `5.1 Notesheet status is APPROVED (actual: ${nsFinalApproved.status})`);
 assert(nsFinalApproved.decision === 'APPROVED', '5.2 Notesheet decision is APPROVED');
@@ -343,22 +370,28 @@ assert(db.getPendingNotesheetsForUser(hodCSE, 'HOD').filter(n => n.id === nsCrea
 assert(db.getPendingNotesheetsForUser(principalSIT, 'PRINCIPAL').filter(n => n.id === nsCreated.id).length === 0, '5.7 Principal pending is 0');
 assert(db.getPendingNotesheetsForUser(dyRegistrarSIT, 'DEPUTY_REGISTRAR').filter(n => n.id === nsCreated.id).length === 0, '5.8 Deputy Registrar pending is 0');
 assert(db.getPendingNotesheetsForUser(registrarUser, 'REGISTRAR').filter(n => n.id === nsCreated.id).length === 0, '5.9 Registrar pending is 0');
+assert(db.getPendingNotesheetsForUser(vicePresidentUser, 'VICE_PRESIDENT').filter(n => n.id === nsCreated.id).length === 0, '5.10 Vice President pending is 0');
 
 // ============================================================================
 // STAGE 6: FINAL APPROVAL NOTIFICATION TO ALL PARTICIPANTS
 // ============================================================================
 console.log('\n--- Step 6: Verify Final Approval Notification Delivered to All Participants ---');
 
-const allNotifs = db.getNotifications();
-const notifRecipients = allNotifs.filter(n => n.type === 'APPROVAL_COMPLETED' && n.referenceId === nsCreated.noteSheetNumber).map(n => n.targetUserId);
+const facNotifs = db.getNotifications(facultyCSE, 'FACULTY');
+const hodNotifs = db.getNotifications(hodCSE, 'HOD');
+const hoiNotifs = db.getNotifications(principalSIT, 'PRINCIPAL');
+const dyRegNotifs = db.getNotifications(dyRegistrarSIT, 'DEPUTY_REGISTRAR');
+const regNotifs = db.getNotifications(registrarUser, 'REGISTRAR');
+const hodMechNotifs = db.getNotifications(hodMechanical, 'HOD');
+const hoiPharmNotifs = db.getNotifications(principalPharmacy, 'PRINCIPAL');
 
-assert(notifRecipients.includes(facultyCSE.id), '6.1 [Creator] Faculty received final approval notification');
-assert(notifRecipients.includes(hodCSE.id), '6.2 [Participant] HOD received final approval notification');
-assert(notifRecipients.includes(principalSIT.id), '6.3 [Participant] Principal received final approval notification');
-assert(notifRecipients.includes(dyRegistrarSIT.id), '6.4 [Participant] Deputy Registrar received final approval notification');
-assert(notifRecipients.includes(registrarUser.id), '6.5 [Approver] Registrar received final approval notification');
-assert(!notifRecipients.includes(hodMechanical.id), '6.6 Unrelated HOD Mechanical received 0 notifications');
-assert(!notifRecipients.includes(principalPharmacy.id), '6.7 Unrelated Principal Pharmacy received 0 notifications');
+assert(facNotifs.some(n => n.type === 'APPROVAL_COMPLETED' && n.referenceId === nsCreated.noteSheetNumber), '6.1 [Creator] Faculty received final approval notification');
+assert(hodNotifs.some(n => n.type === 'APPROVAL_COMPLETED' && n.referenceId === nsCreated.noteSheetNumber), '6.2 [Participant] HOD received final approval notification');
+assert(hoiNotifs.some(n => n.type === 'APPROVAL_COMPLETED' && n.referenceId === nsCreated.noteSheetNumber), '6.3 [Participant] Principal received final approval notification');
+assert(dyRegNotifs.some(n => n.type === 'APPROVAL_COMPLETED' && n.referenceId === nsCreated.noteSheetNumber), '6.4 [Participant] Deputy Registrar received final approval notification');
+assert(regNotifs.some(n => n.type === 'APPROVAL_COMPLETED' && n.referenceId === nsCreated.noteSheetNumber), '6.5 [Approver] Registrar received final approval notification');
+assert(!hodMechNotifs.some(n => n.type === 'APPROVAL_COMPLETED' && n.referenceId === nsCreated.noteSheetNumber), '6.6 Unrelated HOD Mechanical received 0 notifications');
+assert(!hoiPharmNotifs.some(n => n.type === 'APPROVAL_COMPLETED' && n.referenceId === nsCreated.noteSheetNumber), '6.7 Unrelated Principal Pharmacy received 0 notifications');
 
 // ============================================================================
 // STAGE 7: AUDIT OTHER SPECIALIZED ADMINISTRATIVE WORKFLOW OFFICES

@@ -22,7 +22,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const savedUser = localStorage.getItem(AUTH_STORAGE_KEY);
       if (savedUser) {
-        return JSON.parse(savedUser) as User;
+        const parsed = JSON.parse(savedUser) as User;
+        const freshUser = db.getUsers().find(u => u.id === parsed.id || u.username === parsed.username);
+        if (freshUser) {
+          return { ...parsed, name: freshUser.name, designation: freshUser.designation };
+        }
+        return parsed;
       }
     } catch (e) {
       console.error('Error reading auth user:', e);

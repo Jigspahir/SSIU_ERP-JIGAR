@@ -4,7 +4,7 @@ import { HeaderLogo } from './HeaderLogo';
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Bell, Dot, LogOut } from 'lucide-react';
 import { 
   getRoleNavigationItems, NavItemConfig, 
-  STUDENT_NAVIGATION_STRUCTURE, FACULTY_NAVIGATION_STRUCTURE, MENTOR_NAVIGATION_STRUCTURE, HOD_NAVIGATION_STRUCTURE, PRINCIPAL_NAVIGATION_STRUCTURE, STUDENT_SECTION_NAVIGATION_STRUCTURE, REGISTRAR_NAVIGATION_STRUCTURE, DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE, StudentNavGroup, StudentNavSubItem 
+  STUDENT_NAVIGATION_STRUCTURE, FACULTY_NAVIGATION_STRUCTURE, MENTOR_NAVIGATION_STRUCTURE, HOD_NAVIGATION_STRUCTURE, PRINCIPAL_NAVIGATION_STRUCTURE, STUDENT_SECTION_NAVIGATION_STRUCTURE, REGISTRAR_NAVIGATION_STRUCTURE, DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE, VICE_PRESIDENT_NAVIGATION_STRUCTURE, StudentNavGroup, StudentNavSubItem 
 } from '../../constants/navigationConfig';
 import { mentorAssignmentService } from '../../services/mentorAssignmentService';
 import { db } from '../../services/db';
@@ -34,13 +34,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isStudentSection = role === 'STUDENT_SECTION';
   const isRegistrar = role === 'REGISTRAR';
   const isDeputyRegistrar = role === 'DEPUTY_REGISTRAR';
+  const isVicePresident = role === 'VICE_PRESIDENT';
 
-  // Check if faculty is currently assigned as a mentor
+  // Check if user is currently assigned as a mentor or has MENTOR role
   const isMentor = React.useMemo(() => {
+    if (role === 'MENTOR') return true;
     if (!isFaculty || !user) return false;
     const assignments = mentorAssignmentService.getAssignments({}, user);
     return Boolean((assignments.students && assignments.students.length > 0) || (user as any).isMentor);
-  }, [isFaculty, user]);
+  }, [role, isFaculty, user]);
 
   const [mentorMode, setMentorMode] = useState(false);
 
@@ -88,19 +90,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Auto-expand active parent group whenever activeTab changes
   useEffect(() => {
-    const navStructure = isStudent 
-      ? STUDENT_NAVIGATION_STRUCTURE 
-      : (isRegistrar
-          ? REGISTRAR_NAVIGATION_STRUCTURE
-          : (isDeputyRegistrar
-              ? DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE
-              : (isStudentSection
-                  ? STUDENT_SECTION_NAVIGATION_STRUCTURE
-                  : (isPrincipal
-                      ? PRINCIPAL_NAVIGATION_STRUCTURE
-                      : (isHOD
-                          ? HOD_NAVIGATION_STRUCTURE
-                          : (isFaculty ? (mentorMode ? MENTOR_NAVIGATION_STRUCTURE : FACULTY_NAVIGATION_STRUCTURE) : null))))));
+    const navStructure = isVicePresident
+      ? VICE_PRESIDENT_NAVIGATION_STRUCTURE
+      : (isStudent 
+          ? STUDENT_NAVIGATION_STRUCTURE 
+          : (isRegistrar
+              ? REGISTRAR_NAVIGATION_STRUCTURE
+              : (isDeputyRegistrar
+                  ? DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE
+                  : (isStudentSection
+                      ? STUDENT_SECTION_NAVIGATION_STRUCTURE
+                      : (isPrincipal
+                          ? PRINCIPAL_NAVIGATION_STRUCTURE
+                          : (isHOD
+                              ? HOD_NAVIGATION_STRUCTURE
+                              : (isFaculty ? (mentorMode ? MENTOR_NAVIGATION_STRUCTURE : FACULTY_NAVIGATION_STRUCTURE) : null)))))));
     if (navStructure) {
       navStructure.forEach(group => {
         if (group.children) {
@@ -269,12 +273,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation Items Container */}
         <div style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '1rem 0.5rem' : '1.25rem 0.85rem' }}>
-          {(isStudent || isFaculty || isHOD || isPrincipal || isRegistrar || isDeputyRegistrar || isStudentSection) ? (
+          {(isVicePresident || isStudent || isFaculty || isHOD || isPrincipal || isRegistrar || isDeputyRegistrar || isStudentSection) ? (
             /* ─────────────────────────────────────────────────────────────
-               STRUCTURED MENU WITH ACCORDIONS (Student, Faculty, Mentor, HOD, Principal, Registrar & Section)
+               STRUCTURED MENU WITH ACCORDIONS (Vice President, Student, Faculty, Mentor, HOD, Principal, Registrar & Section)
                ───────────────────────────────────────────────────────────── */
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              {(isStudent ? STUDENT_NAVIGATION_STRUCTURE : (isRegistrar ? REGISTRAR_NAVIGATION_STRUCTURE : (isDeputyRegistrar ? DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE : (isStudentSection ? STUDENT_SECTION_NAVIGATION_STRUCTURE : (isPrincipal ? PRINCIPAL_NAVIGATION_STRUCTURE : (isHOD ? HOD_NAVIGATION_STRUCTURE : (mentorMode ? MENTOR_NAVIGATION_STRUCTURE : FACULTY_NAVIGATION_STRUCTURE))))))).map((rawGroup, idx) => {
+              {(isVicePresident ? VICE_PRESIDENT_NAVIGATION_STRUCTURE : (isStudent ? STUDENT_NAVIGATION_STRUCTURE : (isRegistrar ? REGISTRAR_NAVIGATION_STRUCTURE : (isDeputyRegistrar ? DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE : (isStudentSection ? STUDENT_SECTION_NAVIGATION_STRUCTURE : (isPrincipal ? PRINCIPAL_NAVIGATION_STRUCTURE : (isHOD ? HOD_NAVIGATION_STRUCTURE : (mentorMode ? MENTOR_NAVIGATION_STRUCTURE : FACULTY_NAVIGATION_STRUCTURE)))))))).map((rawGroup, idx) => {
                 // If faculty and not mentor, filter out mentor-only items (e.g. pending-verification)
                 let group = rawGroup;
                 if (isFaculty && !isMentor && !mentorMode && group.children) {

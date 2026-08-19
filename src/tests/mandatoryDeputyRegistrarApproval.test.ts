@@ -88,9 +88,18 @@ export async function runMandatoryDeputyRegistrarApprovalTests() {
     createdAt: ''
   };
 
+  const vicePresidentUser: User = {
+    id: 'user-vp',
+    name: 'Vp SSIU',
+    email: 'vp@swarrnim.edu.in',
+    role: 'VICE_PRESIDENT',
+    status: 'ACTIVE',
+    createdAt: ''
+  };
+
   // Register users in database state
   const users = db.getUsers();
-  [facultyUser, hodUser, hoiUser, dyRegSitUser, dyRegOtherUser, registrarUser].forEach(u => {
+  [facultyUser, hodUser, hoiUser, dyRegSitUser, dyRegOtherUser, registrarUser, vicePresidentUser].forEach(u => {
     if (!users.some(existing => existing.id === u.id)) {
       users.push(u);
     }
@@ -237,32 +246,47 @@ export async function runMandatoryDeputyRegistrarApprovalTests() {
     assert(regNotifsStep5[0].message.includes('forwarded by the Deputy Registrar'), `5.6 Notification message states: "${regNotifsStep5[0].message}"`);
   }
 
-  // ─── STEP 6: Registrar Final Approval ─────────────────────────────────────
-  console.log('\n--- Step 6: Registrar Final Approval ---');
+  // ─── STEP 6: Registrar Endorsement to Vice President ──────────────────────
+  console.log('\n--- Step 6: Registrar Endorses & Forwards to Vice President ---');
   db.processNoteSheetAction(
     newNote.id,
     'APPROVE',
-    'Final Sanction & Approval granted by Registrar.',
+    'Registrar Endorsement granted. Submitted for Vice President final sanction.',
     undefined,
     registrarUser
   );
 
-  const finalNote = db.getNoteSheets().find(n => n.id === newNote.id)!;
-  assert(finalNote.status === 'APPROVED', '6.1 Status is APPROVED');
-  assert(finalNote.decision === 'APPROVED', '6.2 Decision is APPROVED');
-  assert(finalNote.currentOffice === 'COMPLETED', '6.3 Current office is COMPLETED');
-  assert(Boolean(finalNote.finalApprovalId), `6.4 Digital Approval ID generated: ${finalNote.finalApprovalId}`);
+  const noteAfterReg = db.getNoteSheets().find(n => n.id === newNote.id)!;
+  assert(noteAfterReg.status === 'PENDING_VICE_PRESIDENT', '6.1 Status advanced to PENDING_VICE_PRESIDENT');
+  assert(noteAfterReg.currentOffice === 'VICE_PRESIDENT', '6.2 Current office advanced to VICE_PRESIDENT');
+  assert(noteAfterReg.currentAssigneeRole === 'VICE_PRESIDENT', '6.3 Current Assignee Role is VICE_PRESIDENT');
 
-  // ─── STEP 7: Full Audit Trail & Designation History Verification ──────────
-  console.log('\n--- Step 7: Full Sequential Movements Audit Trail ---');
-  assert(finalNote.movements.length >= 5, `7.1 Complete movement audit trail recorded (${finalNote.movements.length} steps)`);
+  // ─── STEP 7: Vice President Final Sanction ────────────────────────────────
+  console.log('\n--- Step 7: Vice President Final Sanction ---');
+  db.processNoteSheetAction(
+    newNote.id,
+    'APPROVE',
+    'Final Sanction & Approval granted by Vice President.',
+    undefined,
+    vicePresidentUser
+  );
+
+  const finalNote = db.getNoteSheets().find(n => n.id === newNote.id)!;
+  assert(finalNote.status === 'APPROVED', '7.1 Status is APPROVED');
+  assert(finalNote.decision === 'APPROVED', '7.2 Decision is APPROVED');
+  assert(finalNote.currentOffice === 'COMPLETED', '7.3 Current office is COMPLETED');
+  assert(Boolean(finalNote.finalApprovalId), `7.4 Digital Approval ID generated: ${finalNote.finalApprovalId}`);
+
+  // ─── STEP 8: Full Audit Trail & Designation History Verification ──────────
+  console.log('\n--- Step 8: Full Sequential Movements Audit Trail ---');
+  assert(finalNote.movements.length >= 6, `8.1 Complete movement audit trail recorded (${finalNote.movements.length} steps)`);
 
   const dyRegMovement = finalNote.movements.find(m => m.fromUserRole === 'DEPUTY_REGISTRAR' || m.designation === 'Deputy Registrar');
-  assert(Boolean(dyRegMovement), '7.2 Deputy Registrar step present in official movement log');
+  assert(Boolean(dyRegMovement), '8.2 Deputy Registrar step present in official movement log');
   if (dyRegMovement) {
-    assert(dyRegMovement.action === 'FORWARD', '7.3 Deputy Registrar action recorded as FORWARD');
-    assert(dyRegMovement.designation === 'Deputy Registrar', `7.4 Designation correctly logged as "Deputy Registrar" (actual: ${dyRegMovement.designation})`);
-    assert(Boolean(dyRegMovement.approvalId), `7.5 Intermediate digital approval ID generated for Deputy Registrar: ${dyRegMovement.approvalId}`);
+    assert(dyRegMovement.action === 'FORWARD', '8.3 Deputy Registrar action recorded as FORWARD');
+    assert(dyRegMovement.designation === 'Deputy Registrar', `8.4 Designation correctly logged as "Deputy Registrar" (actual: ${dyRegMovement.designation})`);
+    assert(Boolean(dyRegMovement.approvalId), `8.5 Intermediate digital approval ID generated for Deputy Registrar: ${dyRegMovement.approvalId}`);
   }
 
   // ─── SUMMARY ───────────────────────────────────────────────────────────────

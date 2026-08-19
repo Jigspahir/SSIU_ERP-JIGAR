@@ -986,9 +986,14 @@ export const InwardOutwardRegisterPage: React.FC<InwardOutwardRegisterPageProps>
 
                       <td style={{ padding: '0.85rem 1rem', maxWidth: '280px' }}>
                         <div style={{ color: 'var(--text-main)', fontWeight: 500, lineHeight: 1.3 }}>{r.subject}</div>
-                        {r.notesheetId && (
+                        {(r.notesheetNumber || r.notesheetId) && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.75rem', color: 'var(--brand-orange)', fontFamily: 'monospace', marginTop: '3px' }}>
-                            <Layers size={11} /> {r.notesheetId}
+                            <Layers size={11} /> {r.notesheetNumber || r.notesheetId}
+                          </div>
+                        )}
+                        {r.outwardNumber && (
+                          <div style={{ fontSize: '0.72rem', color: 'var(--brand-navy)', fontFamily: 'monospace', marginTop: '1px' }}>
+                            Outward: {r.outwardNumber}
                           </div>
                         )}
                       </td>
@@ -1032,6 +1037,25 @@ export const InwardOutwardRegisterPage: React.FC<InwardOutwardRegisterPageProps>
 
                           {r.type === 'INWARD' && r.status !== 'CLOSED' && (
                             <>
+                              {r.notesheetId && !r.outwardNumber && (
+                                <button
+                                  className="btn btn-secondary btn-icon"
+                                  style={{ width: '30px', height: '30px', padding: 0, color: '#2563EB' }}
+                                  onClick={() => {
+                                    const res = db.processRegistrarOutwardForNotesheet(r.notesheetId || r.id, {}, user);
+                                    if (res.success) {
+                                      showToast('success', res.message);
+                                      setRecords(db.getInwardOutwardRecords(undefined, user, role));
+                                    } else {
+                                      showToast('error', res.message);
+                                    }
+                                  }}
+                                  title="Generate Outward Dispatch for Notesheet"
+                                >
+                                  <Truck size={14} />
+                                </button>
+                              )}
+
                               <button
                                 className="btn btn-secondary btn-icon"
                                 style={{ width: '30px', height: '30px', padding: 0, color: 'var(--brand-navy)' }}

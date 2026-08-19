@@ -1,9 +1,13 @@
 export type UserRole = 
   | 'SUPER_ADMIN' 
+  | 'PRESIDENT'
+  | 'VICE_PRESIDENT'
+  | 'PROVOST'
   | 'UNIVERSITY_ADMIN' 
   | 'PRINCIPAL' 
   | 'HOD' 
   | 'FACULTY' 
+  | 'MENTOR'
   | 'STUDENT'
   | 'REGISTRAR'
   | 'DEPUTY_REGISTRAR'
@@ -28,11 +32,16 @@ export interface User {
   avatar?: string;
   instituteId?: string;
   departmentId?: string;
+  departmentName?: string;
   programId?: string;
   designation?: string;
   enrollmentNo?: string;
   employeeId?: string;
   status: 'ACTIVE' | 'INACTIVE';
+  signatureFile?: string;
+  signatureStatus?: 'ACTIVE' | 'INACTIVE' | 'PENDING';
+  signatureVersion?: number;
+  signatureUpdatedAt?: string;
   createdAt: string;
 }
 
@@ -1813,10 +1822,19 @@ export interface InwardOutwardRecord {
   subject: string;
   departmentId?: string;
   departmentName?: string;
+  sourceInstituteId?: string;
+  sourceDepartmentId?: string;
+  instituteId?: string;
+  instituteName?: string;
+  destinationInstitute?: string;
+  issuedDate?: string;
+  issuedBy?: string;
+  inwardId?: string; // Linked inward ID when record is OUTWARD
   priority: InwardOutwardPriority;
   status: InwardOutwardStatus;
   remarks?: string;
   notesheetId?: string;
+  notesheetNumber?: string;
   supportingDocuments?: InwardOutwardDocument[];
   forwardings?: InwardForwardingItem[];
   dispatches?: OutwardDispatchItem[];
@@ -2596,6 +2614,13 @@ export type NoteSheetStatus =
   | 'PENDING_DEPUTY_REGISTRAR'
   | 'PENDING_REGISTRAR'
   | 'PENDING_FINANCE'
+  | 'PENDING_EXAMINATION'
+  | 'PENDING_STUDENT_SECTION'
+  | 'PENDING_HOSTEL'
+  | 'PENDING_IQAC'
+  | 'PENDING_HR'
+  | 'PENDING_FACULTY'
+  | 'PENDING_VICE_PRESIDENT'
   | 'PENDING_HIGHER_AUTHORITY'
   | 'PENDING_APPROVAL'
   | 'FORWARDED'
@@ -2651,10 +2676,22 @@ export interface NoteSheetMovement {
   toOffice?: string;
   toRole?: string;
   stage?: NoteSheetStatus;
+  fromStage?: string;
+  toStage?: string;
   action: NoteSheetAction;
+  decision?: string;
+  actorUserId?: string;
+  actorName?: string;
+  actorRole?: string;
   remarks: string;
   attachmentUrl?: string;
   approvalId?: string; // Digital Approval ID e.g. NS-APR-000001
+  signatureSnapshot?: {
+    signatureData?: string;
+    signatureReference?: string;
+    signatureVersion?: number;
+    verifiedAt?: string;
+  };
   date?: string;
   time?: string;
   timestamp: string;
@@ -2684,6 +2721,21 @@ export interface NoteSheetEstimateItem {
   unit: string;
   rate: number;
   amount: number;
+}
+
+export interface NoteSheetAmountRevision {
+  id: string;
+  notesheetId: string;
+  actorUserId: string;
+  actorName: string;
+  actorRole: UserRole | string;
+  previousAmount: number;
+  newAmount: number;
+  changeAmount: number; // positive, negative, or zero
+  changeType: 'INCREASE' | 'DECREASE' | 'NO_CHANGE';
+  reason: string;
+  workflowStage: string;
+  createdAt: string;
 }
 
 export interface NoteSheetClarificationItem {
@@ -2790,6 +2842,51 @@ export const ROLE_NOTESHEET_PERMISSIONS: Record<UserRole, NoteSheetPermission[]>
     'NOTESHEET_CLOSE',
     'NOTESHEET_REPORT',
   ],
+  PRESIDENT: [
+    'NOTESHEET_VIEW',
+    'NOTESHEET_CREATE',
+    'NOTESHEET_EDIT',
+    'NOTESHEET_SUBMIT',
+    'NOTESHEET_REVIEW',
+    'NOTESHEET_FORWARD',
+    'NOTESHEET_APPROVE',
+    'NOTESHEET_REJECT',
+    'NOTESHEET_RETURN',
+    'NOTESHEET_CLARIFICATION',
+    'NOTESHEET_ACTION',
+    'NOTESHEET_CLOSE',
+    'NOTESHEET_REPORT',
+  ],
+  VICE_PRESIDENT: [
+    'NOTESHEET_VIEW',
+    'NOTESHEET_CREATE',
+    'NOTESHEET_EDIT',
+    'NOTESHEET_SUBMIT',
+    'NOTESHEET_REVIEW',
+    'NOTESHEET_FORWARD',
+    'NOTESHEET_APPROVE',
+    'NOTESHEET_REJECT',
+    'NOTESHEET_RETURN',
+    'NOTESHEET_CLARIFICATION',
+    'NOTESHEET_ACTION',
+    'NOTESHEET_CLOSE',
+    'NOTESHEET_REPORT',
+  ],
+  PROVOST: [
+    'NOTESHEET_VIEW',
+    'NOTESHEET_CREATE',
+    'NOTESHEET_EDIT',
+    'NOTESHEET_SUBMIT',
+    'NOTESHEET_REVIEW',
+    'NOTESHEET_FORWARD',
+    'NOTESHEET_APPROVE',
+    'NOTESHEET_REJECT',
+    'NOTESHEET_RETURN',
+    'NOTESHEET_CLARIFICATION',
+    'NOTESHEET_ACTION',
+    'NOTESHEET_CLOSE',
+    'NOTESHEET_REPORT',
+  ],
   UNIVERSITY_ADMIN: [
     'NOTESHEET_VIEW',
     'NOTESHEET_CREATE',
@@ -2863,6 +2960,13 @@ export const ROLE_NOTESHEET_PERMISSIONS: Record<UserRole, NoteSheetPermission[]>
     'NOTESHEET_REPORT',
   ],
   FACULTY: [
+    'NOTESHEET_VIEW',
+    'NOTESHEET_CREATE',
+    'NOTESHEET_EDIT',
+    'NOTESHEET_SUBMIT',
+    'NOTESHEET_CLARIFICATION',
+  ],
+  MENTOR: [
     'NOTESHEET_VIEW',
     'NOTESHEET_CREATE',
     'NOTESHEET_EDIT',
@@ -3034,11 +3138,15 @@ export interface NoteSheet {
   budgetHead?: string;
   budgetAvailable?: boolean;
   requestedAmount?: number;
+  originalRequestedAmount?: number; // Initial permanent requested amount (never overwritten)
+  currentAmount?: number; // Proposed amount at current workflow stage
+  finalApprovedAmount?: number; // Final sanctioned amount by final terminal authority
   approvedAmount?: number;
   approvedAmountRemarks?: string;
   approvedAmountByUserId?: string;
   approvedAmountByName?: string;
   approvedAmountAt?: string;
+  financialRevisionHistory?: NoteSheetAmountRevision[]; // Immutable chronological revision history
   financeRemarks?: string;
   procurementRequirement?: 'DIRECT_PAYMENT' | 'ADVANCE_DISBURSEMENT' | 'REIMBURSEMENT' | 'PURCHASE_ORDER' | 'NOT_APPLICABLE' | string;
   supportingFinancialDoc?: string;
@@ -3051,8 +3159,12 @@ export interface NoteSheet {
   requiredDate: string;
   status: NoteSheetStatus;
   currentOffice: string; // HOD, HOI, DEAN, ACADEMIC_DEAN, REGISTRAR, FINANCE_OFFICER, CONTROLLER_OF_EXAMINATION, DIRECTOR_IQAC, DIRECTOR_TP, DIRECTOR_ADMISSION, DIRECTOR_RESEARCH, PROVOST, VICE_PRESIDENT, PRESIDENT, etc.
+  currentStage?: string; // e.g. VICE_PRESIDENT_APPROVAL, REGISTRAR_APPROVAL
   currentAuthorityRole?: OrganogramRole | string;
   currentHandlerId?: string; // Current user ID responsible
+  currentAssigneeUserId?: string;
+  currentAssigneeName?: string;
+  currentAssigneeRole?: string;
   organogramPath?: string[]; // Upward hierarchy chain
   consultationActive?: boolean;
   consultationHistory?: NoteSheetConsultationItem[];
@@ -3069,6 +3181,7 @@ export interface NoteSheet {
   returnedByUserId?: string;
   returnedByName?: string;
   returnedAt?: string;
+  actionAssignedToUserId?: string;
   actionTakenSummary?: string;
   actionTakenByUserId?: string;
   actionTakenByName?: string;
@@ -3085,15 +3198,105 @@ export interface NoteSheet {
   allocatedFundAccountName?: string;
   financialStatus?: 'NOT_ALLOCATED' | 'ALLOCATED' | 'ACTIVE' | 'SETTLED' | 'CLOSED';
   financialSummary?: NoteSheetFinancialSummary;
+  inwardId?: string;
+  inwardNumber?: string; // e.g. REG-IN-2026-000001
+  inwardDate?: string;
+  inwardStatus?: 'RECEIVED' | 'UNDER_PROCESS' | 'FORWARDED' | 'DISPATCHED' | 'COMPLETED';
+  inwardReceivedBy?: string;
+  inwardReceivedByName?: string;
+  outwardId?: string;
+  outwardNumber?: string; // e.g. REG-OUT-2026-000001
+  outwardDate?: string;
+  outwardStatus?: 'PREPARED' | 'DISPATCHED' | 'DELIVERED' | 'COMPLETED';
+  outwardIssuedBy?: string;
+  outwardIssuedByName?: string;
+  outwardRecipient?: string;
+  outwardDestination?: string;
   attachments: string[]; // List of file names/URLs
   attachmentObjects?: NoteSheetAttachmentItem[];
   clarifications?: NoteSheetClarificationItem[];
   complianceItems?: NoteSheetComplianceItem[];
   movements: NoteSheetMovement[];
   auditTrail?: NoteSheetAuditEntry[];
-  version: number;
+  verificationId?: string; // e.g. NSV-2026-000001
+  finalApprovalDate?: string;
+  digitalApprovalId?: string;
+  approvals?: any[];
+  isLocked?: boolean;
+  documentHash?: string;
+  dataHash?: string;
+  amendmentReason?: string;
+  amendedByUserId?: string;
+  amendedByName?: string;
+  amendedDate?: string;
+  versionHistory?: NoteSheetVersionRecord[];
+  version: number | string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface NoteSheetVersionRecord {
+  version: string | number;
+  notesheetId: string;
+  noteSheetNumber: string;
+  verificationId?: string;
+  status: NoteSheetStatus;
+  decision?: string;
+  requestedAmount?: number;
+  approvedAmount?: number;
+  amendmentReason?: string;
+  changedByUserId: string;
+  changedByName: string;
+  changedByRole?: string;
+  changedDate?: string;
+  createdAt: string;
+  snapshotData?: any;
+}
+
+export interface NoteSheetVerificationResult {
+  valid: boolean;
+  notesheetNumber?: string;
+  verificationId?: string;
+  status?: NoteSheetStatus | string;
+  decision?: string;
+  finalApprovalDate?: string;
+  finalApprovalId?: string;
+  instituteName?: string;
+  departmentName?: string;
+  subject?: string;
+  approvedAmount?: number;
+  inwardNumber?: string;
+  inwardDate?: string;
+  outwardNumber?: string;
+  outwardDate?: string;
+  version?: string | number;
+  integrityStatus: 'VERIFIED_AUTHENTIC' | 'HASH_MISMATCH' | 'RECORD_NOT_FOUND' | 'INVALID_DATA';
+  generatedAt?: string;
+  dataHash?: string;
+  message?: string;
+}
+
+export interface NoteSheetAnalyticsSummary {
+  totalNotesheets: number;
+  pendingCount: number;
+  approvedCount: number;
+  rejectedCount: number;
+  returnedCount: number;
+  financialCount: number;
+  totalRequestedAmount: number;
+  totalApprovedAmount: number;
+  avgTurnaroundHours: number;
+  stageAvgHours: { stage: string; avgHours: number; count: number }[];
+  pendingAgeing: {
+    under2Days: number;
+    twoToFiveDays: number;
+    above5Days: number;
+  };
+  departmentWorkload: { department: string; count: number; pending: number }[];
+  approverWorkload: { role: string; pending: number; processed: number }[];
+  monthlyVolume: { month: string; created: number; approved: number }[];
+  rejectionRate: number;
+  returnRate: number;
 }
 
 export interface NoteSheetWorkflowLevel {
@@ -3290,6 +3493,39 @@ export interface NoteSheetFinancialSummary {
   remainingPercentage: number;
   warningLevel: 'NORMAL' | 'WARNING' | 'HIGH_WARNING' | 'EXHAUSTED';
   isClosed: boolean;
+}
+
+export interface NoteSheetPdfRecord {
+  pdfId: string;
+  notesheetId: string;
+  noteSheetNumber: string;
+  fileName: string;
+  version: number;
+  fileSize: number;
+  dataUrl?: string;
+  storageReference?: string;
+  generatedBy: {
+    id: string;
+    name: string;
+    role: string;
+  };
+  generatedAt: string;
+  notesheetStatusAtGeneration: string;
+  dataHash: string;
+}
+
+export interface NoteSheetPdfResponse {
+  success: boolean;
+  notesheetId: string;
+  noteSheetNumber: string;
+  pdfId: string;
+  downloadUrl: string;
+  fileName: string;
+  version: number;
+  fileSize: number;
+  generatedAt: string;
+  status: string;
+  isCached?: boolean;
 }
 
 // --- PHASE 1A: AI & SMART ACADEMIC ANALYTICS — ACADEMIC RISK PREDICTION TYPES ---
@@ -4014,6 +4250,21 @@ export const ROLE_BULK_IMPORT_PERMISSIONS: Record<UserRole, BulkImportPermission
     'ACADEMIC_IMPORT', 'SUBJECT_IMPORT', 'INVENTORY_IMPORT', 'HOSTEL_IMPORT', 'EXAM_IMPORT',
     'FINANCE_IMPORT', 'TRANSPORT_IMPORT'
   ],
+  PRESIDENT: [
+    'INSTITUTE_IMPORT', 'STUDENT_IMPORT', 'FACULTY_IMPORT', 'DEPARTMENT_IMPORT', 'PROGRAM_IMPORT',
+    'ACADEMIC_IMPORT', 'SUBJECT_IMPORT', 'INVENTORY_IMPORT', 'HOSTEL_IMPORT', 'EXAM_IMPORT',
+    'FINANCE_IMPORT', 'TRANSPORT_IMPORT'
+  ],
+  VICE_PRESIDENT: [
+    'INSTITUTE_IMPORT', 'STUDENT_IMPORT', 'FACULTY_IMPORT', 'DEPARTMENT_IMPORT', 'PROGRAM_IMPORT',
+    'ACADEMIC_IMPORT', 'SUBJECT_IMPORT', 'INVENTORY_IMPORT', 'HOSTEL_IMPORT', 'EXAM_IMPORT',
+    'FINANCE_IMPORT', 'TRANSPORT_IMPORT'
+  ],
+  PROVOST: [
+    'INSTITUTE_IMPORT', 'STUDENT_IMPORT', 'FACULTY_IMPORT', 'DEPARTMENT_IMPORT', 'PROGRAM_IMPORT',
+    'ACADEMIC_IMPORT', 'SUBJECT_IMPORT', 'INVENTORY_IMPORT', 'HOSTEL_IMPORT', 'EXAM_IMPORT',
+    'FINANCE_IMPORT', 'TRANSPORT_IMPORT'
+  ],
   UNIVERSITY_ADMIN: [
     'INSTITUTE_IMPORT', 'STUDENT_IMPORT', 'FACULTY_IMPORT', 'DEPARTMENT_IMPORT', 'PROGRAM_IMPORT',
     'ACADEMIC_IMPORT', 'SUBJECT_IMPORT', 'INVENTORY_IMPORT', 'HOSTEL_IMPORT', 'EXAM_IMPORT',
@@ -4056,6 +4307,7 @@ export const ROLE_BULK_IMPORT_PERMISSIONS: Record<UserRole, BulkImportPermission
     'FACULTY_IMPORT', 'SUBJECT_IMPORT'
   ],
   FACULTY: [],
+  MENTOR: [],
   STUDENT: []
 };
 
@@ -4905,6 +5157,10 @@ export interface DeputyRegistrarScopeMapping {
   assignedByUserId: string;
   assignedByName?: string;
   assignedByRole?: string;
+  assignedBy?: string;
+  assignedAt?: string;
+  isUniversalInstituteScope?: boolean;
+  userEmail?: string;
   status: 'ACTIVE' | 'INACTIVE';
   createdAt: string;
   updatedAt: string;

@@ -60,6 +60,36 @@ export const fileStorage = {
   },
 
   /**
+   * Saves raw ArrayBuffer to IndexedDB
+   * Returns a unique ID URI prefixed with 'idb://'
+   */
+  async saveBuffer(name: string, type: string, buffer: ArrayBuffer): Promise<string> {
+    if (typeof indexedDB === 'undefined') {
+      return `idb://${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    }
+    const db = await openDB();
+    const id = `idb://${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+    const storedFile: StoredFile = {
+      id,
+      name,
+      type,
+      data: buffer,
+      size: buffer.byteLength,
+      uploadedAt: new Date().toISOString()
+    };
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.add(storedFile);
+
+      request.onsuccess = () => resolve(id);
+      request.onerror = () => reject(request.error);
+    });
+  },
+
+  /**
    * Retrieves a file from IndexedDB as a Blob
    */
   async getFile(id: string): Promise<{ blob: Blob, name: string } | null> {

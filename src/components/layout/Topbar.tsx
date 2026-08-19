@@ -22,6 +22,7 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab, mobileO
 
   const rolesList: { role: UserRole; label: string; bg: string; text: string }[] = [
     { role: 'SUPER_ADMIN', label: 'Super Admin', bg: '#0F2C59', text: '#FFFFFF' },
+    { role: 'VICE_PRESIDENT', label: 'Vice President', bg: '#7C3AED', text: '#FFFFFF' },
     { role: 'UNIVERSITY_ADMIN', label: 'University Admin', bg: '#0F2C59', text: '#FFFFFF' },
     { role: 'REGISTRAR', label: 'Registrar', bg: '#F37023', text: '#FFFFFF' },
     { role: 'IQAC', label: 'IQAC Director', bg: '#7CB342', text: '#FFFFFF' },

@@ -13,7 +13,7 @@ import {
   ArrowUpRight, ArrowDownLeft, Paperclip, ChevronRight, AlertTriangle,
   Network, GitCommit, GitPullRequest, GitMerge, ChevronDown, Share2, Building2,
   FileSpreadsheet, FilePlus, CornerUpLeft, MessageCircle, FileUp, Lock, ShieldAlert,
-  ListOrdered, CheckSquare, Sparkles, FolderArchive
+  ListOrdered, CheckSquare, Sparkles, FolderArchive, TrendingUp
 } from 'lucide-react';
 import {
   NoteSheet, NoteSheetStatus, NoteSheetAction, NoteSheetWorkflowConfig,
@@ -22,8 +22,13 @@ import {
 } from '../../types';
 import * as XLSX from 'xlsx';
 import { notesheetImportService, NOTESHEET_TYPES_LIST } from '../../services/notesheetImportService';
+import { notesheetPdfService } from '../../services/notesheetPdfService';
 import { NoteSheetAccountsDashboard } from '../../components/notesheet/NoteSheetAccountsDashboard';
 import { NoteSheetReportsTab } from '../../components/notesheet/NoteSheetReportsTab';
+import { NoteSheetAnalyticsTab } from '../../components/notesheet/NoteSheetAnalyticsTab';
+import { NoteSheetVerificationPage } from '../public/NoteSheetVerificationPage';
+import { UniversityNoteSheetDocument } from '../../components/notesheet/UniversityNoteSheetDocument';
+import { amountToWords, formatIndianNumber, formatIndianCurrency } from '../../utils/numberFormat';
 
 export const DOCUMENT_CATEGORIES = [
   'Quotation',
@@ -55,7 +60,8 @@ export const BUDGET_HEADS = [
   'Research & Innovation Seed Grant',
   'Campus Infrastructure & Maintenance',
   'Examination & Assessment Fund',
-  'Central University General Fund'
+  'Central University General Fund',
+  'Executive Directorate Special Sanction'
 ];
 
 export const PROCUREMENT_MODES = [
@@ -84,7 +90,9 @@ export type NotesheetTabType =
   | 'WORKFLOW_CONFIG'
   | 'ORGANOGRAM'
   | 'ACCOUNTS_FUND'
-  | 'REPORTS';
+  | 'ANALYTICS'
+  | 'REPORTS'
+  | 'VERIFICATION';
 
 export interface NoteSheetPageProps {
   initialTab?: NotesheetTabType;
@@ -176,6 +184,9 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
   const [actionType, setActionType] = useState<NoteSheetAction>('APPROVE');
   const [actionRemarks, setActionRemarks] = useState('');
   const [actionApprovedAmount, setActionApprovedAmount] = useState<number | undefined>(undefined);
+  const [isRevisingAmount, setIsRevisingAmount] = useState<boolean>(false);
+  const [revisedAmountInput, setRevisedAmountInput] = useState<number | undefined>(undefined);
+  const [revisionReasonInput, setRevisionReasonInput] = useState<string>('');
   const [actionFile, setActionFile] = useState('');
   const [forwardOffice, setForwardOffice] = useState('');
   
@@ -197,6 +208,17 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
   const [versionDocName, setVersionDocName] = useState('');
   const [versionDocCategory, setVersionDocCategory] = useState(DOCUMENT_CATEGORIES[0]);
   const [versionDocUrl, setVersionDocUrl] = useState('');
+
+  // Bulk Actions & Operations
+  const [selectedNotesheetIds, setSelectedNotesheetIds] = useState<string[]>([]);
+  const [bulkActionType, setBulkActionType] = useState<NoteSheetAction | null>(null);
+  const [bulkRemarks, setBulkRemarks] = useState<string>('');
+  const [bulkForwardOffice, setBulkForwardOffice] = useState<string>('');
+  const [showBulkModal, setShowBulkModal] = useState<boolean>(false);
+
+  // Version Amendment
+  const [showAmendmentModal, setShowAmendmentModal] = useState<boolean>(false);
+  const [amendmentReasonInput, setAmendmentReasonInput] = useState<string>('');
   const [versionDocType, setVersionDocType] = useState('PDF');
 
   // Excel Import state
@@ -214,6 +236,127 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
     } else {
       setMessage(msg);
       setTimeout(() => setMessage(''), 4000);
+    }
+  };
+
+  // Preview Scale State & Document Print / PDF Handlers
+  const [previewScale, setPreviewScale] = useState<number>(100);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [modalPreviewPdfUrl, setModalPreviewPdfUrl] = useState<string | null>(null);
+  const [draftPreviewPdfUrl, setDraftPreviewPdfUrl] = useState<string | null>(null);
+  const [isLoadingPdfPreview, setIsLoadingPdfPreview] = useState(false);
+
+  // Load official backend PDF for Modal 10 Preview (Single Source of Truth: Preview = Actual PDF)
+  useEffect(() => {
+    let active = true;
+    const fetchOfficialPdfPreview = async () => {
+      if (!showPrintModal || !selectedNote || !user) {
+        setModalPreviewPdfUrl(null);
+        return;
+      }
+      setIsLoadingPdfPreview(true);
+      try {
+        const effectiveRole = role || user.role;
+        const res = await notesheetPdfService.generatePdf(selectedNote.id, user, effectiveRole);
+        const blobUrl = notesheetPdfService.createPdfBlobUrl(res.downloadUrl);
+        if (active) {
+          setModalPreviewPdfUrl(blobUrl);
+        }
+      } catch (err: any) {
+        console.error('Failed to load official PDF preview:', err);
+      } finally {
+        if (active) setIsLoadingPdfPreview(false);
+      }
+    };
+
+    fetchOfficialPdfPreview();
+    return () => { active = false; };
+  }, [showPrintModal, selectedNote?.id, selectedNote?.version, selectedNote?.status, user, role]);
+
+  const handlePrintBackendPdf = async (noteId: string) => {
+    if (!user) return;
+    const effectiveRole = role || user.role;
+    setIsGeneratingPdf(true);
+    try {
+      showFeedback('Generating official Notesheet PDF for printing...');
+      await notesheetPdfService.printPdf(noteId, user, effectiveRole);
+      showFeedback('Official Notesheet PDF sent to print dialog.');
+    } catch (err: any) {
+      showFeedback(err.message || 'Failed to print official Notesheet PDF', true);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handlePrintDraftPdf = async (draftNote: NoteSheet) => {
+    if (!user) return;
+    const effectiveRole = role || user.role;
+    setIsGeneratingPdf(true);
+    try {
+      showFeedback('Generating official draft Notesheet PDF for printing...');
+      await notesheetPdfService.printDraftPdf(draftNote, user, effectiveRole);
+      showFeedback('Draft Notesheet PDF sent to print dialog.');
+    } catch (err: any) {
+      showFeedback(err.message || 'Failed to print draft Notesheet PDF', true);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleOpenPdfInNewTab = async (noteId: string) => {
+    if (!user) return;
+    const effectiveRole = role || user.role;
+    setIsGeneratingPdf(true);
+    try {
+      showFeedback('Opening official Notesheet PDF viewer...');
+      await notesheetPdfService.openPdfInNewTab(noteId, user, effectiveRole);
+    } catch (err: any) {
+      showFeedback(err.message || 'Failed to open official Notesheet PDF', true);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleDownloadBackendPdf = async (noteId: string) => {
+    if (!user) return;
+    const effectiveRole = role || user.role;
+    setIsGeneratingPdf(true);
+    try {
+      const res = await notesheetPdfService.downloadPdf(noteId, user, effectiveRole);
+      // Trigger secure direct browser download
+      const link = document.createElement('a');
+      link.href = res.dataUrl;
+      link.download = res.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showFeedback(`Official University PDF "${res.fileName}" downloaded successfully.`);
+    } catch (err: any) {
+      showFeedback(err.message || 'Failed to generate official PDF', true);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleRegenerateBackendPdf = async (noteId: string) => {
+    if (!user) return;
+    const effectiveRole = role || user.role;
+    setIsGeneratingPdf(true);
+    try {
+      const res = await notesheetPdfService.regeneratePdf(noteId, user, effectiveRole);
+      const blobUrl = notesheetPdfService.createPdfBlobUrl(res.downloadUrl);
+      setModalPreviewPdfUrl(blobUrl);
+      const link = document.createElement('a');
+      link.href = res.downloadUrl;
+      link.download = res.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showFeedback(`Regenerated new version (v${res.version}) of official PDF "${res.fileName}".`);
+    } catch (err: any) {
+      showFeedback(err.message || 'Failed to regenerate official PDF', true);
+    } finally {
+      setIsGeneratingPdf(false);
     }
   };
 
@@ -251,11 +394,7 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
 
   // Financial fields
   const [formFinancialRequirement, setFormFinancialRequirement] = useState<boolean>(false);
-  const [formExpenseCategory, setFormExpenseCategory] = useState<string>('CAPEX');
-  const [formBudgetHead, setFormBudgetHead] = useState<string>(BUDGET_HEADS[0]);
-  const [formBudgetAvailable, setFormBudgetAvailable] = useState<boolean>(true);
   const [formFinanceRemarks, setFormFinanceRemarks] = useState<string>('');
-  const [formProcurementRequirement, setFormProcurementRequirement] = useState<string>('DIRECT_PAYMENT');
   const [formItems, setFormItems] = useState<NoteSheetEstimateItem[]>([
     { id: `item-1`, itemName: '', description: '', quantity: 1, unit: 'Nos', rate: 0, amount: 0 }
   ]);
@@ -292,6 +431,106 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
     if (!formFinancialRequirement) return 0;
     return formItems.reduce((sum, it) => sum + (Math.max(0, Number(it.quantity) || 0) * Math.max(0, Number(it.rate) || 0)), 0);
   }, [formFinancialRequirement, formItems]);
+
+  // Draft Preview NoteSheet constructed for live pre-submission validation preview
+  const draftPreviewNoteSheet: NoteSheet = useMemo(() => {
+    const instObj = institutes.find(i => i.id === formInstituteId || i.code === formInstituteId || i.name === formInstituteId);
+    return {
+      id: editingDraftId || 'draft-preview',
+      noteSheetNumber: editingDraftId ? (noteSheets.find(n => n.id === editingDraftId)?.noteSheetNumber || 'DRAFT-PREVIEW') : 'DRAFT-PREVIEW',
+      date: new Date().toISOString().split('T')[0],
+      instituteId: formInstituteId,
+      instituteName: instObj?.name || 'Swarrnim School of Computing & IT',
+      instituteCode: instObj?.code || 'SSCIT',
+      departmentId: formDepartmentId,
+      department: formDepartmentName || formDepartmentId,
+      subject: formSubject || 'Untitled Subject Proposal',
+      proposal: formProposal || 'No proposal description specified.',
+      purposeJustification: formPurposeJustification || 'No detailed purpose/justification specified.',
+      priority: formPriority,
+      visibility: formVisibility,
+      requiredDate: formRequiredDate,
+      workflowDueDate: formWorkflowDueDate,
+      notesheetType: formNotesheetType,
+      category: formNotesheetType,
+      referenceNumber: formReferenceNumber,
+      previousNoteSheetId: formPreviousNoteSheetId,
+      financialRequirement: formFinancialRequirement,
+      budgetRequired: formFinancialRequirement,
+      estimatedCost: calculatedTotalAmount,
+      requestedAmount: calculatedTotalAmount,
+      currentAmount: calculatedTotalAmount,
+      contactNumber: formContactNumber || '079-68161600',
+      items: formItems.map((it, idx) => ({
+        id: it.id || `item-${idx + 1}`,
+        itemName: it.itemName || `Item ${idx + 1}`,
+        description: it.description,
+        quantity: it.quantity,
+        unit: it.unit || 'Nos',
+        rate: it.rate,
+        amount: (it.quantity || 1) * (it.rate || 0)
+      })),
+      attachments: formAttachments.map(a => a.fileName),
+      attachmentObjects: formAttachments,
+      creatorId: user?.id || 'usr-creator',
+      creatorName: user?.name || 'Initiator',
+      creatorRole: user?.role || 'FACULTY',
+      status: 'DRAFT',
+      currentOffice: 'HOD',
+      movements: [
+        {
+          id: 'mvt-draft-init',
+          noteSheetId: 'draft-preview',
+          fromUserId: user?.id || 'usr-creator',
+          fromUser: user?.name || 'Initiator',
+          fromUserRole: user?.role || 'FACULTY',
+          toUserId: 'usr-hod',
+          toUser: 'Head of Department',
+          action: 'FORWARD',
+          remarks: 'Pre-submission draft preview',
+          date: new Date().toISOString().split('T')[0],
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: new Date().toISOString()
+        }
+      ],
+      version: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+  }, [
+    editingDraftId, noteSheets, formInstituteId, institutes, formDepartmentId, formDepartmentName,
+    formSubject, formProposal, formPurposeJustification, formPriority, formVisibility,
+    formRequiredDate, formWorkflowDueDate, formNotesheetType, formReferenceNumber,
+    formPreviousNoteSheetId, formFinancialRequirement, calculatedTotalAmount,
+    formContactNumber, formItems, formAttachments, user
+  ]);
+
+  // Load official draft backend PDF for Modal 9 Preview (Single Source of Truth: Preview = Actual PDF)
+  useEffect(() => {
+    let active = true;
+    const fetchDraftPdfPreview = async () => {
+      if (!showValidationPreviewModal || !draftPreviewNoteSheet || !user) {
+        setDraftPreviewPdfUrl(null);
+        return;
+      }
+      setIsLoadingPdfPreview(true);
+      try {
+        const effectiveRole = role || user.role;
+        const res = await notesheetPdfService.generateDraftPdf(draftPreviewNoteSheet, user, effectiveRole);
+        const blobUrl = notesheetPdfService.createPdfBlobUrl(res.downloadUrl);
+        if (active) {
+          setDraftPreviewPdfUrl(blobUrl);
+        }
+      } catch (err: any) {
+        console.error('Failed to load draft PDF preview:', err);
+      } finally {
+        if (active) setIsLoadingPdfPreview(false);
+      }
+    };
+
+    fetchDraftPdfPreview();
+    return () => { active = false; };
+  }, [showValidationPreviewModal, draftPreviewNoteSheet, user, role]);
 
   // Add Line Item
   const handleAddLineItem = () => {
@@ -366,11 +605,7 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
     setFormWorkflowDueDate(new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0]);
     setFormPreviousNoteSheetId('');
     setFormFinancialRequirement(false);
-    setFormExpenseCategory('CAPEX');
-    setFormBudgetHead(BUDGET_HEADS[0]);
-    setFormBudgetAvailable(true);
     setFormFinanceRemarks('');
-    setFormProcurementRequirement('DIRECT_PAYMENT');
     setFormItems([{ id: `item-1`, itemName: '', description: '', quantity: 1, unit: 'Nos', rate: 0, amount: 0 }]);
     setFormAttachments([]);
   };
@@ -391,12 +626,8 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
     setFormRequiredDate(ns.requiredDate || new Date().toISOString().split('T')[0]);
     setFormWorkflowDueDate(ns.workflowDueDate || new Date().toISOString().split('T')[0]);
     setFormPreviousNoteSheetId(ns.previousNoteSheetId || '');
-    setFormFinancialRequirement(Boolean(ns.financialRequirement));
-    setFormExpenseCategory(ns.expenseCategory || 'CAPEX');
-    setFormBudgetHead(ns.budgetHead || BUDGET_HEADS[0]);
-    setFormBudgetAvailable(Boolean(ns.budgetAvailable));
+    setFormFinancialRequirement(Boolean(ns.financialRequirement || ns.budgetRequired || (ns.requestedAmount && ns.requestedAmount > 0)));
     setFormFinanceRemarks(ns.financeRemarks || '');
-    setFormProcurementRequirement(ns.procurementRequirement || 'DIRECT_PAYMENT');
     setFormItems(ns.items && ns.items.length > 0 ? ns.items : [{ id: `item-1`, itemName: '', description: '', quantity: 1, unit: 'Nos', rate: 0, amount: 0 }]);
     setFormAttachments(ns.attachmentObjects || []);
     setActiveTab('CREATE');
@@ -430,13 +661,9 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
         previousNoteSheetId: formPreviousNoteSheetId,
         financialRequirement: formFinancialRequirement,
         budgetRequired: formFinancialRequirement,
-        estimatedCost: calculatedTotalAmount,
-        requestedAmount: calculatedTotalAmount,
-        expenseCategory: formFinancialRequirement ? formExpenseCategory : undefined,
-        budgetHead: formFinancialRequirement ? formBudgetHead : undefined,
-        budgetAvailable: formFinancialRequirement ? formBudgetAvailable : undefined,
+        estimatedCost: formFinancialRequirement ? calculatedTotalAmount : 0,
+        requestedAmount: formFinancialRequirement ? calculatedTotalAmount : 0,
         financeRemarks: formFinancialRequirement ? formFinanceRemarks : undefined,
-        procurementRequirement: formFinancialRequirement ? formProcurementRequirement : undefined,
         items: formFinancialRequirement ? formItems : [],
         attachmentObjects: formAttachments,
         attachments: formAttachments.map(a => a.fileName)
@@ -497,13 +724,9 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
           previousNoteSheetId: formPreviousNoteSheetId,
           financialRequirement: formFinancialRequirement,
           budgetRequired: formFinancialRequirement,
-          estimatedCost: calculatedTotalAmount,
-          requestedAmount: calculatedTotalAmount,
-          expenseCategory: formFinancialRequirement ? formExpenseCategory : undefined,
-          budgetHead: formFinancialRequirement ? formBudgetHead : undefined,
-          budgetAvailable: formFinancialRequirement ? formBudgetAvailable : undefined,
+          estimatedCost: formFinancialRequirement ? calculatedTotalAmount : 0,
+          requestedAmount: formFinancialRequirement ? calculatedTotalAmount : 0,
           financeRemarks: formFinancialRequirement ? formFinanceRemarks : undefined,
-          procurementRequirement: formFinancialRequirement ? formProcurementRequirement : undefined,
           items: formFinancialRequirement ? formItems : [],
           attachmentObjects: formAttachments,
           attachments: formAttachments.map(a => a.fileName)
@@ -532,13 +755,9 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
           previousNoteSheetId: formPreviousNoteSheetId,
           financialRequirement: formFinancialRequirement,
           budgetRequired: formFinancialRequirement,
-          estimatedCost: calculatedTotalAmount,
-          requestedAmount: calculatedTotalAmount,
-          expenseCategory: formFinancialRequirement ? formExpenseCategory : undefined,
-          budgetHead: formFinancialRequirement ? formBudgetHead : undefined,
-          budgetAvailable: formFinancialRequirement ? formBudgetAvailable : undefined,
+          estimatedCost: formFinancialRequirement ? calculatedTotalAmount : 0,
+          requestedAmount: formFinancialRequirement ? calculatedTotalAmount : 0,
           financeRemarks: formFinancialRequirement ? formFinanceRemarks : undefined,
-          procurementRequirement: formFinancialRequirement ? formProcurementRequirement : undefined,
           items: formFinancialRequirement ? formItems : [],
           attachmentObjects: formAttachments,
           attachments: formAttachments.map(a => a.fileName)
@@ -559,6 +778,14 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
   const handleExecuteAction = () => {
     if (!selectedNote || !user) return;
     try {
+      const prevAmt = selectedNote.currentAmount !== undefined ? selectedNote.currentAmount : (selectedNote.requestedAmount || selectedNote.estimatedCost || 0);
+      const isAmountChanged = isRevisingAmount && revisedAmountInput !== undefined && revisedAmountInput !== prevAmt;
+
+      if (isAmountChanged && (!revisionReasonInput.trim() && !actionRemarks.trim())) {
+        showFeedback('Reason / Remarks is mandatory when revising the financial amount.', true);
+        return;
+      }
+
       db.processNoteSheetAction(
         selectedNote.id,
         actionType,
@@ -567,12 +794,17 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
         user,
         forwardOffice || undefined,
         {
-          approvedAmount: actionApprovedAmount
+          approvedAmount: actionApprovedAmount,
+          revisedAmount: isRevisingAmount ? revisedAmountInput : undefined,
+          revisionReason: revisionReasonInput.trim() || undefined
         }
       );
       showFeedback(`Action "${actionType}" executed on ${selectedNote.noteSheetNumber}`);
       setShowActionModal(false);
       setActionRemarks('');
+      setIsRevisingAmount(false);
+      setRevisedAmountInput(undefined);
+      setRevisionReasonInput('');
       setActionApprovedAmount(undefined);
       setForwardOffice('');
       refreshData();
@@ -813,6 +1045,16 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('ANALYTICS')}
+            className={`px-4 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2 ${
+              activeTab === 'ANALYTICS' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span>Analytics &amp; SLA</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('REPORTS')}
             className={`px-4 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2 ${
               activeTab === 'REPORTS' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -820,6 +1062,16 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
           >
             <PieChart className="w-4 h-4" />
             <span>Reports &amp; Audit</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('VERIFICATION')}
+            className={`px-4 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2 ${
+              activeTab === 'VERIFICATION' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Document Verification</span>
           </button>
         </div>
       </div>
@@ -1191,59 +1443,6 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
 
             {formFinancialRequirement && (
               <div className="space-y-4 pt-3 border-t border-slate-200 dark:border-slate-700">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Expense Category</label>
-                    <select
-                      value={formExpenseCategory}
-                      onChange={e => setFormExpenseCategory(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium"
-                    >
-                      {EXPENSE_CATEGORIES.map(c => (
-                        <option key={c.value} value={c.value}>{c.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Budget Head</label>
-                    <select
-                      value={formBudgetHead}
-                      onChange={e => setFormBudgetHead(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium"
-                    >
-                      {BUDGET_HEADS.map(b => (
-                        <option key={b} value={b}>{b}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Budget Available?</label>
-                    <select
-                      value={formBudgetAvailable ? 'YES' : 'NO'}
-                      onChange={e => setFormBudgetAvailable(e.target.value === 'YES')}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-semibold"
-                    >
-                      <option value="YES">YES - Budget Available</option>
-                      <option value="NO">NO - Special Sanction Required</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Payment Requirement</label>
-                    <select
-                      value={formProcurementRequirement}
-                      onChange={e => setFormProcurementRequirement(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium"
-                    >
-                      {PROCUREMENT_MODES.map(m => (
-                        <option key={m.value} value={m.value}>{m.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
                 {/* Line Items Table */}
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
@@ -1555,12 +1754,116 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
             )}
           </div>
 
+          {/* Floating Bulk Action Bar */}
+          {selectedNotesheetIds.length > 0 && (
+            <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white p-3.5 px-5 rounded-2xl shadow-xl flex items-center justify-between flex-wrap gap-3 border border-blue-500/40 animate-fadeIn">
+              <div className="flex items-center gap-3">
+                <span className="bg-blue-600 text-white text-xs font-black px-3 py-1 rounded-full">
+                  {selectedNotesheetIds.length} Selected
+                </span>
+                <span className="text-sm font-semibold text-slate-200">
+                  Bulk Operations for Queue
+                </span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {db.hasNoteSheetPermission(user, role, 'NOTESHEET_FORWARD') && (
+                  <button
+                    onClick={() => {
+                      setBulkActionType('FORWARD');
+                      setBulkRemarks('');
+                      setBulkForwardOffice('');
+                      setShowBulkModal(true);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                  >
+                    <ArrowRight className="w-3.5 h-3.5" /> Bulk Forward
+                  </button>
+                )}
+                {db.hasNoteSheetPermission(user, role, 'NOTESHEET_APPROVE') && (
+                  <button
+                    onClick={() => {
+                      setBulkActionType('APPROVE');
+                      setBulkRemarks('');
+                      setBulkForwardOffice('');
+                      setShowBulkModal(true);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Bulk Approve
+                  </button>
+                )}
+                {db.hasNoteSheetPermission(user, role, 'NOTESHEET_RETURN') && (
+                  <button
+                    onClick={() => {
+                      setBulkActionType('RETURN');
+                      setBulkRemarks('');
+                      setBulkForwardOffice('');
+                      setShowBulkModal(true);
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                  >
+                    <CornerUpLeft className="w-3.5 h-3.5" /> Bulk Return
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    const selectedDocs = noteSheets.filter(n => selectedNotesheetIds.includes(n.id));
+                    const exportData = selectedDocs.map(n => ({
+                      'Notesheet Number': n.noteSheetNumber,
+                      'Verification ID': n.verificationId || 'N/A',
+                      'Version': `v${n.version || '1.0'}`,
+                      'Subject': n.subject,
+                      'Institute': n.instituteName || n.instituteCode,
+                      'Department': n.department,
+                      'Creator': n.creatorName,
+                      'Status': n.status,
+                      'Requested Amount': n.requestedAmount || 0,
+                      'Approved Amount': n.approvedAmount || 0,
+                      'Inward No': n.inwardNumber || 'N/A',
+                      'Outward No': n.outwardNumber || 'N/A'
+                    }));
+                    const wb = XLSX.utils.book_new();
+                    const ws = XLSX.utils.json_to_sheet(exportData);
+                    XLSX.utils.book_append_sheet(wb, ws, 'Selected_Notesheets');
+                    XLSX.writeFile(wb, `SSIU_Notesheet_Selected_${Date.now()}.xlsx`);
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                >
+                  <Download className="w-3.5 h-3.5" /> Export Selected
+                </button>
+                <button
+                  onClick={() => setSelectedNotesheetIds([])}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+                >
+                  Clear Selection
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Notesheets Table */}
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider border-b border-slate-200 dark:border-slate-700 text-xs sm:text-sm">
                   <tr>
+                    <th className="p-3.5 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        checked={
+                          filteredRegisterNotesheets.length > 0 &&
+                          filteredRegisterNotesheets.every(ns => selectedNotesheetIds.includes(ns.id))
+                        }
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedNotesheetIds(filteredRegisterNotesheets.map(ns => ns.id));
+                          } else {
+                            setSelectedNotesheetIds([]);
+                          }
+                        }}
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                      />
+                    </th>
                     <th className="p-3.5">Notesheet #</th>
                     <th className="p-3.5">Institute &amp; Dept</th>
                     <th className="p-3.5">Subject &amp; Type</th>
@@ -1574,7 +1877,7 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
                 <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-sm">
                   {filteredRegisterNotesheets.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="p-12 text-center text-slate-500">
+                      <td colSpan={9} className="p-12 text-center text-slate-500">
                         <FileText className="w-12 h-12 mx-auto text-slate-300 mb-2" />
                         <div className="font-bold text-slate-700 dark:text-slate-300 text-base">No Notesheets found</div>
                         <div className="text-sm mt-1">There are no files matching the selected filters.</div>
@@ -1583,14 +1886,36 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
                   ) : (
                     filteredRegisterNotesheets.map(ns => {
                       const isOverdue = ns.workflowDueDate && new Date(ns.workflowDueDate) < new Date() && !['APPROVED', 'CLOSED', 'REJECTED'].includes(ns.status);
+                      const isSelected = selectedNotesheetIds.includes(ns.id);
                       return (
                         <tr
                           key={ns.id}
-                          className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer"
+                          className={`hover:bg-slate-50 dark:hover:bg-slate-800/50 transition cursor-pointer ${
+                            isSelected ? 'bg-blue-50/70 dark:bg-blue-950/40' : ''
+                          }`}
                           onClick={() => setSelectedNote(ns)}
                         >
+                          <td className="p-3.5 text-center" onClick={e => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedNotesheetIds(prev => [...prev, ns.id]);
+                                } else {
+                                  setSelectedNotesheetIds(prev => prev.filter(id => id !== ns.id));
+                                }
+                              }}
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                            />
+                          </td>
                           <td className="p-3.5 font-mono font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap text-[15px]">
                             {ns.noteSheetNumber}
+                            {ns.version && ns.version !== '1.0' && (
+                              <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-bold">
+                                v{ns.version}
+                              </span>
+                            )}
                             {ns.status === 'DRAFT' && <span className="ml-1.5 text-xs px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold">DRAFT</span>}
                           </td>
                           <td className="p-3.5 whitespace-nowrap">
@@ -1668,6 +1993,16 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
                               )}
 
                               <button
+                                onClick={() => handlePrintBackendPdf(ns.id)}
+                                disabled={isGeneratingPdf}
+                                className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1 transition"
+                                title="Print official Notesheet PDF"
+                              >
+                                <Printer className="w-3.5 h-3.5" />
+                                Print
+                              </button>
+
+                              <button
                                 onClick={() => setSelectedNote(ns)}
                                 className="px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-sm font-bold flex items-center gap-1.5 transition hover:bg-blue-100"
                               >
@@ -1692,9 +2027,29 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
         <NoteSheetAccountsDashboard onOpenNoteSheetFinance={(ns) => setSelectedNote(ns)} />
       )}
 
-      {/* ─── TAB 5: REPORTS & AUDIT ─────────────────────────────────────────── */}
+      {/* ─── TAB 5: ANALYTICS & TURNAROUND SLA ──────────────────────────────── */}
+      {activeTab === 'ANALYTICS' && (
+        <NoteSheetAnalyticsTab notesheets={noteSheets} />
+      )}
+
+      {/* ─── TAB 6: REPORTS & AUDIT ─────────────────────────────────────────── */}
       {activeTab === 'REPORTS' && (
         <NoteSheetReportsTab />
+      )}
+
+      {/* ─── TAB 7: DOCUMENT VERIFICATION DASHBOARD ─────────────────────────── */}
+      {activeTab === 'VERIFICATION' && (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
+          <NoteSheetVerificationPage
+            onNavigateToNotesheet={(id) => {
+              const matched = db.getNoteSheetById(id);
+              if (matched) {
+                setSelectedNote(matched);
+                setActiveTab('REGISTER');
+              }
+            }}
+          />
+        </div>
       )}
 
       {/* ─── MODAL 1: NOTESHEET DETAILS & WORKFLOW TIMELINE MODAL ──────────── */}
@@ -1728,13 +2083,32 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
                 </p>
               </div>
 
-              <div className="flex items-center gap-2.5 flex-wrap flex-shrink-0">
+              <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
+                <button
+                  onClick={() => handlePrintBackendPdf(selectedNote.id)}
+                  disabled={isGeneratingPdf}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                  title="Print official Notesheet PDF directly"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  Print Notesheet
+                </button>
+                <button
+                  onClick={() => handleDownloadBackendPdf(selectedNote.id)}
+                  disabled={isGeneratingPdf}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                  title="Generate and download official University PDF"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  {isGeneratingPdf ? 'Generating...' : 'Download PDF'}
+                </button>
                 <button
                   onClick={() => setShowPrintModal(true)}
-                  className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-800 dark:text-slate-200 text-sm font-bold flex items-center gap-2 transition shadow-xs"
+                  className="px-3.5 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                  title="Open high-fidelity A4 preview and print dialog"
                 >
-                  <Printer className="w-4 h-4" />
-                  Print / PDF
+                  <FileText className="w-3.5 h-3.5" />
+                  Preview &amp; Actions
                 </button>
               </div>
             </div>
@@ -1808,6 +2182,111 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
               </div>
             )}
 
+            {/* Financial History & Amount Revision Trail */}
+            {selectedNote.financialRequirement && (
+              <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <DollarSign className="w-4 h-4 text-emerald-600" />
+                    <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Financial History &amp; Amount Revisions</span>
+                  </div>
+                  {selectedNote.financialRevisionHistory && selectedNote.financialRevisionHistory.length > 0 ? (
+                    <span className="text-xs px-2.5 py-1 rounded-full font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300">
+                      {selectedNote.financialRevisionHistory.length} Revision{selectedNote.financialRevisionHistory.length > 1 ? 's' : ''} Recorded
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-400">Original Amount Maintained</span>
+                  )}
+                </div>
+
+                {/* Financial Summary Metric Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+                    <span className="text-xs font-semibold text-slate-500 block">Total Requested Amount</span>
+                    <span className="text-base font-bold font-mono text-slate-900 dark:text-white block">
+                      ₹{(selectedNote.originalRequestedAmount || selectedNote.requestedAmount || selectedNote.estimatedCost || 0).toLocaleString('en-IN')}
+                    </span>
+                    <span className="text-[11px] italic text-slate-600 dark:text-slate-400 mt-1 block">
+                      {amountToWords(selectedNote.originalRequestedAmount || selectedNote.requestedAmount || selectedNote.estimatedCost || 0)}
+                    </span>
+                  </div>
+                  <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+                    <span className="text-xs font-semibold text-slate-500 block">
+                      {selectedNote.status === 'APPROVED' ? 'Final Approved / Sanctioned Amount' : 'Current / Proposed Amount'}
+                    </span>
+                    <span className="text-base font-bold font-mono text-blue-600 dark:text-blue-400 block">
+                      ₹{(selectedNote.finalApprovedAmount !== undefined ? selectedNote.finalApprovedAmount : (selectedNote.currentAmount !== undefined ? selectedNote.currentAmount : (selectedNote.requestedAmount || selectedNote.estimatedCost || 0))).toLocaleString('en-IN')}
+                    </span>
+                    <span className="text-[11px] italic text-blue-700 dark:text-blue-300 mt-1 block">
+                      {amountToWords(selectedNote.finalApprovedAmount !== undefined ? selectedNote.finalApprovedAmount : (selectedNote.currentAmount !== undefined ? selectedNote.currentAmount : (selectedNote.requestedAmount || selectedNote.estimatedCost || 0)))}
+                    </span>
+                  </div>
+                  <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
+                    <span className="text-xs font-semibold text-slate-500 block">Total Net Change</span>
+                    {(() => {
+                      const orig = selectedNote.originalRequestedAmount || selectedNote.requestedAmount || selectedNote.estimatedCost || 0;
+                      const curr = selectedNote.finalApprovedAmount !== undefined ? selectedNote.finalApprovedAmount : (selectedNote.currentAmount !== undefined ? selectedNote.currentAmount : orig);
+                      const net = curr - orig;
+                      return (
+                        <span className={`text-base font-bold font-mono block ${net < 0 ? 'text-rose-600 dark:text-rose-400' : net > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500'}`}>
+                          {net > 0 ? `+₹${net.toLocaleString('en-IN')}` : net < 0 ? `-₹${Math.abs(net).toLocaleString('en-IN')}` : '₹0'}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* Revisions Table */}
+                {selectedNote.financialRevisionHistory && selectedNote.financialRevisionHistory.length > 0 ? (
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs uppercase tracking-wider">
+                        <tr>
+                          <th className="p-3">#</th>
+                          <th className="p-3">Stage / Approver</th>
+                          <th className="p-3 font-mono">Previous Amount</th>
+                          <th className="p-3 font-mono">Revised Amount</th>
+                          <th className="p-3 font-mono">Change</th>
+                          <th className="p-3">Reason / Remarks</th>
+                          <th className="p-3">Date &amp; Time</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+                        {selectedNote.financialRevisionHistory.map((rev, rIdx) => (
+                          <tr key={rev.id || rIdx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                            <td className="p-3 font-bold text-slate-500">{rIdx + 1}</td>
+                            <td className="p-3">
+                              <div className="font-bold text-slate-900 dark:text-white">{rev.actorName}</div>
+                              <div className="text-xs text-slate-400">{rev.workflowStage || rev.actorRole}</div>
+                            </td>
+                            <td className="p-3 font-mono font-medium text-slate-600 dark:text-slate-300">
+                              ₹{rev.previousAmount.toLocaleString('en-IN')}
+                            </td>
+                            <td className="p-3 font-mono font-bold text-blue-600 dark:text-blue-400">
+                              ₹{rev.newAmount.toLocaleString('en-IN')}
+                            </td>
+                            <td className="p-3 font-mono font-bold">
+                              <span className={`px-2 py-0.5 rounded text-xs ${rev.changeAmount < 0 ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' : rev.changeAmount > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-100 text-slate-600'}`}>
+                                {rev.changeAmount > 0 ? `+₹${rev.changeAmount.toLocaleString('en-IN')}` : rev.changeAmount < 0 ? `-₹${Math.abs(rev.changeAmount).toLocaleString('en-IN')}` : '₹0'}
+                              </span>
+                            </td>
+                            <td className="p-3 text-slate-700 dark:text-slate-300 max-w-xs">{rev.reason}</td>
+                            <td className="p-3 text-xs text-slate-400 font-mono">
+                              {new Date(rev.createdAt).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-400 italic p-3 rounded-xl bg-slate-50 dark:bg-slate-800/30">
+                    No amount revisions have been made. The Notesheet is progressing with its initial requested amount.
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Supporting Documents Repository with Version History */}
             <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3.5">
               <div className="flex items-center justify-between">
@@ -1858,6 +2337,277 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Digital Approval Trail / Stepper */}
+            <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <FileSignatureIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Digital Approval Chain &amp; Stage Progress</span>
+                </div>
+                {selectedNote.status === 'APPROVED' && (
+                  <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 text-xs font-bold flex items-center gap-1 border border-emerald-300 dark:border-emerald-800">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Final Approved
+                  </span>
+                )}
+              </div>
+
+              {/* Stepper Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {(() => {
+                  const chainSteps = ['FACULTY', ...(selectedNote.organogramPath || ['HOD', 'HOI', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'VICE_PRESIDENT'])];
+                  const movements = selectedNote.movements || [];
+
+                  return chainSteps.map((stepRole, idx) => {
+                    let isCompleted = false;
+                    let isCurrent = false;
+                    let stepTitle = '';
+                    let approverName = '';
+                    let approvalTimestamp = '';
+                    let approvalId = '';
+
+                    if (stepRole === 'FACULTY') {
+                      stepTitle = '1. Faculty (Creator)';
+                      isCompleted = true;
+                      approverName = selectedNote.creatorName;
+                      approvalTimestamp = selectedNote.date;
+                    } else if (stepRole === 'HOD') {
+                      stepTitle = '2. HOD';
+                      const m = movements.find(mvt => (mvt.fromUserRole === 'HOD' || (mvt.fromUser && mvt.fromUser.includes('HOD'))) && (mvt.action === 'APPROVE' || mvt.action === 'FORWARD'));
+                      if (m) {
+                        isCompleted = true;
+                        approverName = m.actorName || m.fromUser.split(' (')[0];
+                        approvalTimestamp = m.timestamp || `${m.date} ${m.time}`;
+                        approvalId = m.approvalId || '';
+                      } else if (selectedNote.status === 'PENDING_HOD' || selectedNote.currentOffice === 'HOD') {
+                        isCurrent = true;
+                        approverName = selectedNote.currentAssigneeName || 'Head of Department';
+                      }
+                    } else if (stepRole === 'HOI' || stepRole === 'PRINCIPAL') {
+                      stepTitle = '3. HOI / Principal';
+                      const m = movements.find(mvt => (mvt.fromUserRole === 'PRINCIPAL' || (mvt.fromUser && (mvt.fromUser.includes('PRINCIPAL') || mvt.fromUser.includes('HOI')))) && (mvt.action === 'APPROVE' || mvt.action === 'FORWARD'));
+                      if (m) {
+                        isCompleted = true;
+                        approverName = m.actorName || m.fromUser.split(' (')[0];
+                        approvalTimestamp = m.timestamp || `${m.date} ${m.time}`;
+                        approvalId = m.approvalId || '';
+                      } else if (selectedNote.status === 'PENDING_HOI' || selectedNote.currentOffice === 'HOI' || selectedNote.currentOffice === 'PRINCIPAL') {
+                        isCurrent = true;
+                        approverName = selectedNote.currentAssigneeName || 'Principal / HOI';
+                      }
+                    } else if (stepRole === 'DEPUTY_REGISTRAR') {
+                      stepTitle = '4. Deputy Registrar';
+                      const m = movements.find(mvt => (mvt.fromUserRole === 'DEPUTY_REGISTRAR' || (mvt.fromUser && mvt.fromUser.includes('DEPUTY_REGISTRAR'))) && (mvt.action === 'APPROVE' || mvt.action === 'FORWARD'));
+                      if (m) {
+                        isCompleted = true;
+                        approverName = m.actorName || m.fromUser.split(' (')[0];
+                        approvalTimestamp = m.timestamp || `${m.date} ${m.time}`;
+                        approvalId = m.approvalId || '';
+                      } else if (selectedNote.status === 'PENDING_DEPUTY_REGISTRAR' || selectedNote.currentOffice === 'DEPUTY_REGISTRAR') {
+                        isCurrent = true;
+                        approverName = selectedNote.currentAssigneeName || 'Deputy Registrar';
+                      }
+                    } else if (stepRole === 'REGISTRAR') {
+                      stepTitle = '5. Registrar';
+                      const m = movements.find(mvt => (mvt.fromUserRole === 'REGISTRAR' || (mvt.fromUser && mvt.fromUser.includes('REGISTRAR'))) && (mvt.action === 'APPROVE' || mvt.action === 'FORWARD'));
+                      if (m) {
+                        isCompleted = true;
+                        approverName = m.actorName || m.fromUser.split(' (')[0];
+                        approvalTimestamp = m.timestamp || `${m.date} ${m.time}`;
+                        approvalId = m.approvalId || '';
+                      } else if (selectedNote.status === 'PENDING_REGISTRAR' || selectedNote.currentOffice === 'REGISTRAR') {
+                        isCurrent = true;
+                        approverName = selectedNote.currentAssigneeName || 'Registrar';
+                      }
+                    } else if (stepRole === 'VICE_PRESIDENT') {
+                      stepTitle = '6. Vice President (Final Sanction)';
+                      if (selectedNote.status === 'APPROVED' || selectedNote.decision === 'APPROVED') {
+                        isCompleted = true;
+                        approverName = selectedNote.approvedByName || 'Vice President';
+                        approvalTimestamp = selectedNote.approvedAt ? new Date(selectedNote.approvedAt).toLocaleString() : selectedNote.date;
+                        approvalId = selectedNote.finalApprovalId || '';
+                      } else if (selectedNote.status === 'PENDING_VICE_PRESIDENT' || selectedNote.currentOffice === 'VICE_PRESIDENT') {
+                        isCurrent = true;
+                        approverName = selectedNote.currentAssigneeName || 'Vice President';
+                      }
+                    } else {
+                      stepTitle = stepRole;
+                      const m = movements.find(mvt => (mvt.fromUserRole === stepRole || (mvt.fromUser && mvt.fromUser.includes(stepRole))) && (mvt.action === 'APPROVE' || mvt.action === 'FORWARD'));
+                      if (m) {
+                        isCompleted = true;
+                        approverName = m.actorName || m.fromUser.split(' (')[0];
+                        approvalTimestamp = m.timestamp || `${m.date} ${m.time}`;
+                      } else if (selectedNote.currentOffice === stepRole) {
+                        isCurrent = true;
+                        approverName = selectedNote.currentAssigneeName || stepRole;
+                      }
+                    }
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`p-3.5 rounded-xl border flex flex-col justify-between transition ${
+                          isCompleted
+                            ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800/60 text-emerald-950 dark:text-emerald-200'
+                            : isCurrent
+                            ? 'bg-amber-50/70 dark:bg-amber-950/20 border-amber-300 dark:border-amber-800/60 text-amber-950 dark:text-amber-200 ring-2 ring-amber-400/40'
+                            : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500'
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-xs font-bold">
+                            <span className="uppercase tracking-wider truncate">{stepTitle}</span>
+                            {isCompleted ? (
+                              <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold shrink-0 ml-1">
+                                <CheckCircle2 className="w-3.5 h-3.5" /> Done
+                              </span>
+                            ) : isCurrent ? (
+                              <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold animate-pulse shrink-0 ml-1">
+                                <Clock className="w-3.5 h-3.5" /> Pending
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-[11px] shrink-0 ml-1">○ Upcoming</span>
+                            )}
+                          </div>
+
+                          <div className="text-xs font-medium truncate pt-1">
+                            {approverName || (isCurrent ? 'Awaiting Action' : 'Upcoming Stage')}
+                          </div>
+                        </div>
+
+                        {approvalTimestamp && (
+                          <div className="text-[10px] text-slate-500 dark:text-slate-400 pt-1.5 mt-1.5 border-t border-slate-200/60 dark:border-slate-700/60 truncate">
+                            {approvalTimestamp}
+                          </div>
+                        )}
+                        {approvalId && (
+                          <div className="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400 truncate">
+                            ID: {approvalId}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+
+            {/* Registrar Office Official Tracking (Inward & Outward Register) */}
+            {(selectedNote.status === 'APPROVED' || selectedNote.inwardNumber || selectedNote.outwardNumber) && (
+              <div className="p-5 rounded-2xl border border-blue-200 dark:border-blue-900 bg-blue-50/40 dark:bg-blue-950/20 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                      Registrar Office Tracking &amp; Official Registry
+                    </span>
+                  </div>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold flex items-center gap-1 border ${
+                    selectedNote.outwardNumber
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300'
+                      : 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300'
+                  }`}>
+                    {selectedNote.outwardNumber ? 'Dispatched / Completed' : 'Inward Registered'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Inward Register Information */}
+                  <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Inward Entry (Registrar Registry)</span>
+                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Registered
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800">
+                      <span className="text-xs text-slate-500">Inward Number:</span>
+                      <span className="font-mono font-bold text-sm text-blue-700 dark:text-blue-400">
+                        {selectedNote.inwardNumber || 'REG-IN-PENDING'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
+                      <span>Inward Date:</span>
+                      <span className="font-medium">{selectedNote.inwardDate || selectedNote.date}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
+                      <span>Received By:</span>
+                      <span className="font-medium">{selectedNote.inwardReceivedByName || 'Registrar Directorate'}</span>
+                    </div>
+                  </div>
+
+                  {/* Outward Dispatch Information */}
+                  <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Outward Entry (Dispatched)</span>
+                      {selectedNote.outwardNumber ? (
+                        <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Dispatched
+                        </span>
+                      ) : (
+                        <span className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                          <Clock className="w-3.5 h-3.5" /> Pending Dispatch
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800">
+                      <span className="text-xs text-slate-500">Outward Number:</span>
+                      <span className="font-mono font-bold text-sm text-blue-700 dark:text-blue-400">
+                        {selectedNote.outwardNumber || 'Pending Registrar Dispatch'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
+                      <span>Outward Date:</span>
+                      <span className="font-medium">{selectedNote.outwardDate || 'Awaiting Dispatch'}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
+                      <span>Dispatched To:</span>
+                      <span className="font-medium">{selectedNote.outwardRecipient || selectedNote.creatorName || 'Faculty / Staff'}</span>
+                    </div>
+                    {role && !selectedNote.outwardNumber && ['REGISTRAR', 'ADMIN', 'SUPER_ADMIN', 'VICE_PRESIDENT'].includes(role) && (
+                      <button
+                        onClick={() => {
+                          const res = db.processRegistrarOutwardForNotesheet(selectedNote.id, {}, user);
+                          if (res.success) {
+                            setSelectedNote({ ...db.getNoteSheetById(selectedNote.id)! });
+                            setNoteSheets(db.getScopedNoteSheets(user, role));
+                          }
+                        }}
+                        className="w-full mt-2 py-1.5 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-sm"
+                      >
+                        <Send className="w-3.5 h-3.5" /> Generate &amp; Dispatch Outward
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Version History & Amendments */}
+            {selectedNote.versionHistory && selectedNote.versionHistory.length > 0 && (
+              <div className="p-5 rounded-2xl border border-purple-200 dark:border-purple-900 bg-purple-50/40 dark:bg-purple-950/20 space-y-3">
+                <div className="flex items-center gap-2">
+                  <GitFork className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                    Document Version History &amp; Amendments
+                  </span>
+                </div>
+                <div className="space-y-2 text-xs">
+                  {selectedNote.versionHistory.map((vh, vIdx) => (
+                    <div key={vIdx} className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                      <div>
+                        <span className="font-bold text-purple-700 dark:text-purple-400 mr-2 font-mono">v{vh.version}</span>
+                        <span className="text-slate-700 dark:text-slate-300 font-medium">{vh.amendmentReason || 'Prior Version State'}</span>
+                        <div className="text-[11px] text-slate-400 mt-0.5">By: {vh.changedByName} ({vh.changedDate})</div>
+                      </div>
+                      <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                        {vh.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Visual Movement Timeline */}
             <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3.5">
@@ -1990,7 +2740,14 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
                   <>
                     {db.hasNoteSheetPermission(user, role, 'NOTESHEET_APPROVE') && (
                       <button
-                        onClick={() => { setActionType('APPROVE'); setShowActionModal(true); }}
+                        onClick={() => {
+                          setActionType('APPROVE');
+                          setIsRevisingAmount(false);
+                          const curr = selectedNote.currentAmount !== undefined ? selectedNote.currentAmount : (selectedNote.requestedAmount || selectedNote.estimatedCost || 0);
+                          setRevisedAmountInput(curr);
+                          setRevisionReasonInput('');
+                          setShowActionModal(true);
+                        }}
                         className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold flex items-center gap-2 shadow-sm"
                       >
                         <CheckCircle2 className="w-4 h-4" />
@@ -2000,7 +2757,14 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
 
                     {db.hasNoteSheetPermission(user, role, 'NOTESHEET_FORWARD') && (
                       <button
-                        onClick={() => { setActionType('FORWARD'); setShowActionModal(true); }}
+                        onClick={() => {
+                          setActionType('FORWARD');
+                          setIsRevisingAmount(false);
+                          const curr = selectedNote.currentAmount !== undefined ? selectedNote.currentAmount : (selectedNote.requestedAmount || selectedNote.estimatedCost || 0);
+                          setRevisedAmountInput(curr);
+                          setRevisionReasonInput('');
+                          setShowActionModal(true);
+                        }}
                         className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold flex items-center gap-2 shadow-sm"
                       >
                         <ArrowRight className="w-4 h-4" />
@@ -2028,6 +2792,20 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
                       </button>
                     )}
                   </>
+                )}
+
+                {/* Create Amendment Version for Approved Notesheets */}
+                {selectedNote.status === 'APPROVED' && (
+                  <button
+                    onClick={() => {
+                      setAmendmentReasonInput('');
+                      setShowAmendmentModal(true);
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold flex items-center gap-2 shadow-sm"
+                  >
+                    <GitFork className="w-4 h-4" />
+                    Create Amendment Version
+                  </button>
                 )}
 
                 {/* Post-Approval Action Taken / Close */}
@@ -2075,18 +2853,99 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
           maxWidth="600px"
         >
           <div className="notesheet-modal-scope space-y-4">
-            {actionType === 'APPROVE' && selectedNote.financialRequirement && (
-              <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 space-y-2">
-                <label className="text-sm font-bold text-emerald-800 dark:text-emerald-300">
-                  Approved Sanction Amount (₹) [Requested: ₹{(selectedNote.requestedAmount || selectedNote.estimatedCost || 0).toLocaleString('en-IN')}]:
-                </label>
-                <input
-                  type="number"
-                  placeholder="Enter sanctioned amount (e.g. 85000)"
-                  value={actionApprovedAmount !== undefined ? actionApprovedAmount : (selectedNote.requestedAmount || selectedNote.estimatedCost || 0)}
-                  onChange={e => setActionApprovedAmount(Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-800 text-sm font-mono font-bold"
-                />
+            {(actionType === 'APPROVE' || actionType === 'FORWARD') && selectedNote.financialRequirement && (
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Financial Amount Review</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRevisingAmount(false);
+                        setRevisedAmountInput(selectedNote.currentAmount !== undefined ? selectedNote.currentAmount : (selectedNote.requestedAmount || selectedNote.estimatedCost || 0));
+                        setRevisionReasonInput('');
+                      }}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition ${!isRevisingAmount ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}`}
+                    >
+                      Keep Current Amount
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRevisingAmount(true);
+                        if (revisedAmountInput === undefined) {
+                          setRevisedAmountInput(selectedNote.currentAmount !== undefined ? selectedNote.currentAmount : (selectedNote.requestedAmount || selectedNote.estimatedCost || 0));
+                        }
+                      }}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition ${isRevisingAmount ? 'bg-amber-600 text-white shadow-sm' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'}`}
+                    >
+                      Revise Amount
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <div>
+                    <span className="text-slate-500">Original Requested:</span>
+                    <div className="font-mono font-bold text-sm text-slate-800 dark:text-slate-200">
+                      ₹{(selectedNote.originalRequestedAmount || selectedNote.requestedAmount || selectedNote.estimatedCost || 0).toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Current Proposed Amount:</span>
+                    <div className="font-mono font-bold text-sm text-blue-600 dark:text-blue-400">
+                      ₹{(selectedNote.currentAmount !== undefined ? selectedNote.currentAmount : (selectedNote.requestedAmount || selectedNote.estimatedCost || 0)).toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                </div>
+
+                {isRevisingAmount && (
+                  <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                          New Revised Amount (₹) *
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={revisedAmountInput !== undefined ? revisedAmountInput : ''}
+                          onChange={e => setRevisedAmountInput(Number(e.target.value))}
+                          className="w-full px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 text-sm font-mono font-bold"
+                          placeholder="Enter new amount"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                          Calculated Change
+                        </label>
+                        {(() => {
+                          const curr = selectedNote.currentAmount !== undefined ? selectedNote.currentAmount : (selectedNote.requestedAmount || selectedNote.estimatedCost || 0);
+                          const rev = revisedAmountInput !== undefined ? revisedAmountInput : curr;
+                          const diff = rev - curr;
+                          return (
+                            <div className={`px-3 py-2 rounded-xl text-xs font-mono font-bold border ${diff < 0 ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:border-rose-900' : diff > 0 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-900' : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800'}`}>
+                              {diff > 0 ? `+₹${diff.toLocaleString('en-IN')} (Increase)` : diff < 0 ? `-₹${Math.abs(diff).toLocaleString('en-IN')} (Decrease)` : '₹0 (No Change)'}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-amber-800 dark:text-amber-300 block mb-1">
+                        Reason / Remarks for Amount Revision *
+                      </label>
+                      <input
+                        type="text"
+                        value={revisionReasonInput}
+                        onChange={e => setRevisionReasonInput(e.target.value)}
+                        placeholder="e.g. Budget optimization, Scope adjustment, Market negotiation..."
+                        className="w-full px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 text-sm"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2106,6 +2965,7 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
                   <option value="DEPUTY_REGISTRAR">Deputy Registrar Office</option>
                   <option value="ACADEMIC_DEAN">Academic Dean</option>
                   <option value="REGISTRAR">Registrar Secretariat</option>
+                  <option value="VICE_PRESIDENT">Vice President Office</option>
                   <option value="FINANCE">Finance &amp; Accounts Officer</option>
                   <option value="EXAM_CELL">Controller of Examination</option>
                   <option value="PROVOST">Provost / Vice-Chancellor</option>
@@ -2113,7 +2973,7 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
                 </select>
                 {actionType === 'APPROVE' && (
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    ℹ Intermediate endorsement forwards this Notesheet to the next authority stage. Final approval is recorded by the terminal authority in the hierarchy.
+                    ℹ Intermediate endorsement forwards this Notesheet to the next authority stage. Final approval is recorded by the terminal authority in the hierarchy (Vice President).
                   </p>
                 )}
               </div>
@@ -2143,7 +3003,7 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
                 onClick={handleExecuteAction}
                 className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition shadow-sm"
               >
-                Confirm {actionType === 'APPROVE' ? 'Approve & Forward' : actionType}
+                Confirm {actionType === 'APPROVE' ? (role === 'VICE_PRESIDENT' ? 'Approve & Finalize' : 'Approve & Forward') : actionType}
               </button>
             </div>
           </div>
@@ -2476,252 +3336,311 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
         <Modal
           isOpen={showValidationPreviewModal}
           onClose={() => setShowValidationPreviewModal(false)}
-          title="Pre-Submission Validation &amp; Workflow Preview"
-          maxWidth="750px"
+          title="Pre-Submission Notesheet Preview & Verification"
+          maxWidth="1050px"
         >
-          <div className="notesheet-modal-scope space-y-4 max-h-[75vh] overflow-y-auto pr-1">
-            <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 space-y-1">
-              <div className="text-sm font-bold text-blue-900 dark:text-blue-200">Notesheet Validation Check</div>
-              <p className="text-sm text-blue-700 dark:text-blue-300">
-                Review all required sections before committing official submission.
-              </p>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between p-3.5 bg-blue-50 dark:bg-blue-950/50 rounded-xl border border-blue-200 dark:border-blue-800 no-print flex-wrap gap-2">
+              <div>
+                <div className="text-sm font-bold text-blue-950 dark:text-blue-200 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                  Pre-Submission Document Verification
+                </div>
+                <div className="text-xs text-blue-700 dark:text-blue-300">
+                  Review the authentic official University Notesheet layout before final submission into the approval hierarchy.
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowValidationPreviewModal(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-800 dark:text-slate-200 text-xs font-bold transition cursor-pointer"
+                >
+                  Edit Form
+                </button>
+                <button
+                  onClick={() => draftPreviewNoteSheet && handlePrintDraftPdf(draftPreviewNoteSheet)}
+                  disabled={isGeneratingPdf}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-bold border border-slate-300 dark:border-slate-600 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  title="Print official draft Notesheet PDF"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  {isGeneratingPdf ? 'Preparing...' : 'Print Draft PDF'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowValidationPreviewModal(false);
+                    handleSubmitNotesheet();
+                  }}
+                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  Submit Notesheet Now
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-2.5 text-sm">
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">Subject / Title:</span>
-                <span className="font-bold text-slate-900 dark:text-white">{formSubject.trim() || <span className="text-rose-500 font-bold">MISSING *</span>}</span>
+            {/* Canonical Vector PDF Document Preview Canvas */}
+            <div className="university-notesheet-preview-container max-h-[75vh] h-[75vh] w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 overflow-hidden shadow-inner">
+              {draftPreviewPdfUrl ? (
+                <iframe
+                  src={`${draftPreviewPdfUrl}#toolbar=0&navpanes=0`}
+                  className="w-full h-full border-0 bg-white"
+                  title="Official Draft Notesheet Document PDF Preview"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-white dark:bg-slate-900">
+                  <RefreshCw className="w-8 h-8 text-blue-600 animate-spin mb-3" />
+                  <div className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                    Rendering Official Vector Notesheet PDF...
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    Building pixel-perfect A4 University document stream.
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ─── MODAL 10: OFFICIAL UNIVERSITY NOTESHEET DOCUMENT (PREVIEW = PRINT = PDF) ─── */}
+      {showPrintModal && selectedNote && (
+        <Modal
+          isOpen={showPrintModal}
+          onClose={() => setShowPrintModal(false)}
+          title={`Official Notesheet Document: ${selectedNote.noteSheetNumber}`}
+          maxWidth="1050px"
+        >
+          <div className="space-y-4">
+            {/* Top Toolbar / Action Controls (Hidden during print) */}
+            <div className="flex items-center justify-between p-3.5 bg-slate-100 dark:bg-slate-800 rounded-xl no-print border border-slate-200 dark:border-slate-700 flex-wrap gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg bg-[#0F2C59]/10 dark:bg-[#0097D7]/15">
+                  <FileText className="w-5 h-5 text-[#0F2C59] dark:text-[#0097D7]" />
+                </div>
+                <div>
+                  <div className="font-bold text-slate-900 dark:text-white text-sm">
+                    Swarrnim University Official Notesheet
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    A4 Portrait • High Fidelity Template • Preview, Print &amp; PDF Unified
+                  </div>
+                </div>
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">Institute &amp; Department:</span>
-                <span className="font-bold text-slate-900 dark:text-white">{formInstituteId} • {formDepartmentName}</span>
-              </div>
+              {/* Viewport Scale & Print Actions */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Print Official PDF Button */}
+                <button
+                  onClick={() => handlePrintBackendPdf(selectedNote.id)}
+                  disabled={isGeneratingPdf}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer disabled:opacity-50"
+                  title="Print official Notesheet PDF directly"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  {isGeneratingPdf ? 'Preparing...' : 'Print Document'}
+                </button>
 
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">Notesheet Type:</span>
-                <Badge variant="navy" className="text-xs font-bold px-2 py-0.5">{formNotesheetType}</Badge>
-              </div>
+                {/* Open in PDF Viewer Tab */}
+                <button
+                  onClick={() => handleOpenPdfInNewTab(selectedNote.id)}
+                  disabled={isGeneratingPdf}
+                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer disabled:opacity-50"
+                  title="Open official PDF in full browser tab / native viewer"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  Open PDF Viewer
+                </button>
 
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">Financial Expenditure:</span>
-                <span className="font-bold">{formFinancialRequirement ? `YES (₹${calculatedTotalAmount.toLocaleString('en-IN')})` : 'NO'}</span>
-              </div>
+                {/* Download Backend PDF Button */}
+                <button
+                  onClick={() => handleDownloadBackendPdf(selectedNote.id)}
+                  disabled={isGeneratingPdf}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                  title="Generate and download secure backend PDF"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  {isGeneratingPdf ? 'Generating PDF...' : 'Download Official PDF'}
+                </button>
 
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">Attached Documents:</span>
-                <span className="font-bold">{formAttachments.length} document(s)</span>
+                {/* Regenerate PDF Button */}
+                <button
+                  onClick={() => handleRegenerateBackendPdf(selectedNote.id)}
+                  disabled={isGeneratingPdf}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center gap-1.5 border border-slate-300 dark:border-slate-600 transition cursor-pointer"
+                  title="Force regenerate fresh official PDF version"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isGeneratingPdf ? 'animate-spin' : ''}`} />
+                  Regenerate PDF
+                </button>
+
+                {/* Close Button */}
+                <button
+                  onClick={() => setShowPrintModal(false)}
+                  className="px-3.5 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-700 dark:text-slate-200 font-bold text-xs transition cursor-pointer"
+                >
+                  Close
+                </button>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-100 dark:border-slate-800">
-              <button onClick={() => setShowValidationPreviewModal(false)} className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm font-bold">Close Preview</button>
+            {/* Canonical Vector PDF Document Preview Canvas */}
+            <div className="university-notesheet-preview-container max-h-[78vh] h-[78vh] w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900 overflow-hidden shadow-inner">
+              {modalPreviewPdfUrl ? (
+                <iframe
+                  src={`${modalPreviewPdfUrl}#toolbar=0&navpanes=0`}
+                  className="w-full h-full border-0 bg-white"
+                  title={`Official Notesheet PDF - ${selectedNote.noteSheetNumber}`}
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center bg-white dark:bg-slate-900">
+                  <RefreshCw className="w-8 h-8 text-blue-600 animate-spin mb-3" />
+                  <div className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                    Rendering Official Vector Notesheet PDF...
+                  </div>
+                  <div className="text-xs text-slate-500 mt-1">
+                    Building pixel-perfect A4 University document stream.
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ─── MODAL 8: CREATE AMENDMENT VERSION MODAL ───────────────────────── */}
+      {showAmendmentModal && selectedNote && (
+        <Modal
+          isOpen={showAmendmentModal}
+          onClose={() => setShowAmendmentModal(false)}
+          title={`Create Amendment Version: ${selectedNote.noteSheetNumber}`}
+          maxWidth="600px"
+        >
+          <div className="notesheet-modal-scope space-y-4">
+            <div className="p-4 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-xs text-purple-900 dark:text-purple-300">
+              <strong>University Statutory Amendment Notice:</strong> Creating an amendment will snapshot the current version (v{selectedNote.version || '1.0'}) into the permanent audit ledger and advance this Notesheet to a new editable version for authorized amendments without overwriting historical records.
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Mandatory Amendment Justification *</label>
+              <textarea
+                rows={3}
+                value={amendmentReasonInput}
+                onChange={e => setAmendmentReasonInput(e.target.value)}
+                placeholder="Specify the official justification for amendment (e.g., revised scope, vendor adjustment, updated regulatory requirements)..."
+                className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm leading-relaxed"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setShowAmendmentModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-bold hover:bg-slate-200 transition"
+              >
+                Cancel
+              </button>
               <button
                 onClick={() => {
-                  setShowValidationPreviewModal(false);
-                  handleSubmitNotesheet();
+                  if (!amendmentReasonInput.trim()) {
+                    showFeedback('Amendment justification is mandatory.', true);
+                    return;
+                  }
+                  try {
+                    const res = db.createNoteSheetAmendmentVersion(selectedNote.id, amendmentReasonInput.trim(), user!);
+                    if (res.success && res.notesheet) {
+                      setSelectedNote(res.notesheet);
+                      refreshData();
+                      setShowAmendmentModal(false);
+                      showFeedback(`Amendment version v${res.notesheet.version} created successfully.`);
+                    } else {
+                      showFeedback(res.message || 'Failed to create amendment version', true);
+                    }
+                  } catch (e: any) {
+                    showFeedback(e.message || 'Failed to create amendment version', true);
+                  }
                 }}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-sm transition"
+                className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold transition shadow-sm"
               >
-                Submit Notesheet Now
+                Create Version
               </button>
             </div>
           </div>
         </Modal>
       )}
 
-      {/* ─── MODAL 10: OFFICIAL PRINTABLE / PDF VIEW MODAL ─────────────────── */}
-      {showPrintModal && selectedNote && (
+      {/* ─── MODAL 9: BULK OPERATIONS MODAL ─────────────────────────────────── */}
+      {showBulkModal && bulkActionType && (
         <Modal
-          isOpen={showPrintModal}
-          onClose={() => setShowPrintModal(false)}
-          title={`Print Preview: ${selectedNote.noteSheetNumber}`}
-          maxWidth="900px"
+          isOpen={showBulkModal}
+          onClose={() => setShowBulkModal(false)}
+          title={`Confirm Bulk ${bulkActionType}: ${selectedNotesheetIds.length} Notesheets`}
+          maxWidth="600px"
         >
-          <div className="space-y-6 max-h-[80vh] overflow-y-auto p-5 bg-white text-slate-900 font-serif">
-            {/* Header */}
-            <div className="text-center border-b-2 border-slate-900 pb-4 space-y-1">
-              <h2 className="text-xl font-bold uppercase tracking-wider text-slate-950">Swarrnim Startup &amp; Innovation University</h2>
-              <p className="text-xs uppercase font-sans text-slate-600">Bhoyan Rathod, Gandhinagar, Gujarat - 382420</p>
-              <div className="pt-2 text-base font-sans font-bold uppercase underline">
-                Administrative Notesheet &amp; Sanction Order
-              </div>
+          <div className="notesheet-modal-scope space-y-4">
+            <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-xs text-blue-900 dark:text-blue-300">
+              You are about to execute <strong>{bulkActionType}</strong> across <strong>{selectedNotesheetIds.length}</strong> selected Notesheets. Each document will receive an individual cryptographically logged audit entry.
             </div>
 
-            {/* Meta Table */}
-            <div className="grid grid-cols-2 gap-4 text-sm font-sans border border-slate-300 p-3.5 rounded-xl">
-              <div>
-                <div><strong>Notesheet Number:</strong> {selectedNote.noteSheetNumber}</div>
-                <div><strong>Institute:</strong> {selectedNote.instituteName || selectedNote.instituteCode}</div>
-                <div><strong>Department / Office:</strong> {selectedNote.department}</div>
-                <div><strong>Notesheet Type:</strong> {selectedNote.notesheetType || selectedNote.category}</div>
-              </div>
-              <div className="text-right">
-                <div><strong>Date:</strong> {selectedNote.date}</div>
-                <div><strong>Priority:</strong> {selectedNote.priority}</div>
-                <div><strong>Initiated By:</strong> {selectedNote.creatorName} ({selectedNote.creatorRole})</div>
-                <div><strong>Current Status:</strong> {selectedNote.status}</div>
-              </div>
-            </div>
-
-            {/* Subject */}
-            <div className="text-base font-sans">
-              <strong>SUBJECT: </strong>
-              <span className="font-bold underline">{selectedNote.subject}</span>
-            </div>
-
-            {/* Proposal & Purpose */}
-            <div className="space-y-3 text-sm leading-relaxed">
-              <h4 className="font-bold font-sans uppercase text-sm">1. Proposal Summary:</h4>
-              <p className="pl-3">{selectedNote.proposal}</p>
-
-              <h4 className="font-bold font-sans uppercase text-sm pt-2">2. Detailed Justification &amp; Academic/Administrative Ground:</h4>
-              <p className="pl-3">{selectedNote.purposeJustification}</p>
-            </div>
-
-            {/* Financial Details */}
-            {selectedNote.financialRequirement && (
-              <div className="space-y-2 text-sm font-sans">
-                <h4 className="font-bold uppercase text-sm">3. Financial Implication &amp; Estimate Breakdown:</h4>
-                <div className="border border-slate-300 rounded-xl overflow-hidden">
-                  <table className="w-full text-left text-sm">
-                    <thead className="bg-slate-100 font-bold border-b border-slate-300">
-                      <tr>
-                        <th className="p-2">Item</th>
-                        <th className="p-2">Description</th>
-                        <th className="p-2">Qty</th>
-                        <th className="p-2">Rate</th>
-                        <th className="p-2 text-right">Amount (₹)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200">
-                      {(selectedNote.items || []).map((it, idx) => (
-                        <tr key={idx}>
-                          <td className="p-2">{it.itemName}</td>
-                          <td className="p-2">{it.description || '-'}</td>
-                          <td className="p-2">{it.quantity}</td>
-                          <td className="p-2">₹{it.rate}</td>
-                          <td className="p-2 text-right font-bold">₹{it.amount}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot className="bg-slate-50 font-bold border-t border-slate-300">
-                      <tr>
-                        <td colSpan={4} className="p-2 text-right">Total Requested Amount:</td>
-                        <td className="p-2 text-right">₹{(selectedNote.requestedAmount || selectedNote.estimatedCost || 0).toLocaleString('en-IN')}</td>
-                      </tr>
-                      {selectedNote.approvedAmount !== undefined && (
-                        <tr className="text-emerald-700">
-                          <td colSpan={4} className="p-2 text-right">Sanctioned / Approved Amount:</td>
-                          <td className="p-2 text-right">₹{selectedNote.approvedAmount.toLocaleString('en-IN')}</td>
-                        </tr>
-                      )}
-                    </tfoot>
-                  </table>
-                </div>
+            {(bulkActionType === 'FORWARD' || bulkActionType === 'APPROVE') && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Forward To Office (Optional Override):</label>
+                <select
+                  value={bulkForwardOffice}
+                  onChange={e => setBulkForwardOffice(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm font-semibold"
+                >
+                  <option value="">Next in Organogram Sequence</option>
+                  <option value="HOD">HOD (Head of Department)</option>
+                  <option value="HOI">HOI (Head of Institute / Principal)</option>
+                  <option value="DEPUTY_REGISTRAR">Deputy Registrar Office</option>
+                  <option value="ACADEMIC_DEAN">Academic Dean</option>
+                  <option value="REGISTRAR">Registrar Secretariat</option>
+                  <option value="VICE_PRESIDENT">Vice President Office</option>
+                </select>
               </div>
             )}
 
-            {/* 4. DIGITAL APPROVAL & WORKFLOW HISTORY */}
-            <div className="space-y-4 text-sm font-sans pt-4 border-t-2 border-slate-900">
-              <div className="border-b border-slate-300 pb-2">
-                <h4 className="font-bold uppercase text-base text-slate-900 tracking-wide">
-                  DIGITAL APPROVAL &amp; WORKFLOW HISTORY
-                </h4>
-                <p className="text-xs text-slate-500">
-                  Chronological System-Generated Digital Endorsement &amp; Approval Record
-                </p>
-              </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                {bulkActionType === 'RETURN' ? 'Mandatory Return Reason *' : 'Official Bulk Remarks:'}
+              </label>
+              <textarea
+                rows={3}
+                value={bulkRemarks}
+                onChange={e => setBulkRemarks(e.target.value)}
+                placeholder={bulkActionType === 'RETURN' ? 'Specify required corrections...' : 'Enter official bulk processing remark...'}
+                className="w-full p-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm leading-relaxed"
+              />
+            </div>
 
-              <div className="space-y-3">
-                {selectedNote.movements.map((mvt, idx) => {
-                  const isApproval = mvt.action === 'APPROVE' || mvt.action === 'FORWARD';
-                  const approvalId = mvt.approvalId || (isApproval ? `NS-APR-${String(idx + 1).padStart(6, '0')}` : undefined);
-                  const designation = mvt.designation || (mvt.fromUserRole ? (
-                    mvt.fromUserRole === 'HOD' ? 'Head of Department' :
-                    mvt.fromUserRole === 'PRINCIPAL' ? 'Head of Institute / Principal' :
-                    mvt.fromUserRole === 'DEPUTY_REGISTRAR' ? 'Deputy Registrar' :
-                    mvt.fromUserRole === 'REGISTRAR' ? 'Registrar' :
-                    mvt.fromUserRole === 'ACCOUNTS_ADMIN' ? 'Finance & Accounts Officer' :
-                    mvt.fromUserRole === 'EXAM_CELL' ? 'Controller of Examination' :
-                    mvt.fromUserRole
-                  ) : 'Authorized Signatory');
-
-                  return (
-                    <div key={idx} className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-800 text-xs font-bold flex items-center justify-center">
-                            {idx + 1}
-                          </span>
-                          <span className="font-bold text-slate-900">
-                            {isApproval ? '✓ DIGITALLY APPROVED' : `[${mvt.action}]`}
-                          </span>
-                        </div>
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-200 text-slate-800">
-                          {mvt.action === 'APPROVE' ? (selectedNote.status === 'APPROVED' ? 'FINAL APPROVED' : 'APPROVED') : 'APPROVED & FORWARDED'}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 text-xs pt-1">
-                        <div>
-                          <div><strong>Approved By:</strong> {mvt.fromUser}</div>
-                          <div><strong>Designation:</strong> {designation}</div>
-                          <div><strong>Action:</strong> {mvt.action === 'APPROVE' ? 'Final Approval' : 'Approved & Forwarded'}</div>
-                        </div>
-                        <div className="text-right">
-                          <div><strong>Date &amp; Time:</strong> {mvt.timestamp || `${mvt.date} ${mvt.time}`}</div>
-                          {approvalId && (
-                            <div><strong>Digital Approval ID:</strong> <span className="font-mono font-bold text-blue-700">{approvalId}</span></div>
-                          )}
-                          <div><strong>Routing:</strong> {mvt.toUser}</div>
-                        </div>
-                      </div>
-
-                      {mvt.remarks && (
-                        <div className="text-xs text-slate-600 bg-white p-2 rounded border border-slate-100 italic">
-                          "{mvt.remarks}"
-                        </div>
-                      )}
-                    </div>
+            <div className="flex justify-end gap-2.5 pt-2">
+              <button
+                onClick={() => setShowBulkModal(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-bold hover:bg-slate-200 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (bulkActionType === 'RETURN' && !bulkRemarks.trim()) {
+                    showFeedback('Return remarks are mandatory.', true);
+                    return;
+                  }
+                  const res = db.processBulkNoteSheetActions(
+                    selectedNotesheetIds,
+                    bulkActionType,
+                    bulkRemarks.trim() || `Bulk ${bulkActionType} executed`,
+                    user!,
+                    bulkForwardOffice || undefined
                   );
-                })}
-              </div>
-            </div>
-
-            {/* 5. FINAL PDF CERTIFICATION */}
-            {selectedNote.status === 'APPROVED' && (
-              <div className="p-4 rounded-xl border-2 border-emerald-600 bg-emerald-50/50 space-y-2 text-sm font-sans">
-                <div className="flex items-center justify-between border-b border-emerald-200 pb-2">
-                  <span className="font-bold text-emerald-950 uppercase tracking-wider text-base">
-                    ✓ FINAL APPROVAL CERTIFICATION
-                  </span>
-                  <span className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold text-xs">
-                    STATUS: APPROVED / COMPLETED
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-xs text-emerald-950">
-                  <div>
-                    <div><strong>Final Authority:</strong> {selectedNote.approvedByName || 'Registrar'}</div>
-                    <div><strong>Designation:</strong> Registrar / Authorized Executive</div>
-                  </div>
-                  <div className="text-right">
-                    <div><strong>Date &amp; Time:</strong> {selectedNote.approvedAt ? new Date(selectedNote.approvedAt).toLocaleString() : selectedNote.date}</div>
-                    <div><strong>Digital Approval ID:</strong> <span className="font-mono font-bold">{selectedNote.finalApprovalId || 'NS-APR-FINAL'}</span></div>
-                  </div>
-                </div>
-
-                <div className="text-[11px] text-emerald-800 text-center pt-2 border-t border-emerald-200 italic">
-                  "Digitally approved through SSIU ERP. This document contains a system-generated digital approval trail."
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2 pt-4 font-sans no-print">
-              <button onClick={() => window.print()} className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm flex items-center gap-2 shadow-md transition">
-                <Printer className="w-4 h-4" />
-                Print / Save as PDF
+                  showFeedback(`Bulk processed ${res.successCount} of ${selectedNotesheetIds.length} notesheets.`);
+                  setSelectedNotesheetIds([]);
+                  setShowBulkModal(false);
+                  refreshData();
+                }}
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold transition shadow-sm"
+              >
+                Confirm Bulk {bulkActionType}
               </button>
             </div>
           </div>

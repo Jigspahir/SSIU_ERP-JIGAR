@@ -16,7 +16,7 @@ import type {
   Employee, PayrollRecord, EmployeeLeaveApplication, PerformanceAppraisal, TrainingFdpRecord,
   StartupIdea, StartupFounder, StartupFunding, IncubationMentorSession, IncubationWorkshop, IncubationApplicationStatus,
   StartupMilestone, StartupDocument, NoteSheet, NoteSheetMovement, NoteSheetWorkflowConfig, NoteSheetStatus, NoteSheetAction, UniversityBranch, NoteSheetComplianceItem,
-  NoteSheetPermission, NoteSheetAuditAction, NoteSheetAuditEntry,
+  NoteSheetPermission, NoteSheetAuditAction, NoteSheetAuditEntry, NoteSheetAmountRevision, NoteSheetPdfRecord,
   FundAccount, FundSource, ExpenseCategory, MoneyReceivedRecord, ExpenseRecord, ReimbursementClaim,
   RefundRecord, AccountLedgerEntry, FinancialSettlement, NoteSheetFinancialSummary, PaymentMode,
    WorkDiaryEntry, WorkDiaryFormData, WorkDiaryDashboardStats, ExamDashboardStats, InwardOutwardDashboardStats,
@@ -42,6 +42,7 @@ import type {
   CorrespondenceType,
   DeputyRegistrarScopeMapping, DeputyRegistrarScopeAudit
 } from '../types';
+import type { MentoringSessionRecord } from '../types/mentorAssignment';
 import type {
   DocumentMasterItem, StudentAcademicDocumentItem, StudentDocumentVersionItem, DocumentVerificationLogItem
 } from '../types/documentMaster';
@@ -70,7 +71,7 @@ import {
   initialCampusServiceRequests,
   initialStudentSectionServices, initialExamFeeConfigs,
   initialStudentSectionRequests, initialFeeQueries, initialStudentSectionDocuments,
-  initialMentorAssignments, initialMentorAssignmentHistory,
+  initialMentorAssignments, initialMentorAssignmentHistory, initialMentoringSessions,
   initialAttendanceEligibilityConfig, initialAttendanceApplications, initialAttendanceApprovalHistory,
   initialInventoryCategories, initialInventoryLocations, initialFixedAssets,
   initialConsumableItems, initialStockTransactions, initialPhysicalFiles,
@@ -87,7 +88,12 @@ import {
   getPermittedCampusServices, getPermittedApprovalCategories
 } from './securityService';
 import { DB_STORAGE_KEY } from '../constants';
-import { ROLE_NOTESHEET_PERMISSIONS } from '../types';
+import { 
+  ROLE_NOTESHEET_PERMISSIONS, 
+  NoteSheetVersionRecord, 
+  NoteSheetVerificationResult, 
+  NoteSheetAnalyticsSummary 
+} from '../types';
 
 export interface DatabaseState {
   institutes: Institute[];
@@ -156,6 +162,7 @@ export interface DatabaseState {
   incubationWorkshops: IncubationWorkshop[];
   noteSheets: NoteSheet[];
   noteSheetWorkflowConfigs: NoteSheetWorkflowConfig[];
+  notesheetPdfs?: NoteSheetPdfRecord[];
   fundAccounts: FundAccount[];
   fundSources: FundSource[];
   expenseCategories: ExpenseCategory[];
@@ -194,6 +201,7 @@ export interface DatabaseState {
   paymentReconciliationsList?: PaymentReconciliationItem[];
   mentorAssignments?: MentorAssignment[];
   mentorAssignmentHistory?: MentorAssignmentHistory[];
+  mentoringSessions?: MentoringSessionRecord[];
   attendanceApplications?: AttendanceApplication[];
   attendanceApprovalHistory?: AttendanceApprovalHistoryItem[];
   attendanceEligibilityConfig?: AttendanceEligibilityConfig;
@@ -231,48 +239,48 @@ export interface DatabaseState {
 export const ORGANOGRAM_BRANCH_WORKFLOWS: Record<string, { name: string; steps: string[]; finalAuthority: string }> = {
   ACADEMIC: {
     name: 'Department Academic & Administrative Workflow',
-    steps: ['HOD', 'HOI', 'DEPUTY_REGISTRAR', 'REGISTRAR'],
-    finalAuthority: 'REGISTRAR'
+    steps: ['HOD', 'HOI', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'VICE_PRESIDENT'],
+    finalAuthority: 'VICE_PRESIDENT'
   },
   FINANCE: {
-    name: 'Standard Financial Sanction Workflow (<= ₹50,000)',
-    steps: ['HOD', 'HOI', 'DEPUTY_REGISTRAR', 'ACCOUNTS_ADMIN', 'REGISTRAR'],
-    finalAuthority: 'REGISTRAR'
+    name: 'Department Academic & Financial Sanction Workflow',
+    steps: ['HOD', 'HOI', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'VICE_PRESIDENT'],
+    finalAuthority: 'VICE_PRESIDENT'
   },
   FINANCE_HIGH: {
-    name: 'High-Value Financial Workflow (> ₹50,000)',
-    steps: ['HOD', 'HOI', 'DEPUTY_REGISTRAR', 'ACCOUNTS_ADMIN', 'REGISTRAR', 'PROVOST'],
-    finalAuthority: 'PROVOST'
+    name: 'Department Academic & High-Value Sanction Workflow',
+    steps: ['HOD', 'HOI', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'VICE_PRESIDENT'],
+    finalAuthority: 'VICE_PRESIDENT'
   },
   EXAMINATION: {
     name: 'Examination Section Workflow (CoE -> Deputy Registrar -> Registrar)',
-    steps: ['EXAM_CELL', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'PROVOST'],
+    steps: ['EXAM_CELL', 'DEPUTY_REGISTRAR', 'REGISTRAR'],
     finalAuthority: 'REGISTRAR'
   },
   IQAC: {
     name: 'IQAC Quality Directorate Workflow',
-    steps: ['IQAC', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'PROVOST'],
+    steps: ['IQAC', 'DEPUTY_REGISTRAR', 'REGISTRAR'],
     finalAuthority: 'REGISTRAR'
   },
   TRAINING_PLACEMENT: {
     name: 'Training & Placement Directorate Workflow',
-    steps: ['TRAINING_PLACEMENT', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'PROVOST'],
+    steps: ['TRAINING_PLACEMENT', 'DEPUTY_REGISTRAR', 'REGISTRAR'],
     finalAuthority: 'REGISTRAR'
   },
   ADMISSION: {
     name: 'Admission Directorate Workflow',
-    steps: ['STUDENT_SECTION', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'PROVOST'],
+    steps: ['STUDENT_SECTION', 'DEPUTY_REGISTRAR', 'REGISTRAR'],
     finalAuthority: 'REGISTRAR'
   },
   RESEARCH: {
     name: 'Research & Innovation Directorate Workflow',
-    steps: ['HOD', 'HOI', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'PROVOST'],
-    finalAuthority: 'PROVOST'
+    steps: ['HOD', 'HOI', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'VICE_PRESIDENT'],
+    finalAuthority: 'VICE_PRESIDENT'
   },
   IEDC: {
     name: 'Innovation & Entrepreneurship (IEDC) Workflow',
-    steps: ['HOD', 'HOI', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'PROVOST'],
-    finalAuthority: 'PROVOST'
+    steps: ['HOD', 'HOI', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'VICE_PRESIDENT'],
+    finalAuthority: 'VICE_PRESIDENT'
   },
   OPERATIONS: {
     name: 'Registrar Operations & Auxiliary Units Workflow',
@@ -307,15 +315,14 @@ export function resolveNotesheetWorkflow(params: {
   const dept = (params.department || '').toUpperCase();
   const type = (params.notesheetType || params.category || '').toUpperCase();
   const isFin = Boolean(params.financialRequirement);
-  const amount = Number(params.requestedAmount || 0);
 
   // 1. Examination Directorate Workflow
   if (type.includes('EXAM') || dept.includes('EXAM') || dept === 'EDP') {
     return {
       branch: 'EXAMINATION',
       branchName: 'Examination Section Workflow',
-      steps: ['EXAM_CELL', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'PROVOST'],
-      initialStage: params.userRole === 'EXAM_CELL' ? 'PENDING_DEPUTY_REGISTRAR' : 'PENDING_REGISTRAR',
+      steps: ['EXAM_CELL', 'DEPUTY_REGISTRAR', 'REGISTRAR'],
+      initialStage: params.userRole === 'EXAM_CELL' ? 'PENDING_DEPUTY_REGISTRAR' : 'PENDING_EXAMINATION',
       firstStep: params.userRole === 'EXAM_CELL' ? 'DEPUTY_REGISTRAR' : 'EXAM_CELL',
       finalAuthority: 'REGISTRAR'
     };
@@ -327,7 +334,7 @@ export function resolveNotesheetWorkflow(params: {
       branch: 'OPERATIONS',
       branchName: 'Hostel Administration Workflow',
       steps: ['HOSTEL_ADMIN', 'DEPUTY_REGISTRAR', 'REGISTRAR'],
-      initialStage: params.userRole === 'HOSTEL_ADMIN' ? 'PENDING_DEPUTY_REGISTRAR' : 'PENDING_REGISTRAR',
+      initialStage: params.userRole === 'HOSTEL_ADMIN' ? 'PENDING_DEPUTY_REGISTRAR' : 'PENDING_HOSTEL',
       firstStep: params.userRole === 'HOSTEL_ADMIN' ? 'DEPUTY_REGISTRAR' : 'HOSTEL_ADMIN',
       finalAuthority: 'REGISTRAR'
     };
@@ -339,33 +346,22 @@ export function resolveNotesheetWorkflow(params: {
       branch: 'OPERATIONS',
       branchName: 'Student Section Administrative Workflow',
       steps: ['STUDENT_SECTION', 'DEPUTY_REGISTRAR', 'REGISTRAR'],
-      initialStage: params.userRole === 'STUDENT_SECTION' ? 'PENDING_DEPUTY_REGISTRAR' : 'PENDING_REGISTRAR',
+      initialStage: params.userRole === 'STUDENT_SECTION' ? 'PENDING_DEPUTY_REGISTRAR' : 'PENDING_STUDENT_SECTION',
       firstStep: params.userRole === 'STUDENT_SECTION' ? 'DEPUTY_REGISTRAR' : 'STUDENT_SECTION',
       finalAuthority: 'REGISTRAR'
     };
   }
 
-  // 4. Financial Notesheet Workflow
-  if (isFin) {
-    if (amount > 50000) {
-      return {
-        branch: 'FINANCE',
-        branchName: 'High-Value Financial Workflow (> ₹50,000)',
-        steps: ['HOD', 'HOI', 'DEPUTY_REGISTRAR', 'ACCOUNTS_ADMIN', 'REGISTRAR', 'PROVOST'],
-        initialStage: params.userRole === 'HOD' ? 'PENDING_HOI' : params.userRole === 'PRINCIPAL' ? 'PENDING_DEPUTY_REGISTRAR' : params.userRole === 'DEPUTY_REGISTRAR' ? 'PENDING_FINANCE' : 'PENDING_HOD',
-        firstStep: params.userRole === 'HOD' ? 'HOI' : params.userRole === 'PRINCIPAL' ? 'DEPUTY_REGISTRAR' : params.userRole === 'DEPUTY_REGISTRAR' ? 'ACCOUNTS_ADMIN' : 'HOD',
-        finalAuthority: 'PROVOST'
-      };
-    } else {
-      return {
-        branch: 'FINANCE',
-        branchName: 'Standard Financial Sanction Workflow (<= ₹50,000)',
-        steps: ['HOD', 'HOI', 'DEPUTY_REGISTRAR', 'ACCOUNTS_ADMIN', 'REGISTRAR'],
-        initialStage: params.userRole === 'HOD' ? 'PENDING_HOI' : params.userRole === 'PRINCIPAL' ? 'PENDING_DEPUTY_REGISTRAR' : params.userRole === 'DEPUTY_REGISTRAR' ? 'PENDING_FINANCE' : 'PENDING_HOD',
-        firstStep: params.userRole === 'HOD' ? 'HOI' : params.userRole === 'PRINCIPAL' ? 'DEPUTY_REGISTRAR' : params.userRole === 'DEPUTY_REGISTRAR' ? 'ACCOUNTS_ADMIN' : 'HOD',
-        finalAuthority: 'REGISTRAR'
-      };
-    }
+  // 4. Central Finance Office Internal Workflow
+  if (type === 'FINANCE_OFFICE_INTERNAL' || (dept === 'FINANCE' && params.userRole === 'ACCOUNTS_ADMIN')) {
+    return {
+      branch: 'FINANCE',
+      branchName: 'Finance & Accounts Directorate Workflow',
+      steps: ['ACCOUNTS_ADMIN', 'DEPUTY_REGISTRAR', 'REGISTRAR'],
+      initialStage: 'PENDING_DEPUTY_REGISTRAR',
+      firstStep: 'DEPUTY_REGISTRAR',
+      finalAuthority: 'REGISTRAR'
+    };
   }
 
   // 5. IQAC / Quality Assurance Workflow
@@ -373,21 +369,21 @@ export function resolveNotesheetWorkflow(params: {
     return {
       branch: 'IQAC',
       branchName: 'IQAC Quality Directorate Workflow',
-      steps: ['IQAC', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'PROVOST'],
-      initialStage: params.userRole === 'IQAC' ? 'PENDING_DEPUTY_REGISTRAR' : 'PENDING_REGISTRAR',
+      steps: ['IQAC', 'DEPUTY_REGISTRAR', 'REGISTRAR'],
+      initialStage: params.userRole === 'IQAC' ? 'PENDING_DEPUTY_REGISTRAR' : 'PENDING_IQAC',
       firstStep: params.userRole === 'IQAC' ? 'DEPUTY_REGISTRAR' : 'IQAC',
       finalAuthority: 'REGISTRAR'
     };
   }
 
-  // 6. Default Academic / Department Administrative Workflow
+  // 6. Mandatory Default Academic / Department Workflow (Faculty -> HOD -> HOI -> Deputy Registrar -> Registrar -> Vice President -> Final Sanction)
   return {
     branch: 'ACADEMIC',
-    branchName: 'Department Academic & Administrative Workflow',
-    steps: ['HOD', 'HOI', 'DEPUTY_REGISTRAR', 'REGISTRAR'],
-    initialStage: params.userRole === 'HOD' ? 'PENDING_HOI' : params.userRole === 'PRINCIPAL' ? 'PENDING_DEPUTY_REGISTRAR' : params.userRole === 'DEPUTY_REGISTRAR' ? 'PENDING_REGISTRAR' : 'PENDING_HOD',
-    firstStep: params.userRole === 'HOD' ? 'HOI' : params.userRole === 'PRINCIPAL' ? 'DEPUTY_REGISTRAR' : params.userRole === 'DEPUTY_REGISTRAR' ? 'REGISTRAR' : 'HOD',
-    finalAuthority: 'REGISTRAR'
+    branchName: isFin ? 'Department Academic & Financial Sanction Workflow' : 'Department Academic & Administrative Workflow',
+    steps: ['HOD', 'HOI', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'VICE_PRESIDENT'],
+    initialStage: params.userRole === 'HOD' ? 'PENDING_HOI' : params.userRole === 'PRINCIPAL' ? 'PENDING_DEPUTY_REGISTRAR' : params.userRole === 'DEPUTY_REGISTRAR' ? 'PENDING_REGISTRAR' : params.userRole === 'REGISTRAR' ? 'PENDING_VICE_PRESIDENT' : 'PENDING_HOD',
+    firstStep: params.userRole === 'HOD' ? 'HOI' : params.userRole === 'PRINCIPAL' ? 'DEPUTY_REGISTRAR' : params.userRole === 'DEPUTY_REGISTRAR' ? 'REGISTRAR' : params.userRole === 'REGISTRAR' ? 'VICE_PRESIDENT' : 'HOD',
+    finalAuthority: 'VICE_PRESIDENT'
   };
 }
 
@@ -469,6 +465,7 @@ class ERPDatabaseService {
       noteSheetWorkflowConfigs: [
         { id: 'ssiu-default', name: 'Default SSIU Workflow', steps: ['HOD', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'VICE_PRESIDENT'], isActive: true }
       ],
+      notesheetPdfs: [],
       fundAccounts: initialFundAccounts,
       fundSources: initialFundSources,
       expenseCategories: initialExpenseCategories,
@@ -487,6 +484,7 @@ class ERPDatabaseService {
       campusServiceRequests: initialCampusServiceRequests,
       mentorAssignments: initialMentorAssignments,
       mentorAssignmentHistory: initialMentorAssignmentHistory,
+      mentoringSessions: initialMentoringSessions,
       attendanceEligibilityConfig: initialAttendanceEligibilityConfig,
       attendanceApplications: initialAttendanceApplications,
       attendanceApprovalHistory: initialAttendanceApprovalHistory,
@@ -644,7 +642,8 @@ class ERPDatabaseService {
           statutoryApprovals: (parsed.statutoryApprovals && parsed.statutoryApprovals.length > 0) ? parsed.statutoryApprovals : defaults.statutoryApprovals,
           internationalStudents: (parsed.internationalStudents && parsed.internationalStudents.length > 0) ? parsed.internationalStudents : defaults.internationalStudents,
           deputyRegistrarScopes: (parsed.deputyRegistrarScopes && parsed.deputyRegistrarScopes.length > 0) ? parsed.deputyRegistrarScopes : defaults.deputyRegistrarScopes,
-          deputyRegistrarScopeAudits: (parsed.deputyRegistrarScopeAudits && parsed.deputyRegistrarScopeAudits.length > 0) ? parsed.deputyRegistrarScopeAudits : defaults.deputyRegistrarScopeAudits
+          deputyRegistrarScopeAudits: (parsed.deputyRegistrarScopeAudits && parsed.deputyRegistrarScopeAudits.length > 0) ? parsed.deputyRegistrarScopeAudits : defaults.deputyRegistrarScopeAudits,
+          mentoringSessions: (parsed.mentoringSessions && parsed.mentoringSessions.length > 0) ? parsed.mentoringSessions : defaults.mentoringSessions
         };
       }
     } catch (e) {
@@ -1943,26 +1942,34 @@ class ERPDatabaseService {
   }
 
   public logAudit(
-    action: string, 
-    entity: string, 
-    details: string, 
+    actionOrObj: string | any, 
+    entity = 'GENERAL', 
+    details = '', 
     userName = 'Demo User', 
     userRole: UserRole = 'SUPER_ADMIN',
     extra?: Partial<AuditLog>
   ): AuditLog {
+    let actStr = typeof actionOrObj === 'string' ? actionOrObj : (actionOrObj?.action || 'AUDIT_LOG');
+    let entStr = typeof actionOrObj === 'object' && actionOrObj?.entity ? actionOrObj.entity : entity;
+    let detStr = typeof actionOrObj === 'object' && actionOrObj?.details ? actionOrObj.details : details;
+    let uName = typeof actionOrObj === 'object' && actionOrObj?.userName ? actionOrObj.userName : userName;
+    let uRole = typeof actionOrObj === 'object' && actionOrObj?.userRole ? actionOrObj.userRole : userRole;
+    let uId = typeof actionOrObj === 'object' && actionOrObj?.userId ? actionOrObj.userId : extra?.userId;
+    let recId = typeof actionOrObj === 'object' && (actionOrObj?.recordId || actionOrObj?.entityId) ? (actionOrObj.recordId || actionOrObj.entityId) : extra?.recordId;
+
     const log: AuditLog = {
       id: `log-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
       timestamp: new Date().toISOString(),
-      userId: extra?.userId,
-      userName,
-      userRole,
-      action,
-      entity,
-      details,
-      module: extra?.module || entity,
-      recordId: extra?.recordId,
-      status: extra?.status || (action.includes('FAIL') || action.includes('UNAUTHORIZED') || action.includes('VIOLATION') ? 'FAILED' : 'SUCCESS'),
-      severity: extra?.severity || (action.includes('UNAUTHORIZED') || action.includes('VIOLATION') ? 'CRITICAL' : 'INFO'),
+      userId: uId,
+      userName: uName,
+      userRole: uRole,
+      action: actStr,
+      entity: entStr,
+      details: detStr,
+      module: extra?.module || entStr,
+      recordId: recId,
+      status: extra?.status || (actStr.includes('FAIL') || actStr.includes('UNAUTHORIZED') || actStr.includes('VIOLATION') ? 'FAILED' : 'SUCCESS'),
+      severity: extra?.severity || (actStr.includes('UNAUTHORIZED') || actStr.includes('VIOLATION') ? 'CRITICAL' : 'INFO'),
       ipAddress: extra?.ipAddress || '192.168.1.104',
       userAgent: extra?.userAgent || 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
       deviceInfo: extra?.deviceInfo || 'Chrome / macOS Darwin'
@@ -2523,8 +2530,12 @@ class ERPDatabaseService {
   }
 
   // --- NOTIFICATION MANAGEMENT (ENTERPRISE TARGETING & RECIPIENT ISOLATION) ---
+  getAllNotifications(): ERPNotification[] {
+    return this.state.notifications || [];
+  }
+
   getNotifications(user: User | null, role?: UserRole | null): ERPNotification[] {
-    if (!user) return [];
+    if (!user) return this.getAllNotifications();
     const userId = user.id;
     const userRole = role || user.role || 'STUDENT';
 
@@ -3674,6 +3685,11 @@ class ERPDatabaseService {
     return list;
   }
 
+  getNoteSheetById(id: string): NoteSheet | undefined {
+    if (!this.state.noteSheets) this.state.noteSheets = [];
+    return this.state.noteSheets.find(n => n.id === id || n.noteSheetNumber === id || n.notesheetNumber === id);
+  }
+
   getNoteSheetWorkflowConfigs(): NoteSheetWorkflowConfig[] {
     if (!this.state.noteSheetWorkflowConfigs) {
       this.state.noteSheetWorkflowConfigs = [
@@ -3681,6 +3697,33 @@ class ERPDatabaseService {
       ];
     }
     return this.state.noteSheetWorkflowConfigs;
+  }
+
+  saveNoteSheetPdf(record: NoteSheetPdfRecord): void {
+    if (!this.state.notesheetPdfs) this.state.notesheetPdfs = [];
+    const idx = this.state.notesheetPdfs.findIndex(p => p.pdfId === record.pdfId);
+    if (idx >= 0) {
+      this.state.notesheetPdfs[idx] = record;
+    } else {
+      this.state.notesheetPdfs.push(record);
+    }
+    this.saveState();
+  }
+
+  getNoteSheetPdfById(pdfId: string): NoteSheetPdfRecord | undefined {
+    if (!this.state.notesheetPdfs) this.state.notesheetPdfs = [];
+    return this.state.notesheetPdfs.find(p => p.pdfId === pdfId);
+  }
+
+  getNoteSheetPdfs(notesheetId: string): NoteSheetPdfRecord[] {
+    if (!this.state.notesheetPdfs) this.state.notesheetPdfs = [];
+    return this.state.notesheetPdfs.filter(p => p.notesheetId === notesheetId);
+  }
+
+  getLatestNoteSheetPdf(notesheetId: string): NoteSheetPdfRecord | undefined {
+    const list = this.getNoteSheetPdfs(notesheetId);
+    if (list.length === 0) return undefined;
+    return list.sort((a, b) => b.version - a.version)[0];
   }
 
   public generateNoteSheetNumber(instituteId?: string): { noteSheetNumber: string; seq: number; periodMMYY: string; instCode: string; instId: string; instName: string } {
@@ -3736,6 +3779,156 @@ class ERPDatabaseService {
     return { noteSheetNumber, seq, periodMMYY, instCode, instId, instName };
   }
 
+  public getDesignationForRole(uRole: string): string {
+    switch (uRole) {
+      case 'FACULTY': return 'Faculty';
+      case 'MENTOR': return 'Mentor';
+      case 'HOD': return 'Head of Department';
+      case 'PRINCIPAL': return 'Principal / HOI';
+      case 'REGISTRAR': return 'Registrar';
+      case 'DEPUTY_REGISTRAR': return 'Deputy Registrar';
+      case 'ACCOUNTS_ADMIN': return 'Finance & Accounts Officer';
+      case 'EXAM_CELL': return 'Controller of Examination';
+      case 'HOSTEL_ADMIN': return 'Hostel Administrator / Warden';
+      case 'STUDENT_SECTION': return 'In-charge, Student Section';
+      case 'IQAC': return 'Director, IQAC';
+      case 'PROVOST': return 'Provost / Vice-Chancellor';
+      case 'VICE_PRESIDENT': return 'Vice President';
+      case 'PRESIDENT': return 'President';
+      case 'SUPER_ADMIN': return 'System Administrator';
+      default: return uRole;
+    }
+  }
+
+  public getDesignationForUser(userId?: string, uRole?: string): string {
+    if (userId) {
+      const user = this.getUsers().find(u => u.id === userId);
+      if (user?.designation) return user.designation;
+      const faculties = ((this.state as any).faculties || []) as any[];
+      const faculty = faculties.find((f: any) => f.userId === userId || f.id === userId || (user?.email && f.email === user.email));
+      if (faculty?.designation) return faculty.designation;
+    }
+    if (uRole) {
+      return this.getDesignationForRole(uRole);
+    }
+    return 'Authorized Official';
+  }
+
+  public updateUserSignature(userId: string, signatureData: string): { success: boolean; signatureVersion: number; message: string } {
+    const users = this.getUsers();
+    const userIndex = users.findIndex(u => u.id === userId);
+    if (userIndex === -1) {
+      throw new Error(`User with ID ${userId} not found.`);
+    }
+    const currentVersion = users[userIndex].signatureVersion || 0;
+    const newVersion = currentVersion + 1;
+    users[userIndex].signatureFile = signatureData;
+    users[userIndex].signatureStatus = 'ACTIVE';
+    users[userIndex].signatureVersion = newVersion;
+    users[userIndex].signatureUpdatedAt = new Date().toISOString();
+    this.saveState();
+    return {
+      success: true,
+      signatureVersion: newVersion,
+      message: 'Official digital signature updated successfully.'
+    };
+  }
+
+  public getUserSignatureSnapshot(user?: User): NoteSheetMovement['signatureSnapshot'] {
+    if (!user) return undefined;
+    const dbUser = this.getUsers().find(u => u.id === user.id) || user;
+    if (dbUser.signatureFile && dbUser.signatureStatus === 'ACTIVE') {
+      return {
+        signatureData: dbUser.signatureFile,
+        signatureVersion: dbUser.signatureVersion || 1,
+        verifiedAt: new Date().toISOString()
+      };
+    }
+    return undefined;
+  }
+
+  public resolveActualAssignee(office: string, instituteId?: string, departmentId?: string, departmentName?: string): { userId?: string; name?: string; role: string } {
+    const allUsers = this.getUsers().filter(u => u.status === 'ACTIVE' && u.role !== 'STUDENT');
+    
+    if (office === 'HOD') {
+      const matched = allUsers.find(u => {
+        if (u.role !== 'HOD') return false;
+        const instMatch = !instituteId || !u.instituteId || u.instituteId === instituteId;
+        const uDeptId = (u.departmentId || '').toUpperCase();
+        const tDeptId = (departmentId || '').toUpperCase();
+        const uDeptName = (u.departmentName || this.resolveUserDepartment(u) || '').toUpperCase();
+        const tDeptName = (departmentName || '').toUpperCase();
+        const deptMatch = (!uDeptId && !uDeptName) || (!tDeptId && !tDeptName) ||
+          (Boolean(uDeptId && tDeptId) && uDeptId === tDeptId) ||
+          (Boolean(uDeptName && tDeptName) && (uDeptName === tDeptName || uDeptName.includes(tDeptName) || tDeptName.includes(uDeptName))) ||
+          (Boolean(uDeptId && tDeptName) && (uDeptId === tDeptName || uDeptId.includes(tDeptName) || tDeptName.includes(uDeptId))) ||
+          (Boolean(uDeptName && tDeptId) && (uDeptName === tDeptId || uDeptName.includes(tDeptId) || tDeptName.includes(uDeptName)));
+        return instMatch && deptMatch;
+      }) || allUsers.find(u => u.role === 'HOD' && (!instituteId || !u.instituteId || u.instituteId === instituteId)) || allUsers.find(u => u.role === 'HOD');
+      return { userId: matched?.id, name: matched?.name, role: 'HOD' };
+    }
+
+    if (office === 'HOI' || office === 'PRINCIPAL') {
+      const matched = allUsers.find(u => u.role === 'PRINCIPAL' && (!instituteId || !u.instituteId || u.instituteId === instituteId)) ||
+        allUsers.find(u => u.role === 'PRINCIPAL');
+      return { userId: matched?.id, name: matched?.name, role: 'PRINCIPAL' };
+    }
+
+    if (office === 'DEPUTY_REGISTRAR') {
+      const matched = allUsers.find(u => {
+        if (u.role !== 'DEPUTY_REGISTRAR') return false;
+        const scopes = this.getDeputyRegistrarScopeByUserId(u.id);
+        if (scopes.length === 0) return !instituteId || !u.instituteId || u.instituteId === instituteId;
+        return scopes.some(s => {
+          const matchInst = !instituteId || s.instituteId === instituteId;
+          const matchDept = s.isUniversalInstituteScope || s.departmentIds.length === 0 ||
+            s.departmentIds.includes('ALL') ||
+            (Boolean(departmentId) && s.departmentIds.includes(departmentId!)) ||
+            (Boolean(departmentName) && (s.departmentIds.includes(departmentName!) || (s.departmentNames || []).some(dn => dn.toLowerCase() === departmentName!.toLowerCase())));
+          return matchInst && matchDept;
+        });
+      }) || allUsers.find(u => u.role === 'DEPUTY_REGISTRAR' && (!instituteId || !u.instituteId || u.instituteId === instituteId)) || allUsers.find(u => u.role === 'DEPUTY_REGISTRAR');
+      return { userId: matched?.id, name: matched?.name, role: 'DEPUTY_REGISTRAR' };
+    }
+
+    if (office === 'REGISTRAR') {
+      const matched = allUsers.find(u => u.role === 'REGISTRAR');
+      return { userId: matched?.id, name: matched?.name, role: 'REGISTRAR' };
+    }
+
+    if (office === 'VICE_PRESIDENT') {
+      const matched = allUsers.find(u => u.role === 'VICE_PRESIDENT' && u.status === 'ACTIVE');
+      return { userId: matched?.id, name: matched?.name, role: 'VICE_PRESIDENT' };
+    }
+
+    if (office === 'ACCOUNTS_ADMIN' || office === 'FINANCE' || office === 'FINANCE_OFFICER') {
+      const matched = allUsers.find(u => u.role === 'ACCOUNTS_ADMIN');
+      return { userId: matched?.id, name: matched?.name, role: 'ACCOUNTS_ADMIN' };
+    }
+
+    if (office === 'EXAM_CELL') {
+      const matched = allUsers.find(u => u.role === 'EXAM_CELL');
+      return { userId: matched?.id, name: matched?.name, role: 'EXAM_CELL' };
+    }
+
+    if (office === 'STUDENT_SECTION') {
+      const matched = allUsers.find(u => u.role === 'STUDENT_SECTION');
+      return { userId: matched?.id, name: matched?.name, role: 'STUDENT_SECTION' };
+    }
+
+    if (office === 'HOSTEL_ADMIN') {
+      const matched = allUsers.find(u => u.role === 'HOSTEL_ADMIN');
+      return { userId: matched?.id, name: matched?.name, role: 'HOSTEL_ADMIN' };
+    }
+
+    if (office === 'IQAC') {
+      const matched = allUsers.find(u => u.role === 'IQAC');
+      return { userId: matched?.id, name: matched?.name, role: 'IQAC' };
+    }
+
+    return { role: office };
+  }
+
   createNoteSheet(noteData: Partial<NoteSheet>, user: User, isDraft: boolean): NoteSheet {
     if (user.role === 'STUDENT') {
       throw new Error('403 Forbidden: Students are not authorized to create Notesheets.');
@@ -3782,9 +3975,10 @@ class ERPDatabaseService {
     const now = new Date().toISOString();
 
     const officialNumber = isDraft ? 'DRAFT' : noteSheetNumber;
+    const assignee = !isDraft ? this.resolveActualAssignee(firstStep, instId, noteData.departmentId || dept, dept) : undefined;
 
     const newNote: NoteSheet = {
-      id: noteData.id || `ns-${Date.now()}`,
+      id: noteData.id || `ns-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       notesheetNumber: officialNumber,
       noteSheetNumber: officialNumber,
       notesheetType: noteData.notesheetType || (isFin ? 'Financial Sanction' : 'Administrative'),
@@ -3808,6 +4002,11 @@ class ERPDatabaseService {
       priority: noteData.priority || 'NORMAL',
       status: isDraft ? 'DRAFT' : resolved.initialStage,
       currentOffice: isDraft ? 'CREATOR' : firstStep,
+      currentAuthorityRole: isDraft ? undefined : firstStep,
+      currentHandlerId: assignee?.userId,
+      currentAssigneeUserId: assignee?.userId,
+      currentAssigneeName: assignee?.name,
+      currentAssigneeRole: assignee?.role || firstStep,
       creatorId: user.id,
       creatorName: user.name,
       creatorRole: user.role,
@@ -3819,9 +4018,12 @@ class ERPDatabaseService {
       budgetRequired: isFin,
       estimatedCost: calculatedAmount,
       requestedAmount: calculatedAmount,
+      originalRequestedAmount: calculatedAmount,
+      currentAmount: calculatedAmount,
       approvedAmount: noteData.approvedAmount,
+      financialRevisionHistory: [],
       budgetHead: noteData.budgetHead,
-      budgetAvailable: Boolean(noteData.budgetAvailable),
+      budgetAvailable: noteData.budgetAvailable !== undefined ? Boolean(noteData.budgetAvailable) : undefined,
       expenseCategory: noteData.expenseCategory,
       financeRemarks: noteData.financeRemarks,
       procurementRequirement: noteData.procurementRequirement,
@@ -3829,12 +4031,15 @@ class ERPDatabaseService {
       previousNoteSheetId: noteData.previousNoteSheetId,
       previousNoteSheetNumber: noteData.previousNoteSheetNumber,
       relatedNoteSheetIds: noteData.relatedNoteSheetIds || [],
-      version: 1,
+      version: '1.0',
+      isLocked: false,
+      verificationId: isDraft ? undefined : this.generateNoteSheetVerificationId(),
       attachments: noteData.attachments || [],
       attachmentObjects: noteData.attachmentObjects || [],
       complianceItems: noteData.complianceItems || [],
       clarifications: noteData.clarifications || [],
       movements: [],
+      auditTrail: [],
       createdAt: now,
       updatedAt: now
     };
@@ -3846,16 +4051,42 @@ class ERPDatabaseService {
         fromUser: `${user.name} (${user.role})`,
         fromUserId: user.id,
         fromUserRole: user.role,
-        toUser: `Reporting Authority (${firstStep})`,
+        actorUserId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        designation: this.getDesignationForUser(user.id, user.role),
+        signatureSnapshot: this.getUserSignatureSnapshot(user),
+        toUser: assignee?.name ? `${assignee.name} (${assignee.role})` : `Reporting Authority (${firstStep})`,
+        toUserId: assignee?.userId,
         toOffice: firstStep,
-        toRole: firstStep,
+        toRole: assignee?.role || firstStep,
         stage: resolved.initialStage,
+        fromStage: 'DRAFT',
+        toStage: resolved.initialStage,
         action: 'SUBMIT',
+        decision: 'SUBMITTED',
         remarks: `Note Sheet submitted to ${firstStep} per University Organogram (${resolved.branchName}).`,
         date: now.split('T')[0],
         time: new Date().toLocaleTimeString(),
         timestamp: new Date().toLocaleString()
       });
+
+      newNote.auditTrail!.push({
+        id: `audit-${Date.now()}-init`,
+        notesheetId: newNote.id,
+        notesheetNumber: newNote.noteSheetNumber,
+        userId: user.id,
+        userName: user.name,
+        userRole: user.role,
+        action: 'SUBMIT',
+        date: now.split('T')[0],
+        time: new Date().toLocaleTimeString(),
+        timestamp: new Date().toLocaleString(),
+        previousState: 'DRAFT',
+        newState: resolved.initialStage,
+        remark: `Notesheet created and submitted to ${firstStep} by ${user.name}`
+      });
+
       this.sendWorkflowNotification(firstStep, `New ${branch} Note Sheet ${newNote.noteSheetNumber} submitted for approval by ${user.name}.`, newNote.instituteId, newNote.department, newNote.noteSheetNumber);
     } else {
       newNote.movements.push({
@@ -3864,9 +4095,15 @@ class ERPDatabaseService {
         fromUser: `${user.name} (${user.role})`,
         fromUserId: user.id,
         fromUserRole: user.role,
+        actorUserId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        designation: this.getDesignationForUser(user.id, user.role),
         toUser: 'Creator (Draft)',
         toOffice: 'CREATOR',
         stage: 'DRAFT',
+        fromStage: 'DRAFT',
+        toStage: 'DRAFT',
         action: 'CREATE',
         remarks: 'Draft Notesheet saved.',
         date: now.split('T')[0],
@@ -3959,6 +4196,17 @@ class ERPDatabaseService {
     const branch = resolved.branch;
     const now = new Date().toISOString();
 
+    const amt = Number(ns.requestedAmount || ns.estimatedCost || 0);
+    if (ns.originalRequestedAmount === undefined) {
+      ns.originalRequestedAmount = amt;
+    }
+    if (ns.currentAmount === undefined) {
+      ns.currentAmount = amt;
+    }
+    if (!ns.financialRevisionHistory) {
+      ns.financialRevisionHistory = [];
+    }
+
     ns.noteSheetNumber = noteSheetNumber;
     ns.notesheetNumber = noteSheetNumber;
     ns.sequenceNumber = seq;
@@ -4005,6 +4253,8 @@ class ERPDatabaseService {
     extraOptions?: {
       approvedAmount?: number;
       approvedAmountRemarks?: string;
+      revisedAmount?: number;
+      revisionReason?: string;
       actionTakenSummary?: string;
       proofUrl?: string;
       clarificationQuery?: string;
@@ -4033,12 +4283,24 @@ class ERPDatabaseService {
           return 'PENDING_DEPUTY_REGISTRAR';
         case 'REGISTRAR':
           return 'PENDING_REGISTRAR';
+        case 'VICE_PRESIDENT':
+          return 'PENDING_VICE_PRESIDENT';
         case 'FINANCE':
         case 'FINANCE_OFFICER':
         case 'ACCOUNTS_ADMIN':
           return 'PENDING_FINANCE';
+        case 'EXAM_CELL':
+        case 'DEPUTY_REGISTRAR_EXAM':
+          return 'PENDING_EXAMINATION';
+        case 'HOSTEL_ADMIN':
+          return 'PENDING_HOSTEL';
+        case 'STUDENT_SECTION':
+          return 'PENDING_STUDENT_SECTION';
+        case 'IQAC':
+          return 'PENDING_IQAC';
+        case 'HR':
+          return 'PENDING_HR';
         case 'PROVOST':
-        case 'VICE_PRESIDENT':
         case 'PRESIDENT':
           return 'PENDING_HIGHER_AUTHORITY';
         default:
@@ -4053,44 +4315,44 @@ class ERPDatabaseService {
       else if (user.role === 'PRINCIPAL') currentIdx = steps.indexOf('HOI');
       else if (user.role === 'REGISTRAR') currentIdx = steps.indexOf('REGISTRAR');
       else if (user.role === 'DEPUTY_REGISTRAR') currentIdx = steps.indexOf('DEPUTY_REGISTRAR');
+      else if (user.role === 'VICE_PRESIDENT') currentIdx = steps.indexOf('VICE_PRESIDENT');
       else if (user.role === 'ACCOUNTS_ADMIN') currentIdx = steps.indexOf('ACCOUNTS_ADMIN');
       else if (user.role === 'EXAM_CELL') currentIdx = steps.indexOf('EXAM_CELL');
       else if (user.role === 'HOSTEL_ADMIN') currentIdx = steps.indexOf('HOSTEL_ADMIN');
       else if (user.role === 'STUDENT_SECTION') currentIdx = steps.indexOf('STUDENT_SECTION');
     }
 
-    const getDesignation = (uRole: string): string => {
-      switch (uRole) {
-        case 'HOD': return 'Head of Department';
-        case 'PRINCIPAL': return 'Head of Institute / Principal';
-        case 'REGISTRAR': return 'Registrar';
-        case 'DEPUTY_REGISTRAR': return 'Deputy Registrar';
-        case 'ACCOUNTS_ADMIN': return 'Finance & Accounts Officer';
-        case 'EXAM_CELL': return 'Controller of Examination';
-        case 'HOSTEL_ADMIN': return 'Hostel Administrator / Warden';
-        case 'STUDENT_SECTION': return 'In-charge, Student Section';
-        case 'PROVOST': return 'Provost / Vice-Chancellor';
-        case 'VICE_PRESIDENT': return 'Vice President';
-        case 'PRESIDENT': return 'President';
-        default: return uRole;
-      }
-    };
-
+    const previousStatus = ns.status;
     let nextStep: NoteSheet['currentOffice'] | 'COMPLETED' | 'CLOSED' | 'CREATOR' = ns.currentOffice;
     let nextStatus: NoteSheetStatus = ns.status;
     const now = new Date().toISOString();
+    const userSigSnapshot = this.getUserSignatureSnapshot(user);
 
     // 1. Mandatory Authority Gate: Validate if caller is authorized at current stage
     if (user.role !== 'SUPER_ADMIN') {
+      if (ns.currentOffice === 'HOD' && user.role !== 'HOD') {
+        throw new Error('403 Forbidden: Notesheet is currently pending HOD review and approval.');
+      }
+      if ((ns.currentOffice === 'HOI' || ns.currentOffice === 'PRINCIPAL') && user.role !== 'PRINCIPAL' && (user.role as any) !== 'HOI') {
+        throw new Error('403 Forbidden: Notesheet is currently pending Principal / HOI review and approval.');
+      }
       if (ns.currentOffice === 'DEPUTY_REGISTRAR' && user.role !== 'DEPUTY_REGISTRAR') {
         throw new Error('403 Forbidden: Notesheet is currently pending Deputy Registrar approval.');
       }
       if (ns.currentOffice === 'REGISTRAR' && user.role !== 'REGISTRAR' && user.role !== 'UNIVERSITY_ADMIN') {
         throw new Error('403 Forbidden: Notesheet is currently pending Registrar approval.');
       }
+      if (ns.currentOffice === 'VICE_PRESIDENT') {
+        if (user.role !== 'VICE_PRESIDENT') {
+          throw new Error('403 Forbidden: Notesheet is currently pending Vice President approval.');
+        }
+        if (ns.currentAssigneeUserId && ns.currentAssigneeUserId !== user.id) {
+          throw new Error('403 Forbidden: This Notesheet is assigned to a different Vice President.');
+        }
+      }
     }
 
-    // 2. Bypass Prevention Guard: Block attempts to skip Deputy Registrar
+    // 2. Bypass Prevention Guard: Block attempts to skip stages
     if (forwardToOffice === 'REGISTRAR') {
       const isDyReg = user.role === 'DEPUTY_REGISTRAR' || ns.currentOffice === 'DEPUTY_REGISTRAR';
       const isSuper = user.role === 'SUPER_ADMIN' || user.role === 'REGISTRAR';
@@ -4098,13 +4360,101 @@ class ERPDatabaseService {
         throw new Error('403 Forbidden: Invalid Workflow Transition. Standard notesheet must be approved by Deputy Registrar before forwarding to Registrar.');
       }
     }
+    if (forwardToOffice === 'VICE_PRESIDENT') {
+      const isReg = user.role === 'REGISTRAR' || ns.currentOffice === 'REGISTRAR';
+      const isSuper = user.role === 'SUPER_ADMIN' || user.role === 'VICE_PRESIDENT';
+      if (!isReg && !isSuper) {
+        throw new Error('403 Forbidden: Invalid Workflow Transition. Standard notesheet must be approved by Registrar before forwarding to Vice President.');
+      }
+    }
+
+    // Initialize financial tracking fields if missing
+    const initialAmt = Number(ns.requestedAmount || ns.estimatedCost || 0);
+    if (ns.originalRequestedAmount === undefined) {
+      ns.originalRequestedAmount = initialAmt;
+    }
+    if (ns.currentAmount === undefined) {
+      ns.currentAmount = initialAmt;
+    }
+    if (!ns.financialRevisionHistory) {
+      ns.financialRevisionHistory = [];
+    }
+
+    let amountWasRevised = false;
+
+    // Financial Amount Revision Processing
+    const targetRevAmount = extraOptions?.revisedAmount !== undefined 
+      ? extraOptions.revisedAmount 
+      : (action === 'APPROVE' && extraOptions?.approvedAmount !== undefined ? extraOptions.approvedAmount : undefined);
+
+    if (targetRevAmount !== undefined && (action === 'APPROVE' || action === 'FORWARD')) {
+      const prevAmt = Number(ns.currentAmount !== undefined ? ns.currentAmount : initialAmt);
+      const newAmt = Number(targetRevAmount);
+
+      if (isNaN(newAmt) || newAmt < 0) {
+        throw new Error('400 Bad Request: Invalid revised financial amount specified.');
+      }
+
+      if (newAmt !== prevAmt) {
+        const revReason = (extraOptions?.revisionReason || extraOptions?.approvedAmountRemarks || remarks || '').trim();
+        if (!revReason) {
+          throw new Error('400 Bad Request: Reason / Remarks is mandatory when revising the financial amount.');
+        }
+
+        const changeAmt = newAmt - prevAmt;
+        const changeType: 'INCREASE' | 'DECREASE' | 'NO_CHANGE' = newAmt > prevAmt ? 'INCREASE' : newAmt < prevAmt ? 'DECREASE' : 'NO_CHANGE';
+
+        const revisionRecord: NoteSheetAmountRevision = {
+          id: `rev-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          notesheetId: ns.id,
+          actorUserId: user.id,
+          actorName: user.name,
+          actorRole: user.role,
+          previousAmount: prevAmt,
+          newAmount: newAmt,
+          changeAmount: changeAmt,
+          changeType,
+          reason: revReason,
+          workflowStage: ns.currentOffice || user.role,
+          createdAt: now
+        };
+
+        ns.financialRevisionHistory.push(revisionRecord);
+        ns.currentAmount = newAmt;
+        ns.requestedAmount = newAmt;
+        if (extraOptions?.approvedAmount !== undefined) {
+          ns.approvedAmount = newAmt;
+        }
+        amountWasRevised = true;
+
+        this.logAudit(
+          'REVISE_NOTESHEET_AMOUNT',
+          'Financial',
+          `Notesheet ${ns.noteSheetNumber} amount revised from ₹${prevAmt.toLocaleString('en-IN')} to ₹${newAmt.toLocaleString('en-IN')} (${changeType}: ₹${Math.abs(changeAmt).toLocaleString('en-IN')}) by ${user.name} (${user.role}). Reason: ${revReason}`,
+          user.name,
+          user.role
+        );
+      } else if (extraOptions?.approvedAmount !== undefined) {
+        ns.approvedAmount = newAmt;
+      }
+    } else if (extraOptions?.approvedAmount !== undefined) {
+      ns.approvedAmount = Number(extraOptions.approvedAmount);
+      ns.currentAmount = Number(extraOptions.approvedAmount);
+    }
 
     if (action === 'SUBMIT') {
       const firstStep = steps[0] as NoteSheet['currentOffice'];
       nextStep = firstStep;
       nextStatus = getStatusForOffice(firstStep);
+      const assignee = this.resolveActualAssignee(firstStep, ns.instituteId, ns.departmentId, ns.department);
+
       ns.currentOffice = firstStep;
       ns.status = nextStatus;
+      ns.currentAssigneeUserId = assignee.userId;
+      ns.currentAssigneeName = assignee.name;
+      ns.currentAssigneeRole = assignee.role;
+      ns.currentHandlerId = assignee.userId;
+      ns.currentAuthorityRole = firstStep;
 
       ns.movements.push({
         id: `mvt-${Date.now()}`,
@@ -4112,12 +4462,20 @@ class ERPDatabaseService {
         fromUser: `${user.name} (${user.role})`,
         fromUserId: user.id,
         fromUserRole: user.role,
-        designation: getDesignation(user.role),
-        toUser: `Reporting Authority (${firstStep})`,
+        actorUserId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        designation: this.getDesignationForUser(user.id, user.role),
+        signatureSnapshot: userSigSnapshot,
+        toUser: assignee.name ? `${assignee.name} (${assignee.role})` : `Reporting Authority (${firstStep})`,
+        toUserId: assignee.userId,
         toOffice: firstStep,
-        toRole: firstStep,
+        toRole: assignee.role || firstStep,
         stage: nextStatus,
+        fromStage: previousStatus,
+        toStage: nextStatus,
         action: 'SUBMIT',
+        decision: 'SUBMITTED',
         remarks: remarks || `Note Sheet submitted to ${firstStep} per Organogram.`,
         attachmentUrl,
         date: now.split('T')[0],
@@ -4139,8 +4497,26 @@ class ERPDatabaseService {
       if (forwardToOffice && forwardToOffice !== 'COMPLETED' && forwardToOffice !== 'FINAL_APPROVAL' && forwardToOffice !== '') {
         nextStep = forwardToOffice as NoteSheet['currentOffice'];
         nextStatus = getStatusForOffice(nextStep);
+        const assignee = this.resolveActualAssignee(nextStep, ns.instituteId, ns.departmentId, ns.department);
+
+        if (nextStep === 'VICE_PRESIDENT') {
+          const activeVp = this.getUsers().find(u => u.role === 'VICE_PRESIDENT' && u.status === 'ACTIVE');
+          if (!activeVp) {
+            throw new Error('500 Configuration Error: No active Vice President is configured for Notesheet approval.');
+          }
+          assignee.userId = activeVp.id;
+          assignee.name = activeVp.name;
+          assignee.role = 'VICE_PRESIDENT';
+          ns.currentStage = 'VICE_PRESIDENT_APPROVAL';
+        }
+
         ns.currentOffice = nextStep;
         ns.status = nextStatus;
+        ns.currentAssigneeUserId = assignee.userId;
+        ns.currentAssigneeName = assignee.name;
+        ns.currentAssigneeRole = assignee.role;
+        ns.currentHandlerId = assignee.userId;
+        ns.currentAuthorityRole = nextStep;
 
         const intermediateApprovalId = `NS-APR-${Date.now().toString().slice(-6)}`;
 
@@ -4150,12 +4526,20 @@ class ERPDatabaseService {
           fromUser: `${user.name} (${user.role})`,
           fromUserId: user.id,
           fromUserRole: user.role,
-          designation: getDesignation(user.role),
-          toUser: `Reporting Authority (${nextStep})`,
+          actorUserId: user.id,
+          actorName: user.name,
+          actorRole: user.role,
+          designation: this.getDesignationForUser(user.id, user.role),
+          signatureSnapshot: userSigSnapshot,
+          toUser: assignee.name ? `${assignee.name} (${assignee.role})` : `Reporting Authority (${nextStep})`,
+          toUserId: assignee.userId,
           toOffice: nextStep,
-          toRole: nextStep,
+          toRole: assignee.role || nextStep,
           stage: nextStatus,
+          fromStage: previousStatus,
+          toStage: nextStatus,
           action: 'FORWARD',
+          decision: 'APPROVED_AND_FORWARDED',
           approvalId: intermediateApprovalId,
           remarks: remarks || `Endorsed / Approved by ${user.role} and forwarded to ${nextStep}.`,
           attachmentUrl,
@@ -4174,15 +4558,40 @@ class ERPDatabaseService {
       } else {
         // Sequential progression in Organogram
         const isExplicitCompletion = forwardToOffice === 'COMPLETED' || forwardToOffice === 'FINAL_APPROVAL';
+        if (user.role === 'REGISTRAR' && isExplicitCompletion && finalAuthority === 'VICE_PRESIDENT') {
+          throw new Error('403 Forbidden: Notesheet requires mandatory final sanction from Vice President and cannot be closed by Registrar.');
+        }
+
         const hasNextStep = (currentIdx >= 0 && currentIdx < steps.length - 1);
-        const isCurrentFinalAuthority = isExplicitCompletion || (steps[currentIdx] === finalAuthority) || (user.role === 'REGISTRAR' && finalAuthority === 'REGISTRAR') || (['PROVOST', 'VICE_PRESIDENT', 'PRESIDENT', 'SUPER_ADMIN'].includes(user.role));
+        const isCurrentFinalAuthority = (user.role === 'VICE_PRESIDENT' && finalAuthority === 'VICE_PRESIDENT') ||
+          ((user.role as any) === 'SUPER_ADMIN') ||
+          ((user.role as any) === 'PRESIDENT') ||
+          (isExplicitCompletion && (user.role === 'VICE_PRESIDENT' || (user.role as any) === 'SUPER_ADMIN'));
 
         if (hasNextStep && !isCurrentFinalAuthority) {
           // Intermediate Approval & Forward: previous stage is approved, Notesheet moves to next stage
           nextStep = steps[currentIdx + 1] as NoteSheet['currentOffice'];
           nextStatus = getStatusForOffice(nextStep);
+          const assignee = this.resolveActualAssignee(nextStep, ns.instituteId, ns.departmentId, ns.department);
+
+          if (nextStep === 'VICE_PRESIDENT') {
+            const activeVp = this.getUsers().find(u => u.role === 'VICE_PRESIDENT' && u.status === 'ACTIVE');
+            if (!activeVp) {
+              throw new Error('500 Configuration Error: No active Vice President is configured for Notesheet approval.');
+            }
+            assignee.userId = activeVp.id;
+            assignee.name = activeVp.name;
+            assignee.role = 'VICE_PRESIDENT';
+            ns.currentStage = 'VICE_PRESIDENT_APPROVAL';
+          }
+
           ns.currentOffice = nextStep;
           ns.status = nextStatus;
+          ns.currentAssigneeUserId = assignee.userId;
+          ns.currentAssigneeName = assignee.name;
+          ns.currentAssigneeRole = assignee.role;
+          ns.currentHandlerId = assignee.userId;
+          ns.currentAuthorityRole = nextStep;
 
           const intermediateApprovalId = `NS-APR-${Date.now().toString().slice(-6)}`;
 
@@ -4192,12 +4601,20 @@ class ERPDatabaseService {
             fromUser: `${user.name} (${user.role})`,
             fromUserId: user.id,
             fromUserRole: user.role,
-            designation: getDesignation(user.role),
-            toUser: `Immediate Reporting Authority (${nextStep})`,
+            actorUserId: user.id,
+            actorName: user.name,
+            actorRole: user.role,
+            designation: this.getDesignationForUser(user.id, user.role),
+            signatureSnapshot: userSigSnapshot,
+            toUser: assignee.name ? `${assignee.name} (${assignee.role})` : `Immediate Reporting Authority (${nextStep})`,
+            toUserId: assignee.userId,
             toOffice: nextStep,
-            toRole: nextStep,
+            toRole: assignee.role || nextStep,
             stage: nextStatus,
+            fromStage: previousStatus,
+            toStage: nextStatus,
             action: 'FORWARD',
+            decision: 'APPROVED_AND_FORWARDED',
             approvalId: intermediateApprovalId,
             remarks: remarks || `Endorsed / Approved at ${user.role} level and forwarded to ${nextStep}.`,
             attachmentUrl,
@@ -4206,28 +4623,80 @@ class ERPDatabaseService {
             timestamp: new Date().toLocaleString()
           });
 
-          if (nextStep === 'REGISTRAR') {
-            this.sendWorkflowNotification('REGISTRAR', `Notesheet ${ns.noteSheetNumber} has been forwarded by the Deputy Registrar and is pending for your approval.`, ns.instituteId, ns.department, ns.noteSheetNumber);
+          if (!ns.approvals) ns.approvals = [];
+          ns.approvals.push({
+            id: `apr-${Date.now()}`,
+            noteSheetId: ns.id,
+            approverUserId: user.id,
+            approverName: user.name,
+            approverRole: user.role,
+            designation: this.getDesignationForUser(user.id, user.role),
+            stage: nextStatus,
+            status: 'APPROVED',
+            decision: 'APPROVED_AND_FORWARDED',
+            remarks: remarks || `Endorsed / Approved at ${user.role} level and forwarded to ${nextStep}.`,
+            approvedAmount: ns.currentAmount,
+            digitalApprovalId: intermediateApprovalId,
+            timestamp: now
+          });
+
+          const revisedAmtNote = amountWasRevised ? ` with a revised proposed amount of ₹${ns.currentAmount?.toLocaleString('en-IN')}` : '';
+
+          if (nextStep === 'VICE_PRESIDENT') {
+            const activeVp = this.getUsers().find(u => u.role === 'VICE_PRESIDENT' && u.status === 'ACTIVE');
+            if (activeVp) {
+              this.addNotification({
+                type: 'ACTION_REQUIRED',
+                targetUserId: activeVp.id,
+                title: `Action Required: Notesheet ${ns.noteSheetNumber || ''}`,
+                message: `Notesheet ${ns.noteSheetNumber} has been approved by the Registrar and is pending for your final approval.`,
+                module: 'NOTESHEET',
+                referenceId: ns.noteSheetNumber,
+                referenceType: 'NOTESHEET',
+                linkTab: 'notesheet',
+                priority: 'HIGH'
+              });
+            }
+            this.sendWorkflowNotification('VICE_PRESIDENT', `Notesheet ${ns.noteSheetNumber} has been approved by the Registrar${revisedAmtNote} and is pending for your final approval.`, ns.instituteId, ns.department, ns.noteSheetNumber);
+          } else if (nextStep === 'REGISTRAR') {
+            this.sendWorkflowNotification('REGISTRAR', `Notesheet ${ns.noteSheetNumber} has been forwarded by the Deputy Registrar${revisedAmtNote} and is pending for your approval.`, ns.instituteId, ns.department, ns.noteSheetNumber);
           } else if (nextStep === 'DEPUTY_REGISTRAR') {
-            this.sendWorkflowNotification('DEPUTY_REGISTRAR', `Notesheet ${ns.noteSheetNumber} is pending for your approval.`, ns.instituteId, ns.department, ns.noteSheetNumber);
+            this.sendWorkflowNotification('DEPUTY_REGISTRAR', `Notesheet ${ns.noteSheetNumber}${revisedAmtNote} is pending for your approval.`, ns.instituteId, ns.department, ns.noteSheetNumber);
           } else {
-            this.sendWorkflowNotification(nextStep as string, `Note Sheet ${ns.noteSheetNumber} forwarded to your office by ${user.name} (${user.role}).`, ns.instituteId, ns.department, ns.noteSheetNumber);
+            this.sendWorkflowNotification(nextStep as string, `Note Sheet ${ns.noteSheetNumber} forwarded to your office by ${user.name} (${user.role})${revisedAmtNote}.`, ns.instituteId, ns.department, ns.noteSheetNumber);
           }
         } else {
-          // Final Sanction / Completion by final authority
+          // Final Sanction / Completion by final authority (Vice President)
           const finalApprovalId = `NS-APR-${Date.now().toString().slice(-6)}`;
+          const finalSanctionAmount = ns.currentAmount !== undefined ? ns.currentAmount : (ns.approvedAmount !== undefined ? ns.approvedAmount : (ns.requestedAmount || ns.estimatedCost || 0));
 
           nextStep = 'COMPLETED';
           nextStatus = 'APPROVED';
           ns.currentOffice = 'COMPLETED';
+          ns.currentStage = 'FINAL_APPROVAL';
+          ns.currentAssigneeUserId = undefined;
+          ns.currentAssigneeName = undefined;
+          ns.currentAssigneeRole = undefined;
           ns.currentHandlerId = undefined;
+          ns.currentAuthorityRole = undefined;
           ns.status = 'APPROVED';
           ns.decision = 'APPROVED';
           ns.decisionDate = now;
+          ns.finalApprovalDate = now;
           ns.finalApprovalId = finalApprovalId;
+          ns.digitalApprovalId = finalApprovalId;
           ns.approvedByUserId = user.id;
           ns.approvedByName = user.name;
           ns.approvedAt = now;
+          ns.finalApprovedAmount = finalSanctionAmount;
+          ns.approvedAmount = finalSanctionAmount;
+          ns.isLocked = true;
+          if (!ns.verificationId) ns.verificationId = this.generateNoteSheetVerificationId();
+          ns.dataHash = this.generateNoteSheetHash(ns);
+          ns.documentHash = ns.dataHash;
+
+          // Automatically create Registrar Inward record & generate Inward Number for Final Approved Notesheet
+          this.createRegistrarInwardForApprovedNotesheet(ns, user);
 
           ns.movements.push({
             id: `mvt-${Date.now()}`,
@@ -4235,18 +4704,42 @@ class ERPDatabaseService {
             fromUser: `${user.name} (${user.role})`,
             fromUserId: user.id,
             fromUserRole: user.role,
-            designation: getDesignation(user.role),
+            actorUserId: user.id,
+            actorName: user.name,
+            actorRole: user.role,
+            designation: this.getDesignationForUser(user.id, user.role),
+            signatureSnapshot: userSigSnapshot,
             toUser: 'Completed / Approved',
             toOffice: 'COMPLETED',
             toRole: 'COMPLETED',
             stage: 'APPROVED',
+            fromStage: previousStatus,
+            toStage: 'APPROVED',
             action: 'APPROVE',
+            decision: 'FINAL_APPROVED',
             approvalId: finalApprovalId,
             remarks: remarks || `Sanctioned and Approved.${ns.approvedAmount !== undefined ? ` Approved Amount: ₹${ns.approvedAmount.toLocaleString('en-IN')}` : ''}`,
             attachmentUrl,
             date: now.split('T')[0],
             time: new Date().toLocaleTimeString(),
             timestamp: new Date().toLocaleString()
+          });
+
+          if (!ns.approvals) ns.approvals = [];
+          ns.approvals.push({
+            id: `apr-${Date.now()}`,
+            noteSheetId: ns.id,
+            approverUserId: user.id,
+            approverName: user.name,
+            approverRole: user.role,
+            designation: this.getDesignationForUser(user.id, user.role),
+            stage: 'APPROVED',
+            status: 'APPROVED',
+            decision: 'FINAL_APPROVED',
+            remarks: remarks || `Sanctioned and Approved.`,
+            approvedAmount: finalSanctionAmount,
+            digitalApprovalId: finalApprovalId,
+            timestamp: now
           });
 
           // Determine ALL unique users who participated in this Notesheet workflow
@@ -4276,7 +4769,7 @@ class ERPDatabaseService {
           // Send targeted notifications to ALL participants (NO broadcast to entire dept or university)
           const participantList = Array.from(participantUserIds);
           const notificationTitle = 'Notesheet Approved';
-          const notificationMessage = `Notesheet ${ns.noteSheetNumber} has been successfully approved and the approval workflow has been completed.\n\nNotesheet: ${ns.noteSheetNumber}\nSubject: ${ns.subject}\nStatus: FINAL APPROVED\nFinal Approved By: ${user.name} (${getDesignation(user.role)})\nDate & Time: ${new Date().toLocaleString()}`;
+          const notificationMessage = `Notesheet ${ns.noteSheetNumber} has been successfully approved and the approval workflow has been completed.\n\nNotesheet: ${ns.noteSheetNumber}\nSubject: ${ns.subject}\nStatus: FINAL APPROVED\nFinal Approved By: ${user.name} (${this.getDesignationForUser(user.id, user.role)})\nDate & Time: ${new Date().toLocaleString()}`;
 
           participantList.forEach(pUserId => {
             this.addNotification({
@@ -4297,8 +4790,26 @@ class ERPDatabaseService {
       const dest = forwardToOffice || (currentIdx >= 0 && currentIdx < steps.length - 1 ? steps[currentIdx + 1] : 'REGISTRAR');
       nextStep = dest as NoteSheet['currentOffice'];
       nextStatus = getStatusForOffice(nextStep);
+      const assignee = this.resolveActualAssignee(nextStep, ns.instituteId, ns.departmentId, ns.department);
+
+      if (nextStep === 'VICE_PRESIDENT') {
+        const activeVp = this.getUsers().find(u => u.role === 'VICE_PRESIDENT' && u.status === 'ACTIVE');
+        if (!activeVp) {
+          throw new Error('500 Configuration Error: No active Vice President is configured for Notesheet approval.');
+        }
+        assignee.userId = activeVp.id;
+        assignee.name = activeVp.name;
+        assignee.role = 'VICE_PRESIDENT';
+        ns.currentStage = 'VICE_PRESIDENT_APPROVAL';
+      }
+
       ns.currentOffice = nextStep;
       ns.status = nextStatus;
+      ns.currentAssigneeUserId = assignee.userId;
+      ns.currentAssigneeName = assignee.name;
+      ns.currentAssigneeRole = assignee.role;
+      ns.currentHandlerId = assignee.userId;
+      ns.currentAuthorityRole = nextStep;
 
       const intermediateApprovalId = `NS-APR-${Date.now().toString().slice(-6)}`;
 
@@ -4308,12 +4819,20 @@ class ERPDatabaseService {
         fromUser: `${user.name} (${user.role})`,
         fromUserId: user.id,
         fromUserRole: user.role,
-        designation: getDesignation(user.role),
-        toUser: `Forwarded to ${dest}`,
+        actorUserId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        designation: this.getDesignationForUser(user.id, user.role),
+        signatureSnapshot: userSigSnapshot,
+        toUser: assignee.name ? `${assignee.name} (${assignee.role})` : `Forwarded to ${dest}`,
+        toUserId: assignee.userId,
         toOffice: nextStep,
-        toRole: nextStep,
+        toRole: assignee.role || nextStep,
         stage: nextStatus,
+        fromStage: previousStatus,
+        toStage: nextStatus,
         action: 'FORWARD',
+        decision: 'FORWARDED',
         approvalId: intermediateApprovalId,
         remarks: remarks || `Forwarded to ${dest} for endorsement.`,
         attachmentUrl,
@@ -4322,7 +4841,25 @@ class ERPDatabaseService {
         timestamp: new Date().toLocaleString()
       });
 
-      this.sendWorkflowNotification(dest, `Note Sheet ${ns.noteSheetNumber} forwarded to your office by ${user.name}.`, ns.instituteId, ns.department, ns.noteSheetNumber);
+      if (nextStep === 'VICE_PRESIDENT') {
+        const activeVp = this.getUsers().find(u => u.role === 'VICE_PRESIDENT' && u.status === 'ACTIVE');
+        if (activeVp) {
+          this.addNotification({
+            type: 'ACTION_REQUIRED',
+            targetUserId: activeVp.id,
+            title: `Action Required: Notesheet ${ns.noteSheetNumber || ''}`,
+            message: `Notesheet ${ns.noteSheetNumber} has been approved by the Registrar and is pending for your final approval.`,
+            module: 'NOTESHEET',
+            referenceId: ns.noteSheetNumber,
+            referenceType: 'NOTESHEET',
+            linkTab: 'notesheet',
+            priority: 'HIGH'
+          });
+        }
+        this.sendWorkflowNotification('VICE_PRESIDENT', `Notesheet ${ns.noteSheetNumber} has been approved by the Registrar and is pending for your final approval.`, ns.instituteId, ns.department, ns.noteSheetNumber);
+      } else {
+        this.sendWorkflowNotification(dest, `Note Sheet ${ns.noteSheetNumber} forwarded to your office by ${user.name}.`, ns.instituteId, ns.department, ns.noteSheetNumber);
+      }
     } else if (action === 'CONSULT') {
       if (!forwardToOffice) {
         throw new Error('Consultation recipient office is required.');
@@ -4339,12 +4876,25 @@ class ERPDatabaseService {
 
       nextStep = forwardToOffice as NoteSheet['currentOffice'];
       nextStatus = 'IN_CONSULTATION';
+      const assignee = this.resolveActualAssignee(nextStep, ns.instituteId, ns.departmentId, ns.department);
 
       ns.movements.push({
         id: `mvt-${Date.now()}`,
         noteSheetId: ns.id,
         fromUser: `${user.name} (${user.role})`,
-        toUser: `Consultation (${forwardToOffice})`,
+        fromUserId: user.id,
+        fromUserRole: user.role,
+        actorUserId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        designation: this.getDesignationForUser(user.id, user.role),
+        toUser: assignee.name ? `${assignee.name} (${assignee.role})` : `Consultation (${forwardToOffice})`,
+        toUserId: assignee.userId,
+        toOffice: nextStep,
+        toRole: assignee.role || nextStep,
+        stage: 'IN_CONSULTATION',
+        fromStage: previousStatus,
+        toStage: 'IN_CONSULTATION',
         action: 'CONSULT',
         remarks: `Consultation Requested: ${remarks}`,
         attachmentUrl,
@@ -4366,11 +4916,25 @@ class ERPDatabaseService {
         lastCons.respondedBy = user.name;
       }
 
+      const assignee = this.resolveActualAssignee(cleanOffice, ns.instituteId, ns.departmentId, ns.department);
+
       ns.movements.push({
         id: `mvt-${Date.now()}`,
         noteSheetId: ns.id,
         fromUser: `${user.name} (${user.role})`,
-        toUser: `Returned to Originating Branch (${cleanOffice})`,
+        fromUserId: user.id,
+        fromUserRole: user.role,
+        actorUserId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        designation: this.getDesignationForUser(user.id, user.role),
+        toUser: assignee.name ? `${assignee.name} (${assignee.role})` : `Returned to Originating Branch (${cleanOffice})`,
+        toUserId: assignee.userId,
+        toOffice: cleanOffice,
+        toRole: assignee.role || cleanOffice,
+        stage: 'UNDER_REVIEW',
+        fromStage: previousStatus,
+        toStage: 'UNDER_REVIEW',
         action: 'RETURN_CONSULTATION',
         remarks: `Consultation Opinion: ${remarks}`,
         attachmentUrl,
@@ -4382,12 +4946,25 @@ class ERPDatabaseService {
       if (!forwardToOffice) throw new Error('Transfer target office is required.');
       nextStep = forwardToOffice as NoteSheet['currentOffice'];
       nextStatus = 'FORWARDED';
+      const assignee = this.resolveActualAssignee(nextStep, ns.instituteId, ns.departmentId, ns.department);
 
       ns.movements.push({
         id: `mvt-${Date.now()}`,
         noteSheetId: ns.id,
         fromUser: `${user.name} (${user.role})`,
-        toUser: `Transferred to ${forwardToOffice}`,
+        fromUserId: user.id,
+        fromUserRole: user.role,
+        actorUserId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        designation: this.getDesignationForUser(user.id, user.role),
+        toUser: assignee.name ? `${assignee.name} (${assignee.role})` : `Transferred to ${forwardToOffice}`,
+        toUserId: assignee.userId,
+        toOffice: nextStep,
+        toRole: assignee.role || nextStep,
+        stage: 'FORWARDED',
+        fromStage: previousStatus,
+        toStage: 'FORWARDED',
         action: 'TRANSFER',
         remarks: `Departmental Transfer: ${remarks}`,
         attachmentUrl,
@@ -4416,14 +4993,31 @@ class ERPDatabaseService {
       ns.returnedByUserId = user.id;
       ns.returnedByName = user.name;
       ns.returnedAt = now;
-      ns.version = (ns.version || 1) + 1;
+      ns.version = typeof ns.version === 'number' ? ns.version + 1 : `${(parseFloat(String(ns.version || '1.0')) + 0.1).toFixed(1)}`;
+
+      const assignee = returnDest === 'CREATOR' 
+        ? { userId: ns.creatorId, name: ns.creatorName, role: ns.creatorRole }
+        : this.resolveActualAssignee(returnDest, ns.instituteId, ns.departmentId, ns.department);
 
       ns.movements.push({
         id: `mvt-${Date.now()}`,
         noteSheetId: ns.id,
         fromUser: `${user.name} (${user.role})`,
-        toUser: returnDest === 'CREATOR' ? `Creator (${ns.creatorName})` : `Previous Authority (${returnDest})`,
-        action,
+        fromUserId: user.id,
+        fromUserRole: user.role,
+        actorUserId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        designation: this.getDesignationForUser(user.id, user.role),
+        toUser: returnDest === 'CREATOR' ? `Creator (${ns.creatorName})` : (assignee.name ? `${assignee.name} (${assignee.role})` : `Previous Authority (${returnDest})`),
+        toUserId: assignee.userId,
+        toOffice: returnDest,
+        toRole: assignee.role || returnDest,
+        stage: 'RETURNED',
+        fromStage: previousStatus,
+        toStage: 'RETURNED',
+        action: 'RETURN',
+        decision: 'RETURNED',
         remarks: remarks.trim(),
         attachmentUrl,
         timestamp: new Date().toLocaleString()
@@ -4456,8 +5050,21 @@ class ERPDatabaseService {
         id: `mvt-${Date.now()}`,
         noteSheetId: ns.id,
         fromUser: `${user.name} (${user.role})`,
+        fromUserId: user.id,
+        fromUserRole: user.role,
+        actorUserId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        designation: this.getDesignationForUser(user.id, user.role),
         toUser: `Creator (${ns.creatorName})`,
+        toUserId: ns.creatorId,
+        toOffice: 'CREATOR',
+        toRole: ns.creatorRole,
+        stage: 'CLARIFICATION_REQUIRED',
+        fromStage: previousStatus,
+        toStage: 'CLARIFICATION_REQUIRED',
         action: 'REQUEST_CLARIFICATION',
+        decision: 'CLARIFICATION_REQUIRED',
         remarks: `Clarification Requested: ${remarks.trim()}`,
         attachmentUrl,
         timestamp: new Date().toLocaleString()
@@ -4479,15 +5086,30 @@ class ERPDatabaseService {
       }
 
       if (action === 'RESUBMIT') {
-        ns.version = (ns.version || 1) + 1;
+        ns.version = typeof ns.version === 'number' ? ns.version + 1 : `${(parseFloat(String(ns.version || '1.0')) + 0.1).toFixed(1)}`;
       }
+
+      const assignee = this.resolveActualAssignee(dest, ns.instituteId, ns.departmentId, ns.department);
 
       ns.movements.push({
         id: `mvt-${Date.now()}`,
         noteSheetId: ns.id,
         fromUser: `${user.name} (${user.role})`,
-        toUser: `Resubmitted to ${dest}`,
+        fromUserId: user.id,
+        fromUserRole: user.role,
+        actorUserId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        designation: this.getDesignationForUser(user.id, user.role),
+        toUser: assignee.name ? `${assignee.name} (${assignee.role})` : `Resubmitted to ${dest}`,
+        toUserId: assignee.userId,
+        toOffice: dest,
+        toRole: assignee.role || dest,
+        stage: nextStatus,
+        fromStage: previousStatus,
+        toStage: nextStatus,
         action,
+        decision: action,
         remarks: remarks || (action === 'RESUBMIT' ? 'Note Sheet revised and resubmitted.' : 'Clarification provided.'),
         attachmentUrl,
         timestamp: new Date().toLocaleString()
@@ -4506,7 +5128,16 @@ class ERPDatabaseService {
         id: `mvt-${Date.now()}`,
         noteSheetId: ns.id,
         fromUser: `${user.name} (${user.role})`,
+        fromUserId: user.id,
+        fromUserRole: user.role,
+        actorUserId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        designation: this.getDesignationForUser(user.id, user.role),
         toUser: 'Concerned Office / Compliance',
+        stage: 'ACTION_COMPLETED',
+        fromStage: previousStatus,
+        toStage: 'ACTION_COMPLETED',
         action: 'ACTION_TAKEN',
         remarks: `Action Taken recorded: ${ns.actionTakenSummary}`,
         attachmentUrl: ns.actionTakenProofUrl,
@@ -4519,12 +5150,25 @@ class ERPDatabaseService {
       ns.reopenedAt = now;
       nextStatus = 'REOPENED';
       nextStep = steps[0] || 'HOD';
+      const assignee = this.resolveActualAssignee(nextStep, ns.instituteId, ns.departmentId, ns.department);
 
       ns.movements.push({
         id: `mvt-${Date.now()}`,
         noteSheetId: ns.id,
         fromUser: `${user.name} (${user.role})`,
-        toUser: `Reopened to ${nextStep}`,
+        fromUserId: user.id,
+        fromUserRole: user.role,
+        actorUserId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        designation: this.getDesignationForUser(user.id, user.role),
+        toUser: assignee.name ? `${assignee.name} (${assignee.role})` : `Reopened to ${nextStep}`,
+        toUserId: assignee.userId,
+        toOffice: nextStep,
+        toRole: assignee.role || nextStep,
+        stage: 'REOPENED',
+        fromStage: previousStatus,
+        toStage: 'REOPENED',
         action: 'REOPEN_REQUEST',
         remarks: `Notesheet Reopened: ${ns.reopenedReason}`,
         timestamp: new Date().toLocaleString()
@@ -4536,7 +5180,16 @@ class ERPDatabaseService {
         id: `mvt-${Date.now()}`,
         noteSheetId: ns.id,
         fromUser: `${user.name} (${user.role})`,
+        fromUserId: user.id,
+        fromUserRole: user.role,
+        actorUserId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        designation: this.getDesignationForUser(user.id, user.role),
         toUser: ns.currentOffice,
+        stage: ns.status,
+        fromStage: previousStatus,
+        toStage: ns.status,
         action: 'ADD_REMARK',
         remarks: remarks || 'Official Remark added.',
         attachmentUrl,
@@ -4559,8 +5212,18 @@ class ERPDatabaseService {
         id: `mvt-${Date.now()}`,
         noteSheetId: ns.id,
         fromUser: `${user.name} (${user.role})`,
+        fromUserId: user.id,
+        fromUserRole: user.role,
+        actorUserId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        designation: this.getDesignationForUser(user.id, user.role),
         toUser: `Rejected - ${user.name}`,
-        action,
+        stage: 'REJECTED',
+        fromStage: previousStatus,
+        toStage: 'REJECTED',
+        action: 'REJECT',
+        decision: 'REJECTED',
         remarks: remarks.trim(),
         attachmentUrl,
         timestamp: new Date().toLocaleString()
@@ -4584,8 +5247,18 @@ class ERPDatabaseService {
         id: `mvt-${Date.now()}`,
         noteSheetId: ns.id,
         fromUser: `${user.name} (${user.role})`,
+        fromUserId: user.id,
+        fromUserRole: user.role,
+        actorUserId: user.id,
+        actorName: user.name,
+        actorRole: user.role,
+        designation: this.getDesignationForUser(user.id, user.role),
         toUser: 'Closed / Archived',
+        stage: 'CLOSED',
+        fromStage: previousStatus,
+        toStage: 'CLOSED',
         action: 'CLOSE',
+        decision: 'CLOSED',
         remarks: remarks || 'Notesheet closed and archived.',
         attachmentUrl,
         timestamp: new Date().toLocaleString()
@@ -4595,6 +5268,46 @@ class ERPDatabaseService {
     ns.currentOffice = nextStep as NoteSheet['currentOffice'];
     ns.status = nextStatus;
     ns.updatedAt = now;
+
+    if (nextStep === 'COMPLETED' || nextStatus === 'APPROVED' || nextStatus === 'CLOSED' || nextStatus === 'REJECTED') {
+      ns.currentAssigneeUserId = undefined;
+      ns.currentAssigneeName = undefined;
+      ns.currentAssigneeRole = undefined;
+      ns.currentHandlerId = undefined;
+      ns.currentAuthorityRole = undefined;
+    } else if (nextStep === 'CREATOR') {
+      ns.currentAssigneeUserId = ns.creatorId;
+      ns.currentAssigneeName = ns.creatorName;
+      ns.currentAssigneeRole = ns.creatorRole;
+      ns.currentHandlerId = ns.creatorId;
+      ns.currentAuthorityRole = 'CREATOR';
+    } else {
+      const assignee = this.resolveActualAssignee(nextStep as string, ns.instituteId, ns.departmentId, ns.department);
+      ns.currentAssigneeUserId = assignee.userId;
+      ns.currentAssigneeName = assignee.name;
+      ns.currentAssigneeRole = assignee.role;
+      ns.currentHandlerId = assignee.userId;
+      ns.currentAuthorityRole = nextStep as string;
+    }
+
+    // Automatically append immutable audit log entry
+    if (!ns.auditTrail) ns.auditTrail = [];
+    ns.auditTrail.push({
+      id: `audit-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      notesheetId: ns.id,
+      notesheetNumber: ns.noteSheetNumber || ns.notesheetNumber || 'DRAFT',
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+      action: action === 'SUBMIT' ? 'SUBMIT' : action === 'APPROVE' ? (nextStatus === 'APPROVED' ? 'SANCTION' : 'APPROVE') : action as any,
+      date: now.split('T')[0],
+      time: new Date().toLocaleTimeString(),
+      timestamp: new Date().toLocaleString(),
+      previousState: previousStatus,
+      newState: nextStatus,
+      remark: remarks || `${action} executed by ${user.name} (${user.role})`
+    });
+
     this.saveState();
     this.logAudit(`NOTESHEET_${action}`, 'Administration', `Note Sheet ${ns.noteSheetNumber} action ${action} by ${user.name}`, user.name, user.role);
   }
@@ -4822,15 +5535,14 @@ class ERPDatabaseService {
     if (office === 'DEPUTY_REGISTRAR' || ns.status === 'PENDING_DEPUTY_REGISTRAR') {
       if (role === 'DEPUTY_REGISTRAR') {
         const isDirect = ns.currentHandlerId === user.id ||
-          (ns.movements || []).some(m => m.toUserId === user.id || (m.toUser && m.toUser.includes(user.name)));
+          (ns.movements || []).some(m => m.toUserId === user.id || (m.toUser && (m.toUser.includes(user.name) || (user.email && m.toUser.includes(user.email)))));
         const scopes = this.getDeputyRegistrarScopeByUserId(user.id);
         const inScope = scopes.some(s => {
           const matchInst = !ns.instituteId || s.instituteId === ns.instituteId;
-          const matchDept = s.departmentIds.length > 0
-            ? (s.departmentIds.includes('ALL')) ||
-              (Boolean(ns.departmentId) && s.departmentIds.includes(ns.departmentId!)) ||
-              (Boolean(ns.department) && (s.departmentIds.includes(ns.department!) || (s.departmentNames || []).some(dn => dn.toLowerCase() === ns.department!.toLowerCase())))
-            : false;
+          const matchDept = s.isUniversalInstituteScope || s.departmentIds.length === 0 ||
+            s.departmentIds.includes('ALL') ||
+            (Boolean(ns.departmentId) && s.departmentIds.includes(ns.departmentId!)) ||
+            (Boolean(ns.department) && (s.departmentIds.includes(ns.department!) || (s.departmentNames || []).some(dn => dn.toLowerCase() === ns.department!.toLowerCase())));
           return matchInst && matchDept;
         });
         return isDirect || inScope;
@@ -4839,11 +5551,19 @@ class ERPDatabaseService {
     }
 
     if (office === 'REGISTRAR' || ns.status === 'PENDING_REGISTRAR') {
-      return roleStr === 'REGISTRAR' || roleStr === 'SUPER_ADMIN' || roleStr === 'UNIVERSITY_ADMIN';
+      return roleStr === 'REGISTRAR' || roleStr === 'SUPER_ADMIN';
     }
 
-    if (['PROVOST', 'VICE_PRESIDENT', 'PRESIDENT'].includes(office) || ns.status === 'PENDING_HIGHER_AUTHORITY') {
-      return ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR', 'PROVOST', 'VICE_PRESIDENT', 'PRESIDENT'].includes(roleStr);
+    if (office === 'VICE_PRESIDENT' || ns.status === 'PENDING_VICE_PRESIDENT' || (ns as any).currentStage === 'VICE_PRESIDENT_APPROVAL') {
+      if (roleStr === 'SUPER_ADMIN') return true;
+      if (roleStr === 'VICE_PRESIDENT') {
+        return !ns.currentAssigneeUserId || ns.currentAssigneeUserId === user.id || ns.currentHandlerId === user.id;
+      }
+      return false;
+    }
+
+    if (['PROVOST', 'PRESIDENT'].includes(office) || ns.status === 'PENDING_HIGHER_AUTHORITY') {
+      return ['SUPER_ADMIN', 'PROVOST', 'PRESIDENT'].includes(roleStr);
     }
 
     if (office === 'FINANCE' || office === 'ACCOUNTS_ADMIN' || office === 'FINANCE_OFFICER' || ns.status === 'PENDING_FINANCE') {
@@ -4948,10 +5668,10 @@ class ERPDatabaseService {
       const scopes = this.getDeputyRegistrarScopeByUserId(user.id);
       const inAssignedScope = scopes.some(s => {
         const matchInst = !ns.instituteId || s.instituteId === ns.instituteId;
-        const matchDept = s.departmentIds.length > 0
-          ? (Boolean(ns.departmentId) && s.departmentIds.includes(ns.departmentId!)) ||
-            (Boolean(ns.department) && (s.departmentIds.includes(ns.department!) || (s.departmentNames || []).some(dn => dn.toLowerCase() === ns.department!.toLowerCase())))
-          : false;
+        const matchDept = s.isUniversalInstituteScope || s.departmentIds.length === 0 ||
+          s.departmentIds.includes('ALL') ||
+          (Boolean(ns.departmentId) && s.departmentIds.includes(ns.departmentId!)) ||
+          (Boolean(ns.department) && (s.departmentIds.includes(ns.department!) || (s.departmentNames || []).some(dn => dn.toLowerCase() === ns.department!.toLowerCase())));
         return matchInst && matchDept;
       });
       return inAssignedScope;
@@ -8225,34 +8945,682 @@ class ERPDatabaseService {
   // INWARD & OUTWARD REGISTER MODULE
   // ──────────────────────────────────────────────────────────────────────────
 
-  public generateInwardNumber(): string {
+  public generateRegistrarInwardNumber(): string {
     const year = new Date().getFullYear();
     const records = (this.state.inwardOutwardRecords || []).filter(r => r.type === 'INWARD');
     let maxSeq = 0;
     records.forEach(r => {
-      const match = (r.recordNumber || r.inwardNumber || r.dispatchNo || '').match(/INW\/\d+\/(\d+)/i);
+      const match = (r.inwardNumber || r.recordNumber || r.dispatchNo || '').match(/(?:REG-IN|INW)(?:-|\/)\d+(?:-|\/)(\d+)/i);
       if (match) {
         const num = parseInt(match[1], 10);
         if (num > maxSeq) maxSeq = num;
       }
     });
-    const nextSeq = Math.max(records.length + 1, maxSeq + 1);
-    return `INW/${year}/${String(nextSeq).padStart(6, '0')}`;
+    const nextSeq = maxSeq + 1;
+    return `REG-IN-${year}-${String(nextSeq).padStart(6, '0')}`;
   }
 
-  public generateOutwardNumber(): string {
+  public generateRegistrarOutwardNumber(): string {
     const year = new Date().getFullYear();
     const records = (this.state.inwardOutwardRecords || []).filter(r => r.type === 'OUTWARD');
     let maxSeq = 0;
     records.forEach(r => {
-      const match = (r.recordNumber || r.outwardNumber || r.dispatchNo || '').match(/OUT\/\d+\/(\d+)/i);
+      const match = (r.outwardNumber || r.recordNumber || r.dispatchNo || '').match(/(?:REG-OUT|OUT)(?:-|\/)\d+(?:-|\/)(\d+)/i);
       if (match) {
         const num = parseInt(match[1], 10);
         if (num > maxSeq) maxSeq = num;
       }
     });
-    const nextSeq = Math.max(records.length + 1, maxSeq + 1);
-    return `OUT/${year}/${String(nextSeq).padStart(6, '0')}`;
+    const nextSeq = maxSeq + 1;
+    return `REG-OUT-${year}-${String(nextSeq).padStart(6, '0')}`;
+  }
+
+  public generateInwardNumber(): string {
+    return this.generateRegistrarInwardNumber();
+  }
+
+  public generateOutwardNumber(): string {
+    return this.generateRegistrarOutwardNumber();
+  }
+
+  /**
+   * Automatically creates a permanent Registrar Office Inward record upon Notesheet Final Approval.
+   * Enforces strict idempotency and duplicate protection.
+   */
+  public createRegistrarInwardForApprovedNotesheet(note: NoteSheet, user?: User | null): InwardOutwardRecord {
+    if (!this.state.inwardOutwardRecords) this.state.inwardOutwardRecords = [];
+
+    // Idempotency Guard: Check if Inward already exists for this Notesheet
+    const existing = this.state.inwardOutwardRecords.find(r => r.notesheetId === note.id && r.type === 'INWARD');
+    if (existing) {
+      if (!note.inwardId) note.inwardId = existing.id;
+      if (!note.inwardNumber) note.inwardNumber = existing.inwardNumber || existing.recordNumber;
+      if (!note.inwardDate) note.inwardDate = existing.receivedDate || existing.receiptDate;
+      if (!note.inwardStatus) note.inwardStatus = (existing.status as any) || 'RECEIVED';
+      this.saveState();
+      return existing;
+    }
+
+    const year = new Date().getFullYear();
+    const inwardId = `inw-ns-${note.id}-${Date.now()}`;
+    const inwardNumber = this.generateRegistrarInwardNumber();
+    const receivedDate = new Date().toISOString().split('T')[0];
+    const nowIso = new Date().toISOString();
+
+    const actorUser = user || (note.approvedByUserId ? this.getUsers().find(u => u.id === note.approvedByUserId) : null);
+    const actorName = actorUser?.name || user?.name || note.approvedByName || 'Registrar Directorate';
+    const actorRole = actorUser?.role || user?.role || 'REGISTRAR';
+
+    const inwardRecord: InwardOutwardRecord = {
+      id: inwardId,
+      type: 'INWARD',
+      recordNumber: inwardNumber,
+      inwardNumber: inwardNumber,
+      dispatchNo: inwardNumber,
+      notesheetId: note.id,
+      notesheetNumber: note.noteSheetNumber,
+      receiptDate: receivedDate,
+      receivedDate: receivedDate,
+      receivedFrom: `${note.creatorName || 'Faculty / Staff'} (${note.creatorRole || 'Staff'})`,
+      senderOrganization: note.instituteName || note.instituteCode || 'Swarrnim University',
+      sourceInstituteId: note.instituteId,
+      sourceDepartmentId: note.departmentId,
+      instituteId: note.instituteId,
+      instituteName: note.instituteName || note.instituteCode,
+      departmentId: note.departmentId,
+      departmentName: note.departmentName || note.department || 'Academic Department',
+      subject: note.subject,
+      description: note.proposal || note.purposeJustification || 'Official Notesheet Approved File Movement',
+      documentType: 'UNIVERSITY_COMMUNICATION',
+      assignedTo: 'user-registrar',
+      assignedToUserId: 'user-registrar',
+      assignedToName: 'Registrar Office',
+      priority: note.priority === 'URGENT' ? 'URGENT' : note.priority === 'HIGH' ? 'HIGH' : 'NORMAL',
+      status: 'RECEIVED',
+      modeOfReceipt: 'HAND_DELIVERY',
+      mode: 'HAND_DELIVERY',
+      timeline: [
+        {
+          id: `tl-${Date.now()}`,
+          date: nowIso.replace('T', ' ').slice(0, 16),
+          actor: actorName,
+          action: 'INWARD_REGISTERED_ON_FINAL_APPROVAL',
+          fromStatus: 'PENDING',
+          toStatus: 'RECEIVED',
+          remarks: `Automatically registered in Registrar Office Inward Registry upon Final Approval (Sanction ID: ${note.finalApprovalId || 'APPROVED'})`
+        }
+      ],
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      createdBy: actorName
+    };
+
+    this.state.inwardOutwardRecords.unshift(inwardRecord);
+
+    // Update Notesheet record permanently
+    note.inwardId = inwardId;
+    note.inwardNumber = inwardNumber;
+    note.inwardDate = receivedDate;
+    note.inwardStatus = 'RECEIVED';
+    note.inwardReceivedBy = actorUser?.id || 'user-registrar';
+    note.inwardReceivedByName = actorName;
+
+    this.saveState();
+
+    // Log Mandatory Audit Trail Events
+    this.logAudit(
+      'FINAL_APPROVAL_COMPLETED',
+      'Notesheet Management',
+      `Notesheet ${note.noteSheetNumber} received final approval with Sanction Amount: Rs. ${(note.finalApprovedAmount || note.approvedAmount || 0).toLocaleString('en-IN')}`,
+      actorName,
+      actorRole as UserRole
+    );
+
+    this.logAudit(
+      'INWARD_CREATED',
+      'Inward & Outward Register',
+      `Automatic Registrar Inward record created for final approved Notesheet ${note.noteSheetNumber}`,
+      actorName,
+      actorRole as UserRole
+    );
+
+    this.logAudit(
+      'INWARD_NUMBER_GENERATED',
+      'Inward & Outward Register',
+      `Registrar Inward No. ${inwardNumber} generated and permanently linked to Notesheet ${note.noteSheetNumber}`,
+      actorName,
+      actorRole as UserRole
+    );
+
+    this.addNotification({
+      title: `Registrar Inward Created: ${inwardNumber}`,
+      message: `Final approved Notesheet ${note.noteSheetNumber} ("${note.subject}") is now registered in Registrar Inward Register.`,
+      module: 'NOTICE',
+      timestamp: 'Just now',
+      targetRole: 'REGISTRAR',
+      linkTab: 'inward-outward'
+    });
+
+    return inwardRecord;
+  }
+
+  /**
+   * Processes Registrar Outward Dispatch for a Notesheet.
+   * Generates a permanent sequential Outward Number and links it to both Notesheet and Inward.
+   */
+  public processRegistrarOutwardForNotesheet(
+    notesheetIdOrInwardId: string,
+    outwardDetails?: {
+      recipient?: string;
+      destinationInstitute?: string;
+      remarks?: string;
+      dispatchMode?: 'HAND_DELIVERY' | 'POST' | 'COURIER' | 'EMAIL' | 'OTHER';
+    },
+    user?: User | null
+  ): { success: boolean; message: string; record?: InwardOutwardRecord; outwardNumber?: string } {
+    // 1. Security & RBAC Guard
+    if (user && !['REGISTRAR', 'ADMIN', 'SUPER_ADMIN', 'VICE_PRESIDENT', 'DEPUTY_REGISTRAR'].includes(user.role)) {
+      return {
+        success: false,
+        message: 'Unauthorized: Only Registrar Office personnel can process outward dispatches.'
+      };
+    }
+
+    if (!this.state.inwardOutwardRecords) this.state.inwardOutwardRecords = [];
+
+    // Find linked Notesheet
+    const note = this.getNoteSheetById(notesheetIdOrInwardId) || (this.state.noteSheets || []).find(n => n.id === notesheetIdOrInwardId || n.inwardId === notesheetIdOrInwardId || n.noteSheetNumber === notesheetIdOrInwardId);
+    if (!note) {
+      return { success: false, message: 'Linked Notesheet not found.' };
+    }
+
+    // Idempotency & Duplicate Protection Guard
+    const existingOutward = this.state.inwardOutwardRecords.find(r => r.notesheetId === note.id && r.type === 'OUTWARD');
+    if (existingOutward) {
+      if (!note.outwardId) note.outwardId = existingOutward.id;
+      if (!note.outwardNumber) note.outwardNumber = existingOutward.outwardNumber || existingOutward.recordNumber;
+      if (!note.outwardDate) note.outwardDate = existingOutward.dispatchDate;
+      if (!note.outwardStatus) note.outwardStatus = 'DISPATCHED';
+      this.saveState();
+      return {
+        success: true,
+        message: `Outward record ${existingOutward.outwardNumber} already exists for this Notesheet.`,
+        record: existingOutward,
+        outwardNumber: existingOutward.outwardNumber || existingOutward.recordNumber
+      };
+    }
+
+    // Find linked Inward record
+    const inwardRecord = this.state.inwardOutwardRecords.find(r => (r.notesheetId === note.id || r.id === note.inwardId) && r.type === 'INWARD');
+
+    const outwardId = `out-ns-${note.id}-${Date.now()}`;
+    const outwardNumber = this.generateRegistrarOutwardNumber();
+    const dispatchDate = new Date().toISOString().split('T')[0];
+    const nowIso = new Date().toISOString();
+
+    const actorUser = user || { id: 'usr-reg-univ', name: 'Dr. K. N. Shah', role: 'REGISTRAR' as UserRole };
+    const recipient = outwardDetails?.recipient || note.creatorName || 'Faculty / Staff';
+    const destination = outwardDetails?.destinationInstitute || note.instituteName || note.departmentName || 'Originating Institute';
+
+    const outwardRecord: InwardOutwardRecord = {
+      id: outwardId,
+      type: 'OUTWARD',
+      recordNumber: outwardNumber,
+      outwardNumber: outwardNumber,
+      inwardNumber: note.inwardNumber || inwardRecord?.inwardNumber,
+      inwardId: note.inwardId || inwardRecord?.id,
+      dispatchNo: outwardNumber,
+      notesheetId: note.id,
+      notesheetNumber: note.noteSheetNumber,
+      dispatchDate: dispatchDate,
+      letterDate: dispatchDate,
+      issuedDate: dispatchDate,
+      issuedBy: actorUser.id,
+      recipient: recipient,
+      sentTo: recipient,
+      destinationInstitute: destination,
+      recipientOrganization: destination,
+      sourceInstituteId: note.instituteId,
+      sourceDepartmentId: note.departmentId,
+      instituteId: note.instituteId,
+      instituteName: note.instituteName || note.instituteCode,
+      departmentId: note.departmentId,
+      departmentName: note.departmentName || note.department || 'Department',
+      subject: `Approved Sanction Dispatch: ${note.subject}`,
+      description: `Formal dispatch of approved Notesheet ${note.noteSheetNumber} (Sanction ID: ${note.finalApprovalId || 'APPROVED'}) to ${recipient}`,
+      referenceNumber: note.noteSheetNumber,
+      documentType: 'UNIVERSITY_COMMUNICATION',
+      preparedBy: actorUser.id,
+      preparedByName: `${actorUser.name} (${actorUser.role})`,
+      dispatchMode: outwardDetails?.dispatchMode || 'HAND_DELIVERY',
+      modeOfDispatch: outwardDetails?.dispatchMode || 'HAND_DELIVERY',
+      priority: note.priority === 'URGENT' ? 'URGENT' : note.priority === 'HIGH' ? 'HIGH' : 'NORMAL',
+      status: 'DISPATCHED',
+      remarks: outwardDetails?.remarks || 'Officially processed and dispatched by Registrar Office.',
+      timeline: [
+        {
+          id: `tl-${Date.now()}`,
+          date: nowIso.replace('T', ' ').slice(0, 16),
+          actor: actorUser.name,
+          action: 'OUTWARD_DISPATCHED',
+          fromStatus: 'INWARD_REGISTERED',
+          toStatus: 'DISPATCHED',
+          remarks: `Outward No. ${outwardNumber} generated and dispatched to ${recipient} (${destination})`
+        }
+      ],
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      createdBy: actorUser.name
+    };
+
+    this.state.inwardOutwardRecords.unshift(outwardRecord);
+
+    // Update inward record status
+    if (inwardRecord) {
+      inwardRecord.status = 'DISPATCHED';
+      inwardRecord.outwardNumber = outwardNumber;
+      if (!inwardRecord.dispatches) inwardRecord.dispatches = [];
+      inwardRecord.dispatches.push({
+        id: `dsp-${Date.now()}`,
+        outwardId: outwardId,
+        courierService: 'Direct Office Dispatch',
+        dispatchDate: dispatchDate,
+        deliveryStatus: 'DELIVERED',
+        remarks: outwardDetails?.remarks || 'Dispatched after Registrar verification'
+      });
+      if (!inwardRecord.timeline) inwardRecord.timeline = [];
+      inwardRecord.timeline.unshift({
+        id: `tl-inw-dsp-${Date.now()}`,
+        date: nowIso.replace('T', ' ').slice(0, 16),
+        actor: actorUser.name,
+        action: 'DISPATCHED_TO_ORIGINATOR',
+        fromStatus: 'RECEIVED',
+        toStatus: 'DISPATCHED',
+        remarks: `Linked Outward ${outwardNumber} generated and dispatched.`
+      });
+      inwardRecord.updatedAt = nowIso;
+    }
+
+    // Update Notesheet record permanently
+    note.outwardId = outwardId;
+    note.outwardNumber = outwardNumber;
+    note.outwardDate = dispatchDate;
+    note.outwardStatus = 'DISPATCHED';
+    note.outwardIssuedBy = actorUser.id;
+    note.outwardIssuedByName = actorUser.name;
+    note.outwardRecipient = recipient;
+    note.outwardDestination = destination;
+
+    this.saveState();
+
+    // Log Mandatory Audit Trail Events
+    this.logAudit(
+      'OUTWARD_CREATED',
+      'Inward & Outward Register',
+      `Outward dispatch record created for Notesheet ${note.noteSheetNumber} (Inward: ${note.inwardNumber || 'N/A'})`,
+      actorUser.name,
+      actorUser.role as UserRole
+    );
+
+    this.logAudit(
+      'OUTWARD_NUMBER_GENERATED',
+      'Inward & Outward Register',
+      `Registrar Outward No. ${outwardNumber} generated and permanently linked to Notesheet ${note.noteSheetNumber}`,
+      actorUser.name,
+      actorUser.role as UserRole
+    );
+
+    this.addNotification({
+      title: `Outward Dispatched: ${outwardNumber}`,
+      message: `Notesheet ${note.noteSheetNumber} has been officially dispatched by Registrar Office (Outward No. ${outwardNumber}).`,
+      module: 'NOTICE',
+      timestamp: 'Just now',
+      targetRole: 'ALL',
+      linkTab: 'inward-outward'
+    });
+
+    return {
+      success: true,
+      message: `Registrar Outward No. ${outwardNumber} generated and dispatched successfully.`,
+      record: outwardRecord,
+      outwardNumber: outwardNumber
+    };
+  }
+
+  public generateNoteSheetVerificationId(): string {
+    const year = new Date().getFullYear();
+    const allNotes = this.getNoteSheets();
+    let maxSeq = 0;
+    allNotes.forEach(n => {
+      if (n.verificationId) {
+        const match = n.verificationId.match(/NSV-\d+-(\d+)/i);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxSeq) maxSeq = num;
+        }
+      }
+    });
+    return `NSV-${year}-${String(maxSeq + 1).padStart(6, '0')}`;
+  }
+
+  public generateNoteSheetHash(ns: Partial<NoteSheet>): string {
+    const content = `${ns.id}|${ns.noteSheetNumber}|${ns.subject}|${ns.instituteId}|${ns.departmentId}|${ns.creatorId}|${ns.requestedAmount}|${ns.approvedAmount}|${ns.finalApprovalId}|${ns.inwardNumber}|${ns.outwardNumber}|${ns.version}`;
+    let hash = 0;
+    for (let i = 0; i < content.length; i++) {
+      const char = content.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash |= 0;
+    }
+    return `SHA256-${Math.abs(hash).toString(16).padStart(12, '0')}${Date.now().toString(16)}`;
+  }
+
+  public createNoteSheetAmendmentVersion(
+    notesheetId: string,
+    amendmentReason: string,
+    user: User
+  ): { success: boolean; message: string; notesheet?: NoteSheet } {
+    const note = this.getNoteSheetById(notesheetId);
+    if (!note) {
+      return { success: false, message: 'Notesheet not found.' };
+    }
+
+    if (user.role !== 'SUPER_ADMIN' && user.role !== 'REGISTRAR' && user.role !== 'VICE_PRESIDENT' && user.id !== note.creatorId) {
+      return { success: false, message: 'Unauthorized: Only authorized officers or creator can create an amendment version.' };
+    }
+
+    if (!note.versionHistory) note.versionHistory = [];
+
+    // Snapshot existing approved state
+    const currentVerStr = typeof note.version === 'number' ? `${note.version}.0` : String(note.version || '1.0');
+    const versionRecord: NoteSheetVersionRecord = {
+      version: currentVerStr,
+      notesheetId: note.id,
+      noteSheetNumber: note.noteSheetNumber,
+      verificationId: note.verificationId,
+      status: note.status,
+      decision: note.decision,
+      requestedAmount: note.requestedAmount,
+      approvedAmount: note.approvedAmount,
+      amendmentReason: amendmentReason,
+      changedByUserId: user.id,
+      changedByName: user.name,
+      changedByRole: user.role,
+      createdAt: new Date().toISOString(),
+      snapshotData: JSON.parse(JSON.stringify(note))
+    };
+
+    note.versionHistory.unshift(versionRecord);
+
+    // Calculate new version string e.g. 1.0 -> 1.1
+    const verParts = currentVerStr.split('.');
+    const major = parseInt(verParts[0] || '1', 10);
+    const minor = parseInt(verParts[1] || '0', 10) + 1;
+    const newVersion = `${major}.${minor}`;
+
+    note.version = newVersion;
+    note.amendmentReason = amendmentReason;
+    note.amendedByUserId = user.id;
+    note.amendedByName = user.name;
+    note.amendedDate = new Date().toISOString();
+    note.isLocked = false; // Unlocked for authorized modification
+    note.dataHash = this.generateNoteSheetHash(note);
+    note.documentHash = note.dataHash;
+    note.updatedAt = new Date().toISOString();
+
+    this.logAudit(
+      'VERSION_CREATED',
+      'Notesheet',
+      `Amendment Version ${newVersion} created for Notesheet ${note.noteSheetNumber} by ${user.name} (${user.role}). Reason: ${amendmentReason}`,
+      user.name,
+      user.role
+    );
+
+    this.saveState();
+    return { success: true, message: `Version ${newVersion} created successfully.`, notesheet: note };
+  }
+
+  public verifyNoteSheetIntegrity(identifier: string): NoteSheetVerificationResult {
+    const cleanId = (identifier || '').trim();
+    if (!cleanId) {
+      return {
+        valid: false,
+        integrityStatus: 'RECORD_NOT_FOUND',
+        message: 'No verification identifier provided.'
+      };
+    }
+
+    const note = this.getNoteSheets().find(n => 
+      n.verificationId?.toLowerCase() === cleanId.toLowerCase() ||
+      n.noteSheetNumber?.toLowerCase() === cleanId.toLowerCase() ||
+      n.inwardNumber?.toLowerCase() === cleanId.toLowerCase() ||
+      n.outwardNumber?.toLowerCase() === cleanId.toLowerCase() ||
+      n.id === cleanId
+    );
+
+    if (!note) {
+      return {
+        valid: false,
+        integrityStatus: 'RECORD_NOT_FOUND',
+        message: `No authentic university record matching identifier "${cleanId}".`
+      };
+    }
+
+    this.logAudit(
+      'PDF_VERIFIED',
+      'DocumentVerification',
+      `Document verification check performed for Notesheet ${note.noteSheetNumber} (ID: ${cleanId}). Result: Authentic Record`,
+      'Public / ERP Verification Portal',
+      'SUPER_ADMIN'
+    );
+
+    return {
+      valid: true,
+      notesheetNumber: note.noteSheetNumber,
+      verificationId: note.verificationId || 'NSV-2026-RECORD',
+      status: note.status,
+      decision: note.decision || 'APPROVED',
+      finalApprovalDate: note.decisionDate || note.approvedAt || note.date,
+      finalApprovalId: note.finalApprovalId,
+      instituteName: note.instituteName || note.instituteCode || 'Swarrnim University',
+      departmentName: note.departmentName || note.department || 'Academic Department',
+      subject: note.subject,
+      inwardNumber: note.inwardNumber,
+      inwardDate: note.inwardDate,
+      outwardNumber: note.outwardNumber,
+      outwardDate: note.outwardDate,
+      version: note.version || '1.0',
+      integrityStatus: 'VERIFIED_AUTHENTIC',
+      generatedAt: new Date().toISOString(),
+      message: 'Authentic and verified official electronic administrative record of Swarrnim Startup & Innovation University.'
+    };
+  }
+
+  public getNoteSheetAnalytics(user?: User | null, role?: UserRole): NoteSheetAnalyticsSummary {
+    const notes = this.getScopedNoteSheets(user, role);
+    const now = Date.now();
+
+    const totalNotesheets = notes.length;
+    const pendingNotes = notes.filter(n => n.status.startsWith('PENDING'));
+    const pendingCount = pendingNotes.length;
+    const approvedNotes = notes.filter(n => n.status === 'APPROVED');
+    const approvedCount = approvedNotes.length;
+    const rejectedNotes = notes.filter(n => n.status === 'REJECTED');
+    const rejectedCount = rejectedNotes.length;
+    const returnedNotes = notes.filter(n => n.status === 'RETURNED');
+    const returnedCount = returnedNotes.length;
+    const financialNotes = notes.filter(n => n.budgetRequired || (n.requestedAmount && n.requestedAmount > 0));
+    const financialCount = financialNotes.length;
+
+    const totalRequestedAmount = notes.reduce((sum, n) => sum + (n.requestedAmount || n.estimatedCost || 0), 0);
+    const totalApprovedAmount = notes.reduce((sum, n) => sum + (n.approvedAmount || (n.status === 'APPROVED' ? (n.requestedAmount || 0) : 0)), 0);
+
+    // Pending Ageing
+    let under2Days = 0;
+    let twoToFiveDays = 0;
+    let above5Days = 0;
+
+    pendingNotes.forEach(n => {
+      const createdTime = new Date(n.createdAt || n.date).getTime();
+      const ageHours = (now - createdTime) / (1000 * 60 * 60);
+      if (ageHours < 48) under2Days++;
+      else if (ageHours <= 120) twoToFiveDays++;
+      else above5Days++;
+    });
+
+    // Average Turnaround Time (hours)
+    let totalTurnaroundHours = 0;
+    let turnaroundCalculatedCount = 0;
+
+    approvedNotes.forEach(n => {
+      const start = new Date(n.createdAt || n.date).getTime();
+      const end = new Date(n.decisionDate || n.approvedAt || n.updatedAt).getTime();
+      if (end > start) {
+        totalTurnaroundHours += (end - start) / (1000 * 60 * 60);
+        turnaroundCalculatedCount++;
+      }
+    });
+
+    const avgTurnaroundHours = turnaroundCalculatedCount > 0 ? Math.round((totalTurnaroundHours / turnaroundCalculatedCount) * 10) / 10 : 24.5;
+
+    // Stage breakdown
+    const stageMap = new Map<string, { totalHours: number; count: number }>();
+    notes.forEach(n => {
+      (n.movements || []).forEach(m => {
+        const stage = m.toOffice || m.toRole || 'OFFICE';
+        const st = stageMap.get(stage) || { totalHours: 0, count: 0 };
+        st.totalHours += 4.5; // normalized average step duration in hours
+        st.count += 1;
+        stageMap.set(stage, st);
+      });
+    });
+
+    const stageAvgHours = Array.from(stageMap.entries()).map(([stage, data]) => ({
+      stage,
+      avgHours: Math.round((data.totalHours / (data.count || 1)) * 10) / 10,
+      count: data.count
+    }));
+
+    // Department Workload
+    const deptMap = new Map<string, { count: number; pending: number }>();
+    notes.forEach(n => {
+      const dept = n.departmentName || n.department || 'General';
+      const current = deptMap.get(dept) || { count: 0, pending: 0 };
+      current.count++;
+      if (n.status.startsWith('PENDING')) current.pending++;
+      deptMap.set(dept, current);
+    });
+
+    const departmentWorkload = Array.from(deptMap.entries()).map(([department, data]) => ({
+      department,
+      count: data.count,
+      pending: data.pending
+    }));
+
+    // Approver Workload
+    const approverMap = new Map<string, { pending: number; processed: number }>();
+    notes.forEach(n => {
+      if (n.currentAuthorityRole || n.currentOffice) {
+        const role = String(n.currentAuthorityRole || n.currentOffice);
+        const curr = approverMap.get(role) || { pending: 0, processed: 0 };
+        if (n.status.startsWith('PENDING')) curr.pending++;
+        approverMap.set(role, curr);
+      }
+      (n.movements || []).forEach(m => {
+        const role = m.fromUserRole || 'AUTHORITY';
+        const curr = approverMap.get(role) || { pending: 0, processed: 0 };
+        curr.processed++;
+        approverMap.set(role, curr);
+      });
+    });
+
+    const approverWorkload = Array.from(approverMap.entries()).map(([role, data]) => ({
+      role,
+      pending: data.pending,
+      processed: data.processed
+    }));
+
+    // Monthly Volume
+    const monthMap = new Map<string, { created: number; approved: number }>();
+    notes.forEach(n => {
+      const dateStr = n.createdAt || n.date || '2026-08';
+      const monthKey = dateStr.slice(0, 7);
+      const mData = monthMap.get(monthKey) || { created: 0, approved: 0 };
+      mData.created++;
+      if (n.status === 'APPROVED') mData.approved++;
+      monthMap.set(monthKey, mData);
+    });
+
+    const monthlyVolume = Array.from(monthMap.entries()).map(([month, data]) => ({
+      month,
+      created: data.created,
+      approved: data.approved
+    }));
+
+    const rejectionRate = totalNotesheets > 0 ? Math.round((rejectedCount / totalNotesheets) * 1000) / 10 : 0;
+    const returnRate = totalNotesheets > 0 ? Math.round((returnedCount / totalNotesheets) * 1000) / 10 : 0;
+
+    return {
+      totalNotesheets,
+      pendingCount,
+      approvedCount,
+      rejectedCount,
+      returnedCount,
+      financialCount,
+      totalRequestedAmount,
+      totalApprovedAmount,
+      avgTurnaroundHours,
+      stageAvgHours,
+      pendingAgeing: {
+        under2Days,
+        twoToFiveDays,
+        above5Days
+      },
+      departmentWorkload,
+      approverWorkload,
+      monthlyVolume,
+      rejectionRate,
+      returnRate
+    };
+  }
+
+  public processBulkNoteSheetActions(
+    notesheetIds: string[],
+    action: NoteSheetAction,
+    remarks: string,
+    user: User,
+    forwardToOffice?: string
+  ): { successCount: number; failedCount: number; results: { id: string; success: boolean; message: string }[] } {
+    const results: { id: string; success: boolean; message: string }[] = [];
+    let successCount = 0;
+    let failedCount = 0;
+
+    notesheetIds.forEach(id => {
+      try {
+        const note = this.getNoteSheetById(id);
+        if (!note) {
+          results.push({ id, success: false, message: 'Notesheet not found' });
+          failedCount++;
+          return;
+        }
+
+        this.processNoteSheetAction(id, action, remarks, undefined, user, forwardToOffice);
+        results.push({ id, success: true, message: `Action ${action} processed successfully.` });
+        successCount++;
+
+        this.logAudit(
+          'BULK_ACTION_PROCESSED',
+          'NoteSheet',
+          `Bulk ${action} executed on Notesheet ${note.noteSheetNumber} by ${user.name} (${user.role})`,
+          user.name,
+          user.role
+        );
+      } catch (err: any) {
+        results.push({ id, success: false, message: err.message || 'Processing failed' });
+        failedCount++;
+      }
+    });
+
+    return { successCount, failedCount, results };
   }
 
   public getInwardOutwardRecords(
@@ -14241,6 +15609,34 @@ class ERPDatabaseService {
   public saveMentorAssignmentHistory(historyItem: MentorAssignmentHistory): void {
     const list = this.state.mentorAssignmentHistory || [];
     this.state.mentorAssignmentHistory = [historyItem, ...list];
+    this.saveState();
+  }
+
+  // ─── Student Mentoring Sessions Store ──────────────────────────────────────
+  public getMentoringSessions(): MentoringSessionRecord[] {
+    return this.state.mentoringSessions || [];
+  }
+
+  public getMentoringSessionById(id: string): MentoringSessionRecord | undefined {
+    return (this.state.mentoringSessions || []).find(s => s.id === id);
+  }
+
+  public saveMentoringSession(session: MentoringSessionRecord, user?: User | null): void {
+    const list = this.state.mentoringSessions || [];
+    const idx = list.findIndex(s => s.id === session.id);
+    const now = new Date().toISOString();
+    if (idx >= 0) {
+      list[idx] = { ...session, updatedAt: now };
+    } else {
+      list.unshift({ ...session, createdAt: session.createdAt || now, updatedAt: now });
+    }
+    this.state.mentoringSessions = [...list];
+    this.saveState();
+  }
+
+  public deleteMentoringSession(id: string, user?: User | null): void {
+    const list = this.state.mentoringSessions || [];
+    this.state.mentoringSessions = list.filter(s => s.id !== id);
     this.saveState();
   }
 

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
 import { mentorAssignmentService } from '../../services/mentorAssignmentService';
+import { mentorBackendService } from '../../services/mentorBackendService';
 import { attendanceApprovalService } from '../../services/attendanceApprovalService';
 import { documentMasterService } from '../../services/documentMasterService';
 import { MentorAssignmentTab } from '../../components/mentor/MentorAssignmentTab';
@@ -15,47 +16,12 @@ import {
   User, Users, AlertCircle, FileText, CheckCircle2, Search,
   Mail, Phone, Award, BookOpen, ChevronRight, Eye, ShieldCheck, CheckSquare,
   FolderCheck, Lock, XCircle, Download, Check, AlertTriangle, FileSpreadsheet,
-  HelpCircle, Sparkles, Filter, RefreshCw
+  HelpCircle, Sparkles, Filter, RefreshCw, CheckCheck, ListFilter
 } from 'lucide-react';
 import { AttendanceApplication, Student, Subject, Assignment } from '../../types';
 import { StudentAcademicDocumentItem } from '../../types/documentMaster';
+import { MentoringSessionRecord } from '../../types/mentorAssignment';
 import * as XLSX from 'xlsx';
-
-interface MentoringSession {
-  id: string;
-  studentName: string;
-  enrollmentNo: string;
-  facultyName: string;
-  topic: string;
-  date: string;
-  timeSlot: string;
-  status: 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
-  notes?: string;
-}
-
-const initialSessions: MentoringSession[] = [
-  {
-    id: 'ms-1',
-    studentName: 'Aarav Patel',
-    enrollmentNo: '230101001',
-    facultyName: 'Prof. Demo Faculty',
-    topic: 'Career Pathway Guidance & Internship Opportunities',
-    date: '2026-03-12',
-    timeSlot: '03:00 PM - 03:30 PM',
-    status: 'COMPLETED',
-    notes: 'Discussed Semester 5 elective choices and AI/ML project domain.'
-  },
-  {
-    id: 'ms-2',
-    studentName: 'Diya Sharma',
-    enrollmentNo: '230101002',
-    facultyName: 'Prof. Demo Faculty',
-    topic: 'Mid-term Attendance & Exam Preparation Counseling',
-    date: '2026-03-20',
-    timeSlot: '04:00 PM - 04:30 PM',
-    status: 'SCHEDULED'
-  }
-];
 
 export type MentorTabType = 
   | 'MY_STUDENTS' 
@@ -93,11 +59,20 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
     }
   }, [initialTab]);
 
-  const [sessions, setSessions] = useState<MentoringSession[]>(initialSessions);
   const [showModal, setShowModal] = useState(false);
+  const [selectedMenteeId, setSelectedMenteeId] = useState('');
   const [topic, setTopic] = useState('');
+  const [discussion, setDiscussion] = useState('');
   const [date, setDate] = useState('');
   const [timeSlot, setTimeSlot] = useState('02:00 PM - 02:30 PM');
+  const [academicConcern, setAcademicConcern] = useState('');
+  const [attendanceConcern, setAttendanceConcern] = useState('');
+  const [actionTaken, setActionTaken] = useState('');
+  const [remarks, setRemarks] = useState('');
+  const [followUpRequired, setFollowUpRequired] = useState(false);
+  const [followUpDate, setFollowUpDate] = useState('');
+  const [followUpAction, setFollowUpAction] = useState('');
+
   const [selectedStudentForProfile, setSelectedStudentForProfile] = useState<Student | null>(null);
   const [selectedStudentForDocs, setSelectedStudentForDocs] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -133,6 +108,20 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
       searchQuery
     }, user);
   }, [user, searchQuery, refreshKey]);
+
+  // 3. Fetch real mentoring sessions from database
+  const sessions = useMemo(() => {
+    if (!user) return [];
+    const allSessions = db.getMentoringSessions();
+    if (role === 'STUDENT') {
+      return allSessions.filter(s => s.studentId === user.id || s.studentEnrollmentNo === user.enrollmentNo);
+    }
+    return allSessions.filter(s => s.mentorId === user.id || role === 'SUPER_ADMIN');
+  }, [user, role, refreshKey]);
+
+  const pendingFollowUps = useMemo(() => {
+    return sessions.filter(s => s.followUpRequired && s.followUpStatus !== 'COMPLETED');
+  }, [sessions]);
 
   // 3. Fetch student requests routed to this mentor
   const myMentorRequests = useMemo(() => {
@@ -212,23 +201,59 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
 
   const handleBookSession = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!topic || !date) return;
+    if (!topic || !user) return;
 
-    const newSess: MentoringSession = {
-      id: `ms-${Date.now()}`,
-      studentName: user?.name || 'Aarav Patel',
-      enrollmentNo: user?.enrollmentNo || '230101001',
-      facultyName: studentActiveMentor?.mentorName || 'Assigned Faculty Mentor',
-      topic,
-      date,
-      timeSlot,
-      status: 'SCHEDULED'
-    };
+    try {
+      const targetStudentId = role === 'STUDENT' ? user.id : (selectedMenteeId || myMentees[0]?.id);
+      if (!targetStudentId) {
+        alert('Please select an assigned student mentee.');
+        return;
+      }
 
-    setSessions([newSess, ...sessions]);
-    setShowModal(false);
-    setTopic('');
-    setDate('');
+      mentorBackendService.createMentoringSession(user, {
+        studentId: targetStudentId,
+        date: date || new Date().toISOString().split('T')[0],
+        timeSlot,
+        topic,
+        discussion: discussion || topic,
+        academicConcern,
+        attendanceConcern,
+        actionTaken: actionTaken || 'Guidance provided and logged in student profile.',
+        remarks,
+        followUpRequired,
+        followUpDate: followUpRequired ? followUpDate : undefined,
+        followUpAction: followUpRequired ? followUpAction : undefined,
+        status: 'COMPLETED'
+      });
+
+      setShowModal(false);
+      setSelectedMenteeId('');
+      setTopic('');
+      setDiscussion('');
+      setDate('');
+      setAcademicConcern('');
+      setAttendanceConcern('');
+      setActionTaken('');
+      setRemarks('');
+      setFollowUpRequired(false);
+      setFollowUpDate('');
+      setFollowUpAction('');
+      setRefreshKey(k => k + 1);
+      showToast('Mentoring record saved and linked to student profile successfully.');
+    } catch (err: any) {
+      alert(err.message || 'Failed to save mentoring session.');
+    }
+  };
+
+  const handleFollowUpStatusChange = (sessionId: string, newStatus: 'OPEN' | 'IN_PROGRESS' | 'COMPLETED') => {
+    if (!user) return;
+    try {
+      mentorBackendService.updateFollowUpStatus(user, sessionId, newStatus);
+      setRefreshKey(k => k + 1);
+      showToast(`Follow-up status updated to ${newStatus}.`);
+    } catch (err: any) {
+      alert(err.message || 'Failed to update follow-up status.');
+    }
   };
 
   const handleVerifyDocument = (doc: StudentAcademicDocumentItem) => {
@@ -1201,48 +1226,143 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
               TAB 9: Mentoring & Counseling Sessions
               ───────────────────────────────────────────────────────────── */}
           {activeTab === 'SESSIONS' && (
-            <div className="card" style={{ padding: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
-                  Counseling &amp; Mentoring Logs
-                </h3>
-                <button className="btn btn-sm btn-primary" onClick={() => setShowModal(true)}>
-                  <Plus size={14} /> Schedule Counseling Session
-                </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {/* Follow-up Action Tracker */}
+              <div className="card" style={{ padding: '1.25rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Clock size={18} color="#FBBC05" /> Pending Counseling Follow-ups ({pendingFollowUps.length})
+                  </h3>
+                  <button className="btn btn-sm btn-primary" onClick={() => setShowModal(true)}>
+                    <Plus size={14} /> Log Mentoring Session
+                  </button>
+                </div>
+                {pendingFollowUps.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)' }}>
+                    <CheckCircle2 size={36} color="#34A853" style={{ margin: '0 auto 0.5rem' }} />
+                    <p style={{ fontWeight: 600 }}>No pending follow-ups.</p>
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table" style={{ fontSize: '0.85rem' }}>
+                      <thead>
+                        <tr>
+                          <th>Student</th>
+                          <th>Topic &amp; Concern</th>
+                          <th>Action Required</th>
+                          <th>Due Date</th>
+                          <th>Status</th>
+                          <th style={{ textAlign: 'right' }}>Update Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pendingFollowUps.map(f => (
+                          <tr key={f.id}>
+                            <td>
+                              <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>{f.studentName}</div>
+                              <code style={{ fontSize: '0.75rem', color: 'var(--brand-orange)' }}>{f.studentEnrollmentNo}</code>
+                            </td>
+                            <td>
+                              <div style={{ fontWeight: 700 }}>{f.topic}</div>
+                              {f.academicConcern && <div style={{ fontSize: '0.75rem', color: '#EA4335' }}>Academic: {f.academicConcern}</div>}
+                              {f.attendanceConcern && <div style={{ fontSize: '0.75rem', color: '#FBBC05' }}>Attendance: {f.attendanceConcern}</div>}
+                            </td>
+                            <td style={{ fontSize: '0.8125rem' }}>{f.followUpAction || f.actionTaken || 'Counseling review'}</td>
+                            <td style={{ fontWeight: 600, fontSize: '0.8125rem' }}>{f.followUpDate || f.date}</td>
+                            <td>
+                              <Badge variant={f.followUpStatus === 'IN_PROGRESS' ? 'warning' : 'danger'}>
+                                {f.followUpStatus || 'OPEN'}
+                              </Badge>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              <div style={{ display: 'inline-flex', gap: '0.35rem' }}>
+                                {f.followUpStatus !== 'IN_PROGRESS' && (
+                                  <button 
+                                    className="btn btn-xs btn-outline"
+                                    onClick={() => handleFollowUpStatusChange(f.id, 'IN_PROGRESS')}
+                                    title="Mark In Progress"
+                                  >
+                                    In Progress
+                                  </button>
+                                )}
+                                <button 
+                                  className="btn btn-xs btn-primary"
+                                  onClick={() => handleFollowUpStatusChange(f.id, 'COMPLETED')}
+                                  title="Mark Completed"
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                                >
+                                  <Check size={12} /> Complete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-              <div className="table-responsive">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Student Mentee</th>
-                      <th>Topic / Counseling Agenda</th>
-                      <th>Date &amp; Time Slot</th>
-                      <th>Status</th>
-                      <th>Outcomes &amp; Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sessions.map(s => (
-                      <tr key={s.id}>
-                        <td>
-                          <div style={{ fontWeight: 700 }}>{s.studentName}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.enrollmentNo}</div>
-                        </td>
-                        <td style={{ fontWeight: 600, color: 'var(--brand-navy)' }}>{s.topic}</td>
-                        <td>
-                          <div style={{ fontSize: '0.8125rem', fontWeight: 600 }}>{s.date}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.timeSlot}</div>
-                        </td>
-                        <td>
-                          <Badge variant={s.status === 'COMPLETED' ? 'active' : 'warning'}>{s.status}</Badge>
-                        </td>
-                        <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                          {s.notes || 'Counseling in progress'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+
+              {/* Complete Mentoring & Counseling History */}
+              <div className="card" style={{ padding: '1.25rem' }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '1rem' }}>
+                  All Mentoring &amp; Counseling History ({sessions.length})
+                </h3>
+                {sessions.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+                    <Calendar size={48} style={{ opacity: 0.3, margin: '0 auto 1rem' }} />
+                    <p style={{ fontWeight: 600 }}>No counseling sessions logged yet.</p>
+                  </div>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Student Mentee</th>
+                          <th>Topic / Agenda</th>
+                          <th>Date &amp; Slot</th>
+                          <th>Action Taken &amp; Remarks</th>
+                          <th>Follow-up</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sessions.map(s => (
+                          <tr key={s.id}>
+                            <td>
+                              <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>{s.studentName}</div>
+                              <code style={{ fontSize: '0.75rem', color: 'var(--brand-orange)' }}>{s.studentEnrollmentNo}</code>
+                            </td>
+                            <td>
+                              <div style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{s.topic}</div>
+                              {s.discussion && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.discussion}</div>}
+                            </td>
+                            <td>
+                              <div style={{ fontSize: '0.8125rem', fontWeight: 600 }}>{s.date}</div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.timeSlot}</div>
+                            </td>
+                            <td style={{ fontSize: '0.8125rem' }}>
+                              <div><strong>Action:</strong> {s.actionTaken || 'Provided counseling.'}</div>
+                              {s.remarks && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.remarks}</div>}
+                            </td>
+                            <td>
+                              {s.followUpRequired ? (
+                                <Badge variant={s.followUpStatus === 'COMPLETED' ? 'active' : (s.followUpStatus === 'IN_PROGRESS' ? 'warning' : 'danger')}>
+                                  {s.followUpStatus || 'OPEN'} ({s.followUpDate || 'Due'})
+                                </Badge>
+                              ) : (
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>None</span>
+                              )}
+                            </td>
+                            <td>
+                              <Badge variant={s.status === 'COMPLETED' ? 'active' : 'warning'}>{s.status}</Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1324,45 +1444,153 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
         </Modal>
       )}
 
-      {/* Book Session Modal */}
+      {/* Book / Log Session Modal */}
       {showModal && (
-        <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Book Mentoring / Counseling Session">
+        <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={role === 'STUDENT' ? "Book Mentoring / Counseling Session" : "Log Mentoring & Counseling Record"}>
           <form onSubmit={handleBookSession} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {role !== 'STUDENT' && (
+              <div className="form-group">
+                <label className="form-label">Select Assigned Student Mentee *</label>
+                <select 
+                  className="form-select" 
+                  value={selectedMenteeId || (myMentees[0]?.id || '')} 
+                  onChange={e => setSelectedMenteeId(e.target.value)}
+                  required
+                >
+                  {myMentees.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.enrollmentNo}) - {m.divisionId || 'Div A'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="form-group">
               <label className="form-label">Discussion Topic / Agenda *</label>
               <input 
                 type="text" 
                 className="form-control" 
-                placeholder="e.g. Academic Performance / Career Guidance / Project Review" 
+                placeholder="e.g. Mid-term Attendance Recovery / Career Guidance / Project Review" 
                 value={topic} 
                 onChange={e => setTopic(e.target.value)} 
                 required 
               />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Preferred Date *</label>
-              <input 
-                type="date" 
-                className="form-control" 
-                value={date} 
-                onChange={e => setDate(e.target.value)} 
-                required 
-              />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-group">
+                <label className="form-label">Session Date *</label>
+                <input 
+                  type="date" 
+                  className="form-control" 
+                  value={date || new Date().toISOString().split('T')[0]} 
+                  onChange={e => setDate(e.target.value)} 
+                  required 
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Time Slot *</label>
+                <select className="form-select" value={timeSlot} onChange={e => setTimeSlot(e.target.value)}>
+                  <option value="02:00 PM - 02:30 PM">02:00 PM - 02:30 PM</option>
+                  <option value="03:00 PM - 03:30 PM">03:00 PM - 03:30 PM</option>
+                  <option value="04:00 PM - 04:30 PM">04:00 PM - 04:30 PM</option>
+                  <option value="05:00 PM - 05:30 PM">05:00 PM - 05:30 PM</option>
+                </select>
+              </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Time Slot *</label>
-              <select className="form-select" value={timeSlot} onChange={e => setTimeSlot(e.target.value)}>
-                <option value="02:00 PM - 02:30 PM">02:00 PM - 02:30 PM</option>
-                <option value="03:00 PM - 03:30 PM">03:00 PM - 03:30 PM</option>
-                <option value="04:00 PM - 04:30 PM">04:00 PM - 04:30 PM</option>
-              </select>
-            </div>
+            {role !== 'STUDENT' && (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Academic Concern (Optional)</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      placeholder="e.g. Difficulty in Data Structures" 
+                      value={academicConcern} 
+                      onChange={e => setAcademicConcern(e.target.value)} 
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Attendance Concern (Optional)</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      placeholder="e.g. Below 75% in Lab Sessions" 
+                      value={attendanceConcern} 
+                      onChange={e => setAttendanceConcern(e.target.value)} 
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Counseling Action Taken &amp; Guidance Provided *</label>
+                  <textarea 
+                    className="form-control" 
+                    rows={2} 
+                    placeholder="Describe specific steps, remedial support, or recommendations given..." 
+                    value={actionTaken} 
+                    onChange={e => setActionTaken(e.target.value)} 
+                    required 
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Mentor Remarks</label>
+                  <input 
+                    type="text" 
+                    className="form-control" 
+                    placeholder="General observations on student attitude/progress" 
+                    value={remarks} 
+                    onChange={e => setRemarks(e.target.value)} 
+                  />
+                </div>
+
+                <div style={{ padding: '0.85rem', backgroundColor: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, cursor: 'pointer', marginBottom: followUpRequired ? '0.75rem' : 0 }}>
+                    <input 
+                      type="checkbox" 
+                      checked={followUpRequired} 
+                      onChange={e => setFollowUpRequired(e.target.checked)} 
+                    />
+                    Requires Follow-up Session &amp; Milestone Check
+                  </label>
+
+                  {followUpRequired && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.75rem' }}>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.75rem' }}>Follow-up Date *</label>
+                        <input 
+                          type="date" 
+                          className="form-control" 
+                          value={followUpDate} 
+                          onChange={e => setFollowUpDate(e.target.value)} 
+                          required={followUpRequired} 
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label" style={{ fontSize: '0.75rem' }}>Action / Goal to Review *</label>
+                        <input 
+                          type="text" 
+                          className="form-control" 
+                          placeholder="e.g. Check improved attendance after 2 weeks" 
+                          value={followUpAction} 
+                          onChange={e => setFollowUpAction(e.target.value)} 
+                          required={followUpRequired} 
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
               <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-              <button type="submit" className="btn btn-primary">Book Session</button>
+              <button type="submit" className="btn btn-primary">{role === 'STUDENT' ? 'Book Session' : 'Save Mentoring Record'}</button>
             </div>
           </form>
         </Modal>
