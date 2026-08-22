@@ -6,6 +6,8 @@ import { DataTable, Column } from '../../components/common/DataTable';
 import { Modal } from '../../components/common/Modal';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { Badge } from '../../components/common/Badge';
+import { BulkDataManagerModal } from '../../components/bulk-import/BulkDataManagerModal';
+import { EntityProfileModal } from '../../components/profile/EntityProfileModal';
 
 export const SubjectsPage: React.FC = () => {
   const { user, role, canMutate } = useAuth();
@@ -24,7 +26,9 @@ export const SubjectsPage: React.FC = () => {
     return all;
   });
 
+  const [viewingSubject, setViewingSubject] = useState<Subject | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Subject | null>(null);
   const [deletingItem, setDeletingItem] = useState<Subject | null>(null);
 
@@ -162,10 +166,33 @@ export const SubjectsPage: React.FC = () => {
         searchFields={['code', 'name', 'type']}
         onAddClick={!isFaculty && canMutate() ? handleOpenAddModal : undefined}
         addLabel="Add Subject"
+        onViewClick={item => setViewingSubject(item)}
+        onBulkImportClick={!isFaculty && canMutate() ? () => setIsBulkModalOpen(true) : undefined}
+        bulkImportLabel="Bulk Import"
         onEditClick={!isFaculty && canMutate() ? handleOpenEditModal : undefined}
         onDeleteClick={!isFaculty && canMutate() ? (item => setDeletingItem(item)) : undefined}
         canMutate={!isFaculty && canMutate()}
         exportFilename={isFaculty ? "my-assigned-subjects" : "swarrnim-subjects"}
+      />
+
+      <EntityProfileModal
+        isOpen={Boolean(viewingSubject)}
+        onClose={() => setViewingSubject(null)}
+        entityType="subject"
+        entityId={viewingSubject?.id || null}
+        onEditClick={item => {
+          setViewingSubject(null);
+          handleOpenEditModal(item);
+        }}
+        canMutate={!isFaculty && canMutate()}
+      />
+
+      {/* Universal Bulk Data Management Modal */}
+      <BulkDataManagerModal
+        isOpen={isBulkModalOpen}
+        onClose={() => setIsBulkModalOpen(false)}
+        initialType="SUBJECT"
+        onSuccess={() => setSubjects(db.getSubjects())}
       />
 
       <Modal

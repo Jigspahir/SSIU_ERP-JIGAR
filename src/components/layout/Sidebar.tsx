@@ -1,12 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { HeaderLogo } from './HeaderLogo';
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Bell, Dot, LogOut } from 'lucide-react';
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  ChevronDown, 
+  ChevronUp, 
+  Search, 
+  X, 
+  LogOut,
+  Star,
+  AlertCircle
+} from 'lucide-react';
 import { 
   getRoleNavigationItems, NavItemConfig, 
-  STUDENT_NAVIGATION_STRUCTURE, FACULTY_NAVIGATION_STRUCTURE, MENTOR_NAVIGATION_STRUCTURE, HOD_NAVIGATION_STRUCTURE, PRINCIPAL_NAVIGATION_STRUCTURE, STUDENT_SECTION_NAVIGATION_STRUCTURE, REGISTRAR_NAVIGATION_STRUCTURE, DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE, VICE_PRESIDENT_NAVIGATION_STRUCTURE, StudentNavGroup, StudentNavSubItem 
+  STUDENT_NAVIGATION_STRUCTURE, FACULTY_NAVIGATION_STRUCTURE, MENTOR_NAVIGATION_STRUCTURE, 
+  HOD_NAVIGATION_STRUCTURE, PRINCIPAL_NAVIGATION_STRUCTURE, STUDENT_SECTION_NAVIGATION_STRUCTURE, 
+  REGISTRAR_NAVIGATION_STRUCTURE, DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE, VICE_PRESIDENT_NAVIGATION_STRUCTURE,
+  PARENT_NAVIGATION_STRUCTURE
 } from '../../constants/navigationConfig';
 import { mentorAssignmentService } from '../../services/mentorAssignmentService';
+import { quickAccessService, QuickAccessItem } from '../../services/quickAccessService';
 import { db } from '../../services/db';
 
 interface SidebarProps {
@@ -18,6 +32,16 @@ interface SidebarProps {
   setMobileOpen?: (open: boolean) => void;
 }
 
+interface SearchableMenuItem {
+  id: string;
+  label: string;
+  parentLabel?: string;
+  icon: any;
+  targetTab: string;
+  parentGroupId?: string;
+  isPinnable?: boolean;
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   setActiveTab,
@@ -26,9 +50,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   mobileOpen = false,
   setMobileOpen
 }) => {
-  const { user, role, logout } = useAuth();
+  const { user, role, activeRole, setActiveRole, logout } = useAuth();
+  const userId = user?.id || (user as any)?.username || 'default_user';
+
+  const isParent = role === 'PARENT';
   const isStudent = role === 'STUDENT';
   const isFaculty = role === 'FACULTY';
+  const isMentor = role === 'MENTOR';
   const isHOD = role === 'HOD';
   const isPrincipal = role === 'PRINCIPAL';
   const isStudentSection = role === 'STUDENT_SECTION';
@@ -36,91 +64,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isDeputyRegistrar = role === 'DEPUTY_REGISTRAR';
   const isVicePresident = role === 'VICE_PRESIDENT';
 
-  // Check if user is currently assigned as a mentor or has MENTOR role
-  const isMentor = React.useMemo(() => {
-    if (role === 'MENTOR') return true;
-    if (!isFaculty || !user) return false;
+  // Check if user has dual Faculty / Mentor authority
+  const isFacultyUser = useMemo(() => {
+    if (!user) return false;
+    if (user.role === 'FACULTY' || (user as any).isMentor) return true;
     const assignments = mentorAssignmentService.getAssignments({}, user);
-    return Boolean((assignments.students && assignments.students.length > 0) || (user as any).isMentor);
-  }, [role, isFaculty, user]);
+    return Boolean((assignments.students && assignments.students.length > 0));
+  }, [user]);
 
-  const [mentorMode, setMentorMode] = useState(false);
+  // Single sidebar accordion expansion state — all parent menus COLLAPSED (null) by default
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
 
-  // Auto-switch to mentor mode when activeTab is mentor-specific
-  useEffect(() => {
-    if (isMentor && (activeTab.startsWith('mentee-') || activeTab === 'mentor-profile')) {
-      setMentorMode(true);
-    }
-  }, [activeTab, isMentor]);
-
-  // State to manage expanded parent accordion items for all portals
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
-    'profile-group': false,
-    'university-group': true,
-    'institute-group': true,
-    'department-group': true,
-    'academic-group': true,
-    'academics-group': true,
-    'attendance-group': true,
-    'students-group': true,
-    'faculty-group': true,
-    'examination-group': false,
-    'records-group': false,
-    'requests-group': true,
-    'approvals-group': true,
-    'notices-group': false,
-    'documents-group': false,
-    'feedback-group': false,
-    'reports-group': false,
-    'mentees-group': true,
-    'services-group': true,
-    'fees-group': false,
-    'idcard-group': false,
-    'academic-records-group': false,
-    academic: true,
-    attendance: true,
-    examination: false,
-    students: false,
-    fees: false,
-    'student-section': false,
-    requests: false,
-    documents: false,
-    feedback: false
-  });
-
-  // Auto-expand active parent group whenever activeTab changes
-  useEffect(() => {
-    const navStructure = isVicePresident
-      ? VICE_PRESIDENT_NAVIGATION_STRUCTURE
-      : (isStudent 
-          ? STUDENT_NAVIGATION_STRUCTURE 
-          : (isRegistrar
-              ? REGISTRAR_NAVIGATION_STRUCTURE
-              : (isDeputyRegistrar
-                  ? DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE
-                  : (isStudentSection
-                      ? STUDENT_SECTION_NAVIGATION_STRUCTURE
-                      : (isPrincipal
-                          ? PRINCIPAL_NAVIGATION_STRUCTURE
-                          : (isHOD
-                              ? HOD_NAVIGATION_STRUCTURE
-                              : (isFaculty ? (mentorMode ? MENTOR_NAVIGATION_STRUCTURE : FACULTY_NAVIGATION_STRUCTURE) : null)))))));
-    if (navStructure) {
-      navStructure.forEach(group => {
-        if (group.children) {
-          const isChildActive = group.children.some(
-            sub => sub.targetTab === activeTab || sub.id === activeTab
-          );
-          if (isChildActive) {
-            setOpenGroups(prev => ({ ...prev, [group.id]: true }));
-          }
-        }
-      });
-    }
-  }, [activeTab, isStudent, isFaculty, isHOD, isPrincipal, isStudentSection, isRegistrar, isDeputyRegistrar, mentorMode]);
+  // Search & Quick Access state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [quickAccessVersion, setQuickAccessVersion] = useState(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const toggleGroup = (groupId: string) => {
-    setOpenGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }));
+    setExpandedGroup(prev => (prev === groupId ? null : groupId));
   };
 
   const canAccessPending = db.hasPendingWithMeAccess(user, role);
@@ -135,14 +98,208 @@ export const Sidebar: React.FC<SidebarProps> = ({
   });
   const categories = Array.from(new Set(visibleItems.map(i => i.category || 'General')));
 
+  // Build searchable index from authorized navigation structures only
+  const searchableItems: SearchableMenuItem[] = useMemo(() => {
+    const isStructured = isParent || isVicePresident || isStudent || isFaculty || isMentor || isHOD || isPrincipal || isRegistrar || isDeputyRegistrar || isStudentSection;
+
+    if (isStructured) {
+      const navStructure = isParent
+        ? PARENT_NAVIGATION_STRUCTURE
+        : (isVicePresident
+            ? VICE_PRESIDENT_NAVIGATION_STRUCTURE
+            : (isStudent 
+                ? STUDENT_NAVIGATION_STRUCTURE 
+                : (isRegistrar
+                    ? REGISTRAR_NAVIGATION_STRUCTURE
+                    : (isDeputyRegistrar
+                        ? DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE
+                        : (isStudentSection
+                            ? STUDENT_SECTION_NAVIGATION_STRUCTURE
+                            : (isPrincipal
+                                ? PRINCIPAL_NAVIGATION_STRUCTURE
+                                : (isHOD
+                                    ? HOD_NAVIGATION_STRUCTURE
+                                    : (isMentor
+                                        ? MENTOR_NAVIGATION_STRUCTURE
+                                        : (isFaculty ? FACULTY_NAVIGATION_STRUCTURE : [])))))))));
+
+      const items: SearchableMenuItem[] = [];
+
+      navStructure.forEach(rawGroup => {
+        let group = rawGroup;
+
+        const hasChildren = group.children && group.children.length > 0;
+
+        if (!hasChildren) {
+          // Direct Top-Level Link (e.g. Dashboard) - not pinnable as parent
+          items.push({
+            id: group.id,
+            label: group.label,
+            icon: group.icon,
+            targetTab: group.defaultTab,
+            isPinnable: false
+          });
+        } else {
+          // Parent Category Group for search discovery (not pinnable)
+          items.push({
+            id: group.id,
+            label: group.label,
+            icon: group.icon,
+            targetTab: group.defaultTab || group.children![0].targetTab,
+            parentGroupId: group.id,
+            isPinnable: false
+          });
+
+          // Submenu Items (PINNABLE)
+          const filteredChildren = group.children!.filter(sub => {
+            if (sub.id === 'notesheet-pending' || sub.targetTab === 'notesheet-pending') {
+              return canAccessPending;
+            }
+            if (sub.id === 'notesheet-create' || sub.targetTab === 'notesheet-create') {
+              return canCreateNotesheet;
+            }
+            if (sub.id.startsWith('notesheet-') || sub.targetTab.startsWith('notesheet-')) {
+              return canViewNotesheet;
+            }
+            return true;
+          });
+
+          filteredChildren.forEach(sub => {
+            items.push({
+              id: sub.id,
+              label: sub.label,
+              parentLabel: group.label,
+              icon: group.icon,
+              targetTab: sub.targetTab,
+              parentGroupId: group.id,
+              isPinnable: true
+            });
+          });
+        }
+      });
+
+      return items;
+    }
+
+    // Category based roles (SUPER_ADMIN, EXAM_CELL, etc.)
+    return visibleItems.map(item => ({
+      id: item.id,
+      label: item.label,
+      parentLabel: item.category,
+      icon: item.icon,
+      targetTab: item.id,
+      isPinnable: true
+    }));
+  }, [
+    isVicePresident, isStudent, isFaculty, isMentor, isHOD, isPrincipal, isRegistrar, isDeputyRegistrar, isStudentSection,
+    canAccessPending, canCreateNotesheet, canViewNotesheet, visibleItems
+  ]);
+
+  // Set of pinned tab IDs for quick lookup (workspace-aware)
+  const pinnedIdsSet = useMemo(() => {
+    return new Set(quickAccessService.getPinnedIds(userId, role || 'DEFAULT'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, quickAccessVersion, role]);
+
+  // Quick access items (Max 5: Pinned first [max 3], then Frequent, workspace-aware)
+  const quickAccessList = useMemo(() => {
+    return quickAccessService.getQuickAccessItems(userId, searchableItems, role || 'DEFAULT');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, searchableItems, quickAccessVersion, role]);
+
+  const pinnedCount = useMemo(() => {
+    return quickAccessList.filter(i => i.isPinned).length;
+  }, [quickAccessList]);
+
+  // Case-insensitive, trimmed, partial match across label & parentLabel
+  const filteredResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return searchableItems.filter(item => {
+      const matchLabel = item.label.toLowerCase().includes(q);
+      const matchParent = item.parentLabel ? item.parentLabel.toLowerCase().includes(q) : false;
+      return matchLabel || matchParent;
+    });
+  }, [searchQuery, searchableItems]);
+
+  // Reset selected index on search change
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [searchQuery]);
+
+  // Global '/' keyboard shortcut to focus search
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === '/' &&
+        document.activeElement?.tagName !== 'INPUT' &&
+        document.activeElement?.tagName !== 'TEXTAREA'
+      ) {
+        e.preventDefault();
+        if (collapsed) {
+          setCollapsed(false);
+        }
+        setTimeout(() => {
+          searchInputRef.current?.focus();
+        }, 50);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [collapsed, setCollapsed]);
+
   const handleNavClick = (id: string) => {
     if (id === 'logout') {
       logout();
       return;
     }
+    quickAccessService.recordUsage(userId, id, role || 'DEFAULT');
+    setQuickAccessVersion(v => v + 1);
     setActiveTab(id);
     if (setMobileOpen) {
       setMobileOpen(false);
+    }
+  };
+
+  const handleTogglePin = (targetTab: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const res = quickAccessService.togglePin(userId, targetTab, role || 'DEFAULT');
+    if (!res.success && res.message) {
+      setToastMessage(res.message);
+      setTimeout(() => {
+        setToastMessage(prev => (prev === res.message ? null : prev));
+      }, 3500);
+    } else {
+      setToastMessage(null);
+    }
+    setQuickAccessVersion(v => v + 1);
+  };
+
+  const handleSelectSearchResult = (item: SearchableMenuItem) => {
+    handleNavClick(item.targetTab);
+    if (item.parentGroupId) {
+      setExpandedGroup(item.parentGroupId);
+    }
+    setSearchQuery('');
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setSearchQuery('');
+      searchInputRef.current?.blur();
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev < filteredResults.length - 1 ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedIndex(prev => (prev > 0 ? prev - 1 : filteredResults.length - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (filteredResults.length > 0 && filteredResults[selectedIndex]) {
+        handleSelectSearchResult(filteredResults[selectedIndex]);
+      }
     }
   };
 
@@ -173,6 +330,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
           flexShrink: 0
         }}
       >
+        {/* Toast Alert for Max Pin Limit */}
+        {toastMessage && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '65px',
+              left: '10px',
+              right: '10px',
+              zIndex: 100,
+              backgroundColor: '#0F172A',
+              border: '1px solid var(--brand-orange)',
+              borderRadius: '8px',
+              padding: '0.65rem 0.8rem',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              color: '#FFFFFF',
+              fontSize: '0.75rem',
+              lineHeight: 1.35
+            }}
+          >
+            <AlertCircle size={15} style={{ color: 'var(--brand-orange)', flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>{toastMessage}</div>
+            <button
+              onClick={() => setToastMessage(null)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'rgba(255,255,255,0.6)',
+                cursor: 'pointer',
+                padding: 0
+              }}
+            >
+              <X size={13} />
+            </button>
+          </div>
+        )}
+
         {/* Sidebar Header & Toggle */}
         <div
           style={{
@@ -207,8 +403,115 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
+        {/* Search Field */}
+        <div style={{ padding: collapsed ? '0.65rem 0.5rem 0.2rem 0.5rem' : '0.65rem 1rem 0.25rem 1rem' }}>
+          {collapsed ? (
+            <button
+              onClick={() => {
+                setCollapsed(false);
+                setTimeout(() => searchInputRef.current?.focus(), 100);
+              }}
+              style={{
+                width: '100%',
+                height: '36px',
+                borderRadius: '8px',
+                border: '1px solid rgba(255,255,255,0.1)',
+                background: 'rgba(255,255,255,0.05)',
+                color: 'rgba(255,255,255,0.6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              title="Search menu (/)"
+              aria-label="Search menu"
+            >
+              <Search size={16} />
+            </button>
+          ) : (
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <Search
+                size={14}
+                style={{
+                  position: 'absolute',
+                  left: '10px',
+                  color: 'rgba(255,255,255,0.45)',
+                  pointerEvents: 'none'
+                }}
+              />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Search menu..."
+                style={{
+                  width: '100%',
+                  height: '34px',
+                  borderRadius: '7px',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  background: 'rgba(255,255,255,0.06)',
+                  color: '#FFFFFF',
+                  fontSize: '0.8125rem',
+                  fontFamily: 'inherit',
+                  padding: '0 2rem 0 2.15rem',
+                  outline: 'none',
+                  transition: 'all 0.18s ease',
+                  boxSizing: 'border-box'
+                }}
+              />
+              {searchQuery ? (
+                <button
+                  onClick={() => {
+                    setSearchQuery('');
+                    searchInputRef.current?.focus();
+                  }}
+                  style={{
+                    position: 'absolute',
+                    right: '6px',
+                    width: '22px',
+                    height: '22px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    background: 'rgba(255,255,255,0.12)',
+                    color: 'rgba(255,255,255,0.8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    padding: 0
+                  }}
+                  title="Clear search (Esc)"
+                  aria-label="Clear search"
+                >
+                  <X size={12} />
+                </button>
+              ) : (
+                <span
+                  style={{
+                    position: 'absolute',
+                    right: '8px',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    color: 'rgba(255,255,255,0.35)',
+                    background: 'rgba(255,255,255,0.08)',
+                    padding: '1px 5px',
+                    borderRadius: '3px',
+                    pointerEvents: 'none',
+                    fontFamily: 'monospace'
+                  }}
+                >
+                  /
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
         {!collapsed && (
-          <div style={{ margin: '0.6rem 1.25rem 0.2rem 1.25rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+          <div style={{ margin: '0.35rem 1rem 0.2rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
             <div
               style={{
                 padding: '0.35rem 0.75rem',
@@ -227,22 +530,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }}
             >
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#F5A623', boxShadow: '0 0 6px #F5A623' }}></span>
-              <span>⚡ {isStudent ? 'STUDENT PORTAL' : (isRegistrar ? 'REGISTRAR OFFICE PORTAL' : (isDeputyRegistrar ? 'DEPUTY REGISTRAR PORTAL' : (isStudentSection ? 'STUDENT SECTION PORTAL' : (isPrincipal ? 'PRINCIPAL / HOI PORTAL' : (isHOD ? 'HOD PORTAL' : (isFaculty ? (mentorMode ? 'MENTOR PORTAL' : 'FACULTY PORTAL') : 'DEMO MODE ACTIVE'))))))}</span>
+              <span>⚡ {isStudent ? 'STUDENT PORTAL' : (isRegistrar ? 'REGISTRAR OFFICE PORTAL' : (isDeputyRegistrar ? 'DEPUTY REGISTRAR PORTAL' : (isStudentSection ? 'STUDENT SECTION PORTAL' : (isPrincipal ? 'PRINCIPAL / HOI PORTAL' : (isHOD ? 'HOD PORTAL' : (isMentor ? 'MENTOR PORTAL' : (isFaculty ? 'FACULTY PORTAL' : 'DEMO MODE ACTIVE')))))))}</span>
             </div>
 
-            {isFaculty && isMentor && (
+            {isFacultyUser && (
               <div style={{ display: 'flex', gap: '0.3rem' }}>
                 <button
-                  onClick={() => { setMentorMode(false); setActiveTab('dashboard'); }}
+                  onClick={() => {
+                    setActiveRole('FACULTY');
+                    setActiveTab('dashboard');
+                    setExpandedGroup(null);
+                    setSearchQuery('');
+                    setQuickAccessVersion(v => v + 1);
+                  }}
                   style={{
                     flex: 1,
                     padding: '0.25rem 0.4rem',
                     fontSize: '0.65rem',
                     fontWeight: 700,
                     borderRadius: '4px',
-                    border: '1px solid ' + (!mentorMode ? 'var(--brand-orange)' : 'rgba(255,255,255,0.15)'),
-                    backgroundColor: !mentorMode ? 'var(--brand-orange)' : 'rgba(255,255,255,0.05)',
-                    color: !mentorMode ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
+                    border: '1px solid ' + (role === 'FACULTY' ? 'var(--brand-orange)' : 'rgba(255,255,255,0.15)'),
+                    backgroundColor: role === 'FACULTY' ? 'var(--brand-orange)' : 'rgba(255,255,255,0.05)',
+                    color: role === 'FACULTY' ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
@@ -250,16 +559,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   Faculty View
                 </button>
                 <button
-                  onClick={() => { setMentorMode(true); setActiveTab('mentee-list'); }}
+                  onClick={() => {
+                    setActiveRole('MENTOR');
+                    setActiveTab('dashboard');
+                    setExpandedGroup(null);
+                    setSearchQuery('');
+                    setQuickAccessVersion(v => v + 1);
+                  }}
                   style={{
                     flex: 1,
                     padding: '0.25rem 0.4rem',
                     fontSize: '0.65rem',
                     fontWeight: 700,
                     borderRadius: '4px',
-                    border: '1px solid ' + (mentorMode ? 'var(--brand-gold)' : 'rgba(255,255,255,0.15)'),
-                    backgroundColor: mentorMode ? 'var(--brand-gold)' : 'rgba(255,255,255,0.05)',
-                    color: mentorMode ? 'var(--brand-navy)' : 'rgba(255,255,255,0.6)',
+                    border: '1px solid ' + (role === 'MENTOR' ? 'var(--brand-gold)' : 'rgba(255,255,255,0.15)'),
+                    backgroundColor: role === 'MENTOR' ? 'var(--brand-gold)' : 'rgba(255,255,255,0.05)',
+                    color: role === 'MENTOR' ? 'var(--brand-navy)' : 'rgba(255,255,255,0.6)',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
@@ -271,256 +586,345 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* Navigation Items Container */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '1rem 0.5rem' : '1.25rem 0.85rem' }}>
-          {(isVicePresident || isStudent || isFaculty || isHOD || isPrincipal || isRegistrar || isDeputyRegistrar || isStudentSection) ? (
+        {/* Navigation Items Container / Search Results View */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '0.75rem 0.5rem' : '0.85rem 0.85rem' }}>
+          {searchQuery.trim() ? (
             /* ─────────────────────────────────────────────────────────────
-               STRUCTURED MENU WITH ACCORDIONS (Vice President, Student, Faculty, Mentor, HOD, Principal, Registrar & Section)
+               SEARCH RESULTS LIST VIEW (PIN/UNPIN ON SUB-ITEMS ONLY)
                ───────────────────────────────────────────────────────────── */
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              {(isVicePresident ? VICE_PRESIDENT_NAVIGATION_STRUCTURE : (isStudent ? STUDENT_NAVIGATION_STRUCTURE : (isRegistrar ? REGISTRAR_NAVIGATION_STRUCTURE : (isDeputyRegistrar ? DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE : (isStudentSection ? STUDENT_SECTION_NAVIGATION_STRUCTURE : (isPrincipal ? PRINCIPAL_NAVIGATION_STRUCTURE : (isHOD ? HOD_NAVIGATION_STRUCTURE : (mentorMode ? MENTOR_NAVIGATION_STRUCTURE : FACULTY_NAVIGATION_STRUCTURE)))))))).map((rawGroup, idx) => {
-                // If faculty and not mentor, filter out mentor-only items (e.g. pending-verification)
-                let group = rawGroup;
-                if (isFaculty && !isMentor && !mentorMode && group.children) {
-                  group = {
-                    ...group,
-                    children: group.children.filter(c => c.targetTab !== 'pending-verification')
-                  };
-                }
+              <div
+                style={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.8px',
+                  color: 'var(--brand-gold)',
+                  marginBottom: '0.25rem',
+                  paddingLeft: '0.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
+                <span>Results ({filteredResults.length})</span>
+                <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', textTransform: 'none', fontWeight: 500 }}>
+                  Esc to clear
+                </span>
+              </div>
 
-                const Icon = group.icon;
-                const hasChildren = group.children && group.children.length > 0;
-                const isGroupExpanded = Boolean(openGroups[group.id]);
-                
-                // Group is active if activeTab is equal to defaultTab OR any child targetTab
-                const isChildTabActive = hasChildren && group.children!.some(
-                  sub => sub.targetTab === activeTab || sub.id === activeTab
-                );
-                const isDirectActive = activeTab === group.id || activeTab === group.defaultTab;
-                const isParentActive = isChildTabActive || isDirectActive;
+              {filteredResults.length === 0 ? (
+                <div
+                  style={{
+                    padding: '2rem 1rem',
+                    textAlign: 'center',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '0.45rem',
+                    background: 'rgba(255,255,255,0.02)',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px dashed rgba(255,255,255,0.1)'
+                  }}
+                >
+                  <Search size={22} style={{ color: 'rgba(245,166,35,0.6)' }} />
+                  <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#FFFFFF' }}>
+                    No matching menu found
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>
+                    Try another module or menu name.
+                  </div>
+                </div>
+              ) : (
+                filteredResults.map((item, idx) => {
+                  const ItemIcon = item.icon;
+                  const isSelected = idx === selectedIndex;
+                  const isActive = activeTab === item.targetTab || activeTab === item.id;
+                  const isItemPinned = pinnedIdsSet.has(item.targetTab);
+                  const isPinnable = item.isPinnable !== false;
 
-                if (!hasChildren) {
-                  // Direct Top-Level Link
                   return (
-                    <button
-                      key={group.id}
-                      onClick={() => handleNavClick(group.defaultTab)}
+                    <div
+                      key={`${item.id}-${idx}`}
                       style={{
+                        position: 'relative',
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.75rem',
-                        padding: collapsed ? '0.75rem' : '0.625rem 0.75rem',
-                        justifyContent: collapsed ? 'center' : 'flex-start',
-                        borderRadius: 'var(--radius-md)',
-                        border: 'none',
-                        background: isParentActive
-                          ? 'linear-gradient(90deg, var(--brand-orange) 0%, #D95300 100%)'
-                          : 'transparent',
-                        color: isParentActive ? '#FFFFFF' : 'rgba(255,255,255,0.8)',
-                        fontWeight: isParentActive ? 700 : 500,
-                        fontSize: '0.875rem',
-                        cursor: 'pointer',
-                        transition: 'all var(--transition-fast)',
-                        boxShadow: isParentActive ? '0 4px 12px rgba(243, 112, 35, 0.3)' : 'none',
-                        width: '100%',
-                        textAlign: 'left'
+                        alignItems: 'center'
                       }}
-                      title={collapsed ? group.label : undefined}
                     >
-                      <Icon size={18} style={{ color: isParentActive ? '#FFFFFF' : 'var(--brand-gold)', flexShrink: 0 }} />
-                      {!collapsed && (
-                        <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {group.label}
-                        </span>
+                      <button
+                        onClick={() => handleSelectSearchResult(item)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          padding: isPinnable ? '0.6rem 2.25rem 0.6rem 0.75rem' : '0.6rem 0.75rem',
+                          borderRadius: 'var(--radius-md)',
+                          border: isSelected ? '1px solid var(--brand-orange)' : '1px solid transparent',
+                          background: isActive
+                            ? 'linear-gradient(90deg, var(--brand-orange) 0%, #D95300 100%)'
+                            : isSelected
+                            ? 'rgba(243, 112, 35, 0.2)'
+                            : 'rgba(255,255,255,0.03)',
+                          color: isActive || isSelected ? '#FFFFFF' : 'rgba(255,255,255,0.85)',
+                          cursor: 'pointer',
+                          transition: 'all var(--transition-fast)',
+                          textAlign: 'left',
+                          width: '100%',
+                          boxSizing: 'border-box'
+                        }}
+                        onMouseEnter={() => setSelectedIndex(idx)}
+                      >
+                        <ItemIcon
+                          size={17}
+                          style={{
+                            color: isActive ? '#FFFFFF' : 'var(--brand-gold)',
+                            flexShrink: 0
+                          }}
+                        />
+                        <div style={{ flex: 1, overflow: 'hidden' }}>
+                          <div
+                            style={{
+                              fontSize: '0.8125rem',
+                              fontWeight: 700,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}
+                          >
+                            {item.label}
+                          </div>
+                          {item.parentLabel && (
+                            <div
+                              style={{
+                                fontSize: '0.6875rem',
+                                color: isActive ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.45)',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}
+                            >
+                              in {item.parentLabel}
+                            </div>
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Pin/Unpin Button ONLY for actual sub-items / leaf pages in search */}
+                      {isPinnable && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleTogglePin(item.targetTab, e)}
+                          style={{
+                            position: 'absolute',
+                            right: '8px',
+                            background: 'none',
+                            border: 'none',
+                            color: isItemPinned ? '#F5A623' : 'rgba(255,255,255,0.3)',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '4px',
+                            transition: 'all 0.15s ease'
+                          }}
+                          title={isItemPinned ? "Unpin from Quick Access" : "Pin to Quick Access"}
+                          aria-label={isItemPinned ? "Unpin from Quick Access" : "Pin to Quick Access"}
+                        >
+                          <Star
+                            size={14}
+                            fill={isItemPinned ? '#F5A623' : 'none'}
+                            strokeWidth={isItemPinned ? 0 : 2}
+                          />
+                        </button>
                       )}
-                    </button>
+                    </div>
                   );
-                }
-
-                // Accordion Parent Group with Sub-items
-                return (
-                  <div key={group.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                    <button
-                      onClick={() => {
-                        if (collapsed) {
-                          setCollapsed(false);
-                          setOpenGroups(prev => ({ ...prev, [group.id]: true }));
-                        } else {
-                          toggleGroup(group.id);
-                        }
-                      }}
+                })
+              )}
+            </div>
+          ) : (
+            <>
+              {/* ─────────────────────────────────────────────────────────────
+                 ⭐ QUICK ACCESS SECTION (MAX 3 PINNED + FREQUENT, TOTAL MAX 5)
+                 ───────────────────────────────────────────────────────────── */}
+              {!collapsed && (
+                <div style={{ marginBottom: '1.15rem' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0 0.5rem 0.4rem 0.5rem',
+                      borderBottom: '1px solid rgba(255,255,255,0.08)',
+                      marginBottom: '0.45rem'
+                    }}
+                  >
+                    <div
                       style={{
+                        fontSize: '0.6875rem',
+                        fontWeight: 800,
+                        letterSpacing: '0.8px',
+                        color: 'var(--brand-gold)',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: collapsed ? '0.75rem' : '0.625rem 0.75rem',
-                        borderRadius: 'var(--radius-md)',
-                        border: 'none',
-                        background: isParentActive && !isGroupExpanded
-                          ? 'rgba(243, 112, 35, 0.25)'
-                          : isParentActive
-                          ? 'rgba(255,255,255,0.06)'
-                          : 'transparent',
-                        color: isParentActive ? '#FFFFFF' : 'rgba(255,255,255,0.85)',
-                        fontWeight: isParentActive ? 700 : 600,
-                        fontSize: '0.875rem',
-                        cursor: 'pointer',
-                        transition: 'all var(--transition-fast)',
-                        width: '100%'
+                        gap: '0.35rem',
+                        textTransform: 'uppercase'
                       }}
-                      title={collapsed ? group.label : undefined}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', overflow: 'hidden' }}>
-                        <Icon size={18} style={{ color: isParentActive ? 'var(--brand-orange)' : 'var(--brand-gold)', flexShrink: 0 }} />
-                        {!collapsed && (
-                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {group.label}
-                          </span>
-                        )}
-                      </div>
-                      {!collapsed && (
-                        <span style={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center' }}>
-                          {isGroupExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                        </span>
-                      )}
-                    </button>
+                      <Star size={13} fill="#F5A623" color="#F5A623" />
+                      <span>Quick Access</span>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: '0.65rem',
+                        fontWeight: 700,
+                        color: pinnedCount >= 3 ? '#F58220' : 'rgba(255,255,255,0.5)',
+                        backgroundColor: pinnedCount >= 3 ? 'rgba(245,130,32,0.15)' : 'rgba(255,255,255,0.06)',
+                        padding: '1px 6px',
+                        borderRadius: '10px',
+                        border: '1px solid ' + (pinnedCount >= 3 ? 'rgba(245,130,32,0.3)' : 'rgba(255,255,255,0.1)')
+                      }}
+                      title="User can pin a maximum of 3 shortcuts"
+                    >
+                      {pinnedCount}/3
+                    </span>
+                  </div>
 
-                    {/* Sub-items List */}
-                    {!collapsed && isGroupExpanded && (
-                      <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.15rem',
-                        paddingLeft: '1.75rem',
-                        borderLeft: '1px solid rgba(255,255,255,0.12)',
-                        marginLeft: '1.25rem',
-                        marginTop: '0.15rem',
-                        marginBottom: '0.35rem'
-                      }}>
-                        {group.children!
-                          .filter(sub => {
-                            if (sub.id === 'notesheet-pending' || sub.targetTab === 'notesheet-pending') {
-                              return canAccessPending;
-                            }
-                            if (sub.id === 'notesheet-create' || sub.targetTab === 'notesheet-create') {
-                              return canCreateNotesheet;
-                            }
-                            if (sub.id.startsWith('notesheet-') || sub.targetTab.startsWith('notesheet-')) {
-                              return canViewNotesheet;
-                            }
-                            return true;
-                          })
-                          .map(sub => {
-                          const isSubActive = activeTab === sub.targetTab || activeTab === sub.id;
+                  {quickAccessList.length === 0 ? (
+                    <div
+                      style={{
+                        padding: '0.5rem 0.65rem',
+                        fontSize: '0.72rem',
+                        color: 'rgba(255,255,255,0.4)',
+                        fontStyle: 'italic',
+                        lineHeight: 1.35
+                      }}
+                    >
+                      Pin up to 3 submenu items using the ☆ icon.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                      {quickAccessList.map((qaItem) => {
+                        const QAIcon = qaItem.icon || Star;
+                        const isQAActive = activeTab === qaItem.targetTab || activeTab === qaItem.id;
 
-                          return (
+                        return (
+                          <div
+                            key={qaItem.targetTab}
+                            style={{
+                              position: 'relative',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                          >
                             <button
-                              key={sub.id}
-                              onClick={() => handleNavClick(sub.targetTab)}
+                              onClick={() => {
+                                handleNavClick(qaItem.targetTab);
+                                if (qaItem.parentGroupId) {
+                                  setExpandedGroup(qaItem.parentGroupId);
+                                }
+                              }}
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: '0.5rem',
-                                padding: '0.45rem 0.65rem',
+                                gap: '0.65rem',
+                                padding: '0.45rem 2rem 0.45rem 0.65rem',
                                 borderRadius: 'var(--radius-sm)',
                                 border: 'none',
-                                background: isSubActive
+                                background: isQAActive
                                   ? 'linear-gradient(90deg, var(--brand-orange) 0%, #D95300 100%)'
-                                  : 'transparent',
-                                color: isSubActive ? '#FFFFFF' : 'rgba(255,255,255,0.7)',
-                                fontWeight: isSubActive ? 700 : 500,
+                                  : 'rgba(255,255,255,0.03)',
+                                color: isQAActive ? '#FFFFFF' : 'rgba(255,255,255,0.85)',
+                                fontWeight: isQAActive ? 700 : 500,
                                 fontSize: '0.8125rem',
                                 cursor: 'pointer',
                                 transition: 'all var(--transition-fast)',
                                 textAlign: 'left',
-                                boxShadow: isSubActive ? '0 2px 8px rgba(243, 112, 35, 0.3)' : 'none'
+                                width: '100%',
+                                boxSizing: 'border-box'
                               }}
                             >
-                              <span style={{
-                                width: '4px',
-                                height: '4px',
-                                borderRadius: '50%',
-                                backgroundColor: isSubActive ? '#FFFFFF' : 'rgba(255,255,255,0.4)'
-                              }}></span>
-                              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {sub.label}
-                              </span>
+                              <QAIcon
+                                size={15}
+                                style={{
+                                  color: isQAActive ? '#FFFFFF' : 'var(--brand-gold)',
+                                  flexShrink: 0
+                                }}
+                              />
+                              <div style={{ flex: 1, overflow: 'hidden' }}>
+                                <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {qaItem.label}
+                                </div>
+                              </div>
                             </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
 
-              {/* Logout Action in menu list */}
-              <button
-                onClick={() => logout()}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.75rem',
-                  padding: collapsed ? '0.75rem' : '0.625rem 0.75rem',
-                  justifyContent: collapsed ? 'center' : 'flex-start',
-                  borderRadius: 'var(--radius-md)',
-                  border: 'none',
-                  background: 'transparent',
-                  color: '#EF4444',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  cursor: 'pointer',
-                  transition: 'all var(--transition-fast)',
-                  width: '100%',
-                  textAlign: 'left',
-                  marginTop: '0.5rem'
-                }}
-                title={collapsed ? "Logout" : undefined}
-              >
-                <LogOut size={18} style={{ color: '#EF4444', flexShrink: 0 }} />
-                {!collapsed && (
-                  <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    Logout
-                  </span>
-                )}
-              </button>
-            </div>
-          ) : (
-            /* ─────────────────────────────────────────────────────────────
-               OTHER ROLES: STANDARD ROLE-ORDERED CATEGORY NAVIGATION
-               ───────────────────────────────────────────────────────────── */
-            categories.map(cat => {
-              const itemsInCat = visibleItems.filter(i => (i.category || 'General') === cat);
-              if (itemsInCat.length === 0) return null;
-
-              return (
-                <div key={cat} style={{ marginBottom: '1.5rem' }}>
-                  {!collapsed && cat !== 'Main' && (
-                    <div
-                      style={{
-                        fontSize: '0.6875rem',
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        letterSpacing: '1.2px',
-                        color: 'var(--brand-gold)',
-                        marginBottom: '0.5rem',
-                        paddingLeft: '0.75rem',
-                        opacity: 0.9
-                      }}
-                    >
-                      {cat}
+                            {/* Pin / Unpin Action inside Quick Access */}
+                            <button
+                              type="button"
+                              onClick={(e) => handleTogglePin(qaItem.targetTab, e)}
+                              style={{
+                                position: 'absolute',
+                                right: '6px',
+                                background: 'none',
+                                border: 'none',
+                                color: qaItem.isPinned ? '#F5A623' : 'rgba(255,255,255,0.25)',
+                                cursor: 'pointer',
+                                padding: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '4px',
+                                transition: 'all 0.15s ease'
+                              }}
+                              title={qaItem.isPinned ? "Unpin from Quick Access" : "Pin to Quick Access"}
+                              aria-label={qaItem.isPinned ? "Unpin from Quick Access" : "Pin to Quick Access"}
+                            >
+                              <Star
+                                size={13}
+                                fill={qaItem.isPinned ? '#F5A623' : 'none'}
+                                strokeWidth={qaItem.isPinned ? 0 : 2}
+                              />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
+                </div>
+              )}
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                    {itemsInCat.map(item => {
-                      const Icon = item.icon;
-                      const isActive = activeTab === item.id;
+              {/* ─────────────────────────────────────────────────────────────
+                 MAIN NAVIGATION MENUS (NO STAR ON PARENTS; STARS ON SUBMENUS ONLY)
+                 ───────────────────────────────────────────────────────────── */}
+              {(isParent || isVicePresident || isStudent || isFaculty || isMentor || isHOD || isPrincipal || isRegistrar || isDeputyRegistrar || isStudentSection) ? (
+                /* ── STRUCTURED MENU WITH ACCORDIONS ── */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  {(isParent ? PARENT_NAVIGATION_STRUCTURE : (isVicePresident ? VICE_PRESIDENT_NAVIGATION_STRUCTURE : (isStudent ? STUDENT_NAVIGATION_STRUCTURE : (isRegistrar ? REGISTRAR_NAVIGATION_STRUCTURE : (isDeputyRegistrar ? DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE : (isStudentSection ? STUDENT_SECTION_NAVIGATION_STRUCTURE : (isPrincipal ? PRINCIPAL_NAVIGATION_STRUCTURE : (isHOD ? HOD_NAVIGATION_STRUCTURE : (isMentor ? MENTOR_NAVIGATION_STRUCTURE : FACULTY_NAVIGATION_STRUCTURE))))))))).map((rawGroup) => {
+                    let group = rawGroup;
 
+                    const Icon = group.icon;
+                    const hasChildren = group.children && group.children.length > 0;
+                    const isGroupExpanded = expandedGroup === group.id;
+                    
+                    // Group is active if activeTab is equal to defaultTab OR any child targetTab
+                    const isChildTabActive = hasChildren && group.children!.some(
+                      sub => sub.targetTab === activeTab || sub.id === activeTab
+                    );
+                    const isNotesheetItem = group.id === 'note-sheets' || group.id === 'notesheet-group' || group.defaultTab === 'note-sheets' || group.defaultTab === 'reg-notesheets';
+                    const isNotesheetTabActive = activeTab === 'note-sheets' || activeTab === 'reg-notesheets' || activeTab.startsWith('note-sheet') || activeTab.startsWith('notesheet-') || activeTab.startsWith('reg-notesheet');
+                    const isRequestsItem = group.id === 'requests' || group.id === 'requests-group' || group.defaultTab === 'requests' || group.defaultTab === 'requests-my-requests' || group.defaultTab === 'mentee-requests-pending' || group.defaultTab === 'hod-requests-pending' || group.defaultTab === 'hoi-requests-pending' || group.defaultTab === 'section-services-all';
+                    const isRequestsTabActive = activeTab === 'requests' || activeTab.startsWith('requests-') || activeTab.startsWith('mentee-requests') || activeTab.startsWith('hod-requests') || activeTab.startsWith('hoi-requests') || activeTab.startsWith('section-services') || activeTab === 'student-requests' || activeTab === 'faculty-student-requests';
+                    const isDirectActive = activeTab === group.id || activeTab === group.defaultTab || (isNotesheetItem && isNotesheetTabActive) || (isRequestsItem && isRequestsTabActive);
+                    const isParentActive = isChildTabActive || isDirectActive;
+
+                    if (!hasChildren) {
+                      // Direct Top-Level Link (NO STAR ICON)
                       return (
                         <button
-                          key={item.id}
-                          onClick={() => handleNavClick(item.id)}
+                          key={group.id}
+                          onClick={() => handleNavClick(group.defaultTab)}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -529,28 +933,310 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             justifyContent: collapsed ? 'center' : 'flex-start',
                             borderRadius: 'var(--radius-md)',
                             border: 'none',
-                            background: isActive
+                            background: isParentActive
                               ? 'linear-gradient(90deg, var(--brand-orange) 0%, #D95300 100%)'
                               : 'transparent',
-                            color: isActive ? '#FFFFFF' : 'rgba(255,255,255,0.75)',
-                            fontWeight: isActive ? 700 : 500,
+                            color: isParentActive ? '#FFFFFF' : 'rgba(255,255,255,0.8)',
+                            fontWeight: isParentActive ? 700 : 500,
                             fontSize: '0.875rem',
                             cursor: 'pointer',
                             transition: 'all var(--transition-fast)',
-                            boxShadow: isActive ? '0 4px 12px rgba(243, 112, 35, 0.3)' : 'none'
+                            boxShadow: isParentActive ? '0 4px 12px rgba(243, 112, 35, 0.3)' : 'none',
+                            width: '100%',
+                            textAlign: 'left'
                           }}
-                          title={collapsed ? item.label : undefined}
+                          title={collapsed ? group.label : undefined}
                         >
-                          <Icon size={18} style={{ color: isActive ? '#FFFFFF' : 'var(--brand-gold)' }} />
-                          {!collapsed && <span>{item.label}</span>}
+                          <Icon size={18} style={{ color: isParentActive ? '#FFFFFF' : 'var(--brand-gold)', flexShrink: 0 }} />
+                          {!collapsed && (
+                            <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {group.label}
+                            </span>
+                          )}
                         </button>
                       );
-                    })}
-                  </div>
+                    }
+
+                    // Accordion Parent Group (ONLY HAS EXPAND/COLLAPSE ARROW; NO STAR ICON)
+                    return (
+                      <div key={group.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                        <button
+                          onClick={() => {
+                            if (collapsed) {
+                              setCollapsed(false);
+                              setExpandedGroup(group.id);
+                            } else {
+                              toggleGroup(group.id);
+                            }
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: collapsed ? '0.75rem' : '0.625rem 0.75rem',
+                            borderRadius: 'var(--radius-md)',
+                            border: 'none',
+                            background: isParentActive && !isGroupExpanded
+                              ? 'rgba(243, 112, 35, 0.25)'
+                              : isParentActive
+                              ? 'rgba(255,255,255,0.06)'
+                              : 'transparent',
+                            color: isParentActive ? '#FFFFFF' : 'rgba(255,255,255,0.85)',
+                            fontWeight: isParentActive ? 700 : 600,
+                            fontSize: '0.875rem',
+                            cursor: 'pointer',
+                            transition: 'all var(--transition-fast)',
+                            width: '100%'
+                          }}
+                          title={collapsed ? group.label : undefined}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', overflow: 'hidden' }}>
+                            <Icon size={18} style={{ color: isParentActive ? 'var(--brand-orange)' : 'var(--brand-gold)', flexShrink: 0 }} />
+                            {!collapsed && (
+                              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {group.label}
+                              </span>
+                            )}
+                          </div>
+                          {!collapsed && (
+                            <span style={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center' }}>
+                              {isGroupExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                            </span>
+                          )}
+                        </button>
+
+                        {/* Sub-items List (EACH ELIGIBLE SUBMENU ITEM HAS ☆ / ★ PIN BUTTON) */}
+                        {!collapsed && isGroupExpanded && (
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.15rem',
+                            paddingLeft: '1.75rem',
+                            borderLeft: '1px solid rgba(255,255,255,0.12)',
+                            marginLeft: '1.25rem',
+                            marginTop: '0.15rem',
+                            marginBottom: '0.35rem'
+                          }}>
+                            {group.children!
+                              .filter(sub => {
+                                if (sub.id === 'notesheet-pending' || sub.targetTab === 'notesheet-pending') {
+                                  return canAccessPending;
+                                }
+                                if (sub.id === 'notesheet-create' || sub.targetTab === 'notesheet-create') {
+                                  return canCreateNotesheet;
+                                }
+                                if (sub.id.startsWith('notesheet-') || sub.targetTab.startsWith('notesheet-')) {
+                                  return canViewNotesheet;
+                                }
+                                return true;
+                              })
+                              .map(sub => {
+                              const isSubActive = activeTab === sub.targetTab || activeTab === sub.id;
+                              const isSubPinned = pinnedIdsSet.has(sub.targetTab);
+
+                              return (
+                                <div key={sub.id} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                  <button
+                                    onClick={() => handleNavClick(sub.targetTab)}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.5rem',
+                                      padding: '0.45rem 1.85rem 0.45rem 0.65rem',
+                                      borderRadius: 'var(--radius-sm)',
+                                      border: 'none',
+                                      background: isSubActive
+                                        ? 'linear-gradient(90deg, var(--brand-orange) 0%, #D95300 100%)'
+                                        : 'transparent',
+                                      color: isSubActive ? '#FFFFFF' : 'rgba(255,255,255,0.7)',
+                                      fontWeight: isSubActive ? 700 : 500,
+                                      fontSize: '0.8125rem',
+                                      cursor: 'pointer',
+                                      transition: 'all var(--transition-fast)',
+                                      textAlign: 'left',
+                                      boxShadow: isSubActive ? '0 2px 8px rgba(243, 112, 35, 0.3)' : 'none',
+                                      width: '100%'
+                                    }}
+                                  >
+                                    <span style={{
+                                      width: '4px',
+                                      height: '4px',
+                                      borderRadius: '50%',
+                                      backgroundColor: isSubActive ? '#FFFFFF' : 'rgba(255,255,255,0.4)'
+                                    }}></span>
+                                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {sub.label}
+                                    </span>
+                                  </button>
+
+                                  {/* Sub-item Pin Button */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleTogglePin(sub.targetTab, e)}
+                                    style={{
+                                      position: 'absolute',
+                                      right: '4px',
+                                      background: 'none',
+                                      border: 'none',
+                                      color: isSubPinned ? '#F5A623' : 'rgba(255,255,255,0.25)',
+                                      cursor: 'pointer',
+                                      padding: '3px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      borderRadius: '3px',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    title={isSubPinned ? "Unpin from Quick Access" : "Pin to Quick Access"}
+                                    aria-label={isSubPinned ? "Unpin from Quick Access" : "Pin to Quick Access"}
+                                  >
+                                    <Star
+                                      size={12}
+                                      fill={isSubPinned ? '#F5A623' : 'none'}
+                                      strokeWidth={isSubPinned ? 0 : 2}
+                                    />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })
+              ) : (
+                /* ── OTHER ROLES: CATEGORY NAVIGATION (DIRECT ACTIONS) ── */
+                categories.map(cat => {
+                  const itemsInCat = visibleItems.filter(i => (i.category || 'General') === cat);
+                  if (itemsInCat.length === 0) return null;
+
+                  return (
+                    <div key={cat} style={{ marginBottom: '1.5rem' }}>
+                      {!collapsed && cat !== 'Main' && (
+                        <div
+                          style={{
+                            fontSize: '0.6875rem',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            letterSpacing: '1.2px',
+                            color: 'var(--brand-gold)',
+                            marginBottom: '0.5rem',
+                            paddingLeft: '0.75rem',
+                            opacity: 0.9
+                          }}
+                        >
+                          {cat}
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        {itemsInCat.map(item => {
+                          const Icon = item.icon;
+                          const isActive = activeTab === item.id;
+                          const isItemPinned = pinnedIdsSet.has(item.id);
+
+                          return (
+                            <div key={item.id} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                              <button
+                                onClick={() => handleNavClick(item.id)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.75rem',
+                                  padding: collapsed ? '0.75rem' : '0.625rem 2rem 0.625rem 0.75rem',
+                                  justifyContent: collapsed ? 'center' : 'flex-start',
+                                  borderRadius: 'var(--radius-md)',
+                                  border: 'none',
+                                  background: isActive
+                                    ? 'linear-gradient(90deg, var(--brand-orange) 0%, #D95300 100%)'
+                                    : 'transparent',
+                                  color: isActive ? '#FFFFFF' : 'rgba(255,255,255,0.75)',
+                                  fontWeight: isActive ? 700 : 500,
+                                  fontSize: '0.875rem',
+                                  cursor: 'pointer',
+                                  transition: 'all var(--transition-fast)',
+                                  boxShadow: isActive ? '0 4px 12px rgba(243, 112, 35, 0.3)' : 'none',
+                                  width: '100%',
+                                  textAlign: 'left'
+                                }}
+                                title={collapsed ? item.label : undefined}
+                              >
+                                <Icon size={18} style={{ color: isActive ? '#FFFFFF' : 'var(--brand-gold)' }} />
+                                {!collapsed && <span>{item.label}</span>}
+                              </button>
+
+                              {!collapsed && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleTogglePin(item.id, e)}
+                                  style={{
+                                    position: 'absolute',
+                                    right: '6px',
+                                    background: 'none',
+                                    border: 'none',
+                                    color: isItemPinned ? '#F5A623' : 'rgba(255,255,255,0.25)',
+                                    cursor: 'pointer',
+                                    padding: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    borderRadius: '4px',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  title={isItemPinned ? "Unpin from Quick Access" : "Pin to Quick Access"}
+                                  aria-label={isItemPinned ? "Unpin from Quick Access" : "Pin to Quick Access"}
+                                >
+                                  <Star
+                                    size={13}
+                                    fill={isItemPinned ? '#F5A623' : 'none'}
+                                    strokeWidth={isItemPinned ? 0 : 2}
+                                  />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </>
           )}
+
+          {/* Canonical Single Logout Action for All Roles */}
+          <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            <button
+              onClick={() => logout()}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: collapsed ? '0.75rem' : '0.625rem 0.75rem',
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                borderRadius: 'var(--radius-md)',
+                border: 'none',
+                background: 'transparent',
+                color: '#EF4444',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                transition: 'all var(--transition-fast)',
+                width: '100%',
+                textAlign: 'left'
+              }}
+              title={collapsed ? "Logout" : undefined}
+              aria-label="Logout"
+            >
+              <LogOut size={18} style={{ color: '#EF4444', flexShrink: 0 }} />
+              {!collapsed && (
+                <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  Logout
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Sidebar Footer User Info */}
@@ -590,26 +1276,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {role}
               </div>
             </div>
-          )}
-
-          {!collapsed && (
-            <button
-              onClick={() => logout()}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'rgba(255,255,255,0.6)',
-                cursor: 'pointer',
-                padding: '4px',
-                borderRadius: '4px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-              title="Logout"
-            >
-              <LogOut size={16} />
-            </button>
           )}
         </div>
       </aside>

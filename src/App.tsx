@@ -45,7 +45,17 @@ import { LibraryPage } from './pages/campus/LibraryPage';
 import { NotificationsPage } from './pages/campus/NotificationsPage';
 import { RequestsPage } from './pages/campus/RequestsPage';
 import { EdpDutyPage } from './pages/campus/EdpDutyPage';
+import { WorkTransferManagementPage } from './pages/faculty/WorkTransferManagementPage';
+import { WorkTransferAuditCenterPage } from './pages/admin-offices/WorkTransferAuditCenterPage';
+import { MyWorkPage } from './pages/work-transfer/MyWorkPage';
+import { TransferWorkPage } from './pages/work-transfer/TransferWorkPage';
+import { ReceivedWorkPage } from './pages/work-transfer/ReceivedWorkPage';
+import { ActiveTransfersPage } from './pages/work-transfer/ActiveTransfersPage';
+import { TransferHistoryPage } from './pages/work-transfer/TransferHistoryPage';
 import { IncubationPage } from './pages/incubation/IncubationPage';
+import { PTMManagementPage } from './pages/ptm/PTMManagementPage';
+import { ParentPTMDashboard } from './pages/ptm/ParentPTMDashboard';
+import { StudentPTMView } from './components/ptm/StudentPTMView';
 
 // Fees & Finance Module Page
 import { FeesFinancePage } from './pages/finance/FeesFinancePage';
@@ -103,34 +113,83 @@ import { isTabPermittedForRole } from './constants/navigationConfig';
 
 import './styles/index.css';
 
+const getInitialTabFromLocation = (): string => {
+  if (typeof window === 'undefined') return 'dashboard';
+  const path = window.location.pathname.replace(/^\/+|\/+$/g, '');
+  const searchParams = new URLSearchParams(window.location.search);
+  const tabParam = searchParams.get('tab');
+  if (tabParam) return tabParam;
+
+  if (path === 'faculty/students/search' || path === 'students/search' || path === 'faculty/students/my-students' || path === 'students/my-students' || path === 'my-students' || path === 'student-search') {
+    return 'my-students';
+  }
+  if (path === 'faculty/students/academic' || path === 'students/academic' || path === 'student-academics') {
+    return 'student-academics';
+  }
+  if (path === 'faculty/students/requests' || path === 'students/requests' || path === 'student-requests') {
+    return 'student-requests';
+  }
+  if (path === 'deputy-registrar/dashboard' || path === 'dashboard' || path === '') {
+    return 'dashboard';
+  }
+  if (path) {
+    return path;
+  }
+  return 'dashboard';
+};
+
 const MainAppContent: React.FC = () => {
   const { user, role } = useAuth();
   const [activeTab, setActiveTabState] = useState<string>(() => {
-    if (typeof window !== 'undefined' && window.location.pathname === '/deputy-registrar/dashboard') {
-      return 'dashboard';
-    }
-    return 'dashboard';
+    return getInitialTabFromLocation();
   });
   const [tabParams, setTabParams] = useState<Record<string, any> | null>(null);
 
-  const setActiveTab = (tab: string, params?: any) => {
+  const setActiveTab = (tab: string, params?: any, pushHistory: boolean = true) => {
     if (params) {
       setTabParams(params);
     } else {
       setTabParams(null);
     }
     setActiveTabState(tab);
+
+    if (pushHistory && typeof window !== 'undefined' && window.history) {
+      let targetUrl = '/';
+      if (tab === 'student-search') {
+        targetUrl = '/faculty/students/search';
+      } else if (tab === 'my-students') {
+        targetUrl = '/faculty/students/my-students';
+      } else if (tab === 'student-academics') {
+        targetUrl = '/faculty/students/academic';
+      } else if (tab === 'student-requests') {
+        targetUrl = '/faculty/students/requests';
+      } else if (tab !== 'dashboard') {
+        targetUrl = `?tab=${encodeURIComponent(tab)}`;
+      }
+
+      const currentPathAndQuery = window.location.pathname + window.location.search;
+      if (currentPathAndQuery !== targetUrl && window.location.search !== `?tab=${encodeURIComponent(tab)}`) {
+        window.history.pushState({ tab, params }, '', targetUrl);
+      }
+    }
   };
   const [collapsed, setCollapsed] = useState<boolean>(false);
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
   const [showWhatsNew, setShowWhatsNew] = useState<boolean>(true);
 
-  // Sync /deputy-registrar/dashboard URL route
+  // Sync browser popstate (back/forward)
   React.useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.pathname === '/deputy-registrar/dashboard') {
-      setActiveTab('dashboard');
-    }
-  }, [role]);
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state && event.state.tab) {
+        setActiveTab(event.state.tab, event.state.params, false);
+      } else {
+        const initialTab = getInitialTabFromLocation();
+        setActiveTab(initialTab, null, false);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // If not logged in, enforce login page screen
   if (!user) {
@@ -280,7 +339,11 @@ const MainAppContent: React.FC = () => {
       case 'mentee-requests-pending':
       case 'mentee-requests-assigned':
       case 'mentee-requests-history':
+      case 'mentee-requests':
         return <RequestsPage initialCategory="ALL" />;
+      case 'counseling':
+      case 'mentee-sessions':
+        return <MentorPage initialTab="SESSIONS" />;
       case 'mentor-profile':
         return <ProfilePage />;
       case 'student-academics':
@@ -289,6 +352,30 @@ const MainAppContent: React.FC = () => {
       case 'student-requests':
       case 'faculty-student-requests':
         return <RequestsPage initialCategory="ALL" />;
+      case 'work-transfer':
+      case 'workload-transfer':
+      case 'delegate-work':
+      case 'faculty-work-transfer':
+      case 'hod-work-transfer':
+      case 'hoi-work-transfer':
+      case 'my-work':
+        return <MyWorkPage setActiveTab={setActiveTab} />;
+      case 'work-transfer-new':
+      case 'transfer-work':
+        return <TransferWorkPage setActiveTab={setActiveTab} />;
+      case 'work-transfer-received':
+      case 'received-work':
+        return <ReceivedWorkPage setActiveTab={setActiveTab} />;
+      case 'work-transfer-active':
+      case 'active-transfers':
+        return <ActiveTransfersPage setActiveTab={setActiveTab} />;
+      case 'work-transfer-history':
+      case 'transfer-history':
+        return <TransferHistoryPage setActiveTab={setActiveTab} />;
+      case 'work-transfer-audit':
+      case 'workload-audit':
+      case 'transfer-audit':
+        return <WorkTransferAuditCenterPage />;
 
       // ─── 3C. HOD Portal Routes ───
       case 'hod-profile':
@@ -821,6 +908,19 @@ const MainAppContent: React.FC = () => {
         return <StudentsPage />;
       case 'student-search':
       case 'students-search':
+        if (role === 'FACULTY' || role === 'MENTOR') {
+          return <MentorPage initialTab="MY_STUDENTS" />;
+        }
+        return role !== 'STUDENT' ? (
+          <StudentDirectorySearchPage 
+            initialRecordId={tabParams?.recordId}
+            initialStudentId={tabParams?.studentId}
+            initialTab={tabParams?.initialTab}
+            initialDocId={tabParams?.docId}
+          />
+        ) : (
+          <Dashboard setActiveTab={setActiveTab} />
+        );
       case 'students-directory':
       case 'reg-students-search':
       case 'section-students-list':
@@ -907,8 +1007,33 @@ const MainAppContent: React.FC = () => {
         return role !== 'STUDENT' ? <InventoryAssetPage initialTab="REPORTS" /> : <Dashboard setActiveTab={setActiveTab} />;
       case 'inventory-audit':
         return role !== 'STUDENT' ? <InventoryAssetPage initialTab="AUDIT_LOG" /> : <Dashboard setActiveTab={setActiveTab} />;
+      
+      // ─── PTM Management Routes ───
+      case 'ptm':
+      case 'ptm-management':
+      case 'ptm-dashboard':
+        return role === 'PARENT' ? <ParentPTMDashboard /> : <PTMManagementPage initialTab="dashboard" />;
+      case 'ptm-schedule':
+        return role === 'PARENT' ? <ParentPTMDashboard /> : <PTMManagementPage initialTab="ptm-schedule" />;
+      case 'ptm-my':
+        return role === 'PARENT' ? <ParentPTMDashboard /> : <PTMManagementPage initialTab="ptm-my" />;
+      case 'ptm-records':
+        return role === 'PARENT' ? <ParentPTMDashboard /> : <PTMManagementPage initialTab="ptm-records" />;
+      case 'ptm-feedback':
+        return role === 'PARENT' ? <ParentPTMDashboard /> : <PTMManagementPage initialTab="ptm-feedback" />;
+      case 'ptm-followups':
+        return role === 'PARENT' ? <ParentPTMDashboard /> : <PTMManagementPage initialTab="ptm-followups" />;
+      case 'ptm-reports':
+        return role === 'PARENT' ? <ParentPTMDashboard /> : <PTMManagementPage initialTab="ptm-reports" />;
+      case 'parent-ptm':
+      case 'parent-dashboard':
+      case 'parent-children':
+        return <ParentPTMDashboard />;
+      case 'student-ptm':
+        return <StudentPTMView />;
+
       default:
-        return <Dashboard setActiveTab={setActiveTab} />;
+        return role === 'PARENT' ? <ParentPTMDashboard /> : <Dashboard setActiveTab={setActiveTab} />;
     }
   };
 
@@ -938,8 +1063,18 @@ const MainAppContent: React.FC = () => {
           mobileOpen={mobileOpen}
           setMobileOpen={setMobileOpen}
         />
-        <main style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
-          {renderActivePage()}
+        <main style={{ flex: 1, padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <div key={activeTab} className="erp-page-transition" style={{ flex: 1 }}>
+            {renderActivePage()}
+          </div>
+          <footer style={{ marginTop: '2.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', fontSize: '0.78125rem', color: 'var(--text-muted)' }}>
+            <div>
+              <strong style={{ color: 'var(--brand-navy)' }}>Swarrnim Startup & Innovation University</strong> • SSIU ERP — University Management System
+            </div>
+            <div>
+              © 2026 Swarrnim University. All rights reserved.
+            </div>
+          </footer>
         </main>
       </div>
     </div>

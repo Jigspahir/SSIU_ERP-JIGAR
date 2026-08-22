@@ -88,7 +88,8 @@ export const PERMITTED_CAMPUS_SERVICES: Record<UserRole, CampusServiceType[]> = 
   EXAM_CELL: ['IT Support', 'Maintenance', 'Furniture'],
   STUDENT_SECTION: ['Maintenance', 'IT Support', 'Furniture'],
   ACCOUNTS_ADMIN: ['IT Support', 'Maintenance', 'Furniture'],
-  IQAC: ['Maintenance', 'IT Support']
+  IQAC: ['Maintenance', 'IT Support'],
+  PARENT: []
 };
 
 // ─── PERMITTED APPROVAL REQUEST CATEGORIES PER ROLE ──────────────────────────
@@ -171,7 +172,8 @@ export const PERMITTED_APPROVAL_CATEGORIES: Record<UserRole, ApprovalRequestCate
   IQAC: ['RESEARCH_GRANT', 'EVENT_PERMISSION'],
   MAINTENANCE_ADMIN: ['INFRASTRUCTURE_MAINTENANCE'],
   ACCOUNTS_ADMIN: ['FEE_CONCESSION', 'GENERAL_ADMINISTRATIVE'],
-  LIBRARY_ADMIN: ['GENERAL_ADMINISTRATIVE']
+  LIBRARY_ADMIN: ['GENERAL_ADMINISTRATIVE'],
+  PARENT: []
 };
 
 // ─── PERMITTED TARGET OFFICES PER CATEGORY ───────────────────────────────────
@@ -245,8 +247,8 @@ export const isUserAuthorizedForCampusServiceRequest = (
 ): boolean => {
   if (!user || !role) return false;
 
-  // Super Admin and University Admin have full executive visibility
-  if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') {
+  // Executive leadership has full campus service visibility
+  if (['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRESIDENT', 'VICE_PRESIDENT', 'PROVOST'].includes(role)) {
     return true;
   }
 
@@ -318,8 +320,8 @@ export const isUserAuthorizedForApprovalRequest = (
 ): boolean => {
   if (!user || !role) return false;
 
-  // Super Admin and University Admin have full executive oversight
-  if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') {
+  // Executive leadership has full executive oversight
+  if (['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRESIDENT', 'VICE_PRESIDENT', 'PROVOST'].includes(role)) {
     return true;
   }
 
@@ -522,7 +524,8 @@ export const ROLE_ERP_PERMISSIONS: Record<UserRole, ErpPermission[]> = {
   IQAC: [
     'FACULTY_VIEW', 'AUDIT_VIEW', 'SUBJECT_MANAGE',
     'NOTESHEET_VIEW', 'NOTESHEET_REVIEW'
-  ]
+  ],
+  PARENT: []
 };
 
 /**

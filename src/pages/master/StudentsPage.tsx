@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { Badge } from '../../components/common/Badge';
 import { StudentProfileModal } from '../../components/profile/StudentProfileModal';
 import { MentorAssignmentTab } from '../../components/mentor/MentorAssignmentTab';
+import { BulkDataManagerModal } from '../../components/bulk-import/BulkDataManagerModal';
 import { Eye, Users, UserCheck } from 'lucide-react';
 
 interface StudentsPageProps {
@@ -28,6 +29,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ initialTab = 'DIRECT
   // Modals State
   const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Student | null>(null);
   const [deletingItem, setDeletingItem] = useState<Student | null>(null);
 
@@ -329,11 +331,21 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ initialTab = 'DIRECT
         }
         onAddClick={handleOpenAddModal}
         addLabel="Register Student"
+        onBulkImportClick={() => setIsBulkModalOpen(true)}
+        bulkImportLabel="Bulk Import"
         onViewClick={item => setViewingStudent(item)}
         onEditClick={handleOpenEditModal}
         onDeleteClick={item => setDeletingItem(item)}
         canMutate={canMutate()}
         exportFilename="swarrnim-students"
+      />
+
+      {/* Universal Bulk Data Management Modal */}
+      <BulkDataManagerModal
+        isOpen={isBulkModalOpen}
+        onClose={() => setIsBulkModalOpen(false)}
+        initialType="STUDENT"
+        onSuccess={() => setStudents(db.getStudents())}
       />
 
       {/* Student Profile Detail Modal */}

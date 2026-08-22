@@ -11,6 +11,7 @@ import { StatCard } from '../../components/common/StatCard';
 import { Modal } from '../../components/common/Modal';
 import { StudentProfileModal } from '../../components/profile/StudentProfileModal';
 import { StudentDocumentsSection } from '../../components/profile/StudentDocumentsSection';
+import { StudentRowActionMenu } from '../../components/common/StudentRowActionMenu';
 import { 
   UserCheck, Calendar, Clock, MessageSquare, Plus, CheckCircle, 
   User, Users, AlertCircle, FileText, CheckCircle2, Search,
@@ -21,6 +22,7 @@ import {
 import { AttendanceApplication, Student, Subject, Assignment } from '../../types';
 import { StudentAcademicDocumentItem } from '../../types/documentMaster';
 import { MentoringSessionRecord } from '../../types/mentorAssignment';
+import { studentProfileAccessService } from '../../services/studentProfileAccessService';
 import * as XLSX from 'xlsx';
 
 export type MentorTabType = 
@@ -76,7 +78,11 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
   const [selectedStudentForProfile, setSelectedStudentForProfile] = useState<Student | null>(null);
   const [selectedStudentForDocs, setSelectedStudentForDocs] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ELIGIBLE' | 'SHORTAGE' | 'RISK'>('ALL');
+  const [filterInstituteId, setFilterInstituteId] = useState<string>('ALL');
+  const [filterDepartmentId, setFilterDepartmentId] = useState<string>('ALL');
+  const [filterProgramId, setFilterProgramId] = useState<string>('ALL');
+  const [filterSemesterId, setFilterSemesterId] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE' | 'SHORTAGE' | 'RISK' | 'ELIGIBLE'>('ALL');
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Document Verification Action Modal
@@ -102,12 +108,17 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
     return null;
   }, [role, user]);
 
-  // 2. Fetch assigned students if user is faculty/mentor (strictly scoped)
-  const { assignments, students: myMentees } = useMemo(() => {
-    return mentorAssignmentService.getAssignments({
-      searchQuery
-    }, user);
-  }, [user, searchQuery, refreshKey]);
+  // 2. Fetch authorized students strictly scoped to current user & active role
+  const authorizedStudents = useMemo(() => {
+    if (!user || !role) return [];
+    const allStudents = db.getStudents();
+    if (role === 'STUDENT') {
+      return allStudents.filter(s => s.id === user.id || s.enrollmentNo === user.enrollmentNo);
+    }
+    return allStudents.filter(s => studentProfileAccessService.isUserAuthorizedForStudent(user, role, s));
+  }, [user, role, refreshKey]);
+
+  const myMentees = authorizedStudents;
 
   // 3. Fetch real mentoring sessions from database
   const sessions = useMemo(() => {
@@ -123,10 +134,10 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
     return sessions.filter(s => s.followUpRequired && s.followUpStatus !== 'COMPLETED');
   }, [sessions]);
 
-  // 3. Fetch student requests routed to this mentor
+  // 4. Fetch student requests routed to this user
   const myMentorRequests = useMemo(() => {
     const allRequests = db.getState().studentRequests || [];
-    if (role === 'FACULTY') {
+    if (role === 'FACULTY' || role === 'MENTOR') {
       const myFac = db.getFaculty().find(f => f.id === user?.id || f.email === user?.email);
       const facId = myFac?.id || user?.id;
       return allRequests.filter(r => r.currentHandlerId === facId || r.mentorId === facId);
@@ -134,12 +145,12 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
     return allRequests;
   }, [role, user, refreshKey]);
 
-  // 4. Fetch documents for this mentor's assigned mentees
+  // 5. Fetch documents for authorized students
   const menteeDocuments = useMemo(() => {
     const allDocs = db.getStudentAcademicDocuments();
-    const menteeIds = new Set(myMentees.map(m => m.id));
-    return allDocs.filter(d => menteeIds.has(d.studentId) || role === 'SUPER_ADMIN');
-  }, [myMentees, role, refreshKey]);
+    const authorizedIds = new Set(authorizedStudents.map(m => m.id));
+    return allDocs.filter(d => authorizedIds.has(d.studentId) || role === 'SUPER_ADMIN');
+  }, [authorizedStudents, role, refreshKey]);
 
   const pendingMenteesDocs = useMemo(() => {
     return menteeDocuments.filter(d => d.status === 'PENDING_VERIFICATION' || !d.isLocked);
@@ -149,23 +160,74 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
     return menteeDocuments.filter(d => d.status === 'VERIFIED' && d.isLocked);
   }, [menteeDocuments]);
 
-  // 5. Attendance Shortage Calculation & Academic Risk Tracker (Centralized)
+  // 6. Filter authorized students by text search and dropdown criteria
+  const filteredStudents = useMemo(() => {
+    const cleanQuery = searchQuery.trim().toLowerCase();
+    const programs = db.getPrograms();
+    const departments = db.getDepartments();
+    const institutes = db.getInstitutes();
+    const semesters = db.getSemesters();
+
+    return authorizedStudents.filter(student => {
+      // Query text search
+      if (cleanQuery) {
+        const nameMatch = student.name?.toLowerCase().includes(cleanQuery);
+        const enrollMatch = student.enrollmentNo?.toLowerCase().includes(cleanQuery);
+        const emailMatch = student.email?.toLowerCase().includes(cleanQuery);
+        const phoneMatch = student.phone?.includes(cleanQuery);
+        const prog = programs.find(p => p.id === student.programId);
+        const progMatch = prog?.name?.toLowerCase().includes(cleanQuery) || prog?.code?.toLowerCase().includes(cleanQuery);
+        const dept = departments.find(d => d.id === student.departmentId);
+        const deptMatch = dept?.name?.toLowerCase().includes(cleanQuery) || dept?.code?.toLowerCase().includes(cleanQuery);
+        const inst = institutes.find(i => i.id === student.instituteId);
+        const instMatch = inst?.name?.toLowerCase().includes(cleanQuery) || inst?.code?.toLowerCase().includes(cleanQuery);
+        const sem = semesters.find(s => s.id === student.semesterId);
+        const semMatch = sem ? `sem ${sem.number}`.includes(cleanQuery) || `${sem.number}` === cleanQuery : false;
+
+        if (!nameMatch && !enrollMatch && !emailMatch && !phoneMatch && !progMatch && !deptMatch && !instMatch && !semMatch) {
+          return false;
+        }
+      }
+
+      // Dropdown filters
+      if (filterInstituteId && filterInstituteId !== 'ALL' && student.instituteId !== filterInstituteId) {
+        return false;
+      }
+      if (filterDepartmentId && filterDepartmentId !== 'ALL' && student.departmentId !== filterDepartmentId) {
+        return false;
+      }
+      if (filterProgramId && filterProgramId !== 'ALL' && student.programId !== filterProgramId) {
+        return false;
+      }
+      if (filterSemesterId && filterSemesterId !== 'ALL' && student.semesterId !== filterSemesterId) {
+        return false;
+      }
+      if (statusFilter === 'ACTIVE' && student.status !== 'ACTIVE') return false;
+      if (statusFilter === 'INACTIVE' && student.status === 'ACTIVE') return false;
+
+      return true;
+    });
+  }, [authorizedStudents, searchQuery, filterInstituteId, filterDepartmentId, filterProgramId, filterSemesterId, statusFilter]);
+
+  // 7. Attendance Shortage Calculation & Academic Risk Tracker
   const menteeAttendanceData = useMemo(() => {
-    return myMentees.map(student => {
+    return filteredStudents.map(student => {
       const stats = db.getStudentAttendanceStats(student.id);
       const studentDocs = menteeDocuments.filter(d => d.studentId === student.id);
+      const verifiedDocsCount = studentDocs.filter(d => d.status === 'VERIFIED').length;
+      const pendingDocsCount = studentDocs.filter(d => d.status !== 'VERIFIED').length;
       const studentReqs = myMentorRequests.filter(r => r.studentId === student.id);
       const hasShortage = stats.percentage < 75;
-      const hasMissingDocs = studentDocs.some(d => d.status !== 'VERIFIED');
+      const hasMissingDocs = pendingDocsCount > 0;
       const hasPendingReqs = studentReqs.some(r => r.status === 'SUBMITTED' || r.status === 'WORK_IN_PROGRESS');
-
-      // Academic Risk indicator
       const isRisk = hasShortage || hasMissingDocs;
 
       return {
         student,
         stats,
         docsCount: studentDocs.length,
+        verifiedDocsCount,
+        pendingDocsCount,
         reqsCount: studentReqs.length,
         hasShortage,
         hasMissingDocs,
@@ -173,7 +235,7 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
         isRisk
       };
     });
-  }, [myMentees, menteeDocuments, myMentorRequests]);
+  }, [filteredStudents, menteeDocuments, myMentorRequests]);
 
   const shortageStudents = useMemo(() => {
     return menteeAttendanceData.filter(m => m.hasShortage);
@@ -198,6 +260,34 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
   }, [menteeAttendanceData, statusFilter]);
 
   const pendingRequestsCount = myMentorRequests.filter(r => r.status === 'SUBMITTED' || r.status === 'WORK_IN_PROGRESS' || r.status === 'WITH_MENTOR').length;
+
+  const handleExportExcel = () => {
+    const exportData = filteredMenteeData.map(({ student, stats, hasShortage, verifiedDocsCount, pendingDocsCount }) => {
+      const inst = db.getInstitutes().find(i => i.id === student.instituteId);
+      const dept = db.getDepartments().find(d => d.id === student.departmentId);
+      const prog = db.getPrograms().find(p => p.id === student.programId);
+      const sem = db.getSemesters().find(s => s.id === student.semesterId);
+
+      return {
+        'Student Name': student.name,
+        'Enrollment Number': student.enrollmentNo,
+        'Email': student.email,
+        'Institute': inst?.name || student.instituteId,
+        'Department': dept?.name || student.departmentId || '-',
+        'Program': prog?.name || student.programId,
+        'Semester': sem ? `Semester ${sem.number}` : '-',
+        'Attendance %': `${stats.percentage}%`,
+        'Academic Status': !hasShortage ? 'IN GOOD STANDING' : 'ATTENDANCE SHORTAGE',
+        'Document Status': `${verifiedDocsCount} Verified, ${pendingDocsCount} Pending`,
+        'Status': student.status
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'My Students');
+    XLSX.writeFile(wb, `My_Students_${user?.username || 'export'}.xlsx`);
+  };
 
   const handleBookSession = (e: React.FormEvent) => {
     e.preventDefault();
@@ -517,132 +607,339 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
           </div>
 
           {/* ─────────────────────────────────────────────────────────────
-              TAB 1: Mentee List (Scoped Roster)
+              TAB 1: My Students / Mentee List (Unified Student Management)
               ───────────────────────────────────────────────────────────── */}
           {activeTab === 'MY_STUDENTS' && (
             <div className="card" style={{ padding: '1.25rem' }}>
+              {/* Header with Title and Export Button */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0 }}>
-                    Assigned Mentees Roster ({filteredMenteeData.length})
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Users size={20} color="var(--brand-orange)" />
+                    {role === 'FACULTY' 
+                      ? 'My Students — Department & Assigned Classes' 
+                      : role === 'MENTOR' 
+                        ? 'My Mentees — Assigned Mentorship Roster'
+                        : role === 'HOD'
+                          ? 'Department Students Directory'
+                          : role === 'PRINCIPAL'
+                            ? 'Institute Students Directory'
+                            : 'University Students Directory'}
                   </h3>
-                  <div style={{ display: 'flex', gap: '0.35rem' }}>
-                    <button 
-                      className={`btn btn-sm ${statusFilter === 'ALL' ? 'btn-navy' : 'btn-outline'}`}
-                      onClick={() => setStatusFilter('ALL')}
-                      style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
-                    >
-                      All ({menteeAttendanceData.length})
-                    </button>
-                    <button 
-                      className={`btn btn-sm ${statusFilter === 'SHORTAGE' ? 'btn-danger' : 'btn-outline'}`}
-                      onClick={() => setStatusFilter('SHORTAGE')}
-                      style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
-                    >
-                      Shortage ({shortageStudents.length})
-                    </button>
-                    <button 
-                      className={`btn btn-sm ${statusFilter === 'RISK' ? 'btn-primary' : 'btn-outline'}`}
-                      onClick={() => setStatusFilter('RISK')}
-                      style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', backgroundColor: statusFilter === 'RISK' ? '#F59E0B' : undefined }}
-                    >
-                      Academic Risk ({riskStudents.length})
-                    </button>
-                  </div>
+                  <Badge variant="navy">{filteredMenteeData.length} Authorized Records</Badge>
                 </div>
 
-                <div style={{ position: 'relative', width: '260px' }}>
-                  <input 
-                    className="form-control" 
-                    placeholder="Search by name or enrollment..." 
-                    value={searchQuery} 
-                    onChange={e => setSearchQuery(e.target.value)} 
-                    style={{ paddingLeft: '2rem' }}
-                  />
-                  <Search size={15} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button 
+                    className="btn btn-sm btn-navy"
+                    onClick={handleExportExcel}
+                    title="Export authorized students to Excel"
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem' }}
+                  >
+                    <FileSpreadsheet size={14} /> Export to Excel
+                  </button>
+                  <button 
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setFilterInstituteId('ALL');
+                      setFilterDepartmentId('ALL');
+                      setFilterProgramId('ALL');
+                      setFilterSemesterId('ALL');
+                      setStatusFilter('ALL');
+                      setRefreshKey(k => k + 1);
+                    }}
+                    title="Reset all filters"
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem' }}
+                  >
+                    <RefreshCw size={14} /> Reset
+                  </button>
                 </div>
               </div>
 
+              {/* Main Search Input Bar */}
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <input 
+                    className="form-control" 
+                    placeholder="Search student by name, enrollment number or email..." 
+                    value={searchQuery} 
+                    onChange={e => setSearchQuery(e.target.value)} 
+                    style={{ 
+                      paddingLeft: '2.5rem', 
+                      paddingRight: searchQuery ? '2.5rem' : '1rem',
+                      height: '42px',
+                      fontSize: '0.9rem',
+                      border: '2px solid #E2E8F0',
+                      borderRadius: '8px'
+                    }}
+                  />
+                  <Search size={18} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--brand-navy)', opacity: 0.6 }} />
+                  {searchQuery && (
+                    <button 
+                      onClick={() => setSearchQuery('')}
+                      style={{ position: 'absolute', right: '0.85rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: 0 }}
+                    >
+                      <XCircle size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Structured Filter Controls Row */}
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', 
+                gap: '0.75rem', 
+                padding: '0.875rem', 
+                backgroundColor: '#F8FAFC', 
+                borderRadius: '8px', 
+                marginBottom: '1.25rem',
+                border: '1px solid #E2E8F0'
+              }}>
+                <div>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Institute</label>
+                  <select 
+                    className="form-control" 
+                    value={filterInstituteId} 
+                    onChange={e => setFilterInstituteId(e.target.value)}
+                    style={{ fontSize: '0.8rem', height: '34px', padding: '0.25rem 0.5rem' }}
+                  >
+                    <option value="ALL">All Institutes</option>
+                    {db.getInstitutes().map(i => (
+                      <option key={i.id} value={i.id}>{i.name} ({i.code})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Department</label>
+                  <select 
+                    className="form-control" 
+                    value={filterDepartmentId} 
+                    onChange={e => setFilterDepartmentId(e.target.value)}
+                    style={{ fontSize: '0.8rem', height: '34px', padding: '0.25rem 0.5rem' }}
+                  >
+                    <option value="ALL">All Departments</option>
+                    {db.getDepartments().map(d => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Program</label>
+                  <select 
+                    className="form-control" 
+                    value={filterProgramId} 
+                    onChange={e => setFilterProgramId(e.target.value)}
+                    style={{ fontSize: '0.8rem', height: '34px', padding: '0.25rem 0.5rem' }}
+                  >
+                    <option value="ALL">All Programs</option>
+                    {db.getPrograms().map(p => (
+                      <option key={p.id} value={p.id}>{p.code} - {p.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Semester</label>
+                  <select 
+                    className="form-control" 
+                    value={filterSemesterId} 
+                    onChange={e => setFilterSemesterId(e.target.value)}
+                    style={{ fontSize: '0.8rem', height: '34px', padding: '0.25rem 0.5rem' }}
+                  >
+                    <option value="ALL">All Semesters</option>
+                    {db.getSemesters().map(s => (
+                      <option key={s.id} value={s.id}>Semester {s.number}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Status / Standing</label>
+                  <select 
+                    className="form-control" 
+                    value={statusFilter} 
+                    onChange={e => setStatusFilter(e.target.value as any)}
+                    style={{ fontSize: '0.8rem', height: '34px', padding: '0.25rem 0.5rem' }}
+                  >
+                    <option value="ALL">All Statuses ({authorizedStudents.length})</option>
+                    <option value="ACTIVE">Active Students</option>
+                    <option value="SHORTAGE">Attendance Shortage (&lt;75%)</option>
+                    <option value="RISK">Academic Risk (Shortage / Docs)</option>
+                    <option value="INACTIVE">Inactive Students</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Data Table */}
               {filteredMenteeData.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
-                  <Users size={48} style={{ opacity: 0.3, margin: '0 auto 1rem' }} />
-                  <p style={{ fontWeight: 600 }}>No mentees match the selected filter criteria.</p>
+                <div style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-muted)', backgroundColor: '#FAFAFA', borderRadius: '8px' }}>
+                  <Users size={48} style={{ opacity: 0.25, margin: '0 auto 1rem' }} />
+                  <p style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--brand-navy)', margin: '0 0 0.25rem 0' }}>No authorized students found</p>
+                  <p style={{ fontSize: '0.8125rem', color: '#64748B', margin: 0 }}>Try clearing your search query or adjusting the filters.</p>
                 </div>
               ) : (
-                <div className="table-responsive">
-                  <table className="table">
+                <div className="table-responsive" style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                  <table className="table" style={{ width: '100%', minWidth: '1320px', borderCollapse: 'collapse', verticalAlign: 'middle', margin: 0 }}>
                     <thead>
-                      <tr>
-                        <th>Student Name &amp; Enrollment</th>
-                        <th>Program &amp; Semester</th>
-                        <th>Section</th>
-                        <th>Attendance %</th>
-                        <th>Academic Status</th>
-                        <th>Document Status</th>
-                        <th>Requests</th>
-                        <th style={{ textAlign: 'right' }}>Actions</th>
+                      <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #CBD5E1' }}>
+                        <th style={{ minWidth: '220px', width: '220px', textAlign: 'left', padding: '0.85rem 1rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Student Name</th>
+                        <th style={{ minWidth: '130px', width: '130px', textAlign: 'left', padding: '0.85rem 0.75rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Enrollment No.</th>
+                        <th style={{ minWidth: '200px', width: '200px', textAlign: 'left', padding: '0.85rem 0.75rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Program</th>
+                        <th style={{ minWidth: '90px', width: '90px', textAlign: 'center', padding: '0.85rem 0.5rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Semester</th>
+                        <th style={{ minWidth: '100px', width: '100px', textAlign: 'left', padding: '0.85rem 0.75rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Department</th>
+                        <th style={{ minWidth: '100px', width: '100px', textAlign: 'left', padding: '0.85rem 0.75rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Institute</th>
+                        <th style={{ minWidth: '110px', width: '110px', textAlign: 'center', padding: '0.85rem 0.5rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Status</th>
+                        <th style={{ minWidth: '170px', width: '170px', textAlign: 'center', padding: '0.85rem 0.5rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Academic Status</th>
+                        <th style={{ minWidth: '130px', width: '130px', textAlign: 'center', padding: '0.85rem 0.5rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Attendance %</th>
+                        <th style={{ minWidth: '150px', width: '150px', textAlign: 'center', padding: '0.85rem 0.5rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Document Status</th>
+                        <th style={{ minWidth: '70px', width: '70px', textAlign: 'center', padding: '0.85rem 0.75rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredMenteeData.map(({ student, stats, hasShortage, hasMissingDocs, reqsCount }) => {
+                      {filteredMenteeData.map(({ student, stats, verifiedDocsCount, pendingDocsCount, hasShortage, isRisk, reqsCount }) => {
                         const prog = db.getProgramById(student.programId);
                         const sem = db.getSemesterById(student.semesterId);
+                        const dept = db.getDepartments().find(d => d.id === student.departmentId);
+                        const inst = db.getInstitutes().find(i => i.id === student.instituteId);
 
                         return (
-                          <tr key={student.id}>
-                            <td>
-                              <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>{student.name}</div>
-                              <code style={{ fontSize: '0.75rem', color: 'var(--brand-orange)' }}>{student.enrollmentNo}</code>
+                          <tr key={student.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
+                            {/* 1. Student Name */}
+                            <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle', cursor: 'pointer' }} onClick={() => setSelectedStudentForProfile(student)}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                                <div style={{ 
+                                  width: '32px', 
+                                  height: '32px', 
+                                  borderRadius: '50%', 
+                                  background: 'linear-gradient(135deg, #1E3A8A, #3B82F6)', 
+                                  color: '#fff', 
+                                  fontWeight: 800, 
+                                  fontSize: '0.75rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  flexShrink: 0
+                                }}>
+                                  {student.name.charAt(0)}
+                                </div>
+                                <div style={{ overflow: 'hidden' }}>
+                                  <div style={{ fontWeight: 800, color: 'var(--brand-navy)', fontSize: '0.875rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{student.name}</div>
+                                  <div style={{ fontSize: '0.725rem', color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{student.email}</div>
+                                </div>
+                              </div>
                             </td>
-                            <td>
-                              <div style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{prog?.code || 'B.Tech'}</div>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Sem {sem?.number || 4}</div>
+
+                            {/* 2. Enrollment No. */}
+                            <td style={{ padding: '0.75rem 0.75rem', verticalAlign: 'middle', cursor: 'pointer' }} onClick={() => setSelectedStudentForProfile(student)}>
+                              <code style={{ fontSize: '0.775rem', fontWeight: 700, color: 'var(--brand-orange)', background: '#FFF7ED', padding: '0.2rem 0.45rem', borderRadius: '4px', border: '1px solid #FFEDD5', display: 'inline-block' }}>
+                                {student.enrollmentNo}
+                              </code>
                             </td>
-                            <td>
-                              <Badge variant="navy">{student.divisionId || 'Div A'}</Badge>
+
+                            {/* 3. Program */}
+                            <td style={{ padding: '0.75rem 0.75rem', verticalAlign: 'middle', maxWidth: '200px' }}>
+                              <div style={{ fontWeight: 800, color: 'var(--brand-navy)', fontSize: '0.8125rem' }}>{prog?.code || 'B.Tech'}</div>
+                              <div style={{ fontSize: '0.7rem', color: '#64748B', lineHeight: 1.3 }}>{prog?.name || 'Computer Science & Engineering'}</div>
                             </td>
-                            <td>
-                              <Badge variant={!hasShortage ? 'active' : 'danger'}>
-                                {stats.percentage}% Attendance
-                              </Badge>
+
+                            {/* 4. Semester */}
+                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                              <Badge variant="navy">Sem {sem?.number || 4}</Badge>
                             </td>
-                            <td>
-                              <Badge variant={!hasShortage ? 'active' : 'warning'}>
-                                {!hasShortage ? 'IN GOOD STANDING' : 'ATTENDANCE RISK'}
-                              </Badge>
+
+                            {/* 5. Department */}
+                            <td style={{ padding: '0.75rem 0.75rem', verticalAlign: 'middle' }}>
+                              <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#334155' }}>
+                                {dept?.code || dept?.name || '-'}
+                              </span>
                             </td>
-                            <td>
-                              <Badge variant={!hasMissingDocs ? 'active' : 'orange'}>
-                                {!hasMissingDocs ? 'VERIFIED' : 'PENDING DOCS'}
-                              </Badge>
+
+                            {/* 6. Institute */}
+                            <td style={{ padding: '0.75rem 0.75rem', verticalAlign: 'middle' }}>
+                              <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#334155' }}>
+                                {inst?.code || inst?.name || 'SSCIT'}
+                              </span>
                             </td>
-                            <td>
-                              {reqsCount > 0 ? (
-                                <Badge variant="gold">{reqsCount} Active</Badge>
+
+                            {/* 7. General Status */}
+                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                              {student.status === 'ACTIVE' ? (
+                                <Badge variant="active">ACTIVE</Badge>
+                              ) : (student.status as string) === 'WARNING' ? (
+                                <Badge variant="warning">WARNING</Badge>
                               ) : (
-                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>None</span>
+                                <Badge variant="danger">{student.status || 'INACTIVE'}</Badge>
                               )}
                             </td>
-                            <td style={{ textAlign: 'right' }}>
-                              <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end' }}>
-                                <button 
-                                  className="btn btn-sm btn-secondary"
-                                  onClick={() => setSelectedStudentForProfile(student)}
-                                  title="View Academic Profile"
-                                >
-                                  <Eye size={13} /> Profile
-                                </button>
-                                <button 
-                                  className="btn btn-sm btn-primary"
-                                  onClick={() => {
-                                    setSelectedStudentForDocs(student);
-                                    setActiveTab('STUDENT_DOCUMENTS');
-                                  }}
-                                  title="View Documents Vault"
-                                >
-                                  <FolderCheck size={13} /> Documents
-                                </button>
-                              </div>
+
+                            {/* 8. Academic Status */}
+                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                              {!isRisk ? (
+                                <Badge variant="active">IN GOOD STANDING</Badge>
+                              ) : stats.percentage < 60 ? (
+                                <Badge variant="danger">CRITICAL RISK</Badge>
+                              ) : (
+                                <Badge variant="warning">ACADEMIC RISK</Badge>
+                              )}
+                            </td>
+
+                            {/* 9. Attendance % */}
+                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                              {stats.percentage >= 75 ? (
+                                <Badge variant="active">{stats.percentage}%</Badge>
+                              ) : stats.percentage >= 60 ? (
+                                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
+                                  <Badge variant="warning">{stats.percentage}%</Badge>
+                                  <span title="Attendance Warning (60%-74%)" style={{ display: 'inline-flex' }}>
+                                    <AlertCircle size={13} color="#D97706" />
+                                  </span>
+                                </div>
+                              ) : (
+                                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
+                                  <Badge variant="danger">{stats.percentage}%</Badge>
+                                  <span title="Critical Attendance Shortage (<60%)" style={{ display: 'inline-flex' }}>
+                                    <AlertCircle size={13} color="#EF4444" />
+                                  </span>
+                                </div>
+                              )}
+                            </td>
+
+                            {/* 10. Document Status */}
+                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                              {pendingDocsCount === 0 && verifiedDocsCount > 0 ? (
+                                <Badge variant="active">{verifiedDocsCount} Verified</Badge>
+                              ) : pendingDocsCount > 0 && verifiedDocsCount > 0 ? (
+                                <Badge variant="warning">{verifiedDocsCount} Verified ({pendingDocsCount} Pending)</Badge>
+                              ) : (
+                                <Badge variant="danger">{pendingDocsCount > 0 ? `${pendingDocsCount} Missing / Pending` : 'Pending'}</Badge>
+                              )}
+                            </td>
+
+                            {/* 11. Action Menu with Status Dot Indicator */}
+                            <td style={{ padding: '0.75rem 0.75rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                              <StudentRowActionMenu
+                                student={student}
+                                statusLevel={
+                                  (stats.percentage < 60 || reqsCount > 0 || (verifiedDocsCount === 0 && pendingDocsCount > 0))
+                                    ? 'critical'
+                                    : (stats.percentage < 75 || pendingDocsCount > 0 || isRisk)
+                                    ? 'warning'
+                                    : 'good'
+                                }
+                                onViewProfile={() => setSelectedStudentForProfile(student)}
+                                onViewDocuments={() => {
+                                  setSelectedStudentForDocs(student);
+                                  setActiveTab('STUDENT_DOCUMENTS');
+                                }}
+                                onViewAcademic={() => setActiveTab('ACADEMIC_OVERVIEW')}
+                                onViewAttendance={() => setActiveTab('ATTENDANCE')}
+                                onViewExamination={() => setActiveTab('EXAM_ELIGIBILITY')}
+                                onViewRequests={() => setActiveTab('REQUESTS')}
+                              />
                             </td>
                           </tr>
                         );

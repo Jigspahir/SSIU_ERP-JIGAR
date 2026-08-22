@@ -1,12 +1,12 @@
 import {
-  LayoutDashboard, Building2, GraduationCap, CalendarDays,
+  LayoutDashboard, Building2, GraduationCap, CalendarDays, Calendar,
   UserCheck, BookOpen, Clock, FileText, FileCheck, CalendarCheck,
   IndianRupee, FolderCheck, BarChart3, Settings, Award, MessageSquare, HelpCircle,
   Bell, Library, CheckSquare, Rocket, Wrench,
   Grid, Activity, ShieldAlert, ShieldCheck, Users2, FileSpreadsheet, UploadCloud, User,
   RotateCcw, RefreshCw, LogOut, Boxes, Package, Layers, Archive,
   Mail, Send, Inbox, Briefcase, History, UserPlus, FileStack, KeyRound, Users, CheckCircle2,
-  FileSignature, Landmark, FileBox, FileQuestion, DollarSign, FileDown
+  FileSignature, Landmark, FileBox, FileQuestion, DollarSign, FileDown, Search, ArrowLeftRight
 } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -242,6 +242,48 @@ export const ALL_NAV_ITEMS: Record<string, NavItemConfig> = {
     icon: CheckSquare,
     allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN', 'ACCOUNTS_ADMIN'],
     category: 'Finance & Admin'
+  },
+  'work-transfer': {
+    id: 'work-transfer',
+    label: 'Workload & Work Transfer',
+    icon: ArrowLeftRight,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 'PRINCIPAL', 'HOD', 'FACULTY', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION'],
+    category: 'Administration'
+  },
+  'work-transfer-new': {
+    id: 'work-transfer-new',
+    label: 'Transfer Work',
+    icon: ArrowLeftRight,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 'PRINCIPAL', 'HOD', 'FACULTY', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION'],
+    category: 'Administration'
+  },
+  'work-transfer-received': {
+    id: 'work-transfer-received',
+    label: 'Received Work',
+    icon: ArrowLeftRight,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 'PRINCIPAL', 'HOD', 'FACULTY', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION'],
+    category: 'Administration'
+  },
+  'work-transfer-active': {
+    id: 'work-transfer-active',
+    label: 'Active Transfers',
+    icon: ArrowLeftRight,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 'PRINCIPAL', 'HOD', 'FACULTY', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION'],
+    category: 'Administration'
+  },
+  'work-transfer-history': {
+    id: 'work-transfer-history',
+    label: 'Transfer History',
+    icon: ArrowLeftRight,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 'PRINCIPAL', 'HOD', 'FACULTY', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION'],
+    category: 'Administration'
+  },
+  'work-transfer-audit': {
+    id: 'work-transfer-audit',
+    label: 'Work Transfer Audit Center',
+    icon: ShieldCheck,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 'PRINCIPAL', 'HOD', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'IQAC', 'EXAM_CELL'],
+    category: 'Administration'
   },
 
   // Campus Services & Auxiliary
@@ -531,6 +573,13 @@ export const ALL_NAV_ITEMS: Record<string, NavItemConfig> = {
   },
 
   // Master Data & Academic Structures
+  'student-search': {
+    id: 'student-search',
+    label: 'Student Search',
+    icon: Search,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'MENTOR', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'VICE_PRESIDENT', 'EXAM_CELL', 'STUDENT_SECTION', 'ACCOUNTS_ADMIN', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN', 'IQAC'],
+    category: 'Master'
+  },
   'students': {
     id: 'students',
     label: 'Students Directory',
@@ -631,16 +680,6 @@ export const STUDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     defaultTab: 'dashboard'
   },
   {
-    id: 'profile-group',
-    label: 'Profile',
-    icon: User,
-    defaultTab: 'profile',
-    children: [
-      { id: 'profile', label: 'Student Profile', targetTab: 'profile' },
-      { id: 'id-card', label: 'Digital ID Card', targetTab: 'id-card' }
-    ]
-  },
-  {
     id: 'academic',
     label: 'Academic',
     icon: GraduationCap,
@@ -688,7 +727,8 @@ export const STUDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     children: [
       { id: 'student-section-services', label: 'Services', targetTab: 'student-section-services' },
       { id: 'student-section-requests', label: 'My Requests', targetTab: 'student-section-requests' },
-      { id: 'student-section-documents', label: 'My Documents', targetTab: 'student-section-documents' }
+      { id: 'student-section-documents', label: 'My Documents', targetTab: 'student-section-documents' },
+      { id: 'id-card', label: 'Digital ID Card', targetTab: 'id-card' }
     ]
   },
   {
@@ -712,6 +752,12 @@ export const STUDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
       { id: 'feedback-my', label: 'My Feedback', targetTab: 'feedback' },
       { id: 'feedback-suggestions', label: 'Suggestions', targetTab: 'feedback' }
     ]
+  },
+  {
+    id: 'student-ptm',
+    label: 'PTM Consultation',
+    icon: Users,
+    defaultTab: 'student-ptm'
   },
   {
     id: 'notices',
@@ -752,26 +798,66 @@ export const STUDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
 ];
 
 /**
- * COMMON AUTHORIZED NOTESHEET NAVIGATION GROUP (12 Stages/Views)
+ * COMMON AUTHORIZED NOTESHEET NAVIGATION ITEM (Single Entry -> Opens Notesheet Dashboard)
  */
 export const COMMON_NOTESHEET_NAV_GROUP: StudentNavGroup = {
-  id: 'notesheet-group',
+  id: 'note-sheets',
   label: 'Notesheet',
   icon: FileSignature,
-  defaultTab: 'notesheet-create',
+  defaultTab: 'note-sheets'
+};
+
+/**
+ * COMMON AUTHORIZED PTM MANAGEMENT NAVIGATION ITEM
+ */
+export const COMMON_PTM_NAV_GROUP: StudentNavGroup = {
+  id: 'ptm-management',
+  label: 'PTM Management',
+  icon: Users,
+  defaultTab: 'ptm-dashboard',
   children: [
-    { id: 'note-sheets', label: 'Dashboard', targetTab: 'note-sheets' },
-    { id: 'notesheet-create', label: 'Create Notesheet', targetTab: 'notesheet-create' },
-    { id: 'notesheet-my', label: 'My Notesheets', targetTab: 'notesheet-my' },
-    { id: 'notesheet-drafts', label: 'Drafts', targetTab: 'notesheet-drafts' },
-    { id: 'notesheet-pending', label: 'Pending With Me', targetTab: 'notesheet-pending' },
-    { id: 'notesheet-sent', label: 'Forwarded', targetTab: 'notesheet-sent' },
-    { id: 'notesheet-returned', label: 'Returned', targetTab: 'notesheet-returned' },
-    { id: 'notesheet-clarification', label: 'Clarification Required', targetTab: 'notesheet-clarification' },
-    { id: 'notesheet-action-pending', label: 'Action Pending', targetTab: 'notesheet-action-pending' },
-    { id: 'notesheet-approved', label: 'Approved', targetTab: 'notesheet-approved' },
-    { id: 'notesheet-rejected', label: 'Rejected', targetTab: 'notesheet-rejected' },
-    { id: 'notesheet-closed', label: 'Closed', targetTab: 'notesheet-closed' }
+    { id: 'ptm-dashboard-item', label: 'Dashboard', targetTab: 'ptm-dashboard' },
+    { id: 'ptm-schedule-item', label: 'PTM Schedule', targetTab: 'ptm-schedule' },
+    { id: 'ptm-my-item', label: 'My PTMs', targetTab: 'ptm-my' },
+    { id: 'ptm-records-item', label: 'PTM Records', targetTab: 'ptm-records' },
+    { id: 'ptm-feedback-item', label: 'Parent Feedback', targetTab: 'ptm-feedback' },
+    { id: 'ptm-followups-item', label: 'Follow-up Actions', targetTab: 'ptm-followups' },
+    { id: 'ptm-reports-item', label: 'Reports', targetTab: 'ptm-reports' }
+  ]
+};
+
+/**
+ * COMMON WORKLOAD & WORK TRANSFER / DELEGATION NAVIGATION GROUP
+ */
+export const COMMON_WORK_TRANSFER_NAV_GROUP: StudentNavGroup = {
+  id: 'work-transfer-group',
+  label: 'Workload & Transfer',
+  icon: ArrowLeftRight,
+  defaultTab: 'work-transfer',
+  children: [
+    { id: 'workload-my-work', label: 'My Work', targetTab: 'work-transfer' },
+    { id: 'workload-transfer-action', label: 'Transfer Work', targetTab: 'work-transfer-new' },
+    { id: 'workload-received', label: 'Received Work', targetTab: 'work-transfer-received' },
+    { id: 'workload-active', label: 'Active Transfers', targetTab: 'work-transfer-active' },
+    { id: 'workload-history', label: 'Transfer History', targetTab: 'work-transfer-history' }
+  ]
+};
+
+/**
+ * HIGHER AUTHORITY WORKLOAD & WORK TRANSFER AUDIT NAVIGATION GROUP
+ */
+export const HIGHER_AUTHORITY_WORK_TRANSFER_NAV_GROUP: StudentNavGroup = {
+  id: 'work-transfer-group',
+  label: 'Workload & Transfer',
+  icon: ArrowLeftRight,
+  defaultTab: 'work-transfer',
+  children: [
+    { id: 'workload-my-work', label: 'My Work', targetTab: 'work-transfer' },
+    { id: 'workload-transfer-action', label: 'Transfer Work', targetTab: 'work-transfer-new' },
+    { id: 'workload-received', label: 'Received Work', targetTab: 'work-transfer-received' },
+    { id: 'workload-active', label: 'Active Transfers', targetTab: 'work-transfer-active' },
+    { id: 'workload-history', label: 'Transfer History', targetTab: 'work-transfer-history' },
+    { id: 'workload-audit', label: 'Work Transfer Audit', targetTab: 'work-transfer-audit' }
   ]
 };
 
@@ -784,15 +870,6 @@ export const FACULTY_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     label: 'Dashboard',
     icon: LayoutDashboard,
     defaultTab: 'dashboard'
-  },
-  {
-    id: 'profile-group',
-    label: 'Profile',
-    icon: User,
-    defaultTab: 'profile',
-    children: [
-      { id: 'profile', label: 'Faculty Profile', targetTab: 'profile' }
-    ]
   },
   {
     id: 'academic',
@@ -839,21 +916,16 @@ export const FACULTY_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     icon: Users2,
     defaultTab: 'my-students',
     children: [
-      { id: 'faculty-my-students', label: 'My Students', targetTab: 'my-students' },
-      { id: 'faculty-student-academics', label: 'Student Academic Details', targetTab: 'student-academics' },
-      { id: 'faculty-student-requests', label: 'Student Requests', targetTab: 'student-requests' }
+      { id: 'faculty-my-students', label: 'My Students', targetTab: 'my-students' }
     ]
   },
+  COMMON_PTM_NAV_GROUP,
+  COMMON_WORK_TRANSFER_NAV_GROUP,
   {
     id: 'requests',
     label: 'Requests',
     icon: CheckSquare,
-    defaultTab: 'requests-my-requests',
-    children: [
-      { id: 'faculty-requests-all', label: 'Student Requests', targetTab: 'requests-my-requests' },
-      { id: 'faculty-requests-queries', label: 'Subject Queries', targetTab: 'requests-subject-query' },
-      { id: 'faculty-requests-assigned', label: 'My Assigned Requests', targetTab: 'requests-assigned' }
-    ]
+    defaultTab: 'requests-my-requests'
   },
   {
     id: 'documents',
@@ -904,12 +976,6 @@ export const FACULTY_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     label: 'Settings',
     icon: Settings,
     defaultTab: 'settings'
-  },
-  {
-    id: 'logout',
-    label: 'Logout',
-    icon: LogOut,
-    defaultTab: 'logout'
   }
 ];
 
@@ -924,25 +990,12 @@ export const MENTOR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     defaultTab: 'dashboard'
   },
   {
-    id: 'profile-group',
-    label: 'Profile',
-    icon: User,
-    defaultTab: 'mentor-profile',
-    children: [
-      { id: 'mentor-profile', label: 'Mentor Profile', targetTab: 'mentor-profile' }
-    ]
-  },
-  {
     id: 'mentees-group',
     label: 'My Mentees',
     icon: GraduationCap,
     defaultTab: 'mentee-list',
     children: [
-      { id: 'mentee-list', label: 'Mentee List', targetTab: 'mentee-list' },
-      { id: 'mentee-profile', label: 'Student Profile', targetTab: 'mentee-profile' },
-      { id: 'mentee-academic-overview', label: 'Academic Overview', targetTab: 'mentee-academic-overview' },
-      { id: 'mentee-attendance', label: 'Attendance', targetTab: 'mentee-attendance' },
-      { id: 'mentee-academic-performance', label: 'Academic Performance', targetTab: 'mentee-academic-performance' }
+      { id: 'mentee-list', label: 'Mentee List', targetTab: 'mentee-list' }
     ]
   },
   {
@@ -951,10 +1004,9 @@ export const MENTOR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     icon: BookOpen,
     defaultTab: 'mentee-subjects',
     children: [
-      { id: 'mentee-subjects', label: 'Student Subjects', targetTab: 'mentee-subjects' },
-      { id: 'mentee-timetable', label: 'Timetable', targetTab: 'mentee-timetable' },
-      { id: 'mentee-assignments', label: 'Assignments', targetTab: 'mentee-assignments' },
-      { id: 'mentee-academic-progress', label: 'Academic Progress', targetTab: 'mentee-academic-progress' }
+      { id: 'mentee-subjects', label: 'My Subjects', targetTab: 'mentee-subjects' },
+      { id: 'mentor-session-plan', label: 'Session Plan', targetTab: 'session-plan' },
+      { id: 'mentor-study-material', label: 'Study Material', targetTab: 'study-material' }
     ]
   },
   {
@@ -964,8 +1016,7 @@ export const MENTOR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     defaultTab: 'mentee-attendance-overview',
     children: [
       { id: 'mentee-attendance-overview', label: 'Mentee Attendance', targetTab: 'mentee-attendance-overview' },
-      { id: 'mentee-attendance-shortage', label: 'Attendance Shortage', targetTab: 'mentee-attendance-shortage' },
-      { id: 'mentee-attendance-applications', label: 'Attendance Applications', targetTab: 'mentee-attendance-applications' }
+      { id: 'mentee-attendance-reports', label: 'Attendance Reports', targetTab: 'attendance-reports' }
     ]
   },
   {
@@ -994,32 +1045,19 @@ export const MENTOR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     id: 'requests-group',
     label: 'Student Requests',
     icon: MessageSquare,
-    defaultTab: 'mentee-requests-pending',
+    defaultTab: 'mentee-requests-pending'
+  },
+  {
+    id: 'counseling-group',
+    label: 'Counseling',
+    icon: Calendar,
+    defaultTab: 'counseling',
     children: [
-      { id: 'mentee-requests-pending', label: 'Pending Requests', targetTab: 'mentee-requests-pending' },
-      { id: 'mentee-requests-assigned', label: 'Assigned Requests', targetTab: 'mentee-requests-assigned' },
-      { id: 'mentee-requests-history', label: 'Request History', targetTab: 'mentee-requests-history' }
+      { id: 'mentor-counseling-sessions', label: 'Counseling Sessions', targetTab: 'counseling' }
     ]
   },
   COMMON_NOTESHEET_NAV_GROUP,
-  {
-    id: 'feedback',
-    label: 'Feedback',
-    icon: Award,
-    defaultTab: 'feedback'
-  },
-  {
-    id: 'notices',
-    label: 'Notices',
-    icon: Bell,
-    defaultTab: 'notices'
-  },
-  {
-    id: 'events',
-    label: 'Events',
-    icon: CalendarCheck,
-    defaultTab: 'events'
-  },
+  COMMON_WORK_TRANSFER_NAV_GROUP,
   {
     id: 'notifications',
     label: 'Notifications',
@@ -1031,12 +1069,6 @@ export const MENTOR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     label: 'Settings',
     icon: Settings,
     defaultTab: 'settings'
-  },
-  {
-    id: 'logout',
-    label: 'Logout',
-    icon: LogOut,
-    defaultTab: 'logout'
   }
 ];
 
@@ -1049,15 +1081,6 @@ export const HOD_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     label: 'Dashboard',
     icon: LayoutDashboard,
     defaultTab: 'dashboard'
-  },
-  {
-    id: 'profile-group',
-    label: 'Profile',
-    icon: User,
-    defaultTab: 'hod-profile',
-    children: [
-      { id: 'hod-profile', label: 'HOD Profile', targetTab: 'hod-profile' }
-    ]
   },
   {
     id: 'department-group',
@@ -1107,11 +1130,7 @@ export const HOD_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     icon: GraduationCap,
     defaultTab: 'hod-students-list',
     children: [
-      { id: 'hod-students-list', label: 'Student List', targetTab: 'hod-students-list' },
-      { id: 'hod-students-profile', label: 'Student Profile', targetTab: 'hod-students-profile' },
-      { id: 'hod-students-performance', label: 'Academic Performance', targetTab: 'hod-students-performance' },
-      { id: 'hod-students-at-risk', label: 'At-Risk Students', targetTab: 'hod-students-at-risk' },
-      { id: 'hod-students-documents', label: 'Student Documents', targetTab: 'hod-students-documents' }
+      { id: 'hod-students-list', label: 'Student List', targetTab: 'hod-students-list' }
     ]
   },
   {
@@ -1142,13 +1161,7 @@ export const HOD_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     id: 'requests-group',
     label: 'Requests',
     icon: MessageSquare,
-    defaultTab: 'hod-requests-pending',
-    children: [
-      { id: 'hod-requests-pending', label: 'Pending Requests', targetTab: 'hod-requests-pending' },
-      { id: 'hod-requests-dept', label: 'Department Requests', targetTab: 'hod-requests-dept' },
-      { id: 'hod-requests-escalated', label: 'Escalated Requests', targetTab: 'hod-requests-escalated' },
-      { id: 'hod-requests-history', label: 'Request History', targetTab: 'hod-requests-history' }
-    ]
+    defaultTab: 'hod-requests-pending'
   },
   {
     id: 'documents-group',
@@ -1197,6 +1210,7 @@ export const HOD_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
       { id: 'hod-reports-department', label: 'Department Reports', targetTab: 'hod-reports-department' }
     ]
   },
+  HIGHER_AUTHORITY_WORK_TRANSFER_NAV_GROUP,
   {
     id: 'inventory-assets',
     label: 'Inventory & Assets',
@@ -1214,12 +1228,6 @@ export const HOD_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     label: 'Settings',
     icon: Settings,
     defaultTab: 'settings'
-  },
-  {
-    id: 'logout',
-    label: 'Logout',
-    icon: LogOut,
-    defaultTab: 'logout'
   }
 ];
 
@@ -1232,15 +1240,6 @@ export const PRINCIPAL_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     label: 'Dashboard',
     icon: LayoutDashboard,
     defaultTab: 'dashboard'
-  },
-  {
-    id: 'profile-group',
-    label: 'Profile',
-    icon: User,
-    defaultTab: 'hoi-profile',
-    children: [
-      { id: 'hoi-profile', label: 'HOI / Principal Profile', targetTab: 'hoi-profile' }
-    ]
   },
   {
     id: 'institute-group',
@@ -1279,12 +1278,7 @@ export const PRINCIPAL_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     icon: GraduationCap,
     defaultTab: 'hoi-students-list',
     children: [
-      { id: 'hoi-students-list', label: 'Student List', targetTab: 'hoi-students-list' },
-      { id: 'hoi-students-profile', label: 'Student Profile', targetTab: 'hoi-students-profile' },
-      { id: 'hoi-students-attendance', label: 'Attendance', targetTab: 'hoi-students-attendance' },
-      { id: 'hoi-students-performance', label: 'Academic Performance', targetTab: 'hoi-students-performance' },
-      { id: 'hoi-students-at-risk', label: 'At-Risk Students', targetTab: 'hoi-students-at-risk' },
-      { id: 'hoi-students-documents', label: 'Student Documents', targetTab: 'hoi-students-documents' }
+      { id: 'hoi-students-list', label: 'Student List', targetTab: 'hoi-students-list' }
     ]
   },
   {
@@ -1328,13 +1322,7 @@ export const PRINCIPAL_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     id: 'requests-group',
     label: 'Requests',
     icon: MessageSquare,
-    defaultTab: 'hoi-requests-pending',
-    children: [
-      { id: 'hoi-requests-pending', label: 'Pending Requests', targetTab: 'hoi-requests-pending' },
-      { id: 'hoi-requests-dept', label: 'Department Requests', targetTab: 'hoi-requests-dept' },
-      { id: 'hoi-requests-escalated', label: 'Escalated Requests', targetTab: 'hoi-requests-escalated' },
-      { id: 'hoi-requests-history', label: 'Request History', targetTab: 'hoi-requests-history' }
-    ]
+    defaultTab: 'hoi-requests-pending'
   },
   {
     id: 'documents-group',
@@ -1385,6 +1373,7 @@ export const PRINCIPAL_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     icon: CalendarCheck,
     defaultTab: 'events'
   },
+  HIGHER_AUTHORITY_WORK_TRANSFER_NAV_GROUP,
   {
     id: 'inventory-assets',
     label: 'Inventory & Assets',
@@ -1402,12 +1391,6 @@ export const PRINCIPAL_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     label: 'Settings',
     icon: Settings,
     defaultTab: 'settings'
-  },
-  {
-    id: 'logout',
-    label: 'Logout',
-    icon: LogOut,
-    defaultTab: 'logout'
   }
 ];
 
@@ -1420,15 +1403,6 @@ export const STUDENT_SECTION_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     label: 'Dashboard',
     icon: LayoutDashboard,
     defaultTab: 'dashboard'
-  },
-  {
-    id: 'profile-group',
-    label: 'Profile',
-    icon: User,
-    defaultTab: 'section-profile',
-    children: [
-      { id: 'section-profile', label: 'Section Profile', targetTab: 'section-profile' }
-    ]
   },
   {
     id: 'students-group',
@@ -1478,14 +1452,7 @@ export const STUDENT_SECTION_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     id: 'requests-group',
     label: 'Student Requests',
     icon: MessageSquare,
-    defaultTab: 'section-requests-pending',
-    children: [
-      { id: 'section-requests-pending', label: 'Pending Requests', targetTab: 'section-requests-pending' },
-      { id: 'section-requests-assigned', label: 'Assigned Requests', targetTab: 'section-requests-assigned' },
-      { id: 'section-requests-dept', label: 'Department Requests', targetTab: 'section-requests-dept' },
-      { id: 'section-requests-escalated', label: 'Escalated Requests', targetTab: 'section-requests-escalated' },
-      { id: 'section-requests-history', label: 'Request History', targetTab: 'section-requests-history' }
-    ]
+    defaultTab: 'section-requests-pending'
   },
   {
     id: 'fees-group',
@@ -1553,17 +1520,12 @@ export const STUDENT_SECTION_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
       { id: 'section-reports-payments', label: 'Payment Reports', targetTab: 'section-reports-payments' }
     ]
   },
+  COMMON_WORK_TRANSFER_NAV_GROUP,
   {
     id: 'settings',
     label: 'Settings',
     icon: Settings,
     defaultTab: 'settings'
-  },
-  {
-    id: 'logout',
-    label: 'Logout',
-    icon: LogOut,
-    defaultTab: 'logout'
   }
 ];
 
@@ -1628,39 +1590,12 @@ export const REGISTRAR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
       { id: 'reg-faculty-dept-strength', label: 'Department-wise Strength', targetTab: 'reg-faculty-dept-strength' }
     ]
   },
-  {
-    id: 'notesheet-group',
-    label: 'Notesheet',
-    icon: FileSignature,
-    defaultTab: 'reg-notesheet-create',
-    children: [
-      { id: 'reg-notesheets', label: 'Dashboard', targetTab: 'reg-notesheets' },
-      { id: 'reg-notesheet-create', label: 'Create Notesheet', targetTab: 'reg-notesheet-create' },
-      { id: 'reg-notesheet-my', label: 'My Notesheets', targetTab: 'reg-notesheet-my' },
-      { id: 'reg-notesheet-drafts', label: 'Drafts', targetTab: 'reg-notesheet-drafts' },
-      { id: 'reg-notesheet-pending', label: 'Pending With Me', targetTab: 'reg-notesheet-pending' },
-      { id: 'reg-notesheet-sent', label: 'Forwarded', targetTab: 'reg-notesheet-sent' },
-      { id: 'reg-notesheet-returned', label: 'Returned', targetTab: 'reg-notesheet-returned' },
-      { id: 'reg-notesheet-clarification', label: 'Clarification Required', targetTab: 'reg-notesheet-clarification' },
-      { id: 'reg-notesheet-action-pending', label: 'Action Pending', targetTab: 'reg-notesheet-action-pending' },
-      { id: 'reg-notesheet-approved', label: 'Approved', targetTab: 'reg-notesheet-approved' },
-      { id: 'reg-notesheet-rejected', label: 'Rejected', targetTab: 'reg-notesheet-rejected' },
-      { id: 'reg-notesheet-closed', label: 'Closed', targetTab: 'reg-notesheet-closed' }
-    ]
-  },
+  COMMON_NOTESHEET_NAV_GROUP,
   {
     id: 'requests-group',
     label: 'Requests & Service Desk',
     icon: MessageSquare,
-    defaultTab: 'reg-requests-pending',
-    children: [
-      { id: 'reg-requests-pending', label: 'Pending Requests', targetTab: 'reg-requests-pending' },
-      { id: 'reg-requests-escalated', label: 'Escalated Requests', targetTab: 'reg-requests-escalated' },
-      { id: 'reg-requests-assigned', label: 'Assigned Requests', targetTab: 'reg-requests-assigned' },
-      { id: 'reg-requests-dept', label: 'Department Requests', targetTab: 'reg-requests-dept' },
-      { id: 'reg-requests-uni', label: 'University Requests', targetTab: 'reg-requests-uni' },
-      { id: 'reg-requests-history', label: 'Request History', targetTab: 'reg-requests-history' }
-    ]
+    defaultTab: 'reg-requests-pending'
   },
   {
     id: 'approvals-group',
@@ -1829,22 +1764,16 @@ export const REGISTRAR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
       { id: 'reg-excel-export', label: 'Export Center', targetTab: 'reg-excel-export' }
     ]
   },
+  HIGHER_AUTHORITY_WORK_TRANSFER_NAV_GROUP,
   {
     id: 'settings-group',
     label: 'Settings',
     icon: Settings,
-    defaultTab: 'profile',
+    defaultTab: 'reg-preferences',
     children: [
-      { id: 'profile', label: 'Profile', targetTab: 'profile' },
       { id: 'reg-preferences', label: 'Preferences', targetTab: 'reg-preferences' },
       { id: 'reg-change-password', label: 'Change Password', targetTab: 'reg-change-password' }
     ]
-  },
-  {
-    id: 'logout',
-    label: 'Logout',
-    icon: LogOut,
-    defaultTab: 'logout'
   }
 ];
 
@@ -1857,6 +1786,15 @@ export const DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     label: 'Dashboard',
     icon: LayoutDashboard,
     defaultTab: 'dashboard'
+  },
+  {
+    id: 'students-group',
+    label: 'Student Administration',
+    icon: GraduationCap,
+    defaultTab: 'deputy-student-records',
+    children: [
+      { id: 'deputy-student-records', label: 'Student Records', targetTab: 'reg-students-records' }
+    ]
   },
   {
     id: 'university-group',
@@ -1901,11 +1839,12 @@ export const DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     icon: BarChart3,
     defaultTab: 'reg-rep-uni'
   },
+  HIGHER_AUTHORITY_WORK_TRANSFER_NAV_GROUP,
   {
-    id: 'profile',
-    label: 'My Profile',
-    icon: User,
-    defaultTab: 'profile'
+    id: 'settings',
+    label: 'Settings',
+    icon: Settings,
+    defaultTab: 'settings'
   }
 ];
 
@@ -1917,6 +1856,7 @@ export const VICE_PRESIDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     defaultTab: 'dashboard'
   },
   COMMON_NOTESHEET_NAV_GROUP,
+  HIGHER_AUTHORITY_WORK_TRANSFER_NAV_GROUP,
   {
     id: 'governance-group',
     label: 'University Governance',
@@ -2014,10 +1954,31 @@ export const VICE_PRESIDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     defaultTab: 'notifications'
   },
   {
-    id: 'profile',
-    label: 'My Profile',
-    icon: User,
-    defaultTab: 'profile'
+    id: 'settings',
+    label: 'Settings',
+    icon: Settings,
+    defaultTab: 'settings'
+  }
+];
+
+export const PARENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
+  {
+    id: 'parent-ptm-dashboard',
+    label: 'PTM Dashboard',
+    icon: LayoutDashboard,
+    defaultTab: 'parent-ptm'
+  },
+  {
+    id: 'parent-my-children',
+    label: 'My Children',
+    icon: Users,
+    defaultTab: 'parent-ptm'
+  },
+  {
+    id: 'parent-feedback',
+    label: 'Parent Feedback',
+    icon: MessageSquare,
+    defaultTab: 'parent-ptm'
   }
 ];
 
@@ -2025,34 +1986,70 @@ export const VICE_PRESIDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
  * Strict Role-Based Menu Sequences
  */
 export const ROLE_NAV_ORDER: Record<string, string[]> = {
-  VICE_PRESIDENT: [
+  PRESIDENT: [
     'dashboard',
     'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'notesheet-history',
     'institutes', 'departments', 'programs', 'academic-years', 'batches', 'semesters', 'divisions', 'subjects',
-    'students', 'student-profile', 'faculty', 'mentor-assignment', 'attendance',
+    'student-search', 'students', 'student-profile', 'faculty', 'mentor-assignment', 'attendance',
     'exam-dashboard', 'exams', 'exam-schedule', 'exam-forms', 'exam-eligibility', 'result-management', 'marksheet',
     'fees', 'fee-structure', 'accounts',
     'hostel', 'maintenance', 'inventory-assets',
     'student-requests', 'support-tickets', 'certificates', 'student-section',
     'hr', 'leave',
-    'security-audit', 'reports', 'notifications', 'profile'
+    'security-audit', 'reports', 'notifications', 'settings'
+  ],
+  PROVOST: [
+    'dashboard',
+    'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'notesheet-history',
+    'institutes', 'departments', 'programs', 'academic-years', 'batches', 'semesters', 'divisions', 'subjects',
+    'student-search', 'students', 'student-profile', 'faculty', 'mentor-assignment', 'attendance',
+    'exam-dashboard', 'exams', 'exam-schedule', 'exam-forms', 'exam-eligibility', 'result-management', 'marksheet',
+    'fees', 'fee-structure', 'accounts',
+    'hostel', 'maintenance', 'inventory-assets',
+    'student-requests', 'support-tickets', 'certificates', 'student-section',
+    'hr', 'leave',
+    'security-audit', 'reports', 'notifications', 'settings'
+  ],
+  UNIVERSITY_ADMIN: [
+    'dashboard',
+    'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'notesheet-history',
+    'institutes', 'departments', 'programs', 'academic-years', 'batches', 'semesters', 'divisions', 'subjects',
+    'student-search', 'students', 'student-profile', 'faculty', 'mentor-assignment', 'attendance',
+    'exam-dashboard', 'exams', 'exam-schedule', 'exam-forms', 'exam-eligibility', 'result-management', 'marksheet',
+    'fees', 'fee-structure', 'accounts',
+    'hostel', 'maintenance', 'inventory-assets',
+    'student-requests', 'support-tickets', 'certificates', 'student-section',
+    'hr', 'leave',
+    'security-audit', 'reports', 'notifications', 'settings'
+  ],
+  VICE_PRESIDENT: [
+    'dashboard',
+    'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'notesheet-history',
+    'institutes', 'departments', 'programs', 'academic-years', 'batches', 'semesters', 'divisions', 'subjects',
+    'student-search', 'students', 'student-profile', 'faculty', 'mentor-assignment', 'attendance',
+    'exam-dashboard', 'exams', 'exam-schedule', 'exam-forms', 'exam-eligibility', 'result-management', 'marksheet',
+    'fees', 'fee-structure', 'accounts',
+    'hostel', 'maintenance', 'inventory-assets',
+    'student-requests', 'support-tickets', 'certificates', 'student-section',
+    'hr', 'leave',
+    'security-audit', 'reports', 'notifications', 'settings'
   ],
   DEPUTY_REGISTRAR: [
     'dashboard',
-    'reg-uni-institutes', 'reg-uni-departments', 'reg-uni-programs', 'reg-academic-year',
+    'student-search', 'reg-uni-institutes', 'reg-uni-departments', 'reg-uni-programs', 'reg-academic-year',
     'note-sheets', 'notesheet-create', 'notesheet-my', 'notesheet-drafts', 'notesheet-pending', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed',
     'inward-outward',
     'reg-corr-incoming', 'reg-corr-outgoing', 'reg-corr-circulars', 'reg-corr-external', 'reg-corr-register',
     'reg-approvals-pending', 'reg-approvals-academic', 'reg-approvals-admin', 'reg-approvals-financial', 'reg-approvals-special',
     'notifications',
     'reg-rep-uni', 'reg-rep-inst', 'reg-rep-dept',
-    'profile'
+    'settings'
   ],
   REGISTRAR: [
     'dashboard',
     'reg-uni-overview', 'reg-uni-institutes', 'reg-uni-departments', 'reg-uni-programs', 'reg-uni-structure',
     'reg-academic-year', 'reg-academic-semesters', 'reg-academic-calendar', 'reg-academic-overview',
-    'reg-students-search', 'reg-students-profile', 'reg-students-records', 'reg-students-status', 'reg-students-international', 'reg-students-stats',
+    'student-search', 'reg-students-search', 'reg-students-profile', 'reg-students-records', 'reg-students-status', 'reg-students-international', 'reg-students-stats',
     'reg-faculty-overview', 'reg-faculty-staff', 'reg-faculty-inst-strength', 'reg-faculty-dept-strength',
     'reg-notesheets', 'reg-notesheet-create', 'reg-notesheet-pending', 'reg-notesheet-my', 'reg-notesheet-drafts', 'reg-notesheet-sent', 'reg-notesheet-financial', 'reg-notesheet-returned', 'reg-notesheet-clarification', 'reg-notesheet-action-pending', 'reg-notesheet-approved', 'reg-notesheet-rejected', 'reg-notesheet-closed', 'reg-notesheet-history',
     'reg-requests-pending', 'reg-requests-escalated', 'reg-requests-assigned', 'reg-requests-dept', 'reg-requests-uni', 'reg-requests-history',
@@ -2069,12 +2066,12 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
     'notifications',
     'reg-audit-log', 'reg-audit-login', 'reg-audit-approvals', 'reg-audit-notesheets', 'reg-audit-system',
     'reg-excel-templates', 'reg-excel-history', 'reg-excel-failed', 'reg-excel-export',
-    'profile', 'reg-preferences', 'reg-change-password',
+    'reg-preferences', 'reg-change-password',
     'logout'
   ],
   STUDENT_SECTION: [
-    'dashboard', 'section-profile',
-    'section-students-list', 'section-students-profile', 'section-students-academic', 'section-students-docs', 'section-students-status',
+    'dashboard',
+    'student-search', 'section-students-list', 'section-students-profile', 'section-students-academic', 'section-students-docs', 'section-students-status',
     'section-docs-verification', 'section-docs-pending', 'section-docs-verified', 'section-docs-reupload', 'section-docs-locked', 'section-docs-master',
     'section-service-bonafide', 'section-service-transcript', 'section-service-degree', 'section-service-migration', 'section-service-transfer', 'section-service-character', 'section-service-idcard', 'section-service-duplicate-id', 'section-service-other',
     'section-requests-pending', 'section-requests-assigned', 'section-requests-dept', 'section-requests-escalated', 'section-requests-history',
@@ -2086,10 +2083,10 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
     'settings'
   ],
   PRINCIPAL: [
-    'dashboard', 'hoi-profile',
+    'dashboard',
     'hoi-inst-overview', 'hoi-inst-departments', 'hoi-inst-hods', 'hoi-inst-programs', 'hoi-inst-faculty', 'hoi-inst-students', 'hoi-inst-sections',
     'hoi-academic-overview', 'hoi-academic-programs', 'hoi-academic-subjects', 'hoi-academic-allocation', 'hoi-timetable', 'hoi-session-plans', 'hoi-calendar', 'hoi-academic-performance',
-    'hoi-students-list', 'hoi-students-profile', 'hoi-students-attendance', 'hoi-students-performance', 'hoi-students-at-risk', 'hoi-students-documents',
+    'student-search', 'hoi-students-list', 'hoi-students-profile', 'hoi-students-attendance', 'hoi-students-performance', 'hoi-students-at-risk', 'hoi-students-documents',
     'hoi-faculty-list', 'hoi-faculty-workload', 'hoi-faculty-allocation', 'hoi-faculty-attendance', 'hoi-faculty-performance',
     'hoi-attendance-institute', 'hoi-attendance-shortage', 'hoi-attendance-comparison', 'hoi-attendance-approvals',
     'hoi-exam-eligibility', 'hoi-exam-attendance-approvals', 'hoi-exam-info', 'hoi-exam-reports',
@@ -2100,11 +2097,11 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
     'notices', 'events', 'notifications', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary', 'settings'
   ],
   HOD: [
-    'dashboard', 'hod-profile',
+    'dashboard',
     'hod-dept-overview', 'hod-dept-students', 'hod-dept-faculty', 'hod-dept-programs', 'hod-dept-semesters', 'hod-dept-sections',
     'hod-academic-subjects', 'hod-faculty-allocation', 'hod-timetable', 'hod-session-plans', 'hod-materials', 'hod-assignments', 'hod-quiz', 'hod-calendar',
     'hod-attendance-overview', 'hod-attendance-shortage', 'hod-subject-attendance', 'hod-attendance-approvals',
-    'hod-students-list', 'hod-students-profile', 'hod-students-performance', 'hod-students-at-risk', 'hod-students-documents',
+    'student-search', 'hod-students-list', 'hod-students-profile', 'hod-students-performance', 'hod-students-at-risk', 'hod-students-documents',
     'hod-faculty-list', 'hod-faculty-workload', 'hod-faculty-subject-allocation', 'hod-faculty-performance',
     'hod-exam-eligibility', 'hod-exam-attendance-approvals', 'hod-exam-info', 'hod-exam-requests',
     'hod-requests-pending', 'hod-requests-dept', 'hod-requests-escalated', 'hod-requests-history',
@@ -2115,8 +2112,8 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
     'notifications', 'settings'
   ],
   MENTOR: [
-    'dashboard', 'mentor-profile',
-    'mentee-list', 'mentee-profile', 'mentee-academic-overview', 'mentee-attendance', 'mentee-academic-performance',
+    'dashboard',
+    'student-search', 'mentee-list', 'mentee-profile', 'mentee-academic-overview', 'mentee-attendance', 'mentee-academic-performance',
     'mentee-subjects', 'mentee-timetable', 'mentee-assignments', 'mentee-academic-progress',
     'mentee-attendance-overview', 'mentee-attendance-shortage', 'mentee-attendance-applications',
     'mentee-exam-eligibility', 'mentee-exam-attendance-approvals', 'mentee-exam-requests',
@@ -2127,23 +2124,26 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
   ],
   STUDENT: [
     'dashboard',
-    'profile', 'id-card',
     'academic', 'subjects', 'timetable', 'attendance', 'assignments', 'materials', 'quiz',
     'examination', 'exam-forms', 'exam-fees-student', 'exam-backlog', 'exam-reassessment', 'exam-hallticket', 'exam-results',
     'fees', 'fees-semester', 'fees-history', 'fees-receipts', 'fees-query',
     'student-section', 'student-section-services', 'student-section-requests', 'student-section-documents', 'certificates',
     'requests', 'requests-subject-query', 'requests-complaint', 'requests-my-requests',
-    'feedback',
+    'student-ptm', 'feedback',
     'notices', 'events', 'hostel', 'transport', 'tickets', 'service-desk', 'notifications'
+  ],
+
+  PARENT: [
+    'parent-ptm', 'ptm-dashboard', 'ptm-schedule', 'ptm-feedback', 'notifications'
   ],
 
   FACULTY: [
     'dashboard',
-    'profile',
     'subjects', 'timetable', 'session-plan', 'materials', 'assignments', 'quiz', 'calendar',
     'attendance', 'attendance-history', 'subject-attendance', 'attendance-reports',
     'exam-duties', 'exam-schedule', 'attendance-applications', 'exam-dashboard',
-    'my-students', 'student-academics', 'student-requests', 'students',
+    'student-search', 'my-students', 'student-academics', 'student-requests', 'students',
+    'ptm-management', 'ptm-dashboard', 'ptm-schedule', 'ptm-my', 'ptm-records', 'ptm-feedback', 'ptm-followups', 'ptm-reports',
     'requests', 'requests-subject-query', 'requests-my-requests', 'requests-assigned',
     'documents', 'student-documents', 'pending-verification', 'document-master',
     'feedback', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary',
@@ -2154,31 +2154,40 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
   EXAM_CELL: [
     'dashboard', 'exam-cell', 'exams', 'exam-schedule', 'exam-eligibility', 'exam-forms', 'exam-fees',
     'exam-hallticket', 'exam-marks', 'exam-results', 'exam-centres', 'exam-seating',
-    'exam-edp-duty', 'exam-day-control', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary', 'reports', 'bulk-import', 'profile'
+    'exam-edp-duty', 'exam-day-control', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary', 'reports', 'bulk-import', 'student-search'
   ],
 
   ACCOUNTS_ADMIN: [
-    'dashboard', 'accounts-admin', 'fees', 'students', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary', 'reports', 'bulk-import', 'profile'
+    'dashboard', 'accounts-admin', 'fees', 'student-search', 'students', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary', 'reports', 'bulk-import'
   ],
 
   HOSTEL_ADMIN: [
-    'dashboard', 'hostel-admin', 'students', 'tickets', 'notifications', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary', 'reports', 'bulk-import', 'profile'
+    'dashboard', 'hostel-admin', 'student-search', 'students', 'tickets', 'notifications', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary', 'reports', 'bulk-import'
   ],
 
   TRANSPORT_ADMIN: [
-    'dashboard', 'transport-admin', 'students', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary', 'reports', 'bulk-import', 'profile'
+    'dashboard', 'transport-admin', 'student-search', 'students', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary', 'reports', 'bulk-import'
+  ],
+
+  LIBRARY_ADMIN: [
+    'dashboard', 'library-admin', 'student-search', 'students', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary', 'reports', 'bulk-import'
+  ],
+
+  MAINTENANCE_ADMIN: [
+    'dashboard', 'maintenance-admin', 'student-search', 'students', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary', 'reports', 'bulk-import'
   ],
 
   IQAC: [
-    'dashboard', 'iqac', 'inward-outward', 'requests', 'edp-duties', 'faculty',
-    'feedback', 'reports', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'work-diary', 'profile'
+    'dashboard', 'iqac', 'inward-outward', 'requests', 'edp-duties', 'faculty', 'student-search',
+    'feedback', 'reports', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'work-diary'
   ],
 
   SUPER_ADMIN: [
     'dashboard', 'accounts-admin', 'registrar', 'iqac', 'exam-cell', 'student-section', 'hostel-admin', 'library-admin', 'transport-admin', 'maintenance-admin',
-    'students', 'mentor-assignment', 'faculty', 'departments', 'programs', 'subjects', 'document-master', 'hr',
+    'student-search', 'students', 'mentor-assignment', 'faculty', 'departments', 'programs', 'subjects', 'document-master', 'hr',
     'calendar', 'attendance', 'exam-dashboard', 'exam-eligibility', 'fees', 'crm', 'certificates',
-    'requests', 'edp-duties', 'tickets', 'feedback', 'notices', 'events', 'reports', 'bulk-import', 'settings', 'security-audit', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary', 'profile'
+    'ptm-management', 'ptm-dashboard', 'ptm-schedule', 'ptm-my', 'ptm-records', 'ptm-feedback', 'ptm-followups', 'ptm-reports',
+    'requests', 'edp-duties', 'tickets', 'feedback', 'notices', 'events', 'reports', 'bulk-import', 'settings', 'security-audit', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary'
   ]
 };
 
@@ -2192,6 +2201,23 @@ export const getRoleNavigationItems = (role?: UserRole | null): NavItemConfig[] 
 
 export const isTabPermittedForRole = (tab: string, role?: UserRole | null): boolean => {
   if (!role) return false;
+  if (role === 'STUDENT') {
+    if (['student-search', 'students-search', 'students-directory', 'work-transfer', 'work-transfer-new', 'work-transfer-received', 'work-transfer-active', 'work-transfer-history', 'work-transfer-audit'].includes(tab)) {
+      return false;
+    }
+  }
+  if ([
+    'student-search', 'students-search', 'students-directory', 
+    'profile', 'mentor-profile', 'hod-profile', 'hoi-profile', 'section-profile', 'id-card', 
+    'settings', 'notifications',
+    'work-transfer', 'work-transfer-new', 'work-transfer-received', 'work-transfer-active', 'work-transfer-history',
+    'workload-transfer', 'delegate-work', 'faculty-work-transfer', 'hod-work-transfer', 'hoi-work-transfer'
+  ].includes(tab)) {
+    return true;
+  }
+  if (tab === 'work-transfer-audit' || tab === 'workload-audit' || tab === 'transfer-audit') {
+    return ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 'PROVOST', 'PRESIDENT', 'PRINCIPAL', 'HOD', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'IQAC', 'EXAM_CELL'].includes(role);
+  }
   if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'VICE_PRESIDENT' || role === 'PROVOST' || role === 'PRESIDENT') return true;
   const allowedList = ROLE_NAV_ORDER[role] || [];
   return allowedList.includes(tab);

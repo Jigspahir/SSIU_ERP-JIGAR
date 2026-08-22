@@ -5,7 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:frontend": "vite",
+    "dev:backend": "npm --prefix backend run start:dev",
+    "start:dev": "npm --prefix backend run start:dev",
+    "start:backend": "npm --prefix backend run start:dev",
     "build": "tsc -b && vite build",
+    "build:backend": "npm --prefix backend run build",
+    "prisma:generate": "npm --prefix backend run prisma:generate",
+    "prisma:validate": "npm --prefix backend run prisma:validate",
+    "prisma:seed": "npm --prefix backend run prisma:seed",
     "lint": "oxlint",
     "preview": "vite preview"
   },

@@ -6892,5 +6892,58 @@ model NotificationRecipient {
   @@index([notificationId])
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// 30. WORKLOAD & WORK TRANSFER / DELEGATION SYSTEM
+// ──────────────────────────────────────────────────────────────────────────────
+
+model WorkTransfer {
+  id                  String    @id @default(uuid())
+  trackingCode        String    @unique // e.g. WTR-2026-000001
+  fromUserId          String
+  fromUserName        String
+  fromUserRole        String
+  fromDepartmentId    String?
+  fromDepartmentName  String?
+  fromInstituteId     String?
+  fromInstituteName   String?
+  toUserId            String
+  toUserName          String
+  toUserRole          String
+  toDepartmentId      String?
+  toDepartmentName    String?
+  toInstituteId       String?
+  toInstituteName     String?
+  startAt             DateTime
+  endAt               DateTime
+  reason              String    // LEAVE | VACATION | WEEK_OFF | OFFICIAL_DUTY | UNAVAILABLE | TEMPORARY_ASSIGNMENT | EMERGENCY | OTHER
+  remarks             String?
+  status              String    @default("SCHEDULED") // SCHEDULED | ACTIVE | EXPIRED | COMPLETED | CANCELLED | REVOKED
+  workItemIds         String[]
+  workItemTypes       String[]
+  totalItemsCount     Int       @default(0)
+  completedItemIds    String[]
+  completedByUserId   String?
+  completedByUserName String?
+  completedAt         DateTime?
+  createdBy           String
+  createdByName       String?
+  createdByRole       String?
+  createdAt           DateTime  @default(now())
+  activatedAt         DateTime?
+  expiredAt           DateTime?
+  cancelledAt         DateTime?
+  cancelledBy         String?
+  cancelledByName     String?
+  revokedAt           DateTime?
+  revokedBy           String?
+  revokedByName       String?
+  auditTrail          Json?
+
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([status])
+  @@index([trackingCode])
+}
+
 
 

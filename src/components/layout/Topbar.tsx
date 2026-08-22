@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { 
   Bell, LogOut, User, RefreshCw, 
@@ -56,8 +56,13 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab, mobileO
       students: 'Student Directory',
       profile: 'User Profile & Security'
     };
-    return map[tab] || 'Swarrnim ERP';
+    return map[tab] || 'University Management';
   };
+
+  useEffect(() => {
+    const title = getBreadcrumbTitle(activeTab);
+    document.title = `SSIU ERP | ${title}`;
+  }, [activeTab]);
 
   return (
     <header
@@ -87,16 +92,37 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab, mobileO
         </button>
 
         <div className="topbar-header-text">
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--brand-orange)', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
-            Swarrnim ERP • {role?.replace('_', ' ')} Scope
+          <div style={{ fontSize: '0.71875rem', fontWeight: 700, color: 'var(--brand-orange)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+            SSIU ERP • University Management System
           </div>
-          <h1 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
+          <h1 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0 }}>
             {getBreadcrumbTitle(activeTab)}
           </h1>
         </div>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {/* Academic Year Session Badge */}
+        <div
+          className="btn-hide-mobile"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.4rem',
+            backgroundColor: 'var(--brand-navy-subtle, #F0F4F8)',
+            border: '1px solid var(--border-color, #E2E8F0)',
+            color: 'var(--brand-navy, #0B192C)',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            padding: '0.35rem 0.75rem',
+            borderRadius: 'var(--radius-full)',
+            letterSpacing: '0.3px'
+          }}
+          title="Current University Academic Session"
+        >
+          <span>AY: <strong>2026–27</strong></span>
+        </div>
+
         {/* DEMO MODE Indicator Badge */}
         <div
           style={{

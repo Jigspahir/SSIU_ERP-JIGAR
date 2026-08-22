@@ -1,5 +1,6 @@
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
+import { AnimatedNumber } from './AnimatedNumber';
 
 interface StatCardProps {
   title: string;
@@ -21,45 +22,89 @@ export const StatCard: React.FC<StatCardProps> = ({
   onClick
 }) => {
   const schemeMap: Record<string, { bg: string; color: string; border: string }> = {
-    orange: { bg: '#FFF2EA', color: '#F37023', border: 'rgba(243, 112, 35, 0.15)' },
-    navy: { bg: '#EEF4FB', color: '#0B192C', border: 'rgba(11, 25, 44, 0.15)' },
-    gold: { bg: '#FFF9E6', color: '#FFB200', border: 'rgba(255, 178, 0, 0.2)' },
-    green: { bg: '#ECFDF5', color: '#10B981', border: 'rgba(16, 185, 129, 0.2)' },
-    blue: { bg: '#EFF6FF', color: '#3B82F6', border: 'rgba(59, 130, 246, 0.2)' }
+    orange: { bg: '#FFF4ED', color: '#EA580C', border: 'rgba(234, 88, 12, 0.18)' },
+    navy: { bg: '#F0F4F8', color: '#0F2C59', border: 'rgba(15, 44, 89, 0.16)' },
+    gold: { bg: '#FEF9C3', color: '#D97706', border: 'rgba(217, 119, 6, 0.2)' },
+    green: { bg: '#ECFDF5', color: '#059669', border: 'rgba(5, 150, 105, 0.2)' },
+    blue: { bg: '#EFF6FF', color: '#2563EB', border: 'rgba(37, 99, 235, 0.2)' }
   };
 
   const schemeStyles = schemeMap[colorScheme] || schemeMap.orange;
 
   return (
     <div
-      className={`card card-hover ${onClick ? 'clickable' : ''}`}
+      className={`card stat-card-compact card-hover ${onClick ? 'clickable' : ''}`}
       onClick={onClick}
       style={{
-        padding: '1.25rem 1.5rem',
+        padding: '0.75rem 1rem',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         cursor: onClick ? 'pointer' : 'default',
         position: 'relative',
-        overflow: 'hidden',
+        borderRadius: '8px',
+        border: '1px solid var(--border-color, #E2E8F0)',
+        boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
+        minHeight: '92px',
+        maxHeight: '108px',
         height: '100%',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        overflow: 'hidden'
       }}
     >
-      <div>
-        <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, flex: 1, paddingRight: '0.65rem' }}>
+        <span 
+          style={{ 
+            fontSize: '0.71875rem', 
+            fontWeight: 600, 
+            color: 'var(--text-muted, #64748B)', 
+            textTransform: 'uppercase', 
+            letterSpacing: '0.04em',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            lineHeight: 1.2
+          }}
+          title={title}
+        >
           {title}
         </span>
-        <div style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.25rem', lineHeight: 1.1 }}>
-          {value}
+        
+        <div 
+          style={{ 
+            fontSize: '1.5rem', 
+            fontWeight: 700, 
+            color: 'var(--text-main, #0F172A)', 
+            marginTop: '0.15rem', 
+            lineHeight: 1.15,
+            letterSpacing: '-0.02em',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}
+        >
+          <AnimatedNumber value={value} />
         </div>
+
         {subtitle && (
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+          <div 
+            style={{ 
+              fontSize: '0.6875rem', 
+              color: 'var(--text-muted, #64748B)', 
+              marginTop: '0.15rem',
+              lineHeight: 1.2,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}
+            title={subtitle}
+          >
             {subtitle}
           </div>
         )}
+
         {trend && (
-          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#10B981', marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: '#059669', marginTop: '0.15rem', display: 'flex', alignItems: 'center', gap: '3px' }}>
             <span>↑</span> {trend}
           </div>
         )}
@@ -67,9 +112,9 @@ export const StatCard: React.FC<StatCardProps> = ({
 
       <div
         style={{
-          width: '52px',
-          height: '52px',
-          borderRadius: '12px',
+          width: '38px',
+          height: '38px',
+          borderRadius: '8px',
           backgroundColor: schemeStyles.bg,
           color: schemeStyles.color,
           display: 'flex',
@@ -79,7 +124,7 @@ export const StatCard: React.FC<StatCardProps> = ({
           flexShrink: 0
         }}
       >
-        <Icon size={26} strokeWidth={2.2} />
+        <Icon size={19} strokeWidth={2} />
       </div>
     </div>
   );

@@ -6,12 +6,14 @@ import { DataTable, Column } from '../../components/common/DataTable';
 import { Modal } from '../../components/common/Modal';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { Badge } from '../../components/common/Badge';
+import { EntityProfileModal } from '../../components/profile/EntityProfileModal';
 
 export const DepartmentsPage: React.FC = () => {
   const { canMutate } = useAuth();
   const [departments, setDepartments] = useState<Department[]>(() => db.getDepartments());
   const [selectedInstituteId, setSelectedInstituteId] = useState<string>('ALL');
 
+  const [viewingDepartment, setViewingDepartment] = useState<Department | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Department | null>(null);
   const [deletingItem, setDeletingItem] = useState<Department | null>(null);
@@ -124,10 +126,23 @@ export const DepartmentsPage: React.FC = () => {
         }
         onAddClick={handleOpenAddModal}
         addLabel="Add Department"
+        onViewClick={item => setViewingDepartment(item)}
         onEditClick={handleOpenEditModal}
         onDeleteClick={item => setDeletingItem(item)}
         canMutate={canMutate()}
         exportFilename="swarrnim-departments"
+      />
+
+      <EntityProfileModal
+        isOpen={Boolean(viewingDepartment)}
+        onClose={() => setViewingDepartment(null)}
+        entityType="department"
+        entityId={viewingDepartment?.id || null}
+        onEditClick={item => {
+          setViewingDepartment(null);
+          handleOpenEditModal(item);
+        }}
+        canMutate={canMutate()}
       />
 
       <Modal

@@ -1,5 +1,6 @@
 import { db } from './db';
 import { approvalWorkflowEngine } from './approvalEngine';
+import { mentorBackendService } from './mentorBackendService';
 import { SmartActionItem, SmartActionPriority, User, UserRole } from '../types';
 
 class SmartActionCenterService {
@@ -18,6 +19,10 @@ class SmartActionCenterService {
 
       case 'FACULTY':
         this.populateFacultyActions(user, actions);
+        break;
+
+      case 'MENTOR':
+        this.populateMentorActions(user, actions);
         break;
 
       case 'HOD':
@@ -294,6 +299,88 @@ class SmartActionCenterService {
         iconName: 'HelpCircle',
         badgeVariant: 'navy',
         sourceModule: 'Student Support'
+      });
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 2B. MENTOR ACTIONS
+  // ──────────────────────────────────────────────────────────────────────────
+  private populateMentorActions(user: User, actions: SmartActionItem[]): void {
+    const alerts = mentorBackendService.getAttendanceAlerts(user);
+    if (alerts.length > 0) {
+      actions.push({
+        id: 'act-mentor-att-shortage',
+        title: 'Assigned Mentee Attendance Shortage (<75%)',
+        shortDescription: `${alerts.length} of your assigned mentees have fallen below the mandatory 75% attendance norm.`,
+        count: alerts.length,
+        countLabel: `${alerts.length} Students`,
+        priority: 'CRITICAL',
+        category: 'ATTENDANCE',
+        targetTab: 'mentee-attendance',
+        takeActionText: 'Review Mentee Attendance',
+        iconName: 'AlertTriangle',
+        badgeVariant: 'danger',
+        sourceModule: 'Mentorship & Counseling'
+      });
+    }
+
+    const followUps = mentorBackendService.getPendingFollowUps(user);
+    if (followUps.length > 0) {
+      actions.push({
+        id: 'act-mentor-followup',
+        title: 'Pending Mentoring & Counseling Follow-ups',
+        shortDescription: `${followUps.length} mentee counseling session(s) require progress review and action closure.`,
+        count: followUps.length,
+        countLabel: `${followUps.length} Pending`,
+        priority: 'HIGH',
+        category: 'ACADEMIC',
+        targetTab: 'counseling',
+        takeActionText: 'Conduct Follow-up',
+        iconName: 'Clock',
+        badgeVariant: 'gold',
+        sourceModule: 'Mentorship & Counseling'
+      });
+    }
+
+    const mentees = mentorBackendService.getMentees(user).records;
+    let pendingDocsCount = 0;
+    mentees.forEach(m => {
+      pendingDocsCount += m.pendingDocumentsCount || 0;
+    });
+    if (pendingDocsCount > 0) {
+      actions.push({
+        id: 'act-mentor-docs',
+        title: 'Mentee Student Document Verification',
+        shortDescription: `${pendingDocsCount} uploaded student document(s) await mentor verification and endorsement.`,
+        count: pendingDocsCount,
+        countLabel: `${pendingDocsCount} Pending`,
+        priority: 'HIGH',
+        category: 'ACADEMIC',
+        targetTab: 'mentee-docs-pending',
+        takeActionText: 'Verify Documents',
+        iconName: 'FolderCheck',
+        badgeVariant: 'navy',
+        sourceModule: 'Student Records'
+      });
+    }
+
+    const requests = mentorBackendService.getMenteeStudentRequests(user);
+    const pendingReqs = requests.filter(r => r.status === 'SUBMITTED' || r.status === 'WITH_MENTOR' || r.status === 'WORK_IN_PROGRESS');
+    if (pendingReqs.length > 0) {
+      actions.push({
+        id: 'act-mentor-requests',
+        title: 'Mentee Applications & Support Requests',
+        shortDescription: `${pendingReqs.length} formal student application(s) require mentor review or recommendation.`,
+        count: pendingReqs.length,
+        countLabel: `${pendingReqs.length} Requests`,
+        priority: 'MEDIUM',
+        category: 'APPROVAL',
+        targetTab: 'mentee-requests-pending',
+        takeActionText: 'Process Requests',
+        iconName: 'MessageSquare',
+        badgeVariant: 'navy',
+        sourceModule: 'Student Section'
       });
     }
   }

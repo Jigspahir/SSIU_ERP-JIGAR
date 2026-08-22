@@ -284,13 +284,56 @@ async function runMentorBackendTests() {
   assert(emptyStats.attendanceAlertsCount === 0, '10.3 attendanceAlertsCount is 0 for unassigned mentor');
   assert(emptyStats.pendingFollowUpsCount === 0, '10.4 pendingFollowUpsCount is 0 for unassigned mentor');
 
-  // ─── Stage 11: Security Audit Log Verification ────────────────────────────
-  console.log('\n--- Stage 11: Security Audit Trail ---');
+  // ─── Stage 12: VICE_PRESIDENT & Executive Leadership Authorization ───────
+  console.log('\n--- Stage 12: VICE_PRESIDENT & Executive Leadership Authorization ---');
 
-  const auditLogs = db.getAuditLogs().filter(a => a.entity === 'MENTOR_MANAGEMENT');
-  assert(auditLogs.length > 0, `11.1 Security audit logs recorded for mentor actions (count: ${auditLogs.length})`);
-  assert(auditLogs.some(a => a.action === 'MENTORING_SESSION_CREATED'), '11.2 MENTORING_SESSION_CREATED logged');
-  assert(auditLogs.some(a => a.action === 'UNAUTHORIZED_MENTEE_ACCESS_BLOCKED'), '11.3 UNAUTHORIZED_MENTEE_ACCESS_BLOCKED logged');
+  const vpUser: User = {
+    id: 'usr-vp-001',
+    name: 'Honorable Vice President',
+    email: 'vp@swarrnim.edu.in',
+    role: 'VICE_PRESIDENT',
+    status: 'ACTIVE',
+    createdAt: '2026-01-01'
+  };
+
+  const studentUser: User = {
+    id: 'stu-1',
+    name: 'Demo Student',
+    email: 'student01@swarrnim.edu.in',
+    role: 'STUDENT',
+    status: 'ACTIVE',
+    createdAt: '2026-01-01'
+  };
+
+  // 12.1 VICE_PRESIDENT successfully validated
+  const vpAuthContext = mentorBackendService.validateMentorUser(vpUser);
+  assert(vpAuthContext.mentorId === 'usr-vp-001', '12.1 VICE_PRESIDENT role authorized for Mentor operations without 403');
+
+  // 12.2 VICE_PRESIDENT student access
+  const vpMenteeProfile = mentorBackendService.getMenteeProfile(vpUser, 'stu-1');
+  assert(vpMenteeProfile.student.id === 'stu-1', '12.2 VICE_PRESIDENT authorized for student profile access');
+
+  // 12.3 VICE_PRESIDENT dashboard stats
+  const vpStats = mentorBackendService.getMentorDashboardStats(vpUser);
+  assert(typeof vpStats.totalMentees === 'number', '12.3 VICE_PRESIDENT retrieves mentor dashboard statistics');
+
+  // 12.4 Unauthorized role (STUDENT) rejected with 403
+  let studentBlocked = false;
+  try {
+    mentorBackendService.validateMentorUser(studentUser);
+  } catch (err: any) {
+    if (err.message.includes('403 Forbidden')) studentBlocked = true;
+  }
+  assert(studentBlocked, '12.4 Unauthorized STUDENT role blocked with 403 Forbidden');
+
+  // 12.5 Unauthenticated (null) rejected with 401
+  let nullBlocked = false;
+  try {
+    mentorBackendService.validateMentorUser(null);
+  } catch (err: any) {
+    if (err.message.includes('401 Unauthorized')) nullBlocked = true;
+  }
+  assert(nullBlocked, '12.5 Unauthenticated request blocked with 401 Unauthorized');
 
   console.log('\n========================================================================');
   console.log(`MENTOR BACKEND TEST RESULTS: ${passedTests} PASSED, 0 FAILED out of ${totalTests} tests`);

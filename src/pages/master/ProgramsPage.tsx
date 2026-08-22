@@ -6,12 +6,14 @@ import { DataTable, Column } from '../../components/common/DataTable';
 import { Modal } from '../../components/common/Modal';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { Badge } from '../../components/common/Badge';
+import { EntityProfileModal } from '../../components/profile/EntityProfileModal';
 
 export const ProgramsPage: React.FC = () => {
   const { canMutate } = useAuth();
   const [programs, setPrograms] = useState<Program[]>(() => db.getPrograms());
   const [selectedDeptId, setSelectedDeptId] = useState<string>('ALL');
 
+  const [viewingProgram, setViewingProgram] = useState<Program | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Program | null>(null);
   const [deletingItem, setDeletingItem] = useState<Program | null>(null);
@@ -131,10 +133,23 @@ export const ProgramsPage: React.FC = () => {
         }
         onAddClick={handleOpenAddModal}
         addLabel="Add Program"
+        onViewClick={item => setViewingProgram(item)}
         onEditClick={handleOpenEditModal}
         onDeleteClick={item => setDeletingItem(item)}
         canMutate={canMutate()}
         exportFilename="swarrnim-programs"
+      />
+
+      <EntityProfileModal
+        isOpen={Boolean(viewingProgram)}
+        onClose={() => setViewingProgram(null)}
+        entityType="program"
+        entityId={viewingProgram?.id || null}
+        onEditClick={item => {
+          setViewingProgram(null);
+          handleOpenEditModal(item);
+        }}
+        canMutate={canMutate()}
       />
 
       <Modal

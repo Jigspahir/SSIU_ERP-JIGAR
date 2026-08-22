@@ -10,6 +10,7 @@ import { Badge } from '../../components/common/Badge';
 import { StatCard } from '../../components/common/StatCard';
 import { Modal } from '../../components/common/Modal';
 import { StudentProfileModal } from '../../components/profile/StudentProfileModal';
+import { StudentRowActionMenu } from '../../components/common/StudentRowActionMenu';
 import { 
   Users, FileText, CheckCircle2, Clock, Award, ShieldCheck, Download, 
   Eye, Search, Sparkles, Send, AlertCircle, RefreshCw, Printer, 
@@ -761,22 +762,30 @@ export const StudentSectionWorkspacePage: React.FC<StudentSectionWorkspacePagePr
                         </Badge>
                       </td>
                       <td>
-                        <Badge variant={isAllVerified ? 'active' : 'warning'}>
+                        <Badge variant={isAllVerified ? 'active' : docs.filter(d => d.status === 'VERIFIED').length > 0 ? 'warning' : 'danger'}>
                           {isAllVerified ? 'LOCKED IN VAULT' : `${docs.filter(d => d.status === 'VERIFIED').length}/${docs.length} Verified`}
                         </Badge>
                       </td>
                       <td>
-                        <Badge variant={student.status === 'ACTIVE' ? 'active' : 'inactive'}>
-                          {student.status}
-                        </Badge>
+                        {student.status === 'ACTIVE' ? (
+                          <Badge variant="active">ACTIVE</Badge>
+                        ) : (student.status as string) === 'WARNING' ? (
+                          <Badge variant="warning">WARNING</Badge>
+                        ) : (
+                          <Badge variant="danger">{student.status || 'INACTIVE'}</Badge>
+                        )}
                       </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button 
-                          className="btn btn-sm btn-secondary"
-                          onClick={() => setSelectedStudentForProfile(student)}
-                        >
-                          <Eye size={13} /> View Full Profile
-                        </button>
+                      <td style={{ textAlign: 'right', paddingRight: '1rem' }}>
+                        <StudentRowActionMenu 
+                          student={student}
+                          statusLevel={!isAllVerified || (student as any).idCardStatus === 'BLOCKED' ? 'warning' : 'good'}
+                          onViewProfile={() => setSelectedStudentForProfile(student)}
+                          onViewAcademic={() => setSelectedStudentForProfile(student)}
+                          onViewAttendance={() => setSelectedStudentForProfile(student)}
+                          onViewDocuments={() => setSelectedStudentForProfile(student)}
+                          onViewExamination={() => setSelectedStudentForProfile(student)}
+                          onViewRequests={() => setSelectedStudentForProfile(student)}
+                        />
                       </td>
                     </tr>
                   );
@@ -1142,13 +1151,16 @@ export const StudentSectionWorkspacePage: React.FC<StudentSectionWorkspacePagePr
                           {isFinalSem ? 'ELIGIBLE FOR PROVISIONAL' : 'IN PROGRESS'}
                         </Badge>
                       </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button 
-                          className="btn btn-sm btn-secondary"
-                          onClick={() => setSelectedStudentForProfile(student)}
-                        >
-                          Inspect Record
-                        </button>
+                      <td style={{ textAlign: 'right', paddingRight: '1rem' }}>
+                        <StudentRowActionMenu 
+                          student={student}
+                          onViewProfile={() => setSelectedStudentForProfile(student)}
+                          onViewAcademic={() => setSelectedStudentForProfile(student)}
+                          onViewAttendance={() => setSelectedStudentForProfile(student)}
+                          onViewDocuments={() => setSelectedStudentForProfile(student)}
+                          onViewExamination={() => setSelectedStudentForProfile(student)}
+                          onViewRequests={() => setSelectedStudentForProfile(student)}
+                        />
                       </td>
                     </tr>
                   );

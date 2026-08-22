@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { UserRole } from '../../types';
 import { db } from '../../services/db';
 import { mentorBackendService } from '../../services/mentorBackendService';
 import { StatCard } from '../../components/common/StatCard';
@@ -24,6 +25,16 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
   const { user, role } = useAuth();
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+
+  // Executive Vice President Workspaces State
+  const [vpWorkspaceTab, setVpWorkspaceTab] = useState<'OVERVIEW' | 'GOVERNANCE' | 'STUDENTS' | 'FINANCE' | 'OPERATIONS' | 'AUDIT'>('OVERVIEW');
+  const [globalSearchTerm, setGlobalSearchTerm] = useState<string>('');
+  const [vpInstFilter, setVpInstFilter] = useState<string>('ALL');
+  const [vpDeptFilter, setVpDeptFilter] = useState<string>('ALL');
+  const [auditSearchTerm, setAuditSearchTerm] = useState<string>('');
+  const [studentSearchQuick, setStudentSearchQuick] = useState<string>('');
+  const [vpReportModalOpen, setVpReportModalOpen] = useState<boolean>(false);
+  const [selectedVpReportType, setSelectedVpReportType] = useState<any>('CAMPUS_HOME');
 
   const institutes = db.getInstitutes();
   const departments = db.getDepartments();
@@ -128,9 +139,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
         {/* =========================================================================
-            6 KPI ANALYTICS CARDS (LARGE NUMBERS + PERCENTAGES + TRENDS + HOVER)
+            6 KPI ANALYTICS CARDS (COMPACT 4-COLUMN ENTERPRISE STAT CARDS)
             ========================================================================= */}
-        <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+        <div className="grid-4">
           {/* 1. Total Students */}
           <StatCard
             title="Total Students"
@@ -304,16 +315,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
 
   // 1.5 Vice President University Executive Portal
   const renderVicePresidentDashboard = () => {
-    // Executive Workspaces Tab State
-    const [vpWorkspaceTab, setVpWorkspaceTab] = useState<'OVERVIEW' | 'GOVERNANCE' | 'STUDENTS' | 'FINANCE' | 'OPERATIONS' | 'AUDIT'>('OVERVIEW');
-    const [globalSearchTerm, setGlobalSearchTerm] = useState<string>('');
-    const [vpInstFilter, setVpInstFilter] = useState<string>('ALL');
-    const [vpDeptFilter, setVpDeptFilter] = useState<string>('ALL');
-    const [auditSearchTerm, setAuditSearchTerm] = useState<string>('');
-    const [studentSearchQuick, setStudentSearchQuick] = useState<string>('');
-    const [vpReportModalOpen, setVpReportModalOpen] = useState<boolean>(false);
-    const [selectedVpReportType, setSelectedVpReportType] = useState<any>('CAMPUS_HOME');
-
     // Real Database Entities
     const allInstitutes = db.getInstitutes();
     const allDepartments = db.getDepartments();
@@ -322,7 +323,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
     const allStudents = db.getStudents();
     const allFaculty = db.getFaculty();
     const allUsers = db.getUsers();
-    const activeAcademicYear = allAcademicYears.find(ay => ay.isCurrent || (ay as any).status === 'ACTIVE')?.name || '2025-2026';
+    const activeAcademicYear = '2026–27';
 
     // Leadership Roles
     const hois = allUsers.filter(u => u.role === 'PRINCIPAL' && u.status === 'ACTIVE');
@@ -2559,13 +2560,65 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
     const mentorStats = mentorBackendService.getMentorDashboardStats(user);
     const alerts = mentorBackendService.getAttendanceAlerts(user);
     const followUps = mentorBackendService.getPendingFollowUps(user);
+    const mentees = mentorBackendService.getMentees(user).records;
+
+    // Calculate pending documents count across assigned mentees
+    let pendingDocsCount = 0;
+    mentees.forEach(m => {
+      pendingDocsCount += m.pendingDocumentsCount || 0;
+    });
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
-        {/* Top 4 Primary Metric Cards */}
-        <div className="grid-4">
+        {/* Mentor Portal Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <div style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '0.4rem', 
+              padding: '0.2rem 0.6rem', 
+              background: 'rgba(245, 130, 32, 0.1)', 
+              color: 'var(--brand-orange)', 
+              borderRadius: '4px', 
+              fontSize: '0.75rem', 
+              fontWeight: 800, 
+              textTransform: 'uppercase', 
+              letterSpacing: '0.5px', 
+              marginBottom: '0.4rem' 
+            }}>
+              <ShieldCheck size={13} /> SWARRNIM ERP • MENTOR SCOPE
+            </div>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 900, color: 'var(--brand-navy)', margin: 0 }}>
+              Mentor Dashboard
+            </h1>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+              Academic and personal oversight for assigned mentees.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button 
+              className="btn btn-primary btn-sm"
+              onClick={() => setActiveTab('counseling')}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+            >
+              <Calendar size={14} /> Log Mentoring Session
+            </button>
+            <button 
+              className="btn btn-secondary btn-sm"
+              onClick={() => setActiveTab('mentee-list')}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+            >
+              <Users2 size={14} /> View All Mentees
+            </button>
+          </div>
+        </div>
+
+        {/* 6 Primary Mentor Metric Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
           <StatCard 
-            title="My Mentees" 
+            title="MY MENTEES" 
             value={mentorStats.totalMentees} 
             subtitle="Assigned active students" 
             icon={Users2} 
@@ -2573,7 +2626,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
             onClick={() => setActiveTab('mentee-list')} 
           />
           <StatCard 
-            title="Attendance Alerts" 
+            title="ATTENDANCE SHORTAGE" 
             value={mentorStats.attendanceAlertsCount} 
             subtitle="Below 75% threshold" 
             icon={AlertTriangle} 
@@ -2581,56 +2634,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
             onClick={() => setActiveTab('mentee-attendance')} 
           />
           <StatCard 
-            title="Academic Risk" 
+            title="PENDING DOCUMENTS" 
+            value={pendingDocsCount} 
+            subtitle="Awaiting verification" 
+            icon={FolderCheck} 
+            colorScheme={pendingDocsCount > 0 ? 'gold' : 'green'} 
+            onClick={() => setActiveTab('mentee-docs-pending')} 
+          />
+          <StatCard 
+            title="ACADEMIC RISK" 
             value={mentorStats.academicRiskCount} 
             subtitle="Shortage or backlogs" 
             icon={AlertCircle} 
             colorScheme={mentorStats.academicRiskCount > 0 ? 'orange' : 'green'} 
-            onClick={() => setActiveTab('mentee-risk')} 
+            onClick={() => setActiveTab('mentee-academic-performance')} 
           />
           <StatCard 
-            title="Pending Follow-ups" 
-            value={mentorStats.pendingFollowUpsCount} 
-            subtitle="Counseling action required" 
-            icon={Clock} 
-            colorScheme={mentorStats.pendingFollowUpsCount > 0 ? 'gold' : 'green'} 
-            onClick={() => setActiveTab('mentee-sessions')} 
-          />
-        </div>
-
-        {/* Secondary 4 Operational Cards */}
-        <div className="grid-4">
-          <StatCard 
-            title="Mentoring Sessions" 
-            value={mentorStats.mentoringSessionsCount} 
-            subtitle="Total logs recorded" 
-            icon={Calendar} 
-            colorScheme="navy" 
-            onClick={() => setActiveTab('mentee-sessions')} 
-          />
-          <StatCard 
-            title="Student Requests" 
+            title="PENDING REQUESTS" 
             value={mentorStats.pendingRequestsCount} 
-            subtitle="Pending mentor action" 
+            subtitle="Student applications" 
             icon={MessageSquare} 
             colorScheme={mentorStats.pendingRequestsCount > 0 ? 'orange' : 'green'} 
-            onClick={() => setActiveTab('mentee-requests')} 
+            onClick={() => setActiveTab('mentee-requests-pending')} 
           />
           <StatCard 
-            title="Notesheets" 
-            value={mentorStats.scopedNotesheetsCount} 
-            subtitle="Authored / Assigned" 
-            icon={FileText} 
+            title="COUNSELING SESSIONS" 
+            value={mentorStats.mentoringSessionsCount} 
+            subtitle="Logged sessions" 
+            icon={Calendar} 
             colorScheme="navy" 
-            onClick={() => setActiveTab('notesheet')} 
-          />
-          <StatCard 
-            title="Notifications" 
-            value={mentorStats.unreadNotificationsCount} 
-            subtitle="Unread alerts" 
-            icon={Bell} 
-            colorScheme={mentorStats.unreadNotificationsCount > 0 ? 'orange' : 'green'} 
-            onClick={() => setActiveTab('notifications')} 
+            onClick={() => setActiveTab('counseling')} 
           />
         </div>
 
@@ -2697,7 +2730,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
               <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Clock size={18} color="#FBBC05" /> Pending Counseling Follow-ups ({followUps.length})
               </h3>
-              <button className="btn btn-sm btn-outline" onClick={() => setActiveTab('mentee-sessions')}>
+              <button className="btn btn-sm btn-outline" onClick={() => setActiveTab('counseling')}>
                 View All <ArrowRight size={13} />
               </button>
             </div>
@@ -2719,7 +2752,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
                   </thead>
                   <tbody>
                     {followUps.slice(0, 5).map(f => (
-                      <tr key={f.id} style={{ cursor: 'pointer' }} onClick={() => setActiveTab('mentee-sessions', { sessionId: f.id })}>
+                      <tr key={f.id} style={{ cursor: 'pointer' }} onClick={() => setActiveTab('counseling', { sessionId: f.id })}>
                         <td>
                           <strong>{f.studentName}</strong>
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{f.studentEnrollmentNo}</div>
@@ -2762,8 +2795,63 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
     return renderStudentDashboard();
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  };
+
+  const getRoleDisplayName = (r?: UserRole | string | null) => {
+    const roleMap: Record<string, string> = {
+      VICE_PRESIDENT: 'Vice President',
+      PRESIDENT: 'President & Chancellor',
+      PROVOST: 'Provost',
+      SUPER_ADMIN: 'Super Administrator',
+      UNIVERSITY_ADMIN: 'University Administrator',
+      REGISTRAR: 'Registrar',
+      DEPUTY_REGISTRAR: 'Deputy Registrar',
+      PRINCIPAL: 'Principal / Head of Institute',
+      HOD: 'Head of Department',
+      FACULTY: 'Teaching Faculty',
+      MENTOR: 'Faculty Mentor',
+      STUDENT: 'Student Scholar',
+      IQAC: 'IQAC Director',
+      EXAM_CELL: 'Controller of Examinations',
+      STUDENT_SECTION: 'Student Section Officer',
+      HOSTEL_ADMIN: 'Hostel Chief Warden',
+      TRANSPORT_ADMIN: 'Transport Supervisor',
+      LIBRARY_ADMIN: 'University Librarian',
+      MAINTENANCE_ADMIN: 'Estate & Maintenance Officer',
+      ACCOUNTS_ADMIN: 'Accounts & Finance Officer',
+      PARENT: 'Guardian / Parent'
+    };
+    return (r && roleMap[r]) || r?.replace(/_/g, ' ') || 'University Member';
+  };
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      {/* ── Official University Dashboard Header ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
+        <div>
+          <h2 style={{ fontSize: '1.45rem', fontWeight: 800, color: 'var(--brand-navy)', lineHeight: 1.2, margin: 0 }}>
+            {getGreeting()}, {user?.name || 'Academic Leader'}
+          </h2>
+          <div style={{ fontSize: '0.84375rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 700, color: 'var(--brand-orange)' }}>{getRoleDisplayName(role)}</span>
+            <span>•</span>
+            <span>Academic Year: <strong>2026–27</strong></span>
+          </div>
+        </div>
+
+        <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', textAlign: 'right' }}>
+          <div style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Swarrnim Startup & Innovation University</div>
+        </div>
+      </div>
+
       {/* ─── PHASE 3: SMART ACTION CENTER ("WHAT NEEDS MY ATTENTION?") ─── */}
       <SmartActionCenter setActiveTab={setActiveTab} />
 

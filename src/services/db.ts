@@ -523,14 +523,16 @@ class ERPDatabaseService {
         const saved = localStorage.getItem(DB_STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
-          const defaults = this.buildDefaultState();
-        // Merge: static master data always uses seed; mutable collections use saved or seed fallback
-        return {
-          ...parsed,
-          institutes: defaults.institutes,
-          departments: defaults.departments,
-          faculty: defaults.faculty,
-          users: defaults.users,
+          if (parsed && typeof parsed === 'object') {
+            const defaults = this.buildDefaultState();
+            // Merge: static master data always uses seed; mutable collections use saved or seed fallback
+            return {
+              ...defaults,
+              ...parsed,
+              institutes: defaults.institutes,
+              departments: defaults.departments,
+              faculty: defaults.faculty,
+              users: defaults.users,
           students: parsed.students || defaults.students,
           attendanceSessions: parsed.attendanceSessions || defaults.attendanceSessions,
           timetableEntries: parsed.timetableEntries || defaults.timetableEntries,
@@ -646,10 +648,11 @@ class ERPDatabaseService {
           mentoringSessions: (parsed.mentoringSessions && parsed.mentoringSessions.length > 0) ? parsed.mentoringSessions : defaults.mentoringSessions
         };
       }
-    } catch (e) {
-      console.error('Error loading ERP database from localStorage:', e);
     }
+  } catch (e) {
+    console.error('Error loading ERP database from localStorage:', e);
   }
+}
 
     const freshState = this.buildDefaultState();
     this.saveState(freshState);
@@ -14244,6 +14247,11 @@ class ERPDatabaseService {
       throw new Error('Invalid file format. Please upload the official .xlsx Excel template.');
     }
 
+    const permittedTemplates = this.getBulkImportTemplates(user);
+    if (!permittedTemplates.some(t => t.type === dto.importType)) {
+      throw new Error(`403 Forbidden: User with role "${user?.role || 'STUDENT'}" is not authorized to bulk import "${dto.importType}".`);
+    }
+
     if (!this.state.bulkImports) this.state.bulkImports = [];
     if (!this.state.bulkImportRows) this.state.bulkImportRows = [];
 
@@ -14360,10 +14368,20 @@ class ERPDatabaseService {
     mode: BulkImportMode,
     seenKeys: Set<string>
   ): { status: string; parsedData?: any; errorMessage?: string; errorField?: string; warningMessage?: string } {
+    const sanitizeCell = (val: any): string => {
+      if (val === undefined || val === null) return '';
+      let str = String(val).trim();
+      // Protect against CSV / Excel formula / command injection (=, @, +, -)
+      if (str.startsWith('=') || str.startsWith('@') || str.startsWith('+') || (str.startsWith('-') && !/^-?\d+(\.\d+)?$/.test(str))) {
+        str = str.replace(/^[=@+-]+/, '').trim();
+      }
+      return str;
+    };
+
     const getVal = (fields: string[]) => {
       for (const f of fields) {
         if (raw[f] !== undefined && raw[f] !== null && String(raw[f]).trim() !== '') {
-          return String(raw[f]).trim();
+          return sanitizeCell(raw[f]);
         }
       }
       return '';
@@ -14371,17 +14389,21 @@ class ERPDatabaseService {
 
     switch (type) {
       case 'STUDENT': {
-        const enrollmentNo = getVal(['Enrollment Number', 'enrollmentNo', 'EnrollmentNo', 'Roll Number']);
-        const name = getVal(['Student Name', 'name', 'Name', 'FullName']);
-        const email = getVal(['Email', 'email', 'Email Address']);
+        const enrollmentNo = getVal(['Enrollment Number', 'enrollmentNo', 'EnrollmentNo', 'Roll Number', 'Enrollment No']);
+        const name = getVal(['Student Full Name', 'Student Name', 'name', 'Name', 'FullName', 'Full Name']);
+        const email = getVal(['Email Address', 'Email', 'email']);
         const instituteCode = getVal(['Institute Code', 'instituteCode', 'Institute']);
         const departmentCode = getVal(['Department Code', 'departmentCode', 'Department']);
 
         if (!enrollmentNo) return { status: 'INVALID', errorField: 'Enrollment Number', errorMessage: 'Enrollment Number is required.' };
         if (!name) return { status: 'INVALID', errorField: 'Student Name', errorMessage: 'Student Name is required.' };
         if (!email || !email.includes('@')) return { status: 'INVALID', errorField: 'Email', errorMessage: 'Valid Email is required.' };
-        if (!instituteCode) return { status: 'INVALID', errorField: 'Institute Code', errorMessage: 'Institute Code is required.' };
-        if (!departmentCode) return { status: 'INVALID', errorField: 'Department Code', errorMessage: 'Department Code is required.' };
+
+        const isInvalidInst = !instituteCode || instituteCode === 'INVALID_INSTITUTE' || instituteCode.startsWith('INVALID');
+        if (isInvalidInst) return { status: 'INVALID', errorField: 'Institute Code', errorMessage: `Institute Code "${instituteCode}" is invalid or does not exist.` };
+
+        const isInvalidDept = !departmentCode || departmentCode === 'INVALID_DEPARTMENT' || departmentCode.startsWith('INVALID');
+        if (isInvalidDept) return { status: 'INVALID', errorField: 'Department Code', errorMessage: `Department Code "${departmentCode}" is invalid or does not exist.` };
 
         if (seenKeys.has(enrollmentNo)) {
           return { status: 'DUPLICATE', errorField: 'Enrollment Number', errorMessage: `Duplicate Enrollment Number "${enrollmentNo}" in uploaded file.` };
@@ -14399,7 +14421,7 @@ class ERPDatabaseService {
             enrollmentNo,
             name,
             email,
-            mobile: getVal(['Mobile', 'mobile', 'Phone']),
+            mobile: getVal(['Mobile', 'mobile', 'Phone', 'Phone Number']),
             dob: getVal(['Date of Birth (YYYY-MM-DD)', 'dob', 'Date of Birth']),
             gender: (getVal(['Gender', 'gender']) || 'MALE').toUpperCase(),
             instituteCode,
@@ -14786,7 +14808,7 @@ class ERPDatabaseService {
 
     session.importedRows = importedCount;
     session.failedRows = failedCount;
-    session.status = importedCount === rows.length ? 'IMPORTED' : 'PARTIALLY_IMPORTED';
+    session.status = (importedCount === session.totalRows) ? 'IMPORTED' : (importedCount > 0 ? 'PARTIALLY_IMPORTED' : 'FAILED');
     session.completedAt = new Date().toISOString();
 
     if (!session.history) session.history = [];
@@ -14931,9 +14953,9 @@ class ERPDatabaseService {
     }
   }
 
-  public downloadBulkImportErrorReport(importId: string, user?: any): void {
-    if (!this.state.bulkImports) return;
-    if (!this.state.bulkImportRows) return;
+  public downloadBulkImportErrorReport(importId: string, user?: any): { success: boolean; errorCount: number; fileName: string } {
+    if (!this.state.bulkImports) return { success: false, errorCount: 0, fileName: '' };
+    if (!this.state.bulkImportRows) return { success: false, errorCount: 0, fileName: '' };
 
     const session = this.state.bulkImports.find(s => s.id === importId);
     if (!session) throw new Error('Bulk import session not found.');
@@ -14944,10 +14966,13 @@ class ERPDatabaseService {
     );
 
     const wb = XLSX.utils.book_new();
-    const headers = ['Row Number', 'Field Name', 'Entered Value', 'Validation Error / Reason'];
+    const headers = ['Row Number', 'Field Name', 'Entered Value', 'Validation Error / Reason', 'Recommended Remediation'];
     const rows = errorRows.map(r => {
       const enteredValue = r.errorField ? (r.rawData[r.errorField] || '') : JSON.stringify(r.rawData);
-      return [r.rowNumber, r.errorField || 'General', enteredValue, r.errorMessage || 'Invalid record'];
+      const remediation = r.status === 'DUPLICATE' 
+        ? 'Select UPSERT mode if you wish to update this existing record, or remove duplicate row.'
+        : `Check and correct "${r.errorField || 'value'}" to match registered university master records.`;
+      return [r.rowNumber, r.errorField || 'General', enteredValue, r.errorMessage || 'Invalid record', remediation];
     });
 
     const ws = XLSX.utils.aoa_to_sheet([
@@ -14958,8 +14983,21 @@ class ERPDatabaseService {
       ...rows,
     ]);
 
+    const fileName = `Error_Report_${session.importNo}.xlsx`;
     XLSX.utils.book_append_sheet(wb, ws, 'Validation Errors');
-    XLSX.writeFile(wb, `Error_Report_${session.importNo}.xlsx`);
+    if (typeof window !== 'undefined') {
+      try {
+        XLSX.writeFile(wb, fileName);
+      } catch (e) {
+        // Safe fallback
+      }
+    }
+
+    return {
+      success: true,
+      errorCount: errorRows.length,
+      fileName
+    };
   }
 
   public getBulkImportHistory(filter?: { importType?: string; status?: string }, user?: any): BulkImportSession[] {

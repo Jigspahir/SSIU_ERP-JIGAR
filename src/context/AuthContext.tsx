@@ -7,6 +7,8 @@ import { AUTH_STORAGE_KEY, SESSION_TIMEOUT_MS, INACTIVITY_EVENTS, DEMO_ACCOUNTS 
 interface AuthContextType {
   user: User | null;
   role: UserRole | null;
+  activeRole: UserRole | null;
+  setActiveRole: (role: UserRole) => void;
   login: (identifier: string, password?: string) => { success: boolean; error?: string };
   logout: () => void;
   updateProfile: (updates: Partial<User>) => void;
@@ -23,17 +25,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const savedUser = localStorage.getItem(AUTH_STORAGE_KEY);
       if (savedUser) {
         const parsed = JSON.parse(savedUser) as User;
-        const freshUser = db.getUsers().find(u => u.id === parsed.id || u.username === parsed.username);
-        if (freshUser) {
-          return { ...parsed, name: freshUser.name, designation: freshUser.designation };
+        if (parsed && typeof parsed === 'object' && parsed.id) {
+          const freshUser = db.getUsers().find(u => u.id === parsed.id || (parsed.username && u.username === parsed.username));
+          if (freshUser) {
+            return { ...parsed, name: freshUser.name, designation: freshUser.designation };
+          }
+          return parsed;
         }
-        return parsed;
       }
     } catch (e) {
       console.error('Error reading auth user:', e);
     }
     return null;
   });
+
+  const [activeRole, setActiveRoleState] = useState<UserRole | null>(() => {
+    try {
+      const savedUser = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser) as User;
+        if (parsed && typeof parsed === 'object' && parsed.id) {
+          const savedActiveRole = localStorage.getItem(`sscit_active_workspace_${parsed.id}`);
+          if (savedActiveRole && (savedActiveRole === 'FACULTY' || savedActiveRole === 'MENTOR' || savedActiveRole === parsed.role)) {
+            return savedActiveRole as UserRole;
+          }
+          return parsed.role || null;
+        }
+      }
+    } catch (e) {
+      console.error('Error reading active role:', e);
+    }
+    return null;
+  });
+
+  const setActiveRole = (newRole: UserRole) => {
+    setActiveRoleState(newRole);
+    if (user) {
+      localStorage.setItem(`sscit_active_workspace_${user.id}`, newRole);
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -95,6 +125,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         foundUser = users.find(u => u.role === 'HOD');
       } else if (cleanId === 'principal') {
         foundUser = users.find(u => u.role === 'PRINCIPAL');
+      } else if (cleanId === 'parent' || cleanId === 'parent2' || cleanId === 'parent3') {
+        foundUser = users.find(u => u.role === 'PARENT' && (u.username === cleanId || cleanId === 'parent'));
       }
     }
 
@@ -107,7 +139,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const isDemoPassMatch = 
         password === 'Student@123' ||
         password === 'Faculty@123' ||
-        password === 'Admin@123';
+        password === 'Admin@123' ||
+        password === 'Parent@123';
 
       if (!isDemoPassMatch) {
         securityAuditService.trackLoginFailure(identifier, 'Invalid password credentials');
@@ -116,6 +149,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     setUser(foundUser);
+    const savedActiveRole = localStorage.getItem(`sscit_active_workspace_${foundUser.id}`);
+    const initialActiveRole = (savedActiveRole && (savedActiveRole === 'FACULTY' || savedActiveRole === 'MENTOR'))
+      ? (savedActiveRole as UserRole)
+      : foundUser.role;
+    setActiveRoleState(initialActiveRole);
+    localStorage.setItem(`sscit_active_workspace_${foundUser.id}`, initialActiveRole);
+
     securityAuditService.trackLoginSuccess(foundUser);
     return { success: true };
   };
@@ -125,6 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       securityAuditService.trackLogout(user);
     }
     setUser(null);
+    setActiveRoleState(null);
   };
 
   const updateProfile = (updates: Partial<User>) => {
@@ -137,29 +178,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const hasAccess = (allowedRoles: UserRole[]): boolean => {
     if (!user) return false;
-    if (user.role === 'SUPER_ADMIN') return true;
-    return allowedRoles.includes(user.role);
+    if (user.role === 'SUPER_ADMIN' || user.role === 'VICE_PRESIDENT' || user.role === 'PRESIDENT') return true;
+    const currentEffectiveRole = activeRole || user.role;
+    return allowedRoles.includes(currentEffectiveRole);
   };
 
   const canMutate = (): boolean => {
     if (!user) return false;
+    const currentEffectiveRole = activeRole || user.role;
     return [
-      'SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD',
+      'SUPER_ADMIN', 'PRESIDENT', 'VICE_PRESIDENT', 'PROVOST', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD',
       'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION',
       'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN'
-    ].includes(user.role);
+    ].includes(currentEffectiveRole);
   };
 
   const resetSystemDatabase = () => {
     db.resetToDefaultSeed();
     setUser(null);
+    setActiveRoleState(null);
   };
+
+  const effectiveRole = activeRole || (user ? user.role : null);
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        role: user ? user.role : null,
+        role: effectiveRole,
+        activeRole: effectiveRole,
+        setActiveRole,
         login,
         logout,
         updateProfile,

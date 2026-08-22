@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Download, Printer, Plus, ChevronLeft, ChevronRight, Edit3, Trash2, Eye, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet } from 'lucide-react';
+import { Search, Download, Printer, Plus, ChevronLeft, ChevronRight, Edit3, Trash2, Eye, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, UploadCloud } from 'lucide-react';
 import { Badge } from './Badge';
 
 export interface Column<T> {
@@ -20,6 +20,8 @@ interface DataTableProps<T extends { id: string }> {
   filterSlot?: React.ReactNode;
   onAddClick?: () => void;
   addLabel?: string;
+  onBulkImportClick?: () => void;
+  bulkImportLabel?: string;
   onEditClick?: (item: T) => void;
   onDeleteClick?: (item: T) => void;
   onViewClick?: (item: T) => void;
@@ -32,11 +34,13 @@ export function DataTable<T extends { id: string }>({
   subtitle,
   data,
   columns,
-  searchPlaceholder = 'Search records...',
+  searchPlaceholder = 'Search records by name, ID, or keyword...',
   searchFields,
   filterSlot,
   onAddClick,
   addLabel = 'Add Record',
+  onBulkImportClick,
+  bulkImportLabel = 'Bulk Import',
   onEditClick,
   onDeleteClick,
   onViewClick,
@@ -49,40 +53,44 @@ export function DataTable<T extends { id: string }>({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(8);
 
-  // Filtered & Searched Data
+  // Filter Logic
   const filteredData = useMemo(() => {
     if (!searchQuery.trim()) return data;
-    const q = searchQuery.toLowerCase();
-    
+    const query = searchQuery.toLowerCase().trim();
     return data.filter(item => {
       if (searchFields && searchFields.length > 0) {
         return searchFields.some(field => {
           const val = item[field];
-          return val !== undefined && val !== null && String(val).toLowerCase().includes(q);
+          return val !== undefined && val !== null && String(val).toLowerCase().includes(query);
         });
       }
-      return Object.values(item).some(val => 
-        val !== undefined && val !== null && String(val).toLowerCase().includes(q)
-      );
+      return Object.values(item).some(val => {
+        if (typeof val === 'object' && val !== null) return false;
+        return val !== undefined && val !== null && String(val).toLowerCase().includes(query);
+      });
     });
   }, [data, searchQuery, searchFields]);
 
-  // Sorted Data
+  // Sort Logic
   const sortedData = useMemo(() => {
     if (!sortKey) return filteredData;
-
-    return [...filteredData].sort((a: any, b: any) => {
-      const valA = a[sortKey] ?? '';
-      const valB = b[sortKey] ?? '';
-
-      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+    return [...filteredData].sort((a, b) => {
+      let aVal = (a as any)[sortKey];
+      let bVal = (b as any)[sortKey];
+      if (aVal === undefined || aVal === null) aVal = '';
+      if (bVal === undefined || bVal === null) bVal = '';
+      if (typeof aVal === 'string') {
+        const cmp = aVal.localeCompare(String(bVal));
+        return sortOrder === 'asc' ? cmp : -cmp;
+      }
+      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
   }, [filteredData, sortKey, sortOrder]);
 
-  // Paginated Data
-  const totalPages = Math.max(1, Math.ceil(sortedData.length / pageSize));
+  // Pagination Logic
+  const totalPages = Math.ceil(sortedData.length / pageSize) || 1;
   const paginatedData = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return sortedData.slice(start, start + pageSize);
@@ -90,7 +98,11 @@ export function DataTable<T extends { id: string }>({
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
-      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+      if (sortOrder === 'asc') setSortOrder('desc');
+      else {
+        setSortKey(null);
+        setSortOrder('asc');
+      }
     } else {
       setSortKey(key);
       setSortOrder('asc');
@@ -98,45 +110,38 @@ export function DataTable<T extends { id: string }>({
   };
 
   const handleExportCSV = () => {
-    if (data.length === 0) return;
-    const exportCols = columns.filter(c => c.header !== 'Actions');
-    const headers = exportCols.map(c => c.header).join(',');
+    if (!data.length) return;
+    const exportableCols = columns.filter(c => c.key !== 'actions');
+    const headers = exportableCols.map(c => `"${c.header.replace(/"/g, '""')}"`).join(',');
     const rows = sortedData.map(item => {
-      return exportCols.map(c => {
+      return exportableCols.map(c => {
         let val = (item as any)[c.key];
         if (val === undefined || val === null) val = '';
-        if (typeof val === 'string') val = `"${val.replace(/"/g, '""')}"`;
-        return val;
+        return `"${String(val).replace(/"/g, '""')}"`;
       }).join(',');
     });
-
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${exportFilename}-${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `${exportFilename}-${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   const handleExportPDF = () => {
-    if (data.length === 0) return;
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
-
-    const printableColumns = columns.filter(c => c.header !== 'Actions');
-
+    const printableColumns = columns.filter(c => c.key !== 'actions');
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>${title} - Swarrnim University ERP</title>
+        <title>${title} - SSIU ERP</title>
         <style>
-          @page { size: A4 landscape; margin: 15mm; }
-          body { font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; padding: 20px; color: #0F2C59; }
-          .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #F37023; padding-bottom: 12px; margin-bottom: 20px; }
-          .logo-title { display: flex; align-items: center; gap: 12px; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; padding: 20px; color: #0F172A; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0F2C59; padding-bottom: 12px; margin-bottom: 20px; }
           .title-area h1 { font-size: 20px; color: #0F2C59; margin: 0; font-weight: 800; }
           .title-area p { font-size: 12px; color: #F37023; margin: 3px 0 0 0; font-weight: 600; }
           .meta-info { font-size: 11px; color: #64748B; text-align: right; }
@@ -156,7 +161,7 @@ export function DataTable<T extends { id: string }>({
             </div>
           </div>
           <div class="meta-info">
-            <div><strong>SSCIT ERP Master Record</strong></div>
+            <div><strong>SSIU ERP Master Record</strong></div>
             <div>Generated: ${new Date().toLocaleString()}</div>
             <div>Total Records: ${sortedData.length}</div>
           </div>
@@ -180,8 +185,8 @@ export function DataTable<T extends { id: string }>({
           </tbody>
         </table>
         <div class="footer">
-          <div>Swarrnim University Academic ERP Management</div>
-          <div>Official Record • Confidential</div>
+          <div>Swarrnim Startup & Innovation University • SSIU ERP — University Management System</div>
+          <div>Official Record • Confidential • Academic Session 2026–27</div>
         </div>
         <script>
           window.onload = function() {
@@ -214,12 +219,22 @@ export function DataTable<T extends { id: string }>({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button className="btn btn-secondary btn-sm" onClick={handleExportCSV} title="Export to Excel / CSV">
-              <FileSpreadsheet size={15} color="#10B981" /> Excel
+            <button className="btn btn-secondary btn-sm" onClick={handleExportCSV} title="Export to Excel / CSV spreadsheet">
+              <FileSpreadsheet size={15} color="#10B981" /> Export Excel
             </button>
-            <button className="btn btn-secondary btn-sm" onClick={handleExportPDF} title="Export to PDF / Print">
-              <Printer size={15} color="#EF4444" /> PDF
+            <button className="btn btn-secondary btn-sm" onClick={handleExportPDF} title="Export to PDF / Print official record">
+              <Printer size={15} color="#EF4444" /> Print PDF
             </button>
+            {onBulkImportClick && canMutate && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={onBulkImportClick}
+                title="Bulk Data Management (Excel Upload, Update & Validation)"
+                style={{ borderColor: 'var(--brand-navy-medium)', color: 'var(--brand-navy)' }}
+              >
+                <UploadCloud size={15} color="var(--brand-orange)" /> {bulkImportLabel}
+              </button>
+            )}
             {onAddClick && canMutate && (
               <button className="btn btn-primary btn-sm" onClick={onAddClick}>
                 <Plus size={16} /> {addLabel}
@@ -288,9 +303,20 @@ export function DataTable<T extends { id: string }>({
           <tbody>
             {paginatedData.length === 0 ? (
               <tr>
-                <td colSpan={columns.length + 1} style={{ padding: '3rem 1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <div style={{ fontWeight: 600, fontSize: '1rem' }}>No records found</div>
-                  <div style={{ fontSize: '0.8125rem', marginTop: '4px' }}>Try adjusting search or filter parameters</div>
+                <td colSpan={columns.length + 1} style={{ padding: '3.5rem 1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--brand-navy)' }}>No records found</div>
+                  <div style={{ fontSize: '0.84375rem', marginTop: '4px' }}>
+                    {searchQuery ? `No matching records found for "${searchQuery}". Try a different keyword.` : 'There are currently no records available in this directory.'}
+                  </div>
+                  {searchQuery && (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      style={{ marginTop: '0.85rem' }}
+                      onClick={() => { setSearchQuery(''); setCurrentPage(1); }}
+                    >
+                      Clear Search Query
+                    </button>
+                  )}
                 </td>
               </tr>
             ) : (

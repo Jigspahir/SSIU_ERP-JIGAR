@@ -41,7 +41,11 @@ export class MentorBackendService {
     }
 
     const effectiveRole = role || user.role;
-    const allowedRoles = ['MENTOR', 'FACULTY', 'HOD', 'PRINCIPAL', 'SUPER_ADMIN', 'UNIVERSITY_ADMIN'];
+    const allowedRoles: UserRole[] = [
+      'MENTOR', 'FACULTY', 'HOD', 'PRINCIPAL', 
+      'SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 
+      'PRESIDENT', 'PROVOST', 'REGISTRAR', 'DEPUTY_REGISTRAR'
+    ];
     if (!allowedRoles.includes(effectiveRole)) {
       throw new Error(`403 Forbidden: Role ${effectiveRole} is not authorized for Mentor operations.`);
     }
@@ -64,8 +68,8 @@ export class MentorBackendService {
   public isStudentAssignedToMentor(mentorId: string, studentId: string, mentorUser?: User): boolean {
     if (!mentorId || !studentId) return false;
 
-    // Super Admin override for administrative support
-    if (mentorUser && (mentorUser.role === 'SUPER_ADMIN' || mentorUser.role === 'UNIVERSITY_ADMIN')) {
+    // Super Admin & Executive Leadership override for administrative support
+    if (mentorUser && ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 'PRESIDENT', 'PROVOST', 'REGISTRAR', 'DEPUTY_REGISTRAR'].includes(mentorUser.role)) {
       return true;
     }
 
@@ -341,7 +345,7 @@ export class MentorBackendService {
    */
   public getMenteeProfile(user: User, studentId: string): StudentProfileData {
     this.assertMentorAuthorizedForStudent(user, studentId);
-    return studentProfileAccessService.getStudentProfile(user, 'MENTOR', studentId);
+    return studentProfileAccessService.getStudentProfile(user, user.role || 'MENTOR', studentId);
   }
 
   // ============================================================================
@@ -576,7 +580,7 @@ export class MentorBackendService {
       throw new Error('404 Not Found: Mentoring session record does not exist.');
     }
 
-    if (session.mentorId !== user.id && user.role !== 'SUPER_ADMIN') {
+    if (session.mentorId !== user.id && !['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 'PRESIDENT'].includes(user.role)) {
       this.logMentorAudit(user, 'UNAUTHORIZED_MENTOR_EDIT_BLOCKED', sessionId, 'Blocked attempt to modify another mentor\'s session record.');
       throw new Error('403 Forbidden: You cannot modify a mentoring record created by another mentor.');
     }

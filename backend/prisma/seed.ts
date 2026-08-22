@@ -164,6 +164,98 @@ async function main() {
     roleMap.set(r.code, roleRecord);
   }
 
+  // 8b. Seed Standard RBAC Permissions
+  const modulesList = [
+    'STUDENT', 'FACULTY', 'DEPARTMENT', 'INSTITUTE', 'PROGRAM', 'SUBJECT',
+    'ATTENDANCE', 'TIMETABLE', 'EXAM', 'FEES', 'HOSTEL', 'TRANSPORT',
+    'INCUBATION', 'STORE', 'ASSET', 'PURCHASE', 'IT', 'GOVERNANCE',
+    'PLACEMENT', 'ALUMNI', 'COMMUNICATION', 'LIBRARY', 'REPORTS',
+    'BULK_IMPORT', 'NOTESHEET', 'APPROVAL', 'AUDIT', 'SETTINGS', 'MEMBER',
+    'ACADEMIC_YEAR', 'SEMESTER', 'BATCH', 'DIVISION'
+  ];
+  const actionsList = ['VIEW', 'CREATE', 'EDIT', 'DELETE', 'APPROVE', 'REJECT', 'EXPORT', 'IMPORT', 'ASSIGN', 'PUBLISH', 'CONFIGURE'];
+
+  const permissionMap = new Map<string, any>();
+  for (const mod of modulesList) {
+    for (const act of actionsList) {
+      const pCode = `${mod}_${act}`;
+      const permRecord = await prisma.permission.upsert({
+        where: { code: pCode },
+        update: {},
+        create: {
+          code: pCode,
+          module: mod,
+          action: act,
+          description: `Permission to ${act} ${mod} entities.`,
+        },
+      });
+      permissionMap.set(pCode, permRecord);
+    }
+  }
+
+  // 8c. Seed Role-Permission Mappings
+  const assignRolePerms = async (roleCode: string, pCodes: string[]) => {
+    const role = roleMap.get(roleCode);
+    if (!role) return;
+    for (const pCode of pCodes) {
+      const perm = permissionMap.get(pCode);
+      if (perm) {
+        await prisma.rolePermission.upsert({
+          where: {
+            roleId_permissionId: {
+              roleId: role.id,
+              permissionId: perm.id,
+            },
+          },
+          update: {},
+          create: {
+            roleId: role.id,
+            permissionId: perm.id,
+          },
+        });
+      }
+    }
+  };
+
+  // Seed all permissions for admin & executive leadership
+  const allPermissionCodes = Array.from(permissionMap.keys());
+  await assignRolePerms('SYSTEM_ADMIN', allPermissionCodes);
+  await assignRolePerms('PRESIDENT', allPermissionCodes);
+  await assignRolePerms('VICE_PRESIDENT', allPermissionCodes);
+  await assignRolePerms('PROVOST', allPermissionCodes);
+
+  // Registrar
+  const registrarPerms = allPermissionCodes.filter(c => !c.includes('DELETE') || c.startsWith('STUDENT') || c.startsWith('FACULTY') || c.startsWith('NOTESHEET'));
+  await assignRolePerms('REGISTRAR', registrarPerms);
+  await assignRolePerms('DEPUTY_REGISTRAR', registrarPerms.filter(c => !c.includes('CONFIGURE')));
+
+  // HOI / Principals & HODs
+  const academicPerms = allPermissionCodes.filter(c => 
+    c.startsWith('STUDENT') || c.startsWith('FACULTY') || c.startsWith('DEPARTMENT') ||
+    c.startsWith('PROGRAM') || c.startsWith('SUBJECT') || c.startsWith('ATTENDANCE') ||
+    c.startsWith('TIMETABLE') || c.startsWith('EXAM') || c.startsWith('NOTESHEET') ||
+    c.startsWith('APPROVAL') || c.startsWith('REPORTS') || c.startsWith('MEMBER')
+  );
+  await assignRolePerms('HOI', academicPerms);
+  await assignRolePerms('HOD', academicPerms.filter(c => !c.includes('APPROVE_NOTESHEET')));
+
+  // Faculty & Mentor
+  const facultyPerms = allPermissionCodes.filter(c => 
+    c === 'STUDENT_VIEW' || c === 'FACULTY_VIEW' || c === 'SUBJECT_VIEW' ||
+    c.startsWith('ATTENDANCE') || c.startsWith('TIMETABLE_VIEW') || c.startsWith('EXAM_VIEW') ||
+    c === 'EXAM_EDIT' || c === 'NOTESHEET_VIEW' || c === 'NOTESHEET_CREATE' ||
+    c.startsWith('APPROVAL_SUBMIT') || c.startsWith('APPROVAL_VIEW') || c === 'MEMBER_VIEW'
+  );
+  await assignRolePerms('FACULTY', facultyPerms);
+  await assignRolePerms('MENTOR', facultyPerms);
+
+  // Student
+  const studentPerms = [
+    'STUDENT_VIEW', 'SUBJECT_VIEW', 'ATTENDANCE_VIEW', 'TIMETABLE_VIEW',
+    'EXAM_VIEW', 'FEES_VIEW', 'APPROVAL_VIEW', 'APPROVAL_SUBMIT', 'COMMUNICATION_VIEW'
+  ];
+  await assignRolePerms('STUDENT', studentPerms);
+
   // 9. Seed Demo People
   const faculty01 = await prisma.faculty.upsert({
     where: { employeeCode: 'FAC-CSE-001' },
@@ -297,6 +389,9 @@ async function main() {
   };
 
   await createDemoUser('ADM000001', 'superadmin', adminPasswordHash, 'SYSTEM_ADMIN');
+  await createDemoUser('VP000001', 'vp_demo01', adminPasswordHash, 'VICE_PRESIDENT');
+  await createDemoUser('PRES000001', 'pres_demo01', adminPasswordHash, 'PRESIDENT');
+  await createDemoUser('PROV000001', 'prov_demo01', adminPasswordHash, 'PROVOST');
   await createDemoUser('REG000001', 'reg_demo01', regPasswordHash, 'REGISTRAR');
   await createDemoUser('HOI000001', 'hoi_demo01', hoiPasswordHash, 'HOI');
   await createDemoUser('HOD000001', 'hod_demo01', hodPasswordHash, 'HOD', { facultyId: faculty01.id });

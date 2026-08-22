@@ -1787,6 +1787,46 @@ export const initialUsers: User[] = [
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
     status: 'ACTIVE',
     createdAt: '2024-01-01T00:00:00Z'
+  },
+  // ─── Parent / Guardian Accounts ───────────────────────────────────────────
+  {
+    id: 'user-parent-1',
+    name: 'Rajesh Sharma',
+    username: 'parent',
+    email: 'rajesh.sharma@parent.ssiu-demo.ac.in',
+    password: 'Parent@123',
+    role: 'PARENT',
+    phone: '+91 98765 43210',
+    designation: 'Parent / Guardian',
+    avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=200&q=80',
+    status: 'ACTIVE',
+    createdAt: '2024-01-10T10:00:00Z'
+  },
+  {
+    id: 'user-parent-2',
+    name: 'Sunita Patel',
+    username: 'parent2',
+    email: 'sunita.patel@parent.ssiu-demo.ac.in',
+    password: 'Parent@123',
+    role: 'PARENT',
+    phone: '+91 98250 12345',
+    designation: 'Parent / Guardian',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80',
+    status: 'ACTIVE',
+    createdAt: '2024-01-15T11:30:00Z'
+  },
+  {
+    id: 'user-parent-3',
+    name: 'Vikram Mehta',
+    username: 'parent3',
+    email: 'vikram.mehta@parent.ssiu-demo.ac.in',
+    password: 'Parent@123',
+    role: 'PARENT',
+    phone: '+91 97123 98765',
+    designation: 'Parent / Guardian',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
+    status: 'ACTIVE',
+    createdAt: '2024-01-20T09:15:00Z'
   }
 ];
 

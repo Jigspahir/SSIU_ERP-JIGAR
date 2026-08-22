@@ -1,1066 +1,1644 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { HeaderLogo } from '../../components/layout/HeaderLogo';
 import { ForgotPasswordModal } from './ForgotPasswordModal';
-import { Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, AlertTriangle, UserCheck, Key, GraduationCap, Building2 } from 'lucide-react';
-import { UserRole } from '../../types';
+import {
+  Mail,
+  Lock,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  ArrowRight,
+  AlertCircle,
+  GraduationCap,
+  Users,
+  Building2,
+  Sliders,
+  KeyRound,
+  X,
+  HelpCircle,
+  Sparkles,
+  ChevronRight
+} from 'lucide-react';
+import logoImg from '../../assets/SSIUlogo.png';
+
+interface DemoRoleAccount {
+  role: string;
+  title: string;
+  userId: string;
+  pass: string;
+  badge: string;
+  icon: React.ElementType;
+  accentColor: string;
+}
+
+interface InstituteShowcase {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  established: number;
+}
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+  const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!identifier.trim() || !password) {
-      setError('Please enter both User ID and Password.');
+    const cleanId = identifier.trim();
+    if (!cleanId || !password) {
+      setError('Please enter your university email or username and password.');
       return;
     }
 
-    const res = login(identifier, password);
-    if (!res.success) {
-      setError(res.error || 'Invalid User ID or Password. Access denied.');
-    }
+    setIsLoading(true);
+
+    setTimeout(() => {
+      const res = login(cleanId, password);
+      setIsLoading(false);
+      if (!res.success) {
+        setError('Invalid username or password. Please check your credentials and try again.');
+      }
+    }, 300);
   };
 
-  const demoAccounts = [
+  const demoAccounts: DemoRoleAccount[] = [
     {
       role: 'STUDENT',
       title: 'Student Candidate',
       userId: 'student',
       pass: 'Student@123',
+      badge: 'Academic Portal',
       icon: GraduationCap,
-      color: '#F59E0B',
-      bg: '#FFFBEB'
+      accentColor: '#F58220'
+    },
+    {
+      role: 'PARENT',
+      title: 'Parent / Guardian',
+      userId: 'parent',
+      pass: 'Parent@123',
+      badge: 'Ward Academic Portal',
+      icon: Users,
+      accentColor: '#0D9488'
     },
     {
       role: 'FACULTY',
       title: 'Faculty / Mentor',
       userId: 'faculty',
       pass: 'Faculty@123',
-      icon: UserCheck,
-      color: '#0284C7',
-      bg: '#F0F9FF'
+      badge: 'Teaching & Mentorship',
+      icon: Users,
+      accentColor: '#12366B'
     },
     {
       role: 'HOD',
       title: 'Department HOD',
       userId: 'hod',
       pass: 'Faculty@123',
-      icon: UserCheck,
-      color: '#059669',
-      bg: '#F0FDF4'
+      badge: 'Departmental Head',
+      icon: Building2,
+      accentColor: '#059669'
+    },
+    {
+      role: 'PRINCIPAL',
+      title: 'Principal / HOI',
+      userId: 'principal',
+      pass: 'Admin@123',
+      badge: 'Institute Leadership',
+      icon: Building2,
+      accentColor: '#DC2626'
     },
     {
       role: 'REGISTRAR',
       title: 'Registrar Office',
       userId: 'registrar',
       pass: 'Admin@123',
+      badge: 'University Secretariat',
       icon: ShieldCheck,
-      color: '#EA580C',
-      bg: '#FFF7ED'
+      accentColor: '#EA580C'
     },
     {
       role: 'DEPUTY_REGISTRAR',
       title: 'Deputy Registrar',
       userId: 'deputyregistrar',
       pass: 'Admin@123',
+      badge: 'Academic Administration',
       icon: ShieldCheck,
-      color: '#4F46E5',
-      bg: '#EEF2FF'
-    },
-    {
-      role: 'EXAM_CELL',
-      title: 'Exam Controller',
-      userId: 'examcell',
-      pass: 'Admin@123',
-      icon: ShieldCheck,
-      color: '#1E3A8A',
-      bg: '#EFF6FF'
-    },
-    {
-      role: 'STUDENT_SECTION',
-      title: 'Student Section',
-      userId: 'studentsection',
-      pass: 'Admin@123',
-      icon: UserCheck,
-      color: '#0284C7',
-      bg: '#F0F9FF'
-    },
-    {
-      role: 'HOSTEL_ADMIN',
-      title: 'Hostel Warden',
-      userId: 'hosteladmin',
-      pass: 'Admin@123',
-      icon: UserCheck,
-      color: '#F59E0B',
-      bg: '#FFFBEB'
-    },
-    {
-      role: 'IQAC',
-      title: 'IQAC Director',
-      userId: 'iqac',
-      pass: 'Admin@123',
-      icon: ShieldCheck,
-      color: '#16A34A',
-      bg: '#F0FDF4'
-    },
-    {
-      role: 'PRINCIPAL',
-      title: 'Institute Principal',
-      userId: 'principal',
-      pass: 'Admin@123',
-      icon: Building2,
-      color: '#E11D48',
-      bg: '#FFF1F2'
+      accentColor: '#4F46E5'
     },
     {
       role: 'VICE_PRESIDENT',
       title: 'Vice President',
       userId: 'vp',
       pass: 'Admin@123',
-      icon: ShieldCheck,
-      color: '#7C3AED',
-      bg: '#F5F3FF'
+      badge: 'Executive Governance',
+      icon: Sparkles,
+      accentColor: '#7C3AED'
     },
     {
       role: 'SUPER_ADMIN',
-      title: 'University Super Admin',
+      title: 'Super Admin',
       userId: 'admin',
       pass: 'Admin@123',
-      icon: Key,
-      color: '#0F2C59',
-      bg: '#F1F5F9'
+      badge: 'System Controller',
+      icon: KeyRound,
+      accentColor: '#0F2C59'
+    },
+    {
+      role: 'EXAM_CELL',
+      title: 'Exam Controller',
+      userId: 'examcell',
+      pass: 'Admin@123',
+      badge: 'Examination Wing',
+      icon: Sliders,
+      accentColor: '#1E3A8A'
+    },
+    {
+      role: 'STUDENT_SECTION',
+      title: 'Student Section',
+      userId: 'studentsection',
+      pass: 'Admin@123',
+      badge: 'Student Services',
+      icon: Users,
+      accentColor: '#0284C7'
     }
   ];
 
-  const handleDemoClick = (userId: string, pass: string) => {
+  const handleDemoLogin = (userId: string, pass: string) => {
     setIdentifier(userId);
     setPassword(pass);
     setError('');
-    login(userId, pass);
+    setIsDemoModalOpen(false);
+    setIsLoading(true);
+
+    setTimeout(() => {
+      login(userId, pass);
+      setIsLoading(false);
+    }, 200);
   };
 
-  /* ── Feature pills for the left panel ── */
-  const featurePills = [
-    { icon: GraduationCap, label: 'Academic Management' },
-    { icon: UserCheck, label: 'Student Management' },
-    { icon: Building2, label: 'Faculty Management' },
-    { icon: ShieldCheck, label: 'Campus Operations' },
+  const universityInstitutes: InstituteShowcase[] = [
+    {
+      id: 'inst-1',
+      code: 'SSCIT',
+      name: 'Swarrnim School of Computing & IT',
+      category: 'Computer Applications & AI',
+      established: 2017
+    },
+    {
+      id: 'inst-sit',
+      code: 'SIT',
+      name: 'Swarrnim Institute of Technology',
+      category: 'Engineering & Technology',
+      established: 2017
+    },
+    {
+      id: 'inst-sid',
+      code: 'SID',
+      name: 'Swarrnim Institute of Design',
+      category: 'Design, Planning & Architecture',
+      established: 2018
+    },
+    {
+      id: 'inst-ssmcla',
+      code: 'SSMCLA',
+      name: 'Swarrnim School of Commerce & Liberal Arts',
+      category: 'Management & Commerce',
+      established: 2017
+    },
+    {
+      id: 'inst-sss',
+      code: 'SSS',
+      name: 'Swarrnim Science College',
+      category: 'Applied & Pure Sciences',
+      established: 2019
+    },
+    {
+      id: 'inst-ssp',
+      code: 'SSP',
+      name: 'Swarrnim Institute of Health Sciences',
+      category: 'Pharmacy & Healthcare',
+      established: 2018
+    },
+    {
+      id: 'inst-ahmcri',
+      code: 'AHMCRI',
+      name: 'Aarihant Homeopathic Medical College & Research Institute',
+      category: 'Medical & Homoeopathy',
+      established: 2017
+    },
+    {
+      id: 'inst-ain',
+      code: 'AIN',
+      name: 'Aarihant Institute of Nursing',
+      category: 'Nursing & Patient Care',
+      established: 2018
+    },
+    {
+      id: 'inst-aamcri',
+      code: 'AAMCRI',
+      name: 'Aarihant Ayurvedic Medical College & Research Institute',
+      category: 'Ayurveda & Integrative Medicine',
+      established: 2017
+    },
+    {
+      id: 'inst-vip',
+      code: 'VIP',
+      name: 'Venus Institute of Physiotherapy',
+      category: 'Physiotherapy & Rehabilitation',
+      established: 2019
+    },
+    {
+      id: 'inst-ssjmc',
+      code: 'SSJMC',
+      name: 'Swarrnim School of Journalism & Mass Communication',
+      category: 'Media & Mass Communication',
+      established: 2020
+    },
+    {
+      id: 'inst-ssa',
+      code: 'SSA',
+      name: 'Swarrnim School of Agriculture',
+      category: 'Agriculture & Agribusiness',
+      established: 2019
+    }
   ];
 
   return (
     <>
-      {/* Scoped styles for the redesigned login page */}
       <style>{`
-        /* ── Login Page Layout ── */
-        .login-page {
+        /* ═════════════════════════════════════════════════════════════════
+           SWARRNIM UNIVERSITY ERP — INSTITUTIONAL LOGIN PAGE
+           Official Colors: Navy #12366B | Orange #F58220 | Light BG #F8FAFD
+           Balanced Equal-Height Two-Column Grid: Left Institutes | Right Login
+           ═════════════════════════════════════════════════════════════════ */
+
+        :root {
+          --swarrnim-navy: #12366B;
+          --swarrnim-navy-dark: #0A2244;
+          --swarrnim-navy-deep: #07172E;
+          --swarrnim-orange: #F58220;
+          --swarrnim-orange-hover: #DC6F13;
+          --swarrnim-gold: #F5A623;
+          --swarrnim-bg-light: #F8FAFD;
+          --swarrnim-border: #E2E8F0;
+        }
+
+        .swarrnim-login-root {
           min-height: 100vh;
           width: 100%;
           display: flex;
           flex-direction: column;
-          background: #071325;
+          background-color: #F8FAFC;
+          background-image: 
+            radial-gradient(circle at 12% 18%, rgba(18, 54, 107, 0.035) 0%, transparent 45%),
+            radial-gradient(circle at 88% 82%, rgba(245, 130, 32, 0.03) 0%, transparent 40%),
+            linear-gradient(135deg, #FAFBFD 0%, #F1F5F9 50%, #E9EFF6 100%);
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          color: #0F172A;
+          overflow-x: hidden;
+          position: relative;
         }
 
-        /* ── Top Bar ── */
-        .login-topbar {
-          position: sticky;
-          top: 0;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          padding: 0 2.5rem;
-          height: 64px;
-          background: #FFFFFF;
-          border-bottom: 3px solid var(--brand-orange);
-          flex-shrink: 0;
-          z-index: 100;
-        }
-        .login-topbar-brand {
-          display: flex;
-          align-items: center;
-          gap: 0.85rem;
-        }
-        .login-topbar-brand img {
-          height: 42px;
-          object-fit: contain;
-        }
-        .login-topbar-brand-text h1 {
-          font-size: 0.9375rem;
-          font-weight: 800;
-          color: var(--brand-navy);
-          line-height: 1.2;
-          letter-spacing: -0.2px;
-        }
-        .login-topbar-brand-text span {
-          font-size: 0.6875rem;
-          font-weight: 700;
-          color: var(--brand-navy-light);
-          text-transform: uppercase;
-          letter-spacing: 1.5px;
-        }
-        .login-topbar-links {
-          display: flex;
-          align-items: center;
-          gap: 1.25rem;
-        }
-        .login-topbar-link {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.4rem;
-          font-size: 0.8125rem;
-          font-weight: 600;
-          color: var(--text-muted);
-          cursor: pointer;
-          transition: color 0.15s;
-          background: none;
-          border: none;
-          font-family: inherit;
-        }
-        .login-topbar-link:hover {
-          color: var(--brand-orange);
-        }
-        .login-topbar-link-accent {
-          padding: 0.4rem 1rem;
-          border-radius: var(--radius-sm);
-          border: 1.5px solid var(--brand-navy);
-          color: var(--brand-navy);
-          font-weight: 700;
-          transition: all 0.15s;
-        }
-        .login-topbar-link-accent:hover {
-          background: var(--brand-navy);
-          color: #FFF;
-        }
-
-        /* ── Main Body (split) ── */
-        .login-body {
-          flex: 1;
-          display: flex;
-          min-height: 0;
-        }
-
-        /* ── Left Hero Panel ── */
-        .login-left {
-          flex: 1.1;
-          position: sticky;
-          top: 64px;
-          height: calc(100vh - 64px - 48px);
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          padding: 2.5rem 3.5rem;
-          background: linear-gradient(135deg, #071325 0%, #0F2C59 55%, #183B70 100%);
-          color: #FFF;
-          overflow: hidden;
-          box-sizing: border-box;
-        }
-
-        /* Geometric grid overlay */
-        .login-left::before {
+        /* Subtle background grid */
+        .swarrnim-login-root::before {
           content: '';
           position: absolute;
           inset: 0;
-          background-image:
-            linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-          background-size: 60px 60px;
+          background-image: radial-gradient(#CBD5E1 0.75px, transparent 0.75px);
+          background-size: 24px 24px;
+          opacity: 0.4;
           pointer-events: none;
+          z-index: 0;
         }
 
-        /* Subtle radial glow top-right */
-        .login-left::after {
-          content: '';
-          position: absolute;
-          top: -5%;
-          right: -10%;
-          width: 500px;
-          height: 500px;
-          background: radial-gradient(circle, rgba(0,151,215,0.12) 0%, transparent 70%);
-          border-radius: 50%;
-          pointer-events: none;
-        }
-
-        .login-left-content {
+        /* ── Official Header with Single University Logo ── */
+        .swarrnim-topbar {
           position: relative;
-          z-index: 1;
-          max-width: 480px;
-          width: 100%;
-        }
-
-        .login-left-tag {
-          font-size: 0.75rem;
-          font-weight: 800;
-          text-transform: uppercase;
-          letter-spacing: 2.5px;
-          color: var(--brand-gold);
-          margin-bottom: 0.85rem;
-        }
-
-        .login-left-heading {
-          font-size: 2.35rem;
-          font-weight: 900;
-          line-height: 1.18;
-          letter-spacing: -0.4px;
-          color: #FFFFFF;
-          margin-bottom: 0.85rem;
-        }
-
-        .login-left-divider {
-          width: 48px;
-          height: 4px;
-          background: var(--brand-orange);
-          border-radius: 2px;
-          margin-bottom: 1.15rem;
-        }
-
-        .login-left-desc {
-          font-size: 0.95rem;
-          line-height: 1.6;
-          color: #94A3B8;
-          max-width: 440px;
-          margin-bottom: 1.75rem;
-        }
-
-        /* Feature pills grid */
-        .login-feature-pills {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 0.75rem;
-          max-width: 440px;
-          position: relative;
-          z-index: 1;
-        }
-        .login-feature-pill {
-          display: flex;
-          align-items: center;
-          gap: 0.65rem;
-          padding: 0.65rem 0.85rem;
-          background: rgba(255,255,255,0.06);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: var(--radius-sm);
-          font-size: 0.8125rem;
-          font-weight: 600;
-          color: #CBD5E1;
-          transition: all 0.2s;
-        }
-        .login-feature-pill:hover {
-          background: rgba(255,255,255,0.1);
-          border-color: rgba(245,166,35,0.3);
-          color: #FFF;
-        }
-        .login-feature-pill-icon {
-          width: 32px;
-          height: 32px;
-          border-radius: 8px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
-
-        /* Decorative dot accent between pills */
-        .login-pills-dot {
-          position: absolute;
-          top: -12px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background: var(--brand-gold);
-          box-shadow: 0 0 10px rgba(245,166,35,0.5);
-        }
-
-        /* ── Right Panel ── */
-        .login-right {
-          flex: 1.35;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: flex-start;
-          background: var(--bg-main);
-          padding: 2.5rem 2rem 5rem 2rem;
-          overflow-y: auto;
-        }
-
-        .login-right-inner {
-          width: 100%;
-          max-width: 900px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-
-        /* Login Card */
-        .login-card {
-          background: #FFFFFF;
-          border-radius: var(--radius-lg);
-          box-shadow: 0 8px 32px rgba(15,44,89,0.08), 0 2px 8px rgba(0,0,0,0.04);
-          padding: 2.25rem 2rem;
-          margin-bottom: 2rem;
-          width: 100%;
-          max-width: 480px;
-        }
-
-        .login-card-accent {
-          width: 48px;
-          height: 4px;
-          background: var(--brand-navy);
-          border-radius: 2px;
-          margin-bottom: 1.25rem;
-        }
-
-        .login-card h2 {
-          font-size: 1.625rem;
-          font-weight: 800;
-          color: var(--brand-navy);
-          margin-bottom: 0.35rem;
-        }
-
-        .login-card-subtitle {
-          font-size: 0.875rem;
-          color: var(--text-muted);
-          margin-bottom: 1.75rem;
-          line-height: 1.5;
-        }
-
-        /* Form fields */
-        .login-field-label {
-          display: block;
-          font-size: 0.75rem;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 0.6px;
-          color: var(--text-main);
-          margin-bottom: 0.45rem;
-        }
-
-        .login-field-wrapper {
-          position: relative;
-          margin-bottom: 1.15rem;
-        }
-
-        .login-field-input {
-          width: 100%;
-          font-family: inherit;
-          font-size: 0.875rem;
-          padding: 0.75rem 1rem 0.75rem 2.65rem;
-          border: 1.5px solid var(--border-color);
-          border-radius: 10px;
-          background: #FFFFFF;
-          color: var(--text-main);
-          outline: none;
-          transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .login-field-input:focus {
-          border-color: var(--brand-orange);
-          box-shadow: 0 0 0 3px rgba(243,112,35,0.12);
-        }
-        .login-field-input::placeholder {
-          color: #94A3B8;
-        }
-
-        .login-field-icon {
-          position: absolute;
-          left: 0.9rem;
-          top: 50%;
-          transform: translateY(-50%);
-          color: #94A3B8;
-          pointer-events: none;
-        }
-
-        .login-field-toggle {
-          position: absolute;
-          right: 0.85rem;
-          top: 50%;
-          transform: translateY(-50%);
-          background: none;
-          border: none;
-          cursor: pointer;
-          color: #94A3B8;
-          display: flex;
-          align-items: center;
-          padding: 0;
-          transition: color 0.15s;
-        }
-        .login-field-toggle:hover {
-          color: var(--text-main);
-        }
-
-        /* Remember me + forgot */
-        .login-extras {
+          z-index: 10;
+          height: 60px;
+          padding: 0 2.25rem;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          margin-bottom: 1.35rem;
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+          box-shadow: 0 1px 4px rgba(18, 54, 107, 0.03);
+          flex-shrink: 0;
         }
-        .login-remember {
+
+        .swarrnim-topbar-brand {
+          display: flex;
+          align-items: center;
+          gap: 0.95rem;
+        }
+
+        .swarrnim-topbar-logo {
+          height: 42px;
+          width: auto;
+          object-fit: contain;
+        }
+
+        .swarrnim-topbar-brand-texts {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .swarrnim-topbar-uni-name {
+          font-size: 0.9375rem;
+          font-weight: 800;
+          color: var(--swarrnim-navy);
+          letter-spacing: -0.2px;
+          line-height: 1.25;
+        }
+
+        .swarrnim-topbar-uni-tag {
+          font-size: 0.6875rem;
+          font-weight: 700;
+          color: var(--swarrnim-orange);
+          letter-spacing: 1.1px;
+          text-transform: uppercase;
+        }
+
+        .swarrnim-topbar-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+
+        .swarrnim-topbar-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          padding: 0.45rem 0.95rem;
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          border-radius: 8px;
+          font-size: 0.8125rem;
+          font-weight: 600;
+          color: #475569;
+          cursor: pointer;
+          transition: all 0.18s ease;
+        }
+
+        .swarrnim-topbar-btn:hover {
+          color: var(--swarrnim-navy);
+          border-color: #CBD5E1;
+          background: #F8FAFC;
+        }
+
+        .swarrnim-topbar-demo-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.4rem;
+          padding: 0.45rem 1.05rem;
+          background: rgba(245, 130, 32, 0.08);
+          border: 1px solid rgba(245, 130, 32, 0.3);
+          border-radius: 8px;
+          font-size: 0.8125rem;
+          font-weight: 700;
+          color: var(--swarrnim-orange);
+          cursor: pointer;
+          transition: all 0.18s ease;
+        }
+
+        .swarrnim-topbar-demo-btn:hover {
+          background: var(--swarrnim-orange);
+          color: #FFFFFF;
+          border-color: var(--swarrnim-orange);
+          box-shadow: 0 2px 8px rgba(245, 130, 32, 0.25);
+        }
+
+        /* ── Main Layout Container ── */
+        .swarrnim-main-layout {
+          position: relative;
+          z-index: 1;
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          width: 100%;
+          max-width: 1360px;
+          margin: 0 auto;
+          padding: 1.15rem 2.25rem;
+          gap: 0.95rem;
+          box-sizing: border-box;
+        }
+
+        /* ── Header & Hero Micro-Animations ── */
+        .swarrnim-header-left {
+          animation: heroLogoFade 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        /* ── Hero Headline (Across Top) ── */
+        .swarrnim-hero-section {
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+        }
+
+        .swarrnim-headline {
+          font-size: 2.15rem;
+          font-weight: 900;
+          line-height: 1.16;
+          color: var(--swarrnim-navy);
+          letter-spacing: -0.5px;
+          margin: 0 0 0.25rem 0;
+          animation: heroHeadlineFade 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .swarrnim-headline-orange {
+          color: var(--swarrnim-orange);
+        }
+
+        .swarrnim-subheadline {
+          font-size: 0.9375rem;
+          line-height: 1.45;
+          color: #475569;
+          margin: 0;
+          max-width: 850px;
+          animation: heroSubheadlineFade 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+        }
+
+        /* ── Two-Column Equal Height Row ── */
+        .swarrnim-panels-row {
+          display: flex;
+          align-items: stretch;
+          justify-content: space-between;
+          gap: 1.5rem;
+          width: 100%;
+          animation: heroPanelsFade 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
+        }
+
+        @keyframes heroLogoFade {
+          from { opacity: 0; transform: scale(0.97); }
+          to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes heroHeadlineFade {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes heroSubheadlineFade {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes heroPanelsFade {
+          from { opacity: 0; transform: translateY(6px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Left Column: Our Institutes Panel (~58%) ── */
+        .swarrnim-institutes-panel {
+          flex: 1 1 58%;
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          border-radius: 18px;
+          padding: 1.35rem 1.5rem 1.15rem 1.5rem;
+          box-shadow: 0 14px 40px -4px rgba(18, 54, 107, 0.06), 0 4px 14px -2px rgba(18, 54, 107, 0.02);
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          box-sizing: border-box;
+          position: relative;
+        }
+
+        /* Top accent line for Left panel to match right card */
+        .swarrnim-institutes-panel::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 18px;
+          right: 18px;
+          height: 3.5px;
+          background: linear-gradient(90deg, var(--swarrnim-orange) 0%, var(--swarrnim-navy) 100%);
+          border-radius: 3px 3px 0 0;
+        }
+
+        .swarrnim-institutes-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 0.4rem;
+          margin-bottom: 0.65rem;
+          padding-bottom: 0.45rem;
+          border-bottom: 1.5px solid rgba(226, 232, 240, 0.9);
+        }
+
+        .swarrnim-institutes-title-row {
           display: flex;
           align-items: center;
           gap: 0.45rem;
-          cursor: pointer;
         }
-        .login-remember input[type="checkbox"] {
-          width: 16px;
-          height: 16px;
-          accent-color: var(--brand-navy);
-          cursor: pointer;
+
+        .swarrnim-institutes-title {
+          font-size: 0.9375rem;
+          font-weight: 800;
+          color: var(--swarrnim-navy);
+          letter-spacing: 0.8px;
+          text-transform: uppercase;
+          margin: 0;
         }
-        .login-remember span {
+
+        .swarrnim-institutes-count {
+          font-size: 0.6875rem;
+          font-weight: 700;
+          color: var(--swarrnim-orange);
+          background: rgba(245, 130, 32, 0.1);
+          border: 1px solid rgba(245, 130, 32, 0.25);
+          padding: 0.12rem 0.45rem;
+          border-radius: 6px;
+        }
+
+        .swarrnim-institutes-subtitle {
+          font-size: 0.75rem;
+          font-weight: 500;
+          color: #64748B;
+          margin: 0;
+        }
+
+        /* Responsive Institutes Grid (3 cols on desktop) */
+        .swarrnim-institutes-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 0.55rem;
+          width: 100%;
+          flex: 1;
+        }
+
+        .swarrnim-institute-card {
+          background: #F8FAFC;
+          border: 1px solid #E2E8F0;
+          border-radius: 10px;
+          padding: 0.5rem 0.65rem;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          gap: 0.2rem;
+          box-shadow: 0 1px 2px rgba(18, 54, 107, 0.02);
+          transition: all 0.18s ease;
+          position: relative;
+          box-sizing: border-box;
+        }
+
+        .swarrnim-institute-card:hover {
+          border-color: rgba(245, 130, 32, 0.6);
+          box-shadow: 0 4px 12px rgba(18, 54, 107, 0.08);
+          transform: translateY(-1px);
+          background: #FFFFFF;
+        }
+
+        .swarrnim-institute-card-top {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.4rem;
+        }
+
+        .swarrnim-institute-logo-badge {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          height: 26px;
+          width: 26px;
+          border-radius: 6px;
+          background: rgba(18, 54, 107, 0.05);
+          flex-shrink: 0;
+          padding: 1px;
+        }
+
+        .swarrnim-institute-logo-badge img {
+          max-height: 22px;
+          max-width: 22px;
+          object-fit: contain;
+        }
+
+        .swarrnim-institute-code {
+          font-family: monospace;
+          font-size: 0.65rem;
+          font-weight: 800;
+          color: var(--swarrnim-navy);
+          background: #E2E8F0;
+          padding: 0.1rem 0.35rem;
+          border-radius: 4px;
+        }
+
+        .swarrnim-institute-card-body {
+          flex: 1;
+        }
+
+        .swarrnim-institute-name {
+          font-size: 0.775rem;
+          font-weight: 700;
+          color: #0F172A;
+          line-height: 1.22;
+          margin-bottom: 0.15rem;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+
+        .swarrnim-institute-category {
+          font-size: 0.66rem;
+          color: #64748B;
+          line-height: 1.2;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        /* ── Right Column: Login Card Panel (~42%) ── */
+        .swarrnim-login-panel {
+          flex: 0 0 42%;
+          max-width: 470px;
+          min-width: 380px;
+          display: flex;
+          flex-direction: column;
+          box-sizing: border-box;
+        }
+
+        .swarrnim-card {
+          width: 100%;
+          height: 100%;
+          background: #FFFFFF;
+          border: 1px solid #E2E8F0;
+          border-radius: 18px;
+          box-shadow: 0 14px 40px -4px rgba(18, 54, 107, 0.08), 0 4px 14px -2px rgba(18, 54, 107, 0.02);
+          padding: 1.35rem 1.85rem 1.15rem 1.85rem;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          position: relative;
+        }
+
+        /* Card top brand stripe */
+        .swarrnim-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 18px;
+          right: 18px;
+          height: 3.5px;
+          background: linear-gradient(90deg, var(--swarrnim-navy) 0%, var(--swarrnim-orange) 100%);
+          border-radius: 3px 3px 0 0;
+        }
+
+        .swarrnim-card-header {
+          text-align: center;
+          margin-bottom: 0.85rem;
+        }
+
+        .swarrnim-card-title {
+          font-size: 1.55rem;
+          font-weight: 800;
+          color: var(--swarrnim-navy);
+          letter-spacing: -0.3px;
+          margin: 0 0 0.25rem 0;
+        }
+
+        .swarrnim-card-subtitle {
+          font-size: 0.84375rem;
+          color: #64748B;
+          line-height: 1.35;
+          margin: 0;
+        }
+
+        /* Error banner */
+        .swarrnim-error-banner {
+          display: flex;
+          align-items: flex-start;
+          gap: 0.6rem;
+          background: #FEF2F2;
+          border: 1px solid #FECACA;
+          border-radius: 10px;
+          padding: 0.65rem 0.85rem;
+          color: #991B1B;
           font-size: 0.8125rem;
           font-weight: 500;
-          color: var(--text-main);
+          line-height: 1.35;
+          margin-bottom: 0.85rem;
         }
-        .login-forgot-btn {
+
+        .swarrnim-error-banner svg {
+          flex-shrink: 0;
+          color: #DC2626;
+          margin-top: 1px;
+        }
+
+        /* Form groups & inputs */
+        .swarrnim-form-group {
+          margin-bottom: 0.85rem;
+          text-align: left;
+        }
+
+        .swarrnim-label {
+          display: block;
+          font-size: 0.785rem;
+          font-weight: 700;
+          color: #334155;
+          margin-bottom: 0.35rem;
+          letter-spacing: 0.2px;
+        }
+
+        .swarrnim-input-container {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+
+        .swarrnim-input-icon {
+          position: absolute;
+          left: 14px;
+          color: #94A3B8;
+          pointer-events: none;
+          transition: color 0.15s ease;
+        }
+
+        .swarrnim-input {
+          width: 100%;
+          height: 44px;
+          background: #FFFFFF;
+          border: 1.5px solid #CBD5E1;
+          border-radius: 10px;
+          padding: 0 1rem 0 2.75rem;
+          font-family: inherit;
+          font-size: 0.9rem;
+          color: #0F172A;
+          outline: none;
+          transition: all 0.18s ease;
+          box-sizing: border-box;
+        }
+
+        .swarrnim-input:hover {
+          border-color: #94A3B8;
+        }
+
+        .swarrnim-input:focus {
+          border-color: var(--swarrnim-navy);
+          box-shadow: 0 0 0 3.5px rgba(18, 54, 107, 0.12);
+        }
+
+        .swarrnim-input:focus + .swarrnim-input-icon,
+        .swarrnim-input-container:focus-within .swarrnim-input-icon {
+          color: var(--swarrnim-navy);
+        }
+
+        .swarrnim-input::placeholder {
+          color: #94A3B8;
+        }
+
+        .swarrnim-password-toggle {
+          position: absolute;
+          right: 6px;
+          width: 32px;
+          height: 32px;
+          border-radius: 6px;
+          background: none;
+          border: none;
+          color: #94A3B8;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .swarrnim-password-toggle:hover {
+          color: #334155;
+          background: #F1F5F9;
+        }
+
+        /* Checkbox + Forgot row */
+        .swarrnim-form-options {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 0.95rem;
+        }
+
+        .swarrnim-checkbox-label {
+          display: flex;
+          align-items: center;
+          gap: 0.45rem;
+          font-size: 0.8125rem;
+          font-weight: 500;
+          color: #475569;
+          cursor: pointer;
+          user-select: none;
+        }
+
+        .swarrnim-checkbox-label input[type="checkbox"] {
+          width: 16px;
+          height: 16px;
+          border-radius: 4px;
+          accent-color: var(--swarrnim-navy);
+          cursor: pointer;
+        }
+
+        .swarrnim-forgot-btn {
           background: none;
           border: none;
           font-family: inherit;
           font-size: 0.8125rem;
-          font-weight: 600;
-          color: var(--brand-orange);
+          font-weight: 700;
+          color: var(--swarrnim-orange);
           cursor: pointer;
-          transition: color 0.15s;
+          padding: 0;
+          transition: color 0.15s ease;
         }
-        .login-forgot-btn:hover {
-          color: var(--brand-orange-hover);
+
+        .swarrnim-forgot-btn:hover {
+          color: var(--swarrnim-orange-hover);
           text-decoration: underline;
         }
 
-        /* Sign In button */
-        .login-submit-btn {
+        /* Sign In Button */
+        .swarrnim-submit-btn {
           width: 100%;
+          height: 46px;
+          background: var(--swarrnim-navy);
+          color: #FFFFFF;
+          border: none;
+          border-radius: 10px;
+          font-family: inherit;
+          font-size: 0.95rem;
+          font-weight: 700;
+          letter-spacing: 0.3px;
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 0.5rem;
-          padding: 0.85rem 1rem;
-          font-family: inherit;
-          font-size: 1rem;
-          font-weight: 700;
-          color: #FFFFFF;
-          background: linear-gradient(135deg, var(--brand-navy) 0%, var(--brand-navy-medium) 100%);
-          border: none;
-          border-radius: 10px;
           cursor: pointer;
-          transition: all 0.2s;
-          box-shadow: 0 4px 14px rgba(15,44,89,0.25);
+          transition: all 0.18s ease;
+          box-shadow: 0 4px 12px rgba(18, 54, 107, 0.2);
         }
-        .login-submit-btn:hover {
-          box-shadow: 0 6px 20px rgba(15,44,89,0.35);
+
+        .swarrnim-submit-btn:hover:not(:disabled) {
+          background: var(--swarrnim-navy-dark);
+          box-shadow: 0 6px 16px rgba(18, 54, 107, 0.3);
           transform: translateY(-1px);
         }
-        .login-submit-btn:active {
+
+        .swarrnim-submit-btn:active:not(:disabled) {
           transform: translateY(0);
         }
 
-        /* Secure badge */
-        .login-secure-badge {
+        .swarrnim-submit-btn:disabled {
+          opacity: 0.75;
+          cursor: not-allowed;
+        }
+
+        /* Spinner */
+        .swarrnim-spinner {
+          width: 18px;
+          height: 18px;
+          border: 2px solid rgba(255, 255, 255, 0.3);
+          border-top-color: #FFFFFF;
+          border-radius: 50%;
+          animation: swarrnim-spin 0.6s linear infinite;
+        }
+
+        @keyframes swarrnim-spin {
+          to { transform: rotate(360deg); }
+        }
+
+        /* Security Indicator */
+        .swarrnim-security-indicator {
+          margin-top: 0.85rem;
+          padding-top: 0.75rem;
+          border-top: 1px solid #F1F5F9;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.45rem;
+          color: #64748B;
+        }
+
+        .swarrnim-security-icon {
+          color: var(--swarrnim-navy);
+        }
+
+        .swarrnim-security-text {
           display: flex;
           flex-direction: column;
-          align-items: center;
-          gap: 0.15rem;
-          padding-top: 1.25rem;
-          text-align: center;
+          text-align: left;
         }
-        .login-secure-badge-line1 {
-          display: flex;
-          align-items: center;
-          gap: 0.35rem;
-          font-size: 0.8125rem;
+
+        .swarrnim-security-title {
+          font-size: 0.785rem;
           font-weight: 700;
-          color: var(--text-main);
-        }
-        .login-secure-badge-line2 {
-          font-size: 0.6875rem;
-          font-weight: 600;
-          text-transform: uppercase;
-          letter-spacing: 1.5px;
-          color: var(--text-muted);
+          color: #334155;
+          line-height: 1.2;
         }
 
-        /* Error alert */
-        .login-error-alert {
-          display: flex;
-          align-items: center;
-          gap: 0.65rem;
-          padding: 0.75rem 1rem;
-          background: #FEF2F2;
-          border: 1px solid #FCA5A5;
-          border-radius: 10px;
-          color: #991B1B;
-          font-size: 0.84375rem;
+        .swarrnim-security-sub {
+          font-size: 0.66rem;
           font-weight: 600;
-          margin-bottom: 1.25rem;
-        }
-
-        /* ── Demo Credentials Section ── */
-        .login-demo-section {
-          width: 100%;
-          max-width: 900px;
-          margin-top: 0.5rem;
-        }
-        .login-demo-header {
-          display: flex;
-          align-items: center;
-          gap: 0.45rem;
-          font-size: 0.75rem;
-          font-weight: 800;
+          color: #94A3B8;
           text-transform: uppercase;
           letter-spacing: 0.8px;
+          line-height: 1.2;
+        }
+
+        /* Demo access compact button inside card */
+        .swarrnim-demo-trigger-box {
+          margin-top: 0.65rem;
+          text-align: center;
+        }
+
+        .swarrnim-demo-trigger-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          padding: 0.4rem 0.85rem;
+          background: #F8FAFC;
+          border: 1px dashed #CBD5E1;
+          border-radius: 8px;
+          font-size: 0.775rem;
+          font-weight: 600;
+          color: #475569;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .swarrnim-demo-trigger-btn:hover {
+          background: #FFF7ED;
+          border-color: #FDBA74;
+          color: var(--swarrnim-orange);
+        }
+
+        /* ── Clean Institutional Footer ── */
+        .swarrnim-footer {
+          position: relative;
+          z-index: 10;
+          height: 40px;
+          padding: 0 2.25rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: rgba(255, 255, 255, 0.9);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border-top: 1px solid #E2E8F0;
+          font-size: 0.775rem;
           color: #64748B;
-          margin-bottom: 0.75rem;
+          flex-shrink: 0;
         }
-        .login-demo-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 12px;
+
+        .swarrnim-footer-left {
+          font-weight: 500;
+        }
+
+        .swarrnim-footer-right {
+          display: flex;
+          align-items: center;
+          gap: 1.25rem;
+        }
+
+        .swarrnim-footer-link {
+          color: #64748B;
+          text-decoration: none;
+          font-weight: 500;
+          cursor: pointer;
+          transition: color 0.15s ease;
+        }
+
+        .swarrnim-footer-link:hover {
+          color: var(--swarrnim-navy);
+          text-decoration: underline;
+        }
+
+        /* ── Demo Credentials Modal / Drawer ── */
+        .swarrnim-modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.6);
+          backdrop-filter: blur(4px);
+          -webkit-backdrop-filter: blur(4px);
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1.5rem;
+          animation: swarrnim-fade-in 0.18s ease-out;
+        }
+
+        @keyframes swarrnim-fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        .swarrnim-modal-dialog {
+          background: #FFFFFF;
+          border-radius: 16px;
+          box-shadow: 0 20px 48px rgba(15, 44, 89, 0.2);
           width: 100%;
+          max-width: 720px;
+          max-height: 88vh;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          animation: swarrnim-scale-up 0.18s ease-out;
         }
-        .login-demo-card {
+
+        @keyframes swarrnim-scale-up {
+          from { transform: scale(0.96); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+
+        .swarrnim-modal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 1.25rem 1.5rem;
+          border-bottom: 1px solid #E2E8F0;
+          background: linear-gradient(135deg, var(--swarrnim-navy) 0%, var(--swarrnim-navy-dark) 100%);
+          color: #FFFFFF;
+        }
+
+        .swarrnim-modal-header-title {
+          font-size: 1.05rem;
+          font-weight: 800;
+          color: #FFFFFF;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .swarrnim-modal-close-btn {
+          width: 32px;
+          height: 32px;
+          border-radius: 8px;
+          border: none;
+          background: rgba(255, 255, 255, 0.1);
+          color: #FFFFFF;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        }
+
+        .swarrnim-modal-close-btn:hover {
+          background: rgba(255, 255, 255, 0.25);
+        }
+
+        .swarrnim-modal-body {
+          padding: 1.25rem 1.5rem;
+          overflow-y: auto;
+        }
+
+        .swarrnim-demo-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 0.85rem;
+        }
+
+        .swarrnim-demo-role-card {
           background: #FFFFFF;
           border: 1px solid #E2E8F0;
           border-radius: 12px;
-          padding: 12px 14px;
-          cursor: pointer;
-          transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+          padding: 0.95rem;
           display: flex;
-          flex-direction: column;
+          align-items: center;
           justify-content: space-between;
-          height: 100%;
-          min-height: 135px;
-          box-sizing: border-box;
+          cursor: pointer;
+          transition: all 0.18s ease;
           text-align: left;
         }
-        .login-demo-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 14px rgba(15, 44, 89, 0.08);
-          border-color: #CBD5E1;
+
+        .swarrnim-demo-role-card:hover {
+          border-color: var(--swarrnim-navy);
+          box-shadow: 0 4px 14px rgba(18, 54, 107, 0.08);
+          transform: translateY(-1px);
+          background: #F8FAFD;
         }
-        .login-demo-card-top {
+
+        .swarrnim-demo-card-left {
           display: flex;
-          flex-direction: column;
+          align-items: center;
+          gap: 0.75rem;
         }
-        .login-demo-card-icon {
-          width: 30px;
-          height: 30px;
-          border-radius: 8px;
+
+        .swarrnim-demo-card-icon {
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
           display: flex;
           align-items: center;
           justify-content: center;
           flex-shrink: 0;
-          margin-bottom: 0.5rem;
         }
-        .login-demo-card-info-title {
+
+        .swarrnim-demo-card-info h4 {
+          font-size: 0.875rem;
           font-weight: 700;
-          font-size: 0.8125rem;
           color: #0F172A;
-          line-height: 1.25;
-          margin-bottom: 0.4rem;
+          margin: 0 0 2px 0;
         }
-        .login-demo-card-creds {
-          display: flex;
-          flex-direction: column;
-          gap: 0.15rem;
-          font-size: 0.72rem;
+
+        .swarrnim-demo-card-info span {
+          font-size: 0.725rem;
           color: #64748B;
+          display: block;
         }
-        .login-demo-card-cred-row {
-          display: flex;
-          align-items: center;
-          gap: 0.3rem;
-          line-height: 1.35;
-        }
-        .login-demo-card-cred-label {
-          color: #64748B;
-          font-weight: 500;
-          font-size: 0.72rem;
-        }
-        .login-demo-card-cred-val {
-          font-family: inherit;
-          font-size: 0.72rem;
-          font-weight: 600;
-        }
-        .login-demo-card-footer {
-          margin-top: 0.6rem;
-          display: flex;
-          justify-content: flex-end;
-          align-items: center;
-        }
-        .login-demo-card-btn {
+
+        .swarrnim-demo-quick-badge {
           display: inline-flex;
           align-items: center;
           gap: 0.25rem;
-          padding: 0.25rem 0.6rem;
-          font-family: inherit;
           font-size: 0.72rem;
           font-weight: 700;
-          color: #EA580C;
-          background: #FFF7ED;
-          border: 1px solid #FFEDD5;
+          color: var(--swarrnim-navy);
+          background: rgba(18, 54, 107, 0.06);
+          padding: 0.3rem 0.55rem;
           border-radius: 6px;
-          cursor: pointer;
+          flex-shrink: 0;
           transition: all 0.15s ease;
         }
-        .login-demo-card:hover .login-demo-card-btn {
-          background: #FFEDD5;
-          border-color: #FED7AA;
-          color: #C2410C;
-          transform: translateX(2px);
+
+        .swarrnim-demo-role-card:hover .swarrnim-demo-quick-badge {
+          background: var(--swarrnim-navy);
+          color: #FFFFFF;
         }
 
-        /* ── Footer ── */
-        .login-footer {
-          position: fixed;
-          bottom: 0;
-          left: 0;
-          right: 0;
+        /* ── Support Info Modal ── */
+        .swarrnim-support-box {
+          padding: 1rem;
+          background: #F8FAFC;
+          border-radius: 10px;
+          border: 1px solid #E2E8F0;
+          margin-bottom: 1rem;
+        }
+
+        .swarrnim-support-row {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 0.85rem 2.5rem;
-          background: #FFFFFF;
-          border-top: 1px solid var(--border-color);
-          flex-shrink: 0;
-          z-index: 100;
-        }
-        .login-footer-copy {
-          font-size: 0.75rem;
-          color: var(--text-muted);
-          font-weight: 500;
-        }
-        .login-footer-tagline {
-          font-size: 0.75rem;
-          font-weight: 700;
-          text-transform: uppercase;
-          letter-spacing: 2px;
-          color: var(--brand-orange);
-        }
-        .login-footer-links {
-          display: flex;
-          gap: 1.25rem;
-        }
-        .login-footer-links span {
-          font-size: 0.75rem;
-          font-weight: 500;
-          color: var(--text-muted);
-          cursor: pointer;
-          transition: color 0.15s;
-        }
-        .login-footer-links span:hover {
-          color: var(--brand-navy);
+          padding: 0.5rem 0;
+          font-size: 0.8125rem;
+          border-bottom: 1px dashed #E2E8F0;
         }
 
-        /* ── Responsive ── */
-        @media (max-width: 1280px) {
-          .login-demo-grid {
-            grid-template-columns: repeat(3, 1fr);
-          }
+        .swarrnim-support-row:last-child {
+          border-bottom: none;
         }
 
-        @media (max-width: 1100px) {
-          .login-left {
-            padding: 2rem 2rem;
+        /* ── Responsive Rules ── */
+        @media (max-width: 1200px) {
+          .swarrnim-main-layout {
+            padding: 1rem 1.5rem;
           }
-          .login-left-heading {
-            font-size: 2rem;
+          .swarrnim-panels-row {
+            gap: 1.25rem;
           }
-          .login-right {
-            padding: 2rem 1.5rem 5rem 1.5rem;
+          .swarrnim-institutes-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+          .swarrnim-headline {
+            font-size: 1.95rem;
+          }
+          .swarrnim-login-panel {
+            flex: 0 0 400px;
           }
         }
 
         @media (max-width: 960px) {
-          .login-body {
-            flex-direction: column;
+          .swarrnim-panels-row {
+            flex-direction: column-reverse;
+            gap: 1.75rem;
           }
-          .login-left {
-            position: static;
-            height: auto;
-            min-height: auto;
-            flex: none;
-            padding: 2.25rem 1.75rem;
-            align-items: flex-start;
+          .swarrnim-institutes-panel {
+            flex: 1 1 auto;
+            width: 100%;
           }
-          .login-left-content {
-            max-width: 100%;
-          }
-          .login-left-heading {
-            font-size: 1.85rem;
-          }
-          .login-right {
-            flex: none;
-            padding: 2rem 1.5rem 6.5rem 1.5rem;
-          }
-          .login-topbar {
-            padding: 0 1.5rem;
-          }
-          .login-footer {
-            flex-direction: column;
-            gap: 0.4rem;
-            padding: 0.65rem 1.5rem;
-            text-align: center;
-          }
-          .login-demo-grid {
+          .swarrnim-institutes-grid {
             grid-template-columns: repeat(2, 1fr);
+          }
+          .swarrnim-login-panel {
+            flex: 1 1 auto;
+            max-width: 100%;
+            width: 100%;
+          }
+          .swarrnim-card {
+            padding: 1.75rem 1.5rem;
           }
         }
 
         @media (max-width: 600px) {
-          .login-topbar-links {
+          .swarrnim-topbar {
+            padding: 0 1rem;
+          }
+          .swarrnim-topbar-brand-texts {
             display: none;
           }
-          .login-left {
-            padding: 1.75rem 1.25rem;
+          .swarrnim-headline {
+            font-size: 1.75rem;
           }
-          .login-left-heading {
-            font-size: 1.5rem;
-          }
-          .login-feature-pills {
+          .swarrnim-institutes-grid {
             grid-template-columns: 1fr;
           }
-          .login-right {
-            padding: 1.5rem 1rem 6.5rem 1rem;
+          .swarrnim-card {
+            padding: 1.5rem 1.15rem;
           }
-          .login-card {
-            padding: 1.75rem 1.25rem;
-          }
-          .login-footer-links {
-            gap: 0.75rem;
-          }
-          .login-demo-grid {
+          .swarrnim-demo-grid {
             grid-template-columns: 1fr;
+          }
+          .swarrnim-footer {
+            flex-direction: column;
+            height: auto;
+            padding: 0.85rem 1rem;
+            gap: 0.5rem;
+            text-align: center;
           }
         }
       `}</style>
 
-      <div className="login-page">
-        {/* ═══ Top Navigation Bar ═══ */}
-        <header className="login-topbar">
-          <div className="login-topbar-brand">
-            <HeaderLogo lightMode />
-            <div className="login-topbar-brand-text">
-              <h1>Swarrnim Startup &amp; Innovation University</h1>
-              <span>University Management System</span>
+      <div className="swarrnim-login-root">
+        {/* ═══ 1. Official Header with Single University Logo ═══ */}
+        <header className="swarrnim-topbar">
+          <div className="swarrnim-topbar-brand">
+            <img
+              src={logoImg}
+              alt="Swarrnim Startup & Innovation University Logo"
+              className="swarrnim-topbar-logo"
+            />
+            <div className="swarrnim-topbar-brand-texts">
+              <span className="swarrnim-topbar-uni-name">SWARRNIM STARTUP &amp; INNOVATION UNIVERSITY</span>
+              <span className="swarrnim-topbar-uni-tag">UNIVERSITY MANAGEMENT SYSTEM</span>
             </div>
           </div>
-          <div className="login-topbar-links">
-            <button className="login-topbar-link" type="button">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              Need Help?
+
+          <div className="swarrnim-topbar-actions">
+            <button
+              type="button"
+              className="swarrnim-topbar-demo-btn"
+              onClick={() => setIsDemoModalOpen(true)}
+              title="Quickly test with demo university roles"
+            >
+              <KeyRound size={14} />
+              <span>Demo Access</span>
             </button>
-            <button className="login-topbar-link login-topbar-link-accent" type="button">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"/></svg>
-              Contact IT Support
+            <button
+              type="button"
+              className="swarrnim-topbar-btn"
+              onClick={() => setIsSupportModalOpen(true)}
+            >
+              <HelpCircle size={14} />
+              <span>IT Support</span>
             </button>
           </div>
         </header>
 
-        {/* ═══ Main Split Body ═══ */}
-        <div className="login-body">
-          {/* ── Left Branding Panel ── */}
-          <div className="login-left login-hero-panel">
-            <div className="login-left-content">
-              <div className="login-left-tag">University Digital Gateway</div>
-              <h2 className="login-left-heading">
-                Empowering Education<br />Through Technology
-              </h2>
-              <div className="login-left-divider" />
-              <p className="login-left-desc">
-                A unified digital platform for managing academic,
-                administrative and campus operations.
+        {/* ═══ 2. Main Content ═══ */}
+        <main className="swarrnim-main-layout">
+          {/* ── Top Hero Headline Section ── */}
+          <div className="swarrnim-hero-section">
+            <h1 className="swarrnim-headline">
+              One Platform. <span className="swarrnim-headline-orange">Smarter University Management.</span>
+            </h1>
+            <p className="swarrnim-subheadline">
+              A unified digital platform for academic, administrative and campus operations.
+            </p>
+          </div>
+
+          {/* ── Balanced Two-Column Panels Row (Equal Height & Top-Aligned) ── */}
+          <div className="swarrnim-panels-row">
+            {/* ── Left Column: Our Institutes Panel (~58%) ── */}
+            <section className="swarrnim-institutes-panel" aria-label="Our Institutes Showcase">
+              <div className="swarrnim-institutes-header">
+                <div className="swarrnim-institutes-title-row">
+                  <Building2 size={18} color="var(--swarrnim-orange)" />
+                  <h2 className="swarrnim-institutes-title">OUR INSTITUTES</h2>
+                  <span className="swarrnim-institutes-count">12 INSTITUTES</span>
+                </div>
+                <p className="swarrnim-institutes-subtitle">
+                  One University. Multiple Institutes. One Digital Ecosystem.
+                </p>
+              </div>
+
+              <div className="swarrnim-institutes-grid">
+                {universityInstitutes.map((inst) => (
+                  <div className="swarrnim-institute-card" key={inst.id}>
+                    <div className="swarrnim-institute-card-top">
+                      <div className="swarrnim-institute-logo-badge">
+                        <img
+                          src={logoImg}
+                          alt={`${inst.name} Emblem`}
+                        />
+                      </div>
+                      <span className="swarrnim-institute-code">{inst.code}</span>
+                    </div>
+                    <div className="swarrnim-institute-card-body">
+                      <div className="swarrnim-institute-name" title={inst.name}>
+                        {inst.name}
+                      </div>
+                      <div className="swarrnim-institute-category">
+                        {inst.category}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* ── Right Column: Login Card Panel (~42%) ── */}
+            <section className="swarrnim-login-panel" aria-label="Sign In Authentication">
+              <div className="swarrnim-card">
+                <div>
+                  <div className="swarrnim-card-header">
+                    <h2 className="swarrnim-card-title">Welcome Back</h2>
+                    <p className="swarrnim-card-subtitle">
+                      Sign in to access the Swarrnim University ERP
+                    </p>
+                  </div>
+
+                  {/* Error Notification */}
+                  {error && (
+                    <div className="swarrnim-error-banner" role="alert">
+                      <AlertCircle size={16} />
+                      <span>{error}</span>
+                    </div>
+                  )}
+
+                  {/* Login Form */}
+                  <form onSubmit={handleSubmit} autoComplete="on">
+                    {/* Username / Email */}
+                    <div className="swarrnim-form-group">
+                      <label className="swarrnim-label" htmlFor="swarrnim-identifier">
+                        University Email / Username
+                      </label>
+                      <div className="swarrnim-input-container">
+                        <Mail size={17} className="swarrnim-input-icon" />
+                        <input
+                          id="swarrnim-identifier"
+                          type="text"
+                          className="swarrnim-input"
+                          placeholder="Enter university email or username"
+                          value={identifier}
+                          onChange={(e) => {
+                            setIdentifier(e.target.value);
+                            if (error) setError('');
+                          }}
+                          required
+                          autoComplete="username"
+                          disabled={isLoading}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Password */}
+                    <div className="swarrnim-form-group">
+                      <label className="swarrnim-label" htmlFor="swarrnim-password">
+                        Password
+                      </label>
+                      <div className="swarrnim-input-container">
+                        <Lock size={17} className="swarrnim-input-icon" />
+                        <input
+                          id="swarrnim-password"
+                          type={showPassword ? 'text' : 'password'}
+                          className="swarrnim-input"
+                          placeholder="••••••••••••"
+                          value={password}
+                          onChange={(e) => {
+                            setPassword(e.target.value);
+                            if (error) setError('');
+                          }}
+                          required
+                          autoComplete="current-password"
+                          disabled={isLoading}
+                        />
+                        <button
+                          type="button"
+                          className="swarrnim-password-toggle"
+                          onClick={() => setShowPassword(!showPassword)}
+                          title={showPassword ? 'Hide password' : 'Show password'}
+                          tabIndex={-1}
+                        >
+                          {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Options Row */}
+                    <div className="swarrnim-form-options">
+                      <label className="swarrnim-checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={rememberMe}
+                          onChange={(e) => setRememberMe(e.target.checked)}
+                          disabled={isLoading}
+                        />
+                        <span>Remember Me</span>
+                      </label>
+
+                      <button
+                        type="button"
+                        className="swarrnim-forgot-btn"
+                        onClick={() => setIsForgotModalOpen(true)}
+                      >
+                        Forgot Password?
+                      </button>
+                    </div>
+
+                    {/* Submit Action */}
+                    <button
+                      type="submit"
+                      className="swarrnim-submit-btn"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <div className="swarrnim-spinner" />
+                          <span>Authenticating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>SIGN IN</span>
+                          <ArrowRight size={16} />
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </div>
+
+                <div>
+                  {/* Security Badge */}
+                  <div className="swarrnim-security-indicator">
+                    <ShieldCheck size={17} className="swarrnim-security-icon" />
+                    <div className="swarrnim-security-text">
+                      <span className="swarrnim-security-title">Secure University Access</span>
+                      <span className="swarrnim-security-sub">Authorized Users Only</span>
+                    </div>
+                  </div>
+
+                  {/* Quick Demo Login Trigger */}
+                  <div className="swarrnim-demo-trigger-box">
+                    <button
+                      type="button"
+                      className="swarrnim-demo-trigger-btn"
+                      onClick={() => setIsDemoModalOpen(true)}
+                    >
+                      <KeyRound size={13} color="var(--swarrnim-orange)" />
+                      <span>Quick Demo Login (Faculty, Student, HOD...)</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </main>
+
+        {/* ═══ 3. Institutional Footer ═══ */}
+        <footer className="swarrnim-footer">
+          <div className="swarrnim-footer-left">
+            &copy; 2026 Swarrnim Startup &amp; Innovation University. All rights reserved.
+          </div>
+          <div className="swarrnim-footer-right">
+            <span className="swarrnim-footer-link" onClick={() => setIsSupportModalOpen(true)}>Privacy Policy</span>
+            <span className="swarrnim-footer-link" onClick={() => setIsSupportModalOpen(true)}>Security</span>
+            <span className="swarrnim-footer-link" onClick={() => setIsSupportModalOpen(true)}>IT Support</span>
+          </div>
+        </footer>
+      </div>
+
+      {/* ═══ 4. Demo Accounts Selection Modal ═══ */}
+      {isDemoModalOpen && (
+        <div className="swarrnim-modal-overlay" onClick={() => setIsDemoModalOpen(false)}>
+          <div className="swarrnim-modal-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="swarrnim-modal-header">
+              <div className="swarrnim-modal-header-title">
+                <KeyRound size={20} color="#F58220" />
+                <span>Select Demo Account</span>
+              </div>
+              <button
+                type="button"
+                className="swarrnim-modal-close-btn"
+                onClick={() => setIsDemoModalOpen(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="swarrnim-modal-body">
+              <p style={{ fontSize: '0.84375rem', color: '#64748B', margin: '0 0 1.15rem 0', lineHeight: 1.5 }}>
+                Click any pre-configured institutional role to test the Swarrnim University ERP:
               </p>
 
-              {/* Feature Pills */}
-              <div className="login-feature-pills" style={{ position: 'relative' }}>
-                <div className="login-pills-dot" />
-                {featurePills.map((fp, i) => {
-                  const Ic = fp.icon;
-                  const colors = ['#F5A623', '#0097D7', '#10B981', '#F37023'];
+              <div className="swarrnim-demo-grid">
+                {demoAccounts.map((account) => {
+                  const Icon = account.icon;
                   return (
-                    <div className="login-feature-pill" key={i}>
-                      <div
-                        className="login-feature-pill-icon"
-                        style={{ background: `${colors[i]}22`, color: colors[i] }}
-                      >
-                        <Ic size={16} />
+                    <div
+                      key={account.role}
+                      className="swarrnim-demo-role-card"
+                      onClick={() => handleDemoLogin(account.userId, account.pass)}
+                    >
+                      <div className="swarrnim-demo-card-left">
+                        <div
+                          className="swarrnim-demo-card-icon"
+                          style={{
+                            background: `${account.accentColor}15`,
+                            color: account.accentColor
+                          }}
+                        >
+                          <Icon size={18} />
+                        </div>
+                        <div className="swarrnim-demo-card-info">
+                          <h4>{account.title}</h4>
+                          <span>{account.badge}</span>
+                        </div>
                       </div>
-                      {fp.label}
+
+                      <div className="swarrnim-demo-quick-badge">
+                        <span>Sign In</span>
+                        <ChevronRight size={13} />
+                      </div>
                     </div>
                   );
                 })}
               </div>
             </div>
           </div>
+        </div>
+      )}
 
-          {/* ── Right Form Panel ── */}
-          <div className="login-right login-form-panel">
-            <div className="login-right-inner">
-              {/* Login Card */}
-              <div className="login-card">
-                <div className="login-card-accent" />
-                <h2>Welcome Back</h2>
-                <p className="login-card-subtitle">
-                  Sign in to access the University Management System
-                </p>
+      {/* ═══ 5. IT Support Modal ═══ */}
+      {isSupportModalOpen && (
+        <div className="swarrnim-modal-overlay" onClick={() => setIsSupportModalOpen(false)}>
+          <div className="swarrnim-modal-dialog" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="swarrnim-modal-header">
+              <div className="swarrnim-modal-header-title">
+                <HelpCircle size={20} color="#F58220" />
+                <span>IT Helpdesk &amp; Technical Support</span>
+              </div>
+              <button
+                type="button"
+                className="swarrnim-modal-close-btn"
+                onClick={() => setIsSupportModalOpen(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
 
-                {/* Error Alert */}
-                {error && (
-                  <div className="login-error-alert">
-                    <AlertTriangle size={18} color="#DC2626" style={{ flexShrink: 0 }} />
-                    <div>{error}</div>
-                  </div>
-                )}
-
-                {/* Login Form */}
-                <form onSubmit={handleSubmit} autoComplete="off">
-                  {/* Username / Email */}
-                  <label className="login-field-label">Username / University Email</label>
-                  <div className="login-field-wrapper">
-                    <Mail size={17} className="login-field-icon" />
-                    <input
-                      type="text"
-                      className="login-field-input"
-                      placeholder="Enter your university email or username"
-                      value={identifier}
-                      onChange={e => setIdentifier(e.target.value)}
-                      required
-                    />
-                  </div>
-
-                  {/* Password */}
-                  <label className="login-field-label">Password</label>
-                  <div className="login-field-wrapper">
-                    <Lock size={17} className="login-field-icon" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      className="login-field-input"
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      style={{ paddingRight: '2.65rem' }}
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="login-field-toggle"
-                      onClick={() => setShowPassword(!showPassword)}
-                      tabIndex={-1}
-                    >
-                      {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-                    </button>
-                  </div>
-
-                  {/* Remember Me + Forgot */}
-                  <div className="login-extras">
-                    <label className="login-remember">
-                      <input type="checkbox" defaultChecked />
-                      <span>Remember Me</span>
-                    </label>
-                    <button
-                      type="button"
-                      className="login-forgot-btn"
-                      onClick={() => setIsForgotModalOpen(true)}
-                    >
-                      Forgot Password?
-                    </button>
-                  </div>
-
-                  {/* Submit */}
-                  <button type="submit" className="login-submit-btn">
-                    Sign In
-                  </button>
-                </form>
-
-                {/* Secure Access Badge */}
-                <div className="login-secure-badge">
-                  <div className="login-secure-badge-line1">
-                    <ShieldCheck size={15} />
-                    Secure University Access
-                  </div>
-                  <div className="login-secure-badge-line2">Authorized Users Only</div>
+            <div className="swarrnim-modal-body">
+              <div className="swarrnim-support-box">
+                <div className="swarrnim-support-row">
+                  <span style={{ color: '#64748B' }}>Helpdesk Phone:</span>
+                  <strong style={{ color: '#12366B' }}>+91 79 2328 1000 / Ext 104</strong>
+                </div>
+                <div className="swarrnim-support-row">
+                  <span style={{ color: '#64748B' }}>Email Support:</span>
+                  <strong style={{ color: '#12366B' }}>erp.support@swarrnim.edu.in</strong>
+                </div>
+                <div className="swarrnim-support-row">
+                  <span style={{ color: '#64748B' }}>Portal Hours:</span>
+                  <strong style={{ color: '#12366B' }}>24 × 7 Operational</strong>
+                </div>
+                <div className="swarrnim-support-row">
+                  <span style={{ color: '#64748B' }}>Physical Location:</span>
+                  <strong style={{ color: '#12366B' }}>Server Room, Admin Block, Gandhinagar</strong>
                 </div>
               </div>
 
-              {/* ── Demo Credentials ── */}
-              <div className="login-demo-section">
-                <div className="login-demo-header">
-                  <Key size={14} color="#F59E0B" />
-                  <span>Demo Credentials (1-Click Test Login)</span>
-                </div>
-                <div className="login-demo-grid">
-                  {demoAccounts.map(acc => {
-                    const IconComponent = acc.icon;
-                    return (
-                      <div
-                        key={acc.role}
-                        className="login-demo-card"
-                        onClick={() => handleDemoClick(acc.userId, acc.pass)}
-                        style={{ borderLeft: `4px solid ${acc.color}` }}
-                      >
-                        <div className="login-demo-card-top">
-                          <div
-                            className="login-demo-card-icon"
-                            style={{ backgroundColor: acc.bg, color: acc.color }}
-                          >
-                            <IconComponent size={16} />
-                          </div>
-                          <div className="login-demo-card-info-title">{acc.title}</div>
-                          <div className="login-demo-card-creds">
-                            <div className="login-demo-card-cred-row">
-                              <span className="login-demo-card-cred-label">User ID:</span>
-                              <span className="login-demo-card-cred-val" style={{ color: acc.color, fontWeight: 700 }}>{acc.userId}</span>
-                            </div>
-                            <div className="login-demo-card-cred-row">
-                              <span className="login-demo-card-cred-label">Pass:</span>
-                              <span className="login-demo-card-cred-val" style={{ color: '#1E293B' }}>{acc.pass}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="login-demo-card-footer">
-                          <button 
-                            className="login-demo-card-btn" 
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDemoClick(acc.userId, acc.pass);
-                            }}
-                          >
-                            Login <ArrowRight size={11} />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+              <div style={{ textAlign: 'right', marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  className="swarrnim-topbar-demo-btn"
+                  onClick={() => setIsSupportModalOpen(false)}
+                  style={{ width: '100%', justifyContent: 'center', height: '40px' }}
+                >
+                  Close Window
+                </button>
               </div>
             </div>
           </div>
         </div>
+      )}
 
-        {/* ═══ Footer ═══ */}
-        <footer className="login-footer">
-          <div className="login-footer-copy">
-            © {new Date().getFullYear()} Swarrnim Startup &amp; Innovation University
-          </div>
-          <div className="login-footer-tagline">Where Ideas Come Alive</div>
-          <div className="login-footer-links">
-            <span>Privacy Policy</span>
-            <span>Security</span>
-            <span>IT Support</span>
-          </div>
-        </footer>
-      </div>
-
-      {/* Forgot Password Modal (unchanged) */}
-      <ForgotPasswordModal isOpen={isForgotModalOpen} onClose={() => setIsForgotModalOpen(false)} />
+      {/* ═══ 6. Forgot Password Modal ═══ */}
+      <ForgotPasswordModal
+        isOpen={isForgotModalOpen}
+        onClose={() => setIsForgotModalOpen(false)}
+      />
     </>
   );
 };

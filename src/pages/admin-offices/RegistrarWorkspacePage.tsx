@@ -4,6 +4,7 @@ import { db } from '../../services/db';
 import { Badge } from '../../components/common/Badge';
 import { Modal } from '../../components/common/Modal';
 import { StudentProfileModal } from '../../components/profile/StudentProfileModal';
+import { StudentRowActionMenu } from '../../components/common/StudentRowActionMenu';
 import { 
   Building2, GraduationCap, UserCheck, BookOpen, Clock, Award, 
   FolderCheck, MessageSquare, CheckSquare, Bell, FileSpreadsheet, 
@@ -1743,12 +1744,15 @@ export const RegistrarWorkspacePage: React.FC<RegistrarWorkspacePageProps> = ({
                             <td className="py-3 px-4 text-center font-bold text-slate-700 dark:text-slate-300">Sem {stu.semesterId?.replace(/\D/g, '') || '1'}</td>
                             <td className="py-3 px-4"><Badge variant="success">ACTIVE</Badge></td>
                             <td className="py-3 px-4 text-right">
-                              <button
-                                onClick={() => setSelectedStudentForProfile(stu)}
-                                className="px-2.5 py-1 rounded bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white dark:bg-blue-950/40 dark:text-blue-300 font-medium transition"
-                              >
-                                View Dossier
-                              </button>
+                              <StudentRowActionMenu 
+                                student={stu}
+                                onViewProfile={() => setSelectedStudentForProfile(stu)}
+                                onViewAcademic={() => setSelectedStudentForProfile(stu)}
+                                onViewAttendance={() => setSelectedStudentForProfile(stu)}
+                                onViewDocuments={() => setSelectedStudentForProfile(stu)}
+                                onViewExamination={() => setSelectedStudentForProfile(stu)}
+                                onViewRequests={() => setSelectedStudentForProfile(stu)}
+                              />
                             </td>
                           </tr>
                         );

@@ -1123,4 +1123,187 @@ export class WorkManagementService {
       followUps: followUps.map((f) => ({ id: f.id, title: f.subject, date: f.nextFollowUpDate, type: 'FOLLOW_UP', status: f.status })),
     };
   }
+
+  // ── 8. Workload & Work Transfer / Delegation Engine ────────────────────────
+
+  async createWorkTransfer(user: any, data: any) {
+    const fromUserId = user.id;
+    if (fromUserId === data.toUserId) {
+      throw new BadRequestException('Cannot transfer workload to oneself.');
+    }
+
+    const startAt = new Date(data.startAt);
+    const endAt = new Date(data.endAt);
+    if (endAt < startAt) {
+      throw new BadRequestException('End date cannot be earlier than start date.');
+    }
+
+    const now = new Date();
+    const isImmediate = startAt <= now && now <= endAt;
+    const count = (await (this.prisma as any).workTransfer.count()) + 1;
+    const trackingCode = `WTR-${now.getFullYear()}-${String(count).padStart(6, '0')}`;
+
+    const toUser = await this.prisma.user.findUnique({
+      where: { id: data.toUserId },
+      include: { faculty: { include: { department: true } } },
+    });
+
+    const fromUserRecord = await this.prisma.user.findUnique({
+      where: { id: fromUserId },
+      include: { faculty: { include: { department: true } } },
+    });
+
+    const transfer = await (this.prisma as any).workTransfer.create({
+      data: {
+        trackingCode,
+        fromUserId,
+        fromUserName: fromUserRecord?.username || user.username || 'Faculty Member',
+        fromUserRole: user.role || 'FACULTY',
+        fromDepartmentId: fromUserRecord?.faculty?.departmentId,
+        fromDepartmentName: fromUserRecord?.faculty?.department?.name,
+        fromInstituteId: fromUserRecord?.faculty?.instituteId,
+        toUserId: data.toUserId,
+        toUserName: toUser?.username || 'Assigned Recipient',
+        toUserRole: toUser?.role || 'FACULTY',
+        toDepartmentId: toUser?.faculty?.departmentId,
+        toDepartmentName: toUser?.faculty?.department?.name,
+        toInstituteId: toUser?.faculty?.instituteId,
+        startAt,
+        endAt,
+        reason: data.reason,
+        remarks: data.remarks,
+        status: isImmediate ? 'ACTIVE' : 'SCHEDULED',
+        workItemIds: data.workItemIds || [],
+        workItemTypes: ['STUDENT_REQUEST', 'APPROVAL_REQUEST'],
+        totalItemsCount: (data.workItemIds || []).length,
+        completedItemIds: [],
+        createdBy: user.id,
+        createdByName: user.username,
+        createdByRole: user.role,
+        activatedAt: isImmediate ? now : null,
+        auditTrail: [
+          {
+            timestamp: now.toISOString(),
+            actorId: user.id,
+            actorName: user.username,
+            actorRole: user.role,
+            action: 'TRANSFER_CREATED',
+            details: `Delegated ${(data.workItemIds || []).length} work items to ${toUser?.username || data.toUserId}`,
+          },
+        ],
+      },
+    });
+
+    return transfer;
+  }
+
+  async getMyWorkTransfers(userId: string) {
+    const [transferredOut, transferredIn] = await Promise.all([
+      (this.prisma as any).workTransfer.findMany({
+        where: { fromUserId: userId },
+        orderBy: { createdAt: 'desc' },
+      }),
+      (this.prisma as any).workTransfer.findMany({
+        where: { toUserId: userId },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    return { transferredOut, transferredIn };
+  }
+
+  async getAllWorkTransfers(query: any, user: any) {
+    const where: any = {};
+    if (query.status && query.status !== 'ALL') {
+      where.status = query.status;
+    }
+    if (query.reason && query.reason !== 'ALL') {
+      where.reason = query.reason;
+    }
+    if (query.departmentId && query.departmentId !== 'ALL') {
+      where.OR = [
+        { fromDepartmentId: query.departmentId },
+        { toDepartmentId: query.departmentId },
+      ];
+    }
+    if (query.search) {
+      where.OR = [
+        { trackingCode: { contains: query.search, mode: 'insensitive' } },
+        { fromUserName: { contains: query.search, mode: 'insensitive' } },
+        { toUserName: { contains: query.search, mode: 'insensitive' } },
+      ];
+    }
+
+    const transfers = await (this.prisma as any).workTransfer.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return transfers;
+  }
+
+  async revokeWorkTransfer(id: string, user: any) {
+    const existing = await (this.prisma as any).workTransfer.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Work transfer not found.');
+    if (['EXPIRED', 'REVOKED', 'CANCELLED'].includes(existing.status)) {
+      throw new BadRequestException(`Cannot revoke transfer in ${existing.status} status.`);
+    }
+
+    const now = new Date();
+    const updated = await (this.prisma as any).workTransfer.update({
+      where: { id },
+      data: {
+        status: 'REVOKED',
+        revokedAt: now,
+        revokedBy: user.id,
+        revokedByName: user.username,
+        auditTrail: [
+          ...(existing.auditTrail || []),
+          {
+            timestamp: now.toISOString(),
+            actorId: user.id,
+            actorName: user.username,
+            actorRole: user.role,
+            action: 'TRANSFER_REVOKED',
+            details: `Work transfer revoked by ${user.username}. Tasks restored to original owner.`,
+          },
+        ],
+      },
+    });
+
+    return updated;
+  }
+
+  async cancelScheduledTransfer(id: string, user: any) {
+    const existing = await (this.prisma as any).workTransfer.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Work transfer not found.');
+    if (existing.status !== 'SCHEDULED') {
+      throw new BadRequestException('Only SCHEDULED transfers can be cancelled.');
+    }
+
+    const now = new Date();
+    const updated = await (this.prisma as any).workTransfer.update({
+      where: { id },
+      data: {
+        status: 'CANCELLED',
+        cancelledAt: now,
+        cancelledBy: user.id,
+        cancelledByName: user.username,
+        auditTrail: [
+          ...(existing.auditTrail || []),
+          {
+            timestamp: now.toISOString(),
+            actorId: user.id,
+            actorName: user.username,
+            actorRole: user.role,
+            action: 'TRANSFER_CANCELLED',
+            details: `Scheduled transfer cancelled by ${user.username}.`,
+          },
+        ],
+      },
+    });
+
+    return updated;
+  }
 }
+

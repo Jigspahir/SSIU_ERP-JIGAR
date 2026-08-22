@@ -9,6 +9,7 @@ export type UserRole =
   | 'FACULTY' 
   | 'MENTOR'
   | 'STUDENT'
+  | 'PARENT'
   | 'REGISTRAR'
   | 'DEPUTY_REGISTRAR'
   | 'IQAC'
@@ -19,6 +20,8 @@ export type UserRole =
   | 'TRANSPORT_ADMIN'
   | 'MAINTENANCE_ADMIN'
   | 'ACCOUNTS_ADMIN';
+
+export * from './ptm';
 
 
 export interface User {
@@ -3086,6 +3089,7 @@ export const ROLE_NOTESHEET_PERMISSIONS: Record<UserRole, NoteSheetPermission[]>
     'NOTESHEET_REPORT',
   ],
   STUDENT: [],
+  PARENT: [],
 };
 
 export interface NoteSheet {
@@ -4308,7 +4312,8 @@ export const ROLE_BULK_IMPORT_PERMISSIONS: Record<UserRole, BulkImportPermission
   ],
   FACULTY: [],
   MENTOR: [],
-  STUDENT: []
+  STUDENT: [],
+  PARENT: []
 };
 
 export const MODULE_TO_BULK_PERMISSION: Record<BulkImportType, BulkImportPermission> = {

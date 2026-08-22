@@ -7,6 +7,7 @@ import { Modal } from '../../components/common/Modal';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { Badge } from '../../components/common/Badge';
 import { FacultyProfileModal } from '../../components/profile/FacultyProfileModal';
+import { BulkDataManagerModal } from '../../components/bulk-import/BulkDataManagerModal';
 import { Eye } from 'lucide-react';
 
 export const FacultyPage: React.FC = () => {
@@ -22,6 +23,7 @@ export const FacultyPage: React.FC = () => {
   // Modal State
   const [viewingFaculty, setViewingFaculty] = useState<Faculty | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Faculty | null>(null);
   const [deletingItem, setDeletingItem] = useState<Faculty | null>(null);
 
@@ -244,11 +246,21 @@ export const FacultyPage: React.FC = () => {
         }
         onAddClick={handleOpenAddModal}
         addLabel="Add Faculty"
+        onBulkImportClick={() => setIsBulkModalOpen(true)}
+        bulkImportLabel="Bulk Import"
         onViewClick={item => setViewingFaculty(item)}
         onEditClick={handleOpenEditModal}
         onDeleteClick={item => setDeletingItem(item)}
         canMutate={canMutate()}
         exportFilename="swarrnim-faculty"
+      />
+
+      {/* Universal Bulk Data Management Modal */}
+      <BulkDataManagerModal
+        isOpen={isBulkModalOpen}
+        onClose={() => setIsBulkModalOpen(false)}
+        initialType="FACULTY"
+        onSuccess={refreshData}
       />
 
       {/* Faculty Profile Detail Modal */}

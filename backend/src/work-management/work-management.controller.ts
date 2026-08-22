@@ -281,4 +281,45 @@ export class WorkManagementController {
     this.checkNonStudent(req);
     return this.workService.getCalendarItems(req.user.id);
   }
+
+  // ── Work Transfer & Workload Delegation Endpoints ─────────────────────────
+
+  @Post('transfers')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create Workload Transfer & Delegation' })
+  @ApiResponse({ status: 201, description: 'Workload transfer successfully registered.' })
+  createWorkTransfer(@Req() req: any, @Body() body: any) {
+    this.checkNonStudent(req);
+    return this.workService.createWorkTransfer(req.user, body);
+  }
+
+  @Get('transfers/my')
+  @ApiOperation({ summary: 'Get My Active & Received Workload Transfers' })
+  getMyWorkTransfers(@Req() req: any) {
+    this.checkNonStudent(req);
+    return this.workService.getMyWorkTransfers(req.user.id);
+  }
+
+  @Get('transfers')
+  @ApiOperation({ summary: 'Get All Workload Transfers (Higher Authority Audit)' })
+  getAllWorkTransfers(@Req() req: any, @Query() query: any) {
+    this.checkNonStudent(req);
+    return this.workService.getAllWorkTransfers(query, req.user);
+  }
+
+  @Post('transfers/:id/revoke')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Revoke an Active Workload Transfer' })
+  revokeWorkTransfer(@Req() req: any, @Param('id') id: string) {
+    this.checkNonStudent(req);
+    return this.workService.revokeWorkTransfer(id, req.user);
+  }
+
+  @Post('transfers/:id/cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cancel a Scheduled Workload Transfer' })
+  cancelScheduledTransfer(@Req() req: any, @Param('id') id: string) {
+    this.checkNonStudent(req);
+    return this.workService.cancelScheduledTransfer(id, req.user);
+  }
 }

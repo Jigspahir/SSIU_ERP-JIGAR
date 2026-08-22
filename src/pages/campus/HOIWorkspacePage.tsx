@@ -9,6 +9,7 @@ import { Badge } from '../../components/common/Badge';
 import { StatCard } from '../../components/common/StatCard';
 import { Modal } from '../../components/common/Modal';
 import { StudentProfileModal } from '../../components/profile/StudentProfileModal';
+import { StudentRowActionMenu } from '../../components/common/StudentRowActionMenu';
 import { 
   Building2, Users, UserCheck, BookOpen, Clock, Award, 
   CheckSquare, AlertCircle, AlertTriangle, FileText, CheckCircle2, 
@@ -715,28 +716,47 @@ export const HOIWorkspacePage: React.FC<HOIWorkspacePageProps> = ({ initialTab =
                         <strong>Sem {sem?.number || 4}</strong>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{student.divisionId || 'Div A'}</div>
                       </td>
+                      {/* Attendance % */}
                       <td>
-                        <Badge variant={!hasShortage ? 'active' : 'danger'}>
-                          {stats.percentage}%
+                        {stats.percentage >= 75 ? (
+                          <Badge variant="active">{stats.percentage}%</Badge>
+                        ) : stats.percentage >= 60 ? (
+                          <Badge variant="warning">{stats.percentage}%</Badge>
+                        ) : (
+                          <Badge variant="danger">{stats.percentage}%</Badge>
+                        )}
+                      </td>
+
+                      {/* Academic Status */}
+                      <td>
+                        {stats.percentage >= 75 ? (
+                          <Badge variant="active">GOOD STANDING</Badge>
+                        ) : stats.percentage >= 60 ? (
+                          <Badge variant="warning">ATTENDANCE RISK</Badge>
+                        ) : (
+                          <Badge variant="danger">CRITICAL RISK</Badge>
+                        )}
+                      </td>
+
+                      {/* Exam Status */}
+                      <td>
+                        <Badge variant={stats.percentage >= 75 ? 'active' : stats.percentage >= 60 ? 'warning' : 'danger'}>
+                          {stats.percentage >= 75 ? 'ELIGIBLE' : stats.percentage >= 60 ? 'PROVISIONAL' : 'SHORTAGE'}
                         </Badge>
                       </td>
-                      <td>
-                        <Badge variant={!hasShortage ? 'active' : 'warning'}>
-                          {!hasShortage ? 'GOOD STANDING' : 'ATTENDANCE RISK'}
-                        </Badge>
-                      </td>
-                      <td>
-                        <Badge variant={!hasShortage ? 'active' : 'danger'}>
-                          {!hasShortage ? 'ELIGIBLE' : 'SHORTAGE'}
-                        </Badge>
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button 
-                          className="btn btn-sm btn-secondary"
-                          onClick={() => setSelectedStudentForProfile(student)}
-                        >
-                          <Eye size={13} /> View Profile
-                        </button>
+
+                      {/* Actions */}
+                      <td style={{ textAlign: 'right', paddingRight: '1rem' }}>
+                        <StudentRowActionMenu 
+                          student={student}
+                          statusLevel={stats.percentage < 60 ? 'critical' : stats.percentage < 75 ? 'warning' : 'good'}
+                          onViewProfile={() => setSelectedStudentForProfile(student)}
+                          onViewAcademic={() => setSelectedStudentForProfile(student)}
+                          onViewAttendance={() => setSelectedStudentForProfile(student)}
+                          onViewDocuments={() => setSelectedStudentForProfile(student)}
+                          onViewExamination={() => setSelectedStudentForProfile(student)}
+                          onViewRequests={() => setSelectedStudentForProfile(student)}
+                        />
                       </td>
                     </tr>
                   );
@@ -809,13 +829,17 @@ export const HOIWorkspacePage: React.FC<HOIWorkspacePageProps> = ({ initialTab =
                             {hasMissingDocs && `• Unverified Academic Records`}
                           </div>
                         </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <button 
-                            className="btn btn-sm btn-secondary"
-                            onClick={() => setSelectedStudentForProfile(student)}
-                          >
-                            Inspect Record
-                          </button>
+                        <td style={{ textAlign: 'right', paddingRight: '1rem' }}>
+                          <StudentRowActionMenu 
+                            student={student}
+                            statusLevel={stats.percentage < 60 ? 'critical' : 'warning'}
+                            onViewProfile={() => setSelectedStudentForProfile(student)}
+                            onViewAcademic={() => setSelectedStudentForProfile(student)}
+                            onViewAttendance={() => setSelectedStudentForProfile(student)}
+                            onViewDocuments={() => setSelectedStudentForProfile(student)}
+                            onViewExamination={() => setSelectedStudentForProfile(student)}
+                            onViewRequests={() => setSelectedStudentForProfile(student)}
+                          />
                         </td>
                       </tr>
                     );
