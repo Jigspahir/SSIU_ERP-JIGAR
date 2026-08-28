@@ -1164,7 +1164,7 @@ export class WorkManagementService {
         fromInstituteId: fromUserRecord?.faculty?.instituteId,
         toUserId: data.toUserId,
         toUserName: toUser?.username || 'Assigned Recipient',
-        toUserRole: toUser?.role || 'FACULTY',
+        toUserRole: (toUser as any)?.role || 'FACULTY',
         toDepartmentId: toUser?.faculty?.departmentId,
         toDepartmentName: toUser?.faculty?.department?.name,
         toInstituteId: toUser?.faculty?.instituteId,

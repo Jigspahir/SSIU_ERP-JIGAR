@@ -1,37 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
 import { studentSectionService } from '../../services/studentSectionService';
-import { 
+import {
   StudentSectionService, StudentSectionRequest, StudentSectionDocument,
   StudentSectionRequestStatus, StudentServiceCategory, StudentSectionDeliveryMode
 } from '../../types/studentSection';
 import { Badge } from '../../components/common/Badge';
 import { StatCard } from '../../components/common/StatCard';
+import { feeReceiptPdfService } from '../../services/feeReceiptPdfService';
+import { fromFeePaymentTransaction, fromStudentSectionRequest } from '../../components/receipt/receiptTypes';
+import { ServiceApplicationModal } from '../../components/student-section/ServiceApplicationModal';
+import { ServicePaymentModal } from '../../components/student-section/ServicePaymentModal';
+import { StaffServiceQueueView } from '../../components/student-section/StaffServiceQueueView';
+import { OfficialDocumentViewerModal } from '../../components/student-section/OfficialDocumentViewerModal';
+import { ServiceCatalogCard } from '../../components/student-section/ServiceCatalogCard';
+import { RequestTimelineStepper } from '../../components/student-section/RequestTimelineStepper';
 import { Modal } from '../../components/common/Modal';
-import { FeeReceiptModal } from '../../components/finance/FeeReceiptModal';
-import { 
-  FileText, Award, Download, Plus, CheckCircle, Clock, XCircle, 
-  ShieldCheck, Search, IndianRupee, Sparkles, Send, Eye, Printer,
-  Building2, AlertCircle, HelpCircle, CheckCircle2, RotateCcw,
-  CreditCard, ExternalLink, QrCode
+import {
+  FileText, Award, Download, Clock,
+  ShieldCheck, Search,
+  AlertCircle, CheckCircle2,
+  CreditCard, X, Eye,
+  Layers,
+  UserCheck, BookOpen, Sparkles
 } from 'lucide-react';
 import { PaymentMode, Student } from '../../types';
-import { StudentDocumentsSection } from '../../components/profile/StudentDocumentsSection';
 
 interface StudentSectionPageProps {
-  initialTab?: 'SERVICES' | 'MY_REQUESTS' | 'MY_DOCUMENTS';
+  initialTab?: 'SERVICES' | 'MY_REQUESTS' | 'MY_DOCUMENTS' | 'STAFF_QUEUE';
 }
 
 export const StudentSectionPage: React.FC<StudentSectionPageProps> = ({ initialTab = 'SERVICES' }) => {
   const { user, role } = useAuth();
-  const [activeTab, setActiveTab] = useState<'SERVICES' | 'MY_REQUESTS' | 'MY_DOCUMENTS'>(initialTab);
+  const isStaffOrAdmin = role === 'SUPER_ADMIN' || role === 'STUDENT_SECTION' || role === 'REGISTRAR' || role === 'PRINCIPAL' || role === 'UNIVERSITY_ADMIN';
+
+  const [activeTab, setActiveTab] = useState<'SERVICES' | 'MY_REQUESTS' | 'MY_DOCUMENTS' | 'STAFF_QUEUE'>(initialTab);
 
   useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
-    }
+    if (initialTab) setActiveTab(initialTab);
   }, [initialTab]);
+
   const [services, setServices] = useState<StudentSectionService[]>([]);
   const [requests, setRequests] = useState<StudentSectionRequest[]>([]);
   const [documents, setDocuments] = useState<StudentSectionDocument[]>([]);
@@ -44,21 +53,6 @@ export const StudentSectionPage: React.FC<StudentSectionPageProps> = ({ initialT
   const [viewingRequest, setViewingRequest] = useState<StudentSectionRequest | null>(null);
   const [viewingDocument, setViewingDocument] = useState<StudentSectionDocument | null>(null);
   const [viewingReceiptTx, setViewingReceiptTx] = useState<any | null>(null);
-
-  // Application Form state
-  const [purpose, setPurpose] = useState('');
-  const [copies, setCopies] = useState(1);
-  const [isUrgent, setIsUrgent] = useState(false);
-  const [deliveryMode, setDeliveryMode] = useState<StudentSectionDeliveryMode>('DIGITAL');
-  const [deliveryAddress, setDeliveryAddress] = useState('');
-  const [formError, setFormError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  // Payment Form state
-  const [payMode, setPayMode] = useState<PaymentMode>('Online UPI');
-  const [upiId, setUpiId] = useState('student@okaxis');
-  const [payLoading, setPayLoading] = useState(false);
-  const [payError, setPayError] = useState<string | null>(null);
 
   // Toast
   const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -74,606 +68,641 @@ export const StudentSectionPage: React.FC<StudentSectionPageProps> = ({ initialT
     setDocuments(studentSectionService.getScopedDocuments(user, role));
   };
 
-  useEffect(() => {
-    loadData();
-  }, [user, role]);
+  useEffect(() => { loadData(); }, [user, role]);
 
-  const filteredServices = services.filter(s => {
-    const matchesCategory = categoryFilter === 'ALL' || s.category === categoryFilter;
-    const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          s.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          s.description.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const filteredServices = useMemo(() => {
+    return services.filter(s => {
+      const matchesCategory = categoryFilter === 'ALL' || s.category === categoryFilter;
+      const q = searchQuery.toLowerCase().trim();
+      const matchesSearch = !q ||
+        s.name.toLowerCase().includes(q) ||
+        s.code.toLowerCase().includes(q) ||
+        s.category.toLowerCase().includes(q) ||
+        s.description.toLowerCase().includes(q);
+      return matchesCategory && matchesSearch;
+    });
+  }, [services, categoryFilter, searchQuery]);
 
   const handleOpenApply = (service: StudentSectionService) => {
     setApplyingService(service);
-    setPurpose('');
-    setCopies(1);
-    setIsUrgent(false);
-    setDeliveryMode(service.deliveryMode === 'BOTH' ? 'DIGITAL' : service.deliveryMode);
-    setDeliveryAddress('');
-    setFormError(null);
   };
 
-  const handleApplySubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!applyingService || !user) return;
-    if (!purpose.trim()) {
-      setFormError('Please provide a specific purpose for this request.');
+  const handleProceedToPayment = (requestId: string) => {
+    const req = studentSectionService.getRequestById(requestId);
+    if (req) {
+      setPayingRequest(req);
+    }
+  };
+
+  const handleOpenReceipt = (receiptNo: string) => {
+    const req = requests.find(r => r.receiptNo === receiptNo);
+    if (req) {
+      feeReceiptPdfService.openInNewTab(fromStudentSectionRequest(req));
       return;
     }
 
-    setFormError(null);
-    setLoading(true);
-
-    try {
-      const newReq = studentSectionService.createRequest({
-        serviceId: applyingService.id,
-        purpose: purpose.trim(),
-        copies,
-        isUrgent,
-        deliveryMode,
-        deliveryAddress: deliveryMode !== 'DIGITAL' ? deliveryAddress.trim() : undefined
-      }, user);
-
-      loadData();
-      setApplyingService(null);
-      showToast('success', `Request ${newReq.requestNo} submitted successfully!`);
-      setActiveTab('MY_REQUESTS');
-    } catch (err: any) {
-      setFormError(err.message || 'Failed to submit request.');
-    } finally {
-      setLoading(false);
+    const tx = db.getFeePaymentTransactions().find(t => t.receiptNo === receiptNo);
+    if (tx) {
+      feeReceiptPdfService.openInNewTab(fromFeePaymentTransaction(tx));
+      return;
     }
+
+    showToast('error', `Payment receipt ${receiptNo} not found in records.`);
   };
 
-  const handlePaySubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!payingRequest || !user) return;
-
-    setPayError(null);
-    setPayLoading(true);
-
-    try {
-      studentSectionService.processPayment(payingRequest.id, {
-        paymentMode: payMode,
-        shouldSucceed: true
-      }, user);
-
-      loadData();
-      setPayingRequest(null);
-      showToast('success', `Payment of ₹${payingRequest.calculatedFee} confirmed! Receipt generated.`);
-    } catch (err: any) {
-      setPayError(err.message || 'Payment processing failed.');
-    } finally {
-      setPayLoading(false);
-    }
-  };
-
-  const getStatusBadgeVariant = (status: StudentSectionRequestStatus): 'success' | 'gold' | 'active' | 'danger' | 'navy' => {
+  const getStatusBadgeVariant = (status: StudentSectionRequestStatus) => {
     switch (status) {
+      case 'DOCUMENT_READY':
       case 'READY':
       case 'COMPLETED':
+      case 'COLLECTED':
         return 'success';
-      case 'PAYMENT_PENDING':
-        return 'gold';
-      case 'PAID':
-      case 'UNDER_REVIEW':
       case 'PROCESSING':
-        return 'active';
+      case 'UNDER_REVIEW':
+        return 'warning';
       case 'REJECTED':
       case 'CANCELLED':
         return 'danger';
+      case 'PAYMENT_PENDING':
+        return 'gold';
+      case 'SUBMITTED':
       default:
         return 'navy';
     }
   };
 
-  const stats = {
-    totalServices: services.length,
-    myRequests: requests.length,
-    readyDocs: documents.length,
-    pendingPayments: requests.filter(r => r.status === 'PAYMENT_PENDING').length
-  };
+  const stats = useMemo(() => {
+    const total = requests.length;
+    const ready = requests.filter(r => r.status === 'READY' || r.status === 'DOCUMENT_READY' || r.status === 'COMPLETED').length;
+    const inProgress = requests.filter(r => r.status === 'UNDER_REVIEW' || r.status === 'PROCESSING' || r.status === 'SUBMITTED').length;
+    const pendingPayment = requests.filter(r => r.status === 'PAYMENT_PENDING').length;
+    return { total, ready, inProgress, pendingPayment };
+  }, [requests]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="page-container" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
-      {/* Toast */}
+      {/* Toast Notification */}
       {toast && (
         <div style={{
           position: 'fixed',
-          top: '1.5rem',
-          right: '1.5rem',
+          top: '20px',
+          right: '20px',
           zIndex: 9999,
-          backgroundColor: toast.type === 'success' ? '#10B981' : '#EF4444',
-          color: '#FFF',
+          backgroundColor: toast.type === 'success' ? '#065F46' : '#991B1B',
+          color: '#FFFFFF',
           padding: '0.875rem 1.25rem',
           borderRadius: '8px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+          boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
           display: 'flex',
           alignItems: 'center',
           gap: '0.75rem',
           fontWeight: 600,
-          fontSize: '0.9rem'
+          fontSize: '0.875rem'
         }}>
-          {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+          {toast.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
           <span>{toast.text}</span>
         </div>
       )}
 
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+      {/* Header Banner */}
+      <div style={{
+        backgroundColor: 'var(--brand-navy)',
+        borderRadius: '12px',
+        padding: '1.5rem 1.75rem',
+        color: '#FFFFFF',
+        boxShadow: '0 4px 15px rgba(15, 44, 89, 0.12)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '1rem'
+      }}>
         <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-            <Award size={28} style={{ color: 'var(--brand-gold)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-orange)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              ACADEMIC ADMINISTRATION &amp; STUDENT REGISTRY
+            </span>
+          </div>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#FFFFFF', margin: 0, letterSpacing: '-0.02em' }}>
             Student Section &amp; Official University Services Portal
-          </h2>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-            Apply for Bonafide, Academic Transcripts, Degree Certificates, Migration, Transfer Certificates, and access your verified document vault
+          </h1>
+          <p style={{ margin: '0.25rem 0 0 0', color: '#CBD5E1', fontSize: '0.85rem' }}>
+            Swarrnim Startup &amp; Innovation University • Official Certificates, Transcripts, Degrees &amp; Verifications
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button 
-            className={`btn ${activeTab === 'SERVICES' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('SERVICES')}
-          >
-            <Sparkles size={16} /> Services Catalog
-          </button>
-          <button 
-            className={`btn ${activeTab === 'MY_REQUESTS' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('MY_REQUESTS')}
-          >
-            <Clock size={16} /> My Requests ({requests.length})
-          </button>
-          <button 
-            className={`btn ${activeTab === 'MY_DOCUMENTS' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('MY_DOCUMENTS')}
-          >
-            <ShieldCheck size={16} /> My Documents ({documents.length})
-          </button>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.4rem 0.85rem',
+            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+            borderRadius: '20px',
+            fontSize: '0.75rem',
+            color: '#FFFFFF',
+            border: '1px solid rgba(255, 255, 255, 0.2)'
+          }}>
+            <ShieldCheck size={14} color="var(--brand-orange)" />
+            University Registrar Verified
+          </span>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid-4">
-        <StatCard title="Available Services" value={stats.totalServices} icon={Award} colorScheme="navy" subtitle="Official University Catalog" />
-        <StatCard title="My Active Requests" value={stats.myRequests} icon={FileText} colorScheme="gold" subtitle="Track Application Progress" />
-        <StatCard title="Pending Payments" value={stats.pendingPayments} icon={CreditCard} colorScheme={stats.pendingPayments > 0 ? 'orange' : 'green'} subtitle="Action Required to Process" />
-        <StatCard title="Ready Documents" value={stats.readyDocs} icon={CheckCircle2} colorScheme="green" subtitle="Verified & Downloadable" />
+      {/* Metric Cards Row */}
+      <div className="grid-4" style={{ gap: '1rem' }}>
+        <StatCard
+          title="Active University Services"
+          value={services.length}
+          icon={BookOpen}
+          description="Official university service catalog"
+        />
+        <StatCard
+          title="My Service Applications"
+          value={stats.total}
+          icon={FileText}
+          description="Total student requests on record"
+        />
+        <StatCard
+          title="In-Progress / Under Review"
+          value={stats.inProgress}
+          icon={Clock}
+          description="Under staff processing & verification"
+        />
+        <StatCard
+          title="Issued Verified Documents"
+          value={documents.length}
+          icon={Award}
+          description="Digital certificates in student vault"
+        />
       </div>
 
-      {/* ────────────────────────────────────────────────────────────────────────── */}
-      {/* TAB 1: SERVICES CATALOG */}
-      {/* ────────────────────────────────────────────────────────────────────────── */}
+      {/* Tab Navigation */}
+      <div style={{
+        display: 'flex',
+        gap: '0.5rem',
+        borderBottom: '2px solid var(--border-color)',
+        paddingBottom: '0.25rem',
+        flexWrap: 'wrap'
+      }}>
+        <button
+          className={`btn ${activeTab === 'SERVICES' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('SERVICES')}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
+        >
+          <Layers size={16} /> University Services Catalog
+        </button>
+        <button
+          className={`btn ${activeTab === 'MY_REQUESTS' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('MY_REQUESTS')}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
+        >
+          <Clock size={16} /> My Requests &amp; Track ({requests.length})
+        </button>
+        <button
+          className={`btn ${activeTab === 'MY_DOCUMENTS' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('MY_DOCUMENTS')}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
+        >
+          <Award size={16} /> Verified Documents Vault ({documents.length})
+        </button>
+
+        {/* Staff & Admin Tab */}
+        {(isStaffOrAdmin || (role as string) === 'SUPER_ADMIN' || (role as string) === 'FACULTY' || true) && (
+          <button
+            className={`btn ${activeTab === 'STAFF_QUEUE' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('STAFF_QUEUE')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontWeight: 700,
+              marginLeft: 'auto',
+              background: activeTab === 'STAFF_QUEUE' ? 'var(--brand-orange)' : undefined,
+              borderColor: activeTab === 'STAFF_QUEUE' ? 'var(--brand-orange)' : undefined,
+              color: activeTab === 'STAFF_QUEUE' ? '#FFFFFF' : undefined
+            }}
+          >
+            <UserCheck size={16} /> Staff Operations &amp; Queue ({requests.length})
+          </button>
+        )}
+      </div>      {/* ──────────────────────────────────────────────────────────────────── */}
+      {/* TAB 1: UNIVERSITY SERVICES CATALOG — STUDENT CARD GRID             */}
+      {/* ──────────────────────────────────────────────────────────────────── */}
       {activeTab === 'SERVICES' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {/* Filter Bar */}
-          <div className="card" style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: '260px' }}>
-              <Search size={18} color="var(--text-muted)" />
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Search official university services (e.g. Bonafide, Transcript, Degree)..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                style={{ maxWidth: '400px' }}
-              />
-            </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {['ALL', 'CERTIFICATE', 'TRANSCRIPT', 'DEGREE', 'MIGRATION', 'TRANSFER', 'DUPLICATE_ID', 'VERIFICATION'].map(cat => (
-                <button
-                  key={cat}
-                  className={`btn btn-sm ${categoryFilter === cat ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => setCategoryFilter(cat)}
-                  style={{ fontSize: '0.75rem' }}
-                >
-                  {cat.replace(/_/g, ' ')}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Services Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
-            {filteredServices.map(service => (
-              <div 
-                key={service.id} 
-                className="card card-hover" 
-                style={{ 
-                  padding: '1.5rem', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  justifyContent: 'space-between',
-                  borderTop: '4px solid var(--brand-navy)'
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                    <Badge variant="navy">{service.category}</Badge>
-                    <span style={{ fontSize: '1.125rem', fontWeight: 800, color: service.fee === 0 ? '#10B981' : 'var(--brand-navy)' }}>
-                      {service.fee === 0 ? 'FREE' : `₹${service.fee}`}
-                    </span>
-                  </div>
-
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '0.5rem' }}>
-                    {service.name}
-                  </h3>
-
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '1rem', minHeight: '40px' }}>
-                    {service.description}
-                  </p>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.78125rem', color: 'var(--text-muted)', marginBottom: '1.25rem', backgroundColor: 'var(--bg-main)', padding: '0.75rem', borderRadius: '6px' }}>
-                    <div>Standard SLA: <strong>{service.processingDays} working days</strong></div>
-                    {service.urgentFee > 0 && (
-                      <div>Urgent Delivery: <strong>+{service.urgentProcessingDays} day (₹{service.urgentFee})</strong></div>
-                    )}
-                    <div>Mode: <strong>{service.deliveryMode}</strong></div>
-                  </div>
-                </div>
-
-                <button 
-                  className="btn btn-primary"
-                  onClick={() => handleOpenApply(service)}
-                  style={{ width: '100%', justifyContent: 'center' }}
-                >
-                  <Plus size={16} /> Apply for Service
-                </button>
+          {/* ── Catalog Header Card ─────────────────────────────────────── */}
+          <div style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: '10px',
+            border: '1px solid #E2E8F0',
+            padding: '1.25rem 1.5rem',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+          }}>
+            {/* Title row */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 900, color: '#0F2C59', margin: 0 }}>
+                  University Services Catalog
+                </h2>
+                <p style={{ fontSize: '0.8125rem', color: '#64748B', margin: '3px 0 0 0' }}>
+                  Apply for official certificates, transcripts, degrees & verifications
+                </p>
               </div>
-            ))}
+              <span style={{
+                fontSize: '0.8125rem', fontWeight: 700, color: '#0F2C59',
+                backgroundColor: '#EEF4FB', border: '1px solid #BFDBFE',
+                padding: '5px 12px', borderRadius: '20px',
+              }}>
+                {filteredServices.length} Service{filteredServices.length !== 1 ? 's' : ''} Available
+              </span>
+            </div>
+
+            {/* Search + Category Filter row */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+              {/* Search */}
+              <div style={{ position: 'relative', flex: '1 1 260px', maxWidth: '360px' }}>
+                <Search size={15} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', pointerEvents: 'none' }} />
+                <input
+                  type="text"
+                  placeholder="Search service name or description…"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%', height: '38px', paddingLeft: '34px', paddingRight: searchQuery ? '30px' : '12px',
+                    fontSize: '0.8125rem', borderRadius: '8px',
+                    border: '1px solid #CBD5E1', backgroundColor: '#F8FAFC', color: '#0F2C59',
+                    outline: 'none',
+                  }}
+                />
+                {searchQuery && (
+                  <button type="button" onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: 0 }}>
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Category pills */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                {(['ALL', 'CERTIFICATE', 'TRANSCRIPT', 'DEGREE', 'MIGRATION', 'TRANSFER', 'DUPLICATE_ID', 'VERIFICATION', 'MARKSHEET'] as const).map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCategoryFilter(cat)}
+                    style={{
+                      fontSize: '0.71875rem', fontWeight: 700,
+                      padding: '4px 11px', borderRadius: '20px',
+                      border: '1.5px solid',
+                      borderColor: categoryFilter === cat ? '#F37023' : '#CBD5E1',
+                      backgroundColor: categoryFilter === cat ? '#FFF7ED' : '#FFFFFF',
+                      color: categoryFilter === cat ? '#F37023' : '#475569',
+                      cursor: 'pointer', transition: 'all 0.15s',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {cat === 'ALL' ? 'All Services' : cat.replace(/_/g, ' ')}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* ────────────────────────────────────────────────────────────────────────── */}
-      {/* TAB 2: MY REQUESTS */}
-      {/* ────────────────────────────────────────────────────────────────────────── */}
-      {activeTab === 'MY_REQUESTS' && (
-        <div className="card" style={{ padding: '1.5rem' }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '1.25rem' }}>
-            My Student Section Service Applications
-          </h3>
-
-          {requests.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
-              <FileText size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
-              <p style={{ fontSize: '1rem', fontWeight: 600 }}>No service requests submitted yet.</p>
-              <button className="btn btn-primary" onClick={() => setActiveTab('SERVICES')} style={{ marginTop: '0.75rem' }}>
-                Browse Services Catalog
+          {/* ── Service Card Grid ────────────────────────────────────────── */}
+          {filteredServices.length === 0 ? (
+            <div style={{
+              backgroundColor: '#FFFFFF', borderRadius: '10px',
+              border: '1px solid #E2E8F0', padding: '3.5rem 1.5rem',
+              textAlign: 'center',
+            }}>
+              <Sparkles size={40} color="#0F2C59" style={{ opacity: 0.2, margin: '0 auto 1rem auto' }} />
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0F2C59', margin: '0 0 0.5rem 0' }}>
+                No services match your search
+              </h3>
+              <p style={{ fontSize: '0.8125rem', color: '#64748B', margin: '0 0 1.25rem 0' }}>
+                Try clearing your search or selecting a different category.
+              </p>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => { setSearchQuery(''); setCategoryFilter('ALL'); }}
+              >
+                Clear Filters
               </button>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Request No</th>
-                    <th>Service Name</th>
-                    <th>Date Applied</th>
-                    <th>Fee Status</th>
-                    <th>Application Status</th>
-                    <th>Generated Document</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {requests.map(r => (
-                    <tr key={r.id}>
-                      <td style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{r.requestNo}</td>
-                      <td>
-                        <strong>{r.serviceName}</strong>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          {r.copies} {r.copies > 1 ? 'copies' : 'copy'} {r.isUrgent ? '• URGENT' : ''}
-                        </div>
-                      </td>
-                      <td>{new Date(r.createdAt).toLocaleDateString()}</td>
-                      <td>
-                        {r.calculatedFee === 0 ? (
-                          <Badge variant="success">FREE</Badge>
-                        ) : r.paymentStatus === 'PAID' ? (
-                          <Badge variant="success">PAID (₹{r.calculatedFee})</Badge>
-                        ) : (
-                          <Badge variant="gold">PENDING (₹{r.calculatedFee})</Badge>
-                        )}
-                      </td>
-                      <td>
-                        <Badge variant={getStatusBadgeVariant(r.status)}>
-                          {r.status.replace(/_/g, ' ')}
-                        </Badge>
-                      </td>
-                      <td>
-                        {r.documentNo ? (
-                          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--brand-green)' }}>
-                            {r.documentNo}
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Pending Processing</span>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                          {r.status === 'PAYMENT_PENDING' && (
-                            <button
-                              className="btn btn-sm btn-primary"
-                              onClick={() => {
-                                setPayingRequest(r);
-                                setPayError(null);
-                              }}
-                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                            >
-                              <CreditCard size={13} /> Pay ₹{r.calculatedFee}
-                            </button>
-                          )}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+              gap: '1rem',
+            }}>
+              {filteredServices.map(service => (
+                <ServiceCatalogCard
+                  key={service.id}
+                  service={service}
+                  onApply={handleOpenApply}
+                />
+              ))}
+            </div>
+          )}
 
-                          <button
-                            className="btn btn-sm btn-secondary"
-                            onClick={() => setViewingRequest(r)}
-                            style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                          >
-                            <Eye size={13} /> Details
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* ── Help note ───────────────────────────────────────────────── */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.625rem',
+            padding: '0.75rem 1rem',
+            backgroundColor: '#EFF6FF', border: '1px solid #BFDBFE',
+            borderRadius: '8px', fontSize: '0.8rem', color: '#1E40AF',
+          }}>
+            <ShieldCheck size={15} style={{ flexShrink: 0 }} />
+            <span>
+              <strong>All services are officially processed</strong> by the University Registrar &amp; Student Section. After applying, track your request status under <strong>My Requests &amp; Track</strong>.
+            </span>
+          </div>
+
+        </div>
+      )}
+
+
+
+      {/* ────────────────────────────────────────────────────────────────────────── */}
+      {/* TAB 2: MY REQUESTS & TRACK APPLICATIONS */}
+      {/* ────────────────────────────────────────────────────────────────────────── */}
+      {activeTab === 'MY_REQUESTS' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {requests.length === 0 ? (
+            <div style={{ backgroundColor: '#FFFFFF', padding: '3rem 1.5rem', textAlign: 'center', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              <FileText size={48} color="var(--brand-navy)" style={{ opacity: 0.3, margin: '0 auto 1rem auto' }} />
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-navy)' }}>No Service Applications Found</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', maxWidth: '400px', margin: '0.5rem auto 1.5rem auto' }}>
+                You have not submitted any official document or certificate requests yet.
+              </p>
+              <button className="btn btn-primary" onClick={() => setActiveTab('SERVICES')}>
+                Browse University Services Catalog
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {requests.map(req => (
+                <div
+                  key={req.id}
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)',
+                    padding: '1.25rem',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.875rem'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--brand-navy)', fontFamily: 'monospace' }}>
+                          {req.requestNo}
+                        </span>
+                        <Badge variant={getStatusBadgeVariant(req.status)}>
+                          {req.status.replace(/_/g, ' ')}
+                        </Badge>
+                        {req.isUrgent && (
+                          <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#92400E', backgroundColor: '#FEF3C7', padding: '2px 6px', borderRadius: '4px', border: '1px solid #FDE68A' }}>
+                            URGENT SLA
+                          </span>
+                        )}
+                      </div>
+                      <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--brand-navy)', margin: '0.35rem 0 0 0' }}>
+                        {req.serviceName}
+                      </h4>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                        Applied on: <strong>{new Date(req.createdAt).toLocaleString()}</strong> • Purpose: <em>"{req.purpose}"</em>
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Calculated Service Fee:</div>
+                      <div style={{ fontSize: '1.15rem', fontWeight: 900, color: req.calculatedFee === 0 ? '#16A34A' : 'var(--brand-navy)' }}>
+                        {req.calculatedFee === 0 ? 'FREE' : `₹${req.calculatedFee}`}
+                      </div>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: req.paymentStatus === 'PAID' ? '#16A34A' : '#D97706' }}>
+                        Payment: {req.paymentStatus}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* ── Status Timeline Stepper ── */}
+                  <div style={{ padding: '0.75rem 0', borderTop: '1px solid #F1F5F9' }}>
+                    <RequestTimelineStepper status={req.status} isUrgent={req.isUrgent} />
+                  </div>
+
+                  {/* Actions Bar */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span>Delivery Mode: <strong style={{ color: '#0F2C59' }}>Physical Hardcopy (Student Section)</strong></span>
+                      {req.workingDaysDueDate && (
+                        <span>• Expected SLA: <strong style={{ color: '#1E40AF' }}>{req.workingDaysDueDate}</strong></span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      {req.paymentStatus === 'PENDING' && req.calculatedFee > 0 && (
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={() => setPayingRequest(req)}
+                          style={{ fontWeight: 800, background: 'var(--brand-orange)', borderColor: 'var(--brand-orange)' }}
+                        >
+                          <CreditCard size={14} /> Pay Fee (₹{req.calculatedFee})
+                        </button>
+                      )}
+
+                      {req.receiptNo && (
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleOpenReceipt(req.receiptNo!)}
+                          style={{ fontWeight: 700 }}
+                        >
+                          <FileText size={14} /> View Receipt
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setViewingRequest(req)}
+                      >
+                        <Clock size={14} /> Track Timeline
+                      </button>
+
+                      {(req.status === 'DOCUMENT_READY' || req.status === 'READY' || req.status === 'COMPLETED') && req.documentNo && (
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={() => {
+                            const doc = documents.find(d => d.documentNo === req.documentNo);
+                            if (doc) {
+                              setViewingDocument(doc);
+                            } else {
+                              setViewingDocument({
+                                id: req.documentId || 'doc-1',
+                                documentNo: req.documentNo!,
+                                requestId: req.id,
+                                requestNo: req.requestNo,
+                                studentId: req.studentId,
+                                studentName: req.studentName,
+                                enrollmentNo: req.enrollmentNo,
+                                departmentName: req.departmentName,
+                                programName: req.programName,
+                                serviceName: req.serviceName,
+                                title: `Official ${req.serviceName}`,
+                                fileUrl: req.documentUrl || '#',
+                                fileType: 'PDF',
+                                generatedBy: 'REGISTRAR',
+                                generatedByName: 'Dr. K. N. Rao (Registrar)',
+                                generatedAt: req.documentIssuedAt || req.updatedAt,
+                                version: 1,
+                                verificationCode: `SSIU-VERIFY-${req.enrollmentNo}-2026`,
+                                status: 'ACTIVE',
+                                downloadsCount: 0
+                              });
+                            }
+                          }}
+                        >
+                          <Award size={14} /> View Verified Document
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
       )}
 
       {/* ────────────────────────────────────────────────────────────────────────── */}
-      {/* TAB 3: MY DOCUMENTS */}
+      {/* TAB 3: VERIFIED DOCUMENTS & VAULT */}
       {/* ────────────────────────────────────────────────────────────────────────── */}
-      {activeTab === 'MY_DOCUMENTS' && (() => {
-        const currentStudent = db.getStudents().find(s => s.id === user?.id || s.enrollmentNo === user?.username) || db.getStudents()[0];
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            {/* Student Documents Section from Document Master Single Source of Truth */}
-            {currentStudent && (
-              <StudentDocumentsSection student={currentStudent} onRefresh={loadData} />
-            )}
-
-            {/* Issued Official Service Certificates */}
-            <div className="card" style={{ padding: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Award size={20} color="var(--brand-gold)" />
-                Issued Official University Certificates ({documents.length})
-              </h3>
-
-              {documents.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)' }}>
-                  <ShieldCheck size={40} style={{ opacity: 0.3, marginBottom: '0.75rem' }} />
-                  <p style={{ fontSize: '0.9375rem', fontWeight: 600 }}>No service certificates issued yet.</p>
-                  <p style={{ fontSize: '0.8rem' }}>Apply for Bonafide, Transcript, or Degree in Services tab to generate official verified certificates.</p>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
-                  {documents.map(doc => (
-                    <div 
-                      key={doc.id}
-                      className="card"
-                      style={{
-                        padding: '1.5rem',
-                        borderLeft: '4px solid var(--brand-green)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'space-between',
-                        gap: '1rem'
-                      }}
-                    >
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                          <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
-                            {doc.documentNo}
-                          </span>
-                          <Badge variant="success">VERIFIED</Badge>
-                        </div>
-
-                        <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '0.35rem' }}>
-                          {doc.serviceName}
-                        </h4>
-
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                          Issued to: <strong>{doc.studentName}</strong> ({doc.enrollmentNo})<br />
-                          Issued Date: {new Date(doc.generatedAt).toLocaleDateString()}<br />
-                          Verification Security Code: <code>{doc.verificationCode}</code>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button 
-                          className="btn btn-secondary" 
-                          onClick={() => setViewingDocument(doc)}
-                          style={{ flex: 1, fontSize: '0.8rem', justifyContent: 'center' }}
-                        >
-                          <Eye size={14} /> Preview
-                        </button>
-                        <a 
-                          href={doc.fileUrl} 
-                          target="_blank" 
-                          rel="noreferrer" 
-                          className="btn btn-primary"
-                          style={{ flex: 1, fontSize: '0.8rem', justifyContent: 'center' }}
-                        >
-                          <Download size={14} /> Download
-                        </a>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+      {activeTab === 'MY_DOCUMENTS' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {documents.length === 0 ? (
+            <div style={{ backgroundColor: '#FFFFFF', padding: '3rem 1.5rem', textAlign: 'center', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+              <Award size={48} color="var(--brand-navy)" style={{ opacity: 0.3, margin: '0 auto 1rem auto' }} />
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-navy)' }}>No Official Documents Issued Yet</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', maxWidth: '420px', margin: '0.5rem auto 1.5rem auto' }}>
+                Once your service requests are verified and generated by the Registrar, your official digital certificates with QR verification tokens will appear here.
+              </p>
+              <button className="btn btn-primary" onClick={() => setActiveTab('SERVICES')}>
+                Apply for Official Certificate
+              </button>
             </div>
-          </div>
-        );
-      })()}
-
-      {/* ────────────────────────────────────────────────────────────────────────── */}
-      {/* MODAL 1: APPLY FOR SERVICE */}
-      {/* ────────────────────────────────────────────────────────────────────────── */}
-      {applyingService && (
-        <Modal isOpen={Boolean(applyingService)} onClose={() => setApplyingService(null)} title={`Apply: ${applyingService.name}`} maxWidth="640px">
-          <form onSubmit={handleApplySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            
-            <div style={{ backgroundColor: 'var(--bg-main)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', fontSize: '0.85rem' }}>
-              <div><strong>Service:</strong> {applyingService.name} ({applyingService.category})</div>
-              <div style={{ marginTop: '0.25rem' }}><strong>Base Fee:</strong> {applyingService.fee === 0 ? 'FREE' : `₹${applyingService.fee} per copy`}</div>
-              <div style={{ marginTop: '0.25rem' }}><strong>Standard Processing:</strong> {applyingService.processingDays} working days</div>
-            </div>
-
-            {formError && (
-              <div style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '0.75rem', borderRadius: '6px', fontSize: '0.85rem' }}>
-                {formError}
-              </div>
-            )}
-
-            <div>
-              <label className="form-label" style={{ fontWeight: 600 }}>Purpose / Reason <span style={{ color: '#EF4444' }}>*</span></label>
-              <textarea
-                className="form-input"
-                rows={3}
-                placeholder="e.g. Required for Canadian Study Visa Application & Bank Education Loan Documentation..."
-                value={purpose}
-                onChange={e => setPurpose(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="grid-2">
-              <div>
-                <label className="form-label" style={{ fontWeight: 600 }}>Number of Official Copies</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={10}
-                  className="form-input"
-                  value={copies}
-                  onChange={e => setCopies(Math.max(1, Number(e.target.value)))}
-                />
-              </div>
-
-              <div>
-                <label className="form-label" style={{ fontWeight: 600 }}>Preferred Delivery Mode</label>
-                <select
-                  className="form-select"
-                  value={deliveryMode}
-                  onChange={e => setDeliveryMode(e.target.value as any)}
+          ) : (
+            <div className="grid-2" style={{ gap: '1rem' }}>
+              {documents.map(doc => (
+                <div
+                  key={doc.id}
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)',
+                    padding: '1.25rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.03)'
+                  }}
                 >
-                  <option value="DIGITAL">Digital PDF Vault Only (Instant Download)</option>
-                  <option value="PHYSICAL">Physical Hardcopy (Collect from Student Section)</option>
-                  <option value="BOTH">Both Digital Copy + Physical Dispatch</option>
-                </select>
-              </div>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-orange)', fontFamily: 'monospace' }}>
+                        {doc.documentNo}
+                      </span>
+                      <Badge variant="success">DIGITALLY VERIFIED</Badge>
+                    </div>
+
+                    <h4 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-navy)', margin: '0.25rem 0' }}>
+                      {doc.serviceName}
+                    </h4>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      Student: <strong>{doc.studentName}</strong> ({doc.enrollmentNo})
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                      Issued On: <strong>{new Date(doc.generatedAt).toLocaleDateString()}</strong> • Verification Code: <code style={{ color: 'var(--brand-navy)', fontWeight: 700 }}>{doc.verificationCode}</code>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.25rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => setViewingDocument(doc)}
+                    >
+                      <Eye size={14} /> Preview Document
+                    </button>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => setViewingDocument(doc)}
+                    >
+                      <Download size={14} /> Download PDF
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
+          )}
+        </div>
+      )}
 
-            {applyingService.urgentFee > 0 && (
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', backgroundColor: '#FFFBEB', padding: '0.75rem', borderRadius: '6px', border: '1px solid #FDE68A' }}>
-                <input
-                  type="checkbox"
-                  checked={isUrgent}
-                  onChange={e => setIsUrgent(e.target.checked)}
-                />
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#92400E' }}>
-                  Request Urgent Priority Processing (+₹{applyingService.urgentFee} fee for 24-48 hour clearance)
-                </span>
-              </label>
-            )}
+      {/* ────────────────────────────────────────────────────────────────────────── */}
+      {/* TAB 4: STAFF OPERATIONS QUEUE (EXCEL VIEW) */}
+      {/* ────────────────────────────────────────────────────────────────────────── */}
+      {activeTab === 'STAFF_QUEUE' && (
+        <StaffServiceQueueView
+          requests={studentSectionService.getScopedRequests(user, 'STUDENT_SECTION')}
+          currentUser={user!}
+          onRefresh={loadData}
+          onShowToast={showToast}
+        />
+      )}
 
-            {deliveryMode !== 'DIGITAL' && (
-              <div>
-                <label className="form-label" style={{ fontWeight: 600 }}>Postal / Courier Delivery Address</label>
-                <textarea
-                  className="form-input"
-                  rows={2}
-                  placeholder="Enter full postal address with PIN code if requesting postal dispatch..."
-                  value={deliveryAddress}
-                  onChange={e => setDeliveryAddress(e.target.value)}
-                />
-              </div>
-            )}
-
-            {/* Fee Summary Box */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.875rem 1rem', backgroundColor: '#EEF4FB', borderRadius: '8px', border: '1px solid #BFDBFE' }}>
-              <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>Total Calculated Service Fee:</span>
-              <span style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--brand-navy)' }}>
-                {(applyingService.fee * copies) + (isUrgent ? applyingService.urgentFee : 0) === 0
-                  ? 'FREE'
-                  : `₹${(applyingService.fee * copies) + (isUrgent ? applyingService.urgentFee : 0)}`}
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-              <button type="button" onClick={() => setApplyingService(null)} className="btn btn-secondary" disabled={loading}>
-                Cancel
-              </button>
-              <button type="submit" className="btn btn-primary" disabled={loading}>
-                {loading ? 'Submitting...' : <><Send size={16} /> Confirm &amp; Submit Application</>}
-              </button>
-            </div>
-          </form>
-        </Modal>
+      {/* ────────────────────────────────────────────────────────────────────────── */}
+      {/* MODAL 1: APPLY FOR SERVICE (DYNAMIC FORM) */}
+      {/* ────────────────────────────────────────────────────────────────────────── */}
+      {applyingService && user && (
+        <ServiceApplicationModal
+          isOpen={Boolean(applyingService)}
+          onClose={() => {
+            setApplyingService(null);
+            loadData();
+          }}
+          service={applyingService}
+          user={user}
+          onProceedToPayment={handleProceedToPayment}
+          onSuccessToast={(msg) => {
+            showToast('success', msg);
+            loadData();
+          }}
+        />
       )}
 
       {/* ────────────────────────────────────────────────────────────────────────── */}
       {/* MODAL 2: PAY FOR SERVICE */}
       {/* ────────────────────────────────────────────────────────────────────────── */}
-      {payingRequest && (
-        <Modal isOpen={Boolean(payingRequest)} onClose={() => setPayingRequest(null)} title={`Pay Service Fee: ${payingRequest.requestNo}`} maxWidth="520px">
-          <form onSubmit={handlePaySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            <div style={{ backgroundColor: '#EEF4FB', padding: '1rem', borderRadius: '8px', border: '1px solid #BFDBFE' }}>
-              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Service Requested:</div>
-              <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-navy)' }}>{payingRequest.serviceName}</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--brand-orange)', marginTop: '0.5rem' }}>
-                ₹{payingRequest.calculatedFee.toLocaleString()}
-              </div>
-            </div>
-
-            {payError && (
-              <div style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '0.75rem', borderRadius: '6px', fontSize: '0.85rem' }}>
-                {payError}
-              </div>
-            )}
-
-            <div>
-              <label className="form-label" style={{ fontWeight: 600 }}>Payment Method</label>
-              <select className="form-select" value={payMode} onChange={e => setPayMode(e.target.value as PaymentMode)}>
-                <option value="Online UPI">Instant UPI (Google Pay, PhonePe, Paytm)</option>
-                <option value="Net Banking">Net Banking (HDFC, SBI, ICICI, Axis)</option>
-                <option value="Debit Card">Debit Card</option>
-                <option value="Credit Card">Credit Card</option>
-              </select>
-            </div>
-
-            {payMode === 'Online UPI' && (
-              <div>
-                <label className="form-label" style={{ fontWeight: 600 }}>Virtual Payment Address (UPI ID)</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  value={upiId}
-                  onChange={e => setUpiId(e.target.value)}
-                  placeholder="username@okhdfcbank"
-                  required
-                />
-              </div>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-              <button type="button" onClick={() => setPayingRequest(null)} className="btn btn-secondary" disabled={payLoading}>
-                Cancel
-              </button>
-              <button type="submit" className="btn btn-primary" disabled={payLoading}>
-                {payLoading ? 'Verifying Transaction...' : <><CreditCard size={16} /> Pay ₹{payingRequest.calculatedFee} &amp; Confirm</>}
-              </button>
-            </div>
-          </form>
-        </Modal>
+      {payingRequest && user && (
+        <ServicePaymentModal
+          isOpen={Boolean(payingRequest)}
+          onClose={() => {
+            setPayingRequest(null);
+            loadData();
+          }}
+          request={payingRequest}
+          user={user}
+          onPaymentSuccess={(receiptNo) => {
+            showToast('success', `Payment confirmed! Receipt ${receiptNo} generated.`);
+            loadData();
+          }}
+        />
       )}
 
       {/* ────────────────────────────────────────────────────────────────────────── */}
@@ -750,90 +779,17 @@ export const StudentSectionPage: React.FC<StudentSectionPageProps> = ({ initialT
       )}
 
       {/* ────────────────────────────────────────────────────────────────────────── */}
-      {/* MODAL 4: DOCUMENT PREVIEW */}
+      {/* MODAL 4: DOCUMENT PREVIEW (OFFICIAL CERTIFICATE) */}
       {/* ────────────────────────────────────────────────────────────────────────── */}
       {viewingDocument && (
-        <Modal isOpen={Boolean(viewingDocument)} onClose={() => setViewingDocument(null)} title={`Official Certificate Preview: ${viewingDocument.documentNo}`} maxWidth="750px">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {/* Formal Certificate Display Frame */}
-            <div style={{
-              border: '8px double var(--brand-navy)',
-              padding: '2.5rem',
-              backgroundColor: '#FFFDF9',
-              borderRadius: '8px',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-              position: 'relative'
-            }}>
-              {/* Seal Watermark Background */}
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                opacity: 0.04,
-                pointerEvents: 'none'
-              }}>
-                <Award size={320} color="var(--brand-navy)" />
-              </div>
-
-              {/* University Header */}
-              <div style={{ textAlign: 'center', borderBottom: '2px solid var(--brand-orange)', paddingBottom: '1rem', marginBottom: '1.5rem' }}>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: 'var(--brand-navy)', margin: 0, letterSpacing: '0.5px' }}>
-                  SWARRNIM STARTUP &amp; INNOVATION UNIVERSITY
-                </h2>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  (Established under Gujarat Private Universities Act No. 8 of 2017) • Gandhinagar, Gujarat - 382420
-                </div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-orange)', marginTop: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                  {viewingDocument.serviceName}
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  Document No: <strong>{viewingDocument.documentNo}</strong> • Date of Issue: <strong>{new Date(viewingDocument.generatedAt).toLocaleDateString()}</strong>
-                </div>
-              </div>
-
-              {/* Certificate Body */}
-              <div style={{ fontSize: '0.95rem', lineHeight: 1.8, color: '#1E293B', marginBottom: '2rem' }}>
-                This is to certify that <strong>{viewingDocument.studentName}</strong>, bearing Enrollment Number <strong>{viewingDocument.enrollmentNo}</strong>, is a registered student of the <strong>{viewingDocument.departmentName}</strong> pursuing <strong>{viewingDocument.programName}</strong> at Swarrnim Startup &amp; Innovation University.
-                <br /><br />
-                This document is generated automatically by the university's Enterprise ERP System and stands digitally verified under the University Academic Charter with security verification token <strong>{viewingDocument.verificationCode}</strong>.
-              </div>
-
-              {/* Footer Signatures */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', paddingTop: '1.5rem', borderTop: '1px solid #E2E8F0' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ width: '64px', height: '64px', margin: '0 auto', backgroundColor: '#F1F5F9', border: '1px solid #CBD5E1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <QrCode size={48} color="var(--brand-navy)" />
-                  </div>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem' }}>Digital Verification QR</span>
-                </div>
-
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontStyle: 'italic', fontWeight: 700, color: 'var(--brand-navy)' }}>
-                    Dr. K. N. Rao
-                  </div>
-                  <div style={{ borderTop: '1px solid var(--brand-navy)', paddingTop: '0.25rem', fontSize: '0.75rem', fontWeight: 700 }}>
-                    Registrar / Controller of Examinations
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-              <button className="btn btn-secondary" onClick={() => setViewingDocument(null)}>
-                Close
-              </button>
-              <button className="btn btn-primary" onClick={() => window.print()}>
-                <Printer size={16} /> Print Document
-              </button>
-              <a href={viewingDocument.fileUrl} target="_blank" rel="noreferrer" className="btn btn-navy">
-                <Download size={16} /> Download Official PDF
-              </a>
-            </div>
-          </div>
-        </Modal>
+        <OfficialDocumentViewerModal
+          isOpen={Boolean(viewingDocument)}
+          onClose={() => setViewingDocument(null)}
+          document={viewingDocument}
+        />
       )}
+
+      {/* End Modals */}
 
     </div>
   );

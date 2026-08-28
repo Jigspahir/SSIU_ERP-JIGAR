@@ -397,4 +397,236 @@ export class AssetsService {
 
     return { total, available, assigned, underMaintenance, disposed, warrantyExpiring };
   }
+
+  // ── My Assets (Faculty / Staff Scoped)
+  async getMyAssets(userId: string) {
+    return this.prisma.asset.findMany({
+      where: {
+        assignments: {
+          some: {
+            assignedToUserId: userId,
+            status: 'ACTIVE'
+          }
+        }
+      },
+      include: {
+        category: true,
+        assignments: {
+          where: { assignedToUserId: userId, status: 'ACTIVE' }
+        }
+      }
+    });
+  }
+
+  // ── Receive Stock (Inward Master Item)
+  async receiveStock(dto: any, userId: string) {
+    const existing = await this.prisma.asset.findUnique({ where: { assetTag: dto.assetTag.toUpperCase() } });
+    if (existing) throw new ConflictException(`Asset tag '${dto.assetTag}' already exists.`);
+
+    return this.prisma.$transaction(async (tx) => {
+      const asset = await tx.asset.create({
+        data: {
+          assetTag: dto.assetTag.toUpperCase(),
+          name: dto.name,
+          categoryId: dto.categoryId,
+          serialNo: dto.serialNo,
+          manufacturer: dto.manufacturer,
+          modelNo: dto.modelNo,
+          purchaseDate: dto.purchaseDate ? new Date(dto.purchaseDate) : new Date(),
+          purchasePrice: dto.purchasePrice ? Number(dto.purchasePrice) : 0,
+          currentValue: dto.purchasePrice ? Number(dto.purchasePrice) : 0,
+          location: dto.location || 'Central University Store',
+          invoiceRef: dto.invoiceRef,
+          poNo: dto.poNo,
+          remarks: dto.remarks ? `Vendor: ${dto.vendor || 'Depot'} | ${dto.remarks}` : `Vendor: ${dto.vendor || 'Depot'}`,
+          status: 'AVAILABLE'
+        },
+        include: { category: true }
+      });
+
+      // Log movement as CENTRAL_DISPATCH inward
+      await tx.assetTransfer.create({
+        data: {
+          transferNo: await this.nextSeq('TRN', () => tx.assetTransfer.count()),
+          assetId: asset.id,
+          toLocation: dto.location || 'Central University Store',
+          reason: 'Vendor procurement and stock inward receipt',
+          transferredByUserId: userId,
+          transferredAt: new Date()
+        }
+      });
+
+      return asset;
+    });
+  }
+
+  // ── Issue Stock
+  async issueStock(dto: any, userId: string) {
+    const asset = await this.prisma.asset.findUnique({ where: { id: dto.assetId } });
+    if (!asset) throw new NotFoundException('Asset record not found.');
+
+    return this.prisma.$transaction(async (tx) => {
+      const updatedAsset = await tx.asset.update({
+        where: { id: asset.id },
+        data: {
+          status: dto.recipientRole === 'HOI' ? 'ASSIGNED_TO_HOI' : 'ASSIGNED_TO_HOD',
+          assignedDeptId: dto.departmentId,
+          location: dto.location || asset.location
+        }
+      });
+
+      await tx.assetTransfer.create({
+        data: {
+          transferNo: await this.nextSeq('TRN', () => tx.assetTransfer.count()),
+          assetId: asset.id,
+          toLocation: dto.location || 'Institution Store',
+          reason: dto.remarks || `Stock issued to ${dto.recipientRole}`,
+          receivedByUserId: dto.issueToUserId,
+          transferredByUserId: userId,
+          transferredAt: new Date()
+        }
+      });
+
+      return updatedAsset;
+    });
+  }
+
+  // ── Transfer Requests Workflow
+  async createTransferRequest(dto: any, userId: string) {
+    const asset = await this.prisma.asset.findUnique({ where: { id: dto.assetId } });
+    if (!asset) throw new NotFoundException('Asset not found.');
+
+    return this.prisma.asset.update({
+      where: { id: asset.id },
+      data: {
+        status: 'TRANSFER_REQUESTED',
+        remarks: `Transfer requested to User ${dto.toUserId}: ${dto.reason}`
+      }
+    });
+  }
+
+  async approveTransferRequest(assetId: string, remarks: string, userId: string) {
+    const asset = await this.prisma.asset.findUnique({ where: { id: assetId } });
+    if (!asset) throw new NotFoundException('Asset not found.');
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.asset.update({
+        where: { id: assetId },
+        data: {
+          status: 'ASSIGNED',
+          remarks: `Transfer approved: ${remarks}`
+        }
+      });
+
+      return updated;
+    });
+  }
+
+  async rejectTransferRequest(assetId: string, remarks: string, userId: string) {
+    return this.prisma.asset.update({
+      where: { id: assetId },
+      data: {
+        status: 'ASSIGNED',
+        remarks: `Transfer rejected: ${remarks}`
+      }
+    });
+  }
+
+  // ── Return Requests Workflow
+  async createReturnRequest(dto: any, userId: string) {
+    const asset = await this.prisma.asset.findUnique({ where: { id: dto.assetId } });
+    if (!asset) throw new NotFoundException('Asset not found.');
+
+    return this.prisma.asset.update({
+      where: { id: asset.id },
+      data: {
+        status: 'RETURN_REQUESTED',
+        remarks: `Return requested: ${dto.returnReason} (Condition: ${dto.conditionAtReturn})`
+      }
+    });
+  }
+
+  async approveReturnRequest(assetId: string, dto: any, userId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      // Mark active assignments as COMPLETED
+      await tx.assetAssignment.updateMany({
+        where: { assetId, status: 'ACTIVE' },
+        data: { status: 'COMPLETED', returnedDate: new Date(), returnRemarks: dto.remarks }
+      });
+
+      return tx.asset.update({
+        where: { id: assetId },
+        data: {
+          status: 'AVAILABLE',
+          location: 'Department Store',
+          remarks: `Returned to store. Verified condition: ${dto.conditionAtReturn || 'GOOD'}`
+        }
+      });
+    });
+  }
+
+  // ── Replacement Requests Workflow
+  async createReplacementRequest(dto: any, userId: string) {
+    const asset = await this.prisma.asset.findUnique({ where: { id: dto.assetId } });
+    if (!asset) throw new NotFoundException('Asset not found.');
+
+    return this.prisma.asset.update({
+      where: { id: asset.id },
+      data: {
+        status: 'REPLACEMENT_REQUESTED',
+        remarks: `Replacement proposal: ${dto.reason} | ${dto.problemDescription}`
+      }
+    });
+  }
+
+  async approveReplacementRequest(assetId: string, dto: any, userId: string) {
+    return this.prisma.asset.update({
+      where: { id: assetId },
+      data: {
+        status: 'DISPOSED',
+        remarks: `Condemned and replaced by ${dto.replacementAssetTag || 'New unit'}`
+      }
+    });
+  }
+
+  // ── Issue / Damage Reporting
+  async createIssueReport(dto: any, userId: string) {
+    return this.prisma.asset.update({
+      where: { id: dto.assetId },
+      data: {
+        status: dto.issueType === 'LOST' ? 'LOST' : 'DAMAGED',
+        remarks: `Reported issue: ${dto.issueType} - ${dto.description}`
+      }
+    });
+  }
+
+  // ── Physical Verification
+  async createVerification(dto: any, userId: string) {
+    const asset = await this.prisma.asset.findUnique({ where: { id: dto.assetId } });
+    if (!asset) throw new NotFoundException('Asset not found.');
+
+    if (dto.verificationStatus === 'MISSING') {
+      await this.prisma.asset.update({
+        where: { id: dto.assetId },
+        data: { status: 'LOST', remarks: `Marked LOST during verification by user ${userId}` }
+      });
+    }
+
+    return { success: true, assetId: dto.assetId, verifiedAt: new Date() };
+  }
+
+  // ── Archive Asset
+  async archiveAsset(id: string, dto: any, userId: string) {
+    const asset = await this.prisma.asset.findUnique({ where: { id } });
+    if (!asset) throw new NotFoundException('Asset not found.');
+
+    return this.prisma.asset.update({
+      where: { id },
+      data: {
+        status: 'ARCHIVED',
+        remarks: `Archived: ${dto.reason || 'Asset record archived'}`
+      }
+    });
+  }
 }
+

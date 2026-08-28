@@ -7,6 +7,7 @@ import {
   CampusFacilityCategory, SuggestionCategory 
 } from '../../types/feedback';
 import { Badge } from '../../components/common/Badge';
+import { ExcelTableContainer, ExcelTable, ExcelTh, ExcelTd } from '../../components/common/ExcelTable';
 import { StatCard } from '../../components/common/StatCard';
 import { Modal } from '../../components/common/Modal';
 import { 
@@ -15,9 +16,46 @@ import {
   Sparkles, ThumbsUp, Eye, Lock, RefreshCw, X, Check
 } from 'lucide-react';
 
-export const StudentFeedbackPage: React.FC = () => {
+interface StudentFeedbackPageProps {
+  activeSubTab?: string;
+  onTabChange?: (tab: string) => void;
+}
+
+export const StudentFeedbackPage: React.FC<StudentFeedbackPageProps> = ({ activeSubTab, onTabChange }) => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'GIVE_FEEDBACK' | 'MY_FEEDBACK' | 'SUGGESTIONS'>('GIVE_FEEDBACK');
+  
+  const mapSubTabToInternal = (tab?: string): 'GIVE_FEEDBACK' | 'MY_FEEDBACK' | 'SUGGESTIONS' => {
+    if (tab === 'feedback-my') return 'MY_FEEDBACK';
+    if (tab === 'feedback-suggestions') return 'SUGGESTIONS';
+    return 'GIVE_FEEDBACK';
+  };
+
+  const [activeTab, setActiveTabInternal] = useState<'GIVE_FEEDBACK' | 'MY_FEEDBACK' | 'SUGGESTIONS'>(() => {
+    if (activeSubTab) return mapSubTabToInternal(activeSubTab);
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const tabParam = searchParams.get('tab');
+      if (tabParam) return mapSubTabToInternal(tabParam);
+    }
+    return 'GIVE_FEEDBACK';
+  });
+
+  // Sync internal tab whenever activeSubTab prop changes (e.g. sidebar navigation)
+  React.useEffect(() => {
+    if (activeSubTab) {
+      setActiveTabInternal(mapSubTabToInternal(activeSubTab));
+    }
+  }, [activeSubTab]);
+
+  const handleTabSwitch = (tab: 'GIVE_FEEDBACK' | 'MY_FEEDBACK' | 'SUGGESTIONS') => {
+    setActiveTabInternal(tab);
+    const targetRoute = tab === 'MY_FEEDBACK' ? 'feedback-my' : (tab === 'SUGGESTIONS' ? 'feedback-suggestions' : 'feedback-give');
+    if (onTabChange) {
+      onTabChange(targetRoute);
+    } else if (typeof window !== 'undefined' && window.history) {
+      window.history.pushState({ tab: targetRoute }, '', `?tab=${targetRoute}`);
+    }
+  };
 
   // Feedback Form State
   const [selectedCategory, setSelectedCategory] = useState<FeedbackCategoryType>('SUBJECT');
@@ -179,7 +217,7 @@ export const StudentFeedbackPage: React.FC = () => {
       setSuggestions('');
       setRefreshKey(k => k + 1);
       showToast('success', `${selectedCategory.replace(/_/g, ' ')} Feedback submitted successfully.`);
-      setActiveTab('MY_FEEDBACK');
+      handleTabSwitch('MY_FEEDBACK');
     } catch (err: any) {
       showToast('error', err.message || 'Failed to submit feedback.');
     }
@@ -204,7 +242,7 @@ export const StudentFeedbackPage: React.FC = () => {
       setExpectedImprovement('');
       setRefreshKey(k => k + 1);
       showToast('success', 'Your improvement suggestion has been recorded.');
-      setActiveTab('SUGGESTIONS');
+      handleTabSwitch('SUGGESTIONS');
     } catch (err: any) {
       showToast('error', err.message || 'Failed to submit suggestion.');
     }
@@ -262,21 +300,21 @@ export const StudentFeedbackPage: React.FC = () => {
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button 
             className={`btn ${activeTab === 'GIVE_FEEDBACK' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('GIVE_FEEDBACK')}
+            onClick={() => handleTabSwitch('GIVE_FEEDBACK')}
             style={{ backgroundColor: activeTab === 'GIVE_FEEDBACK' ? 'var(--brand-gold)' : 'rgba(255,255,255,0.15)', color: activeTab === 'GIVE_FEEDBACK' ? '#000' : '#FFF', border: 'none' }}
           >
             <Plus size={16} /> Give Feedback
           </button>
           <button 
             className={`btn ${activeTab === 'MY_FEEDBACK' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('MY_FEEDBACK')}
+            onClick={() => handleTabSwitch('MY_FEEDBACK')}
             style={{ backgroundColor: activeTab === 'MY_FEEDBACK' ? 'var(--brand-gold)' : 'rgba(255,255,255,0.15)', color: activeTab === 'MY_FEEDBACK' ? '#000' : '#FFF', border: 'none' }}
           >
             <FileText size={16} /> My Feedback ({myFeedbacks.length})
           </button>
           <button 
             className={`btn ${activeTab === 'SUGGESTIONS' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('SUGGESTIONS')}
+            onClick={() => handleTabSwitch('SUGGESTIONS')}
             style={{ backgroundColor: activeTab === 'SUGGESTIONS' ? 'var(--brand-gold)' : 'rgba(255,255,255,0.15)', color: activeTab === 'SUGGESTIONS' ? '#000' : '#FFF', border: 'none' }}
           >
             <Sparkles size={16} /> Suggestions ({mySuggestions.length})
@@ -496,50 +534,96 @@ export const StudentFeedbackPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Qualitative Comments & Suggestions */}
-              <div className="grid-2">
+              {/* Qualitative Comments & Suggestions in 2-Column Responsive Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem', alignItems: 'start' }}>
                 <div>
-                  <label style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                  <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.85rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
                     Detailed Comments &amp; Remarks (Optional)
                   </label>
                   <textarea 
-                    className="form-control" 
-                    rows={3} 
+                    className="input-field" 
+                    rows={5} 
                     placeholder="Share specific observations or positive feedback..." 
                     value={comments} 
                     onChange={e => setComments(e.target.value)} 
+                    style={{ 
+                      width: '100%', 
+                      minHeight: '120px', 
+                      height: '130px', 
+                      resize: 'vertical', 
+                      fontSize: '0.85rem', 
+                      lineHeight: 1.5,
+                      padding: '0.75rem', 
+                      borderColor: '#CBD5E1', 
+                      borderRadius: '6px',
+                      backgroundColor: '#FFFFFF'
+                    }}
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                  <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.85rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
                     Constructive Suggestions for Improvement (Optional)
                   </label>
                   <textarea 
-                    className="form-control" 
-                    rows={3} 
+                    className="input-field" 
+                    rows={5} 
                     placeholder="Suggest concrete ways to improve..." 
                     value={suggestions} 
                     onChange={e => setSuggestions(e.target.value)} 
+                    style={{ 
+                      width: '100%', 
+                      minHeight: '120px', 
+                      height: '130px', 
+                      resize: 'vertical', 
+                      fontSize: '0.85rem', 
+                      lineHeight: 1.5,
+                      padding: '0.75rem', 
+                      borderColor: '#CBD5E1', 
+                      borderRadius: '6px',
+                      backgroundColor: '#FFFFFF'
+                    }}
                   />
                 </div>
               </div>
 
-              {/* Anonymous Toggle */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem', borderRadius: '8px', backgroundColor: 'var(--bg-surface-hover)' }}>
+              {/* Anonymous Toggle - Separate Full-Width Section */}
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '0.75rem', 
+                padding: '0.85rem 1rem', 
+                borderRadius: '8px', 
+                backgroundColor: 'var(--bg-surface-hover)', 
+                border: '1px solid var(--border-color)' 
+              }}>
                 <input 
                   type="checkbox" 
                   id="anonymous-feedback-check"
                   checked={isAnonymous} 
                   onChange={e => setIsAnonymous(e.target.checked)} 
-                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--brand-orange, #F37023)' }}
                 />
                 <label htmlFor="anonymous-feedback-check" style={{ fontSize: '0.875rem', color: 'var(--brand-navy)', fontWeight: 600, cursor: 'pointer' }}>
                   Submit Anonymously (Your name and enrollment number will be hidden from normal reviewer dashboards)
                 </label>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-                <button type="submit" className="btn btn-primary">
+              {/* Submit Feedback Button - Right Aligned */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem', 
+                    fontWeight: 700, 
+                    padding: '0.65rem 1.35rem', 
+                    background: 'var(--brand-orange, #F37023)', 
+                    borderColor: 'var(--brand-orange, #F37023)',
+                    borderRadius: '6px'
+                  }}
+                >
                   <Send size={16} /> Submit Feedback
                 </button>
               </div>
@@ -551,60 +635,66 @@ export const StudentFeedbackPage: React.FC = () => {
       {/* ─── TAB 2: MY FEEDBACK LEDGER ────────────────────────────────────── */}
       {activeTab === 'MY_FEEDBACK' && (
         <div className="card" style={{ padding: '1.5rem' }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '1rem' }}>
+          <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '1.25rem' }}>
             My Feedback Submissions ({myFeedbacks.length})
           </h3>
 
           {myFeedbacks.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
               <MessageSquare size={48} style={{ opacity: 0.3, margin: '0 auto 1rem' }} />
-              <p style={{ fontWeight: 600 }}>You have not submitted any feedback yet.</p>
-              <button className="btn btn-sm btn-primary" onClick={() => setActiveTab('GIVE_FEEDBACK')} style={{ marginTop: '0.5rem' }}>
+              <p style={{ fontWeight: 600, color: 'var(--brand-navy)', fontSize: '1rem' }}>You have not submitted any feedback yet.</p>
+              <button className="btn btn-sm btn-primary" onClick={() => handleTabSwitch('GIVE_FEEDBACK')} style={{ marginTop: '0.75rem', background: 'var(--brand-orange, #F37023)', borderColor: 'var(--brand-orange, #F37023)' }}>
                 Give Feedback Now
               </button>
             </div>
           ) : (
-            <div className="table-responsive">
-              <table className="table">
+            <ExcelTableContainer minWidth="1050px">
+              <ExcelTable>
                 <thead>
                   <tr>
-                    <th>Feedback No</th>
-                    <th>Category</th>
-                    <th>Target / Subject / Faculty</th>
-                    <th>Overall Rating</th>
-                    <th>Submitted Date</th>
-                    <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Action</th>
+                    <ExcelTh align="left" style={{ width: '130px', minWidth: '130px' }}>Feedback No</ExcelTh>
+                    <ExcelTh align="center" style={{ width: '140px', minWidth: '140px' }}>Category</ExcelTh>
+                    <ExcelTh align="left" style={{ width: '240px', minWidth: '240px' }}>Target / Subject / Faculty</ExcelTh>
+                    <ExcelTh align="center" style={{ width: '130px', minWidth: '130px' }}>Overall Rating</ExcelTh>
+                    <ExcelTh align="center" style={{ width: '110px', minWidth: '110px' }}>Submitted Date</ExcelTh>
+                    <ExcelTh align="center" style={{ width: '130px', minWidth: '130px' }}>Status</ExcelTh>
+                    <ExcelTh align="center" style={{ width: '100px', minWidth: '100px' }}>Action</ExcelTh>
                   </tr>
                 </thead>
                 <tbody>
                   {myFeedbacks.map(f => (
                     <tr key={f.id}>
-                      <td><code style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{f.feedbackNo}</code></td>
-                      <td><Badge variant="navy">{f.category.replace(/_/g, ' ')}</Badge></td>
-                      <td>
+                      <ExcelTd align="left" mono color="#1E40AF">
+                        <span style={{ fontWeight: 800 }}>{f.feedbackNo}</span>
+                      </ExcelTd>
+                      <ExcelTd align="center">
+                        <Badge variant="navy">{f.category.replace(/_/g, ' ')}</Badge>
+                      </ExcelTd>
+                      <ExcelTd align="left">
                         <div style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>
                           {f.subjectName || f.facultyName || f.mentorName || f.hodName || f.hoiName || f.campusFacilityCategory?.replace(/_/g, ' ') || 'University'}
                         </div>
                         {f.isAnonymous && <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>(Submitted Anonymously)</span>}
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#F59E0B', fontWeight: 700 }}>
-                          <Star size={16} fill="#F59E0B" /> {f.overallRating} / 5
+                      </ExcelTd>
+                      <ExcelTd align="center">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#F59E0B', fontWeight: 700 }}>
+                          <Star size={15} fill="#F59E0B" /> {f.overallRating} / 5
                         </div>
-                      </td>
-                      <td>{new Date(f.createdAt).toLocaleDateString()}</td>
-                      <td>{getStatusBadge(f.status)}</td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button className="btn btn-sm btn-secondary" onClick={() => setViewingFeedback(f)}>
-                          <Eye size={14} /> View
+                      </ExcelTd>
+                      <ExcelTd align="center">
+                        <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{new Date(f.createdAt).toLocaleDateString()}</span>
+                      </ExcelTd>
+                      <ExcelTd align="center">{getStatusBadge(f.status)}</ExcelTd>
+                      <ExcelTd align="center">
+                        <button className="btn btn-sm btn-secondary" onClick={() => setViewingFeedback(f)} style={{ padding: '0.25rem 0.65rem', fontSize: '0.78rem' }}>
+                          <Eye size={13} /> View
                         </button>
-                      </td>
+                      </ExcelTd>
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+              </ExcelTable>
+            </ExcelTableContainer>
           )}
         </div>
       )}
@@ -621,14 +711,17 @@ export const StudentFeedbackPage: React.FC = () => {
               Propose institutional improvements, new club activities, technological innovations, or facility upgrades.
             </p>
 
-            <form onSubmit={handleSubmitSuggestion} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="grid-2">
+            <form onSubmit={handleSubmitSuggestion} style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
                 <div>
-                  <label style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-muted)' }}>Suggestion Category *</label>
+                  <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.85rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
+                    Suggestion Category *
+                  </label>
                   <select 
-                    className="form-control" 
+                    className="input-field" 
                     value={suggestionCategory} 
                     onChange={e => setSuggestionCategory(e.target.value as any)}
+                    style={{ width: '100%', height: '40px', fontSize: '0.85rem', borderColor: '#CBD5E1' }}
                   >
                     <option value="ACADEMIC">Academic Curriculum</option>
                     <option value="TEACHING">Teaching Pedagogy</option>
@@ -648,56 +741,78 @@ export const StudentFeedbackPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-muted)' }}>Suggestion Title *</label>
+                  <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.85rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
+                    Suggestion Title *
+                  </label>
                   <input 
                     type="text" 
-                    className="form-control" 
+                    className="input-field" 
                     placeholder="e.g. 24/7 Digital Library Terminal in CS Building" 
                     value={suggestionTitle} 
                     onChange={e => setSuggestionTitle(e.target.value)} 
                     required 
+                    style={{ width: '100%', height: '40px', fontSize: '0.85rem', borderColor: '#CBD5E1' }}
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-muted)' }}>Detailed Description *</label>
+                <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.85rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
+                  Detailed Description *
+                </label>
                 <textarea 
-                  className="form-control" 
-                  rows={3} 
+                  className="input-field" 
+                  rows={4} 
                   placeholder="Explain the proposed improvement in detail..." 
                   value={suggestionDescription} 
                   onChange={e => setSuggestionDescription(e.target.value)} 
                   required 
+                  style={{ width: '100%', minHeight: '100px', resize: 'vertical', fontSize: '0.85rem', padding: '0.75rem', borderColor: '#CBD5E1', borderRadius: '6px' }}
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-muted)' }}>Expected Impact / Improvement (Optional)</label>
+                <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.85rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
+                  Expected Impact / Improvement (Optional)
+                </label>
                 <input 
                   type="text" 
-                  className="form-control" 
+                  className="input-field" 
                   placeholder="e.g. Enables students to access ACM digital library journals after class hours" 
                   value={expectedImprovement} 
                   onChange={e => setExpectedImprovement(e.target.value)} 
+                  style={{ width: '100%', height: '40px', fontSize: '0.85rem', borderColor: '#CBD5E1' }}
                 />
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 1rem', borderRadius: '6px', backgroundColor: 'var(--bg-surface-hover)', border: '1px solid var(--border-color)' }}>
                 <input 
                   type="checkbox" 
                   id="suggestion-anon-check"
                   checked={suggestionAnonymous} 
                   onChange={e => setSuggestionAnonymous(e.target.checked)} 
-                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer', accentColor: 'var(--brand-orange, #F37023)' }}
                 />
                 <label htmlFor="suggestion-anon-check" style={{ fontSize: '0.875rem', color: 'var(--brand-navy)', fontWeight: 600, cursor: 'pointer' }}>
                   Submit suggestion anonymously
                 </label>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-                <button type="submit" className="btn btn-primary">
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.25rem' }}>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    gap: '0.5rem', 
+                    fontWeight: 700, 
+                    padding: '0.65rem 1.35rem', 
+                    background: 'var(--brand-orange, #F37023)', 
+                    borderColor: 'var(--brand-orange, #F37023)',
+                    borderRadius: '6px'
+                  }}
+                >
                   <Send size={16} /> Submit Suggestion
                 </button>
               </div>
@@ -706,39 +821,43 @@ export const StudentFeedbackPage: React.FC = () => {
 
           {/* My Suggestions List */}
           <div className="card" style={{ padding: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '1.25rem' }}>
               My Suggestions ({mySuggestions.length})
             </h3>
 
             {mySuggestions.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)' }}>
                 <Sparkles size={40} style={{ opacity: 0.3, margin: '0 auto 0.75rem' }} />
-                <p style={{ fontWeight: 600 }}>No suggestions submitted yet.</p>
+                <p style={{ fontWeight: 600, color: 'var(--brand-navy)', fontSize: '1rem' }}>No suggestions submitted yet.</p>
               </div>
             ) : (
-              <div className="table-responsive">
-                <table className="table">
+              <ExcelTableContainer minWidth="1050px">
+                <ExcelTable>
                   <thead>
                     <tr>
-                      <th>Suggestion No</th>
-                      <th>Category</th>
-                      <th>Title</th>
-                      <th>Status</th>
-                      <th>Admin Response</th>
-                      <th>Date</th>
+                      <ExcelTh align="left" style={{ width: '130px', minWidth: '130px' }}>Suggestion No</ExcelTh>
+                      <ExcelTh align="center" style={{ width: '140px', minWidth: '140px' }}>Category</ExcelTh>
+                      <ExcelTh align="left" style={{ width: '280px', minWidth: '280px' }}>Title &amp; Description</ExcelTh>
+                      <ExcelTh align="center" style={{ width: '130px', minWidth: '130px' }}>Status</ExcelTh>
+                      <ExcelTh align="left" style={{ width: '200px', minWidth: '200px' }}>Admin Response</ExcelTh>
+                      <ExcelTh align="center" style={{ width: '110px', minWidth: '110px' }}>Date</ExcelTh>
                     </tr>
                   </thead>
                   <tbody>
                     {mySuggestions.map(s => (
                       <tr key={s.id}>
-                        <td><code style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{s.suggestionNo}</code></td>
-                        <td><Badge variant="navy">{s.category}</Badge></td>
-                        <td>
+                        <ExcelTd align="left" mono color="#1E40AF">
+                          <span style={{ fontWeight: 800 }}>{s.suggestionNo}</span>
+                        </ExcelTd>
+                        <ExcelTd align="center">
+                          <Badge variant="navy">{s.category}</Badge>
+                        </ExcelTd>
+                        <ExcelTd align="left">
                           <div style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{s.title}</div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{s.description.slice(0, 70)}...</div>
-                        </td>
-                        <td>{getStatusBadge(s.status)}</td>
-                        <td>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>{s.description.slice(0, 70)}...</div>
+                        </ExcelTd>
+                        <ExcelTd align="center">{getStatusBadge(s.status)}</ExcelTd>
+                        <ExcelTd align="left">
                           {s.adminResponse ? (
                             <span style={{ color: 'var(--brand-navy)', fontWeight: 600, fontSize: '0.8125rem' }}>
                               {s.adminResponse}
@@ -746,13 +865,15 @@ export const StudentFeedbackPage: React.FC = () => {
                           ) : (
                             <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Under Review</span>
                           )}
-                        </td>
-                        <td>{new Date(s.createdAt).toLocaleDateString()}</td>
+                        </ExcelTd>
+                        <ExcelTd align="center">
+                          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{new Date(s.createdAt).toLocaleDateString()}</span>
+                        </ExcelTd>
                       </tr>
                     ))}
                   </tbody>
-                </table>
-              </div>
+                </ExcelTable>
+              </ExcelTableContainer>
             )}
           </div>
         </div>

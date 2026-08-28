@@ -10,8 +10,12 @@ export type StudentSectionRequestStatus =
   | 'PAYMENT_PENDING'
   | 'PAID'
   | 'UNDER_REVIEW'
+  | 'APPROVED'
   | 'PROCESSING'
+  | 'DOCUMENT_READY'
   | 'READY'
+  | 'COLLECTED'
+  | 'DELIVERED'
   | 'COMPLETED'
   | 'REJECTED'
   | 'CANCELLED';
@@ -35,6 +39,18 @@ export type StudentServiceCategory =
   | 'MARKSHEET'
   | 'OTHER';
 
+export interface StudentServiceFieldConfig {
+  id: string;
+  name: string;
+  label: string;
+  type: 'text' | 'select' | 'date' | 'textarea' | 'checkbox';
+  required?: boolean;
+  options?: string[];
+  placeholder?: string;
+  helpText?: string;
+  defaultValue?: any;
+}
+
 export interface StudentSectionService {
   id: string;
   code: string;
@@ -48,10 +64,67 @@ export interface StudentSectionService {
   processingDays: number;
   urgentProcessingDays: number;
   requiredDocuments: string[];
+  customFields?: StudentServiceFieldConfig[];
   templateId?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+// ==============================================================================
+// SERVICE FEE MASTER CONFIGURATION TYPES
+// ==============================================================================
+
+export interface ServiceFeeMasterConfig {
+  id: string;
+  serviceCode: string;
+  serviceName: string;
+  category: StudentServiceCategory;
+  
+  // Rate Rules (Official Paper Form Matrix)
+  baseFeeEnrolled: number;          // Enrolled regular students
+  baseFeePassout: number;           // Pass-out / graduated alumni
+  perCopyFee: number;               // Cost per additional copy
+  firstCopyIncluded: boolean;       // Base fee covers 1st copy (true default)
+  
+  // Document Type specific rates (for Document Verification & Attestation)
+  documentTypeRates?: Record<string, { baseFee: number; perCopyFee: number }>;
+  
+  // Expedited / Urgent Surcharge
+  urgentFee: number;
+  
+  // Surcharges & Postal
+  postalCharges?: number;
+  processingCharges?: number;
+  
+  isRefundable: boolean;
+  isActive: boolean;
+}
+
+export interface ServiceFeeCalculationBreakdownItem {
+  head: string;
+  rate: number;
+  qty: string;
+  amount: number;
+}
+
+export interface ServiceFeeCalculationResult {
+  serviceCode: string;
+  serviceName: string;
+  passoutStatus: 'NON_PASSOUT' | 'PASSOUT';
+  documentType?: string;
+  copies: number;
+  
+  baseFee: number;
+  perCopyFee: number;
+  additionalCopiesCount: number;
+  copiesFeeTotal: number;
+  urgentFee: number;
+  postalCharges: number;
+  processingCharges: number;
+  
+  totalFee: number;
+  breakdownItems: ServiceFeeCalculationBreakdownItem[];
 }
 
 export interface StudentSectionTimelineItem {
@@ -74,14 +147,26 @@ export interface StudentSectionRequest {
   studentId: string;
   studentName: string;
   enrollmentNo: string;
+  admissionNo?: string;
+  applicationNumber?: string;
   email: string;
   phone?: string;
+  instituteId?: string;
+  instituteName?: string;
   departmentId: string;
   departmentName: string;
   programId: string;
   programName: string;
   semesterId?: string;
   semesterName?: string;
+  divisionName?: string;
+  batchName?: string;
+  academicYear?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  address?: string;
+  guardianName?: string;
+  guardianPhone?: string;
   
   // Service configuration
   serviceId: string;
@@ -91,12 +176,14 @@ export interface StudentSectionRequest {
   purpose: string;
   copies: number;
   isUrgent: boolean;
+  serviceSpecificData?: Record<string, any>;
 
   // Financial / Payment
   calculatedFee: number;
   paymentStatus: StudentSectionPaymentStatus;
   paymentTransactionId?: string;
   receiptNo?: string;
+  paymentMode?: string;
   paidAt?: string;
 
   // Delivery & Dispatch
@@ -105,12 +192,25 @@ export interface StudentSectionRequest {
   trackingNumber?: string;
   dispatchedAt?: string;
 
-  // Review & Processing
+  // Review & Processing Lifecycle
   status: StudentSectionRequestStatus;
   assignedStaffId?: string;
   assignedStaffName?: string;
   rejectionReason?: string;
   remarks?: string;
+  expectedCompletionDate?: string;
+  workingDaysDueDate?: string;
+  acceptedBy?: string;
+  acceptedByName?: string;
+  acceptedAt?: string;
+  processedBy?: string;
+  processedByName?: string;
+  processedAt?: string;
+  documentReadyAt?: string;
+  collectedBy?: string;
+  collectedByName?: string;
+  collectedAt?: string;
+  deliveryOfficerName?: string;
 
   // Generated Document
   documentId?: string;
@@ -123,6 +223,8 @@ export interface StudentSectionRequest {
     name: string;
     url: string;
     uploadedAt: string;
+    fileSize?: string;
+    required?: boolean;
   }[];
 
   timeline: StudentSectionTimelineItem[];

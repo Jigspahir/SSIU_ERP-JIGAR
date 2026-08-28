@@ -26,6 +26,8 @@ import {
   ApproveAdmissionDto,
   RejectAdmissionDto,
   EnrollStudentDto,
+  AssignFinalEnrollmentDto,
+  ResetAccessCodeDto,
   LeadQueryDto,
   ApplicationQueryDto,
 } from './dto/admission.dto';
@@ -196,9 +198,40 @@ export class AdmissionController {
   @Post('applications/:id/enroll')
   @UseGuards(JwtAuthGuard, RbacGuard)
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Enroll Student: Generate Enrollment No, ERP ID, Student Master & User Login' })
+  @ApiOperation({ summary: 'Enroll Student: Generate Temporary Enrollment No, ERP ID, Student Master & User Login' })
   enrollStudent(@Param('id') id: string, @Req() req: any, @Body() body?: EnrollStudentDto) {
     return this.admissionService.enrollStudent(id, req.user.id, body);
+  }
+
+  @Post('students/:studentId/assign-final-enrollment')
+  @UseGuards(JwtAuthGuard, RbacGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Assign Final Enrollment Number & Convert Student from Temporary to Final Enrollment' })
+  assignFinalEnrollment(
+    @Param('studentId') studentId: string,
+    @Req() req: any,
+    @Body() body: AssignFinalEnrollmentDto,
+  ) {
+    return this.admissionService.assignFinalEnrollment(studentId, req.user.id, body.finalEnrollmentNo, body.remarks);
+  }
+
+  @Post('students/:studentId/reset-access-code')
+  @UseGuards(JwtAuthGuard, RbacGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset / Regenerate Student 5-digit Temporary Access Code' })
+  resetAccessCode(
+    @Param('studentId') studentId: string,
+    @Req() req: any,
+    @Body() body?: ResetAccessCodeDto,
+  ) {
+    return this.admissionService.resetAccessCode(studentId, req.user.id, body?.reason);
+  }
+
+  @Get('students/temporary-enrollments')
+  @UseGuards(JwtAuthGuard, RbacGuard)
+  @ApiOperation({ summary: 'Get List of all Students with Temporary Enrollment' })
+  getTemporaryEnrollments() {
+    return this.admissionService.getTemporaryEnrollments();
   }
 
   // ── 4. Admission Reports ──────────────────────────────────────────────────

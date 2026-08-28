@@ -1,218 +1,561 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
 import { Badge } from '../../components/common/Badge';
-import { ShieldCheck, Download, Ticket, MapPin, Calendar, Clock, AlertTriangle } from 'lucide-react';
+import { hallTicketDataService } from '../../services/hallTicketDataService';
+import { hallTicketPdfService } from '../../services/hallTicketPdfService';
+import { HallTicketData } from '../../types/hallTicket';
+import {
+  FileText,
+  Download,
+  Printer,
+  ExternalLink,
+  Search,
+  Filter,
+  CheckCircle,
+  Clock,
+  AlertTriangle,
+  Building,
+  Calendar,
+  Layers,
+  Sparkles,
+  Users,
+  Eye,
+  RefreshCw,
+  QrCode
+} from 'lucide-react';
 import logoSvg from '../../assets/swarrnim-logo.svg';
 
-export const HallTicketPage: React.FC = () => {
+interface HallTicketPageProps {
+  setActiveTab?: (tab: string) => void;
+}
+
+export const HallTicketPage: React.FC<HallTicketPageProps> = ({ setActiveTab }) => {
   const { user, role } = useAuth();
+  const isStudent = role === 'STUDENT';
+  const isAdminOrFaculty = role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'FACULTY' || role === 'REGISTRAR';
+
   const exams = db.getExams();
-  const forms = db.getExamForms();
-  const timetables = db.getExamTimetables();
+  const programs = db.getPrograms();
+  const departments = db.getDepartments();
+  const semesters = db.getSemesters();
   const students = db.getStudents();
-  const subjects = db.getSubjects();
+  const forms = db.getExamForms();
 
+  // Filters State
   const [selectedExamId, setSelectedExamId] = useState<string>(exams[0]?.id || '');
+  const [selectedProgramId, setSelectedProgramId] = useState<string>('ALL');
+  const [selectedSemesterId, setSelectedSemesterId] = useState<string>('ALL');
+  const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [generatingBulk, setGeneratingBulk] = useState<boolean>(false);
 
-  const currentExam = exams.find(e => e.id === selectedExamId);
-  const currentStudent = role === 'STUDENT' ? students.find(s => s.id === user?.id || s.email === user?.email) : null;
-  const currentForm = currentStudent ? forms.find(f => f.examId === selectedExamId && f.studentId === currentStudent.id) : null;
-  const currentTimetable = timetables.filter(t => t.examId === selectedExamId);
+  // Current Exam Object
+  const currentExam = useMemo(() => exams.find(e => e.id === selectedExamId) || exams[0], [exams, selectedExamId]);
 
-  const handleDownloadHallTicket = (formObj: any) => {
-    const examObj = exams.find(e => e.id === formObj.examId);
-    const ttList = timetables.filter(t => t.examId === formObj.examId);
+  // Current Student (for Student View)
+  const currentStudent = useMemo(() => {
+    if (!isStudent) return null;
+    return students.find(s => s.id === user?.id || s.email === user?.email || s.enrollmentNo === user?.enrollmentNo) || students[0];
+  }, [students, user, isStudent]);
 
-    let scheduleText = '';
-    ttList.forEach(t => {
-      const subj = subjects.find(s => s.id === t.subjectId);
-      scheduleText += `${subj?.code?.padEnd(10)} | ${subj?.name?.padEnd(30)} | Date: ${t.date} | Time: ${t.startTime}-${t.endTime} | Room: ${t.roomNo}\n`;
+  // Current Student Form
+  const currentStudentForm = useMemo(() => {
+    if (!currentStudent || !currentExam) return null;
+    return forms.find(f => f.examId === currentExam.id && (f.studentId === currentStudent.id || f.enrollmentNo === currentStudent.enrollmentNo));
+  }, [forms, currentExam, currentStudent]);
+
+  // Student Hall Ticket Data
+  const studentHallTicket = useMemo(() => {
+    if (!currentStudent || !currentExam) return null;
+    return hallTicketDataService.getHallTicketForStudent(currentExam.id, currentStudent.id);
+  }, [currentExam, currentStudent]);
+
+  // Admin Hall Tickets List (Filtered)
+  const adminHallTickets = useMemo(() => {
+    if (isStudent || !currentExam) return [];
+    return hallTicketDataService.getAllHallTicketsForExam(currentExam.id, {
+      programId: selectedProgramId,
+      semesterId: selectedSemesterId,
+      status: selectedStatus,
+      search: searchQuery
     });
+  }, [isStudent, currentExam, selectedProgramId, selectedSemesterId, selectedStatus, searchQuery]);
 
-    const content = `===================================================================================
-                          SWARRNIM UNIVERSITY
-                 OFFICIAL EXAMINATION HALL TICKET / ADMIT CARD
-===================================================================================
-Hall Ticket No : ${formObj.hallTicketNo || 'HT-2024-001'}
-Exam Name      : ${examObj?.name || 'End Semester Examination'}
-Student Name   : ${formObj.studentName}
-Enrollment No  : ${formObj.enrollmentNo}
-Program        : ${db.getPrograms().find(p => p.id === formObj.programId)?.name || 'B.Tech'}
-Semester       : ${db.getSemesters().find(s => s.id === formObj.semesterId)?.code || 'Sem-4'}
-Exam Center    : Swarrnim University Main Campus, Gandhinagar
------------------------------------------------------------------------------------
-EXAMINATION TIMETABLE & SEAT ALLOCATION:
------------------------------------------------------------------------------------
-Subject Code | Subject Name                   | Date & Time                 | Room
------------------------------------------------------------------------------------
-${scheduleText || 'Schedule to be announced at exam hall.\n'}
------------------------------------------------------------------------------------
-IMPORTANT INSTRUCTIONS FOR CANDIDATE:
-1. Carry this official Hall Ticket and Student Photo ID Card to every exam session.
-2. Electronic gadgets, mobile phones, and smart watches are strictly prohibited.
-3. Candidates must reach the examination hall 20 minutes prior to start time.
-===================================================================================
-                                                  [Controller of Examinations]
-===================================================================================`;
-
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `HallTicket_${formObj.enrollmentNo}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  // Handler: View PDF in New Tab
+  const handleViewPdf = (ticket: HallTicketData) => {
+    hallTicketPdfService.openInNewTab(ticket);
   };
 
+  // Handler: Download Single PDF
+  const handleDownloadPdf = (ticket: HallTicketData) => {
+    hallTicketPdfService.downloadPdf(ticket);
+  };
+
+  // Handler: Print Single PDF
+  const handlePrintPdf = (ticket: HallTicketData) => {
+    hallTicketPdfService.openInNewTab(ticket);
+  };
+
+  // Handler: Download Bulk PDFs
+  const handleDownloadBulk = async () => {
+    if (adminHallTickets.length === 0) return;
+    setGeneratingBulk(true);
+    try {
+      await hallTicketPdfService.downloadBulkPdf(
+        adminHallTickets,
+        `HallTickets_${currentExam.code || 'EXAM'}_${adminHallTickets.length}_Students.pdf`
+      );
+    } finally {
+      setGeneratingBulk(false);
+    }
+  };
+
+  // Examination Navigation Tabs
+  const examNavTabs = [
+    { id: 'exam-forms', label: 'Exam Forms', icon: FileText },
+    { id: 'exam-fees-student', label: 'Exam Fees', icon: Layers },
+    { id: 'exam-hallticket', label: 'Hall Ticket', icon: QrCode, active: true },
+    { id: 'exam-backlog', label: 'Backlog / Re-Exam', icon: RefreshCw },
+    { id: 'exam-reassessment', label: 'Reassessment / Rechecking', icon: Filter },
+    { id: 'exam-results', label: 'Results', icon: CheckCircle }
+  ];
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
-      <div>
-        <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
-          Official Examination Hall Ticket &amp; Admit Card
-        </h2>
-        <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-          {role === 'STUDENT' ? 'View and download your official examination admit card with venue seating details' : 'Manage student hall tickets and seating allocations'}
-        </p>
+    <div className="space-y-6 animate-fadeIn">
+      {/* ── 1. EXAMINATION MODULE NAVIGATION HEADER ──────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                EXAMINATION CONTROLLER PORTAL
+              </span>
+              <span className="text-xs text-slate-500">•</span>
+              <span className="text-xs font-semibold text-slate-600">Official Admit Cards</span>
+            </div>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+              Examination Hall Ticket &amp; Admit Card
+            </h1>
+            <p className="text-sm text-slate-600 mt-1">
+              {isStudent
+                ? 'View, download, and print your official university examination hall ticket with allocated exam room and seat number.'
+                : 'Manage student admit cards, seating plans, bulk PDF generation, and official hall ticket issuance.'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <img src={logoSvg} alt="SSIU" className="h-10 w-auto object-contain hidden md:block" />
+          </div>
+        </div>
+
+        {/* Examination Sub-Navigation Tabs */}
+        {setActiveTab && (
+          <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-200 pt-5 -mb-6 pb-0">
+            {examNavTabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-t-lg transition-colors border-b-2 whitespace-nowrap ${
+                  tab.active
+                    ? 'border-orange-500 text-orange-600 bg-orange-50/50'
+                    : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                }`}
+              >
+                <tab.icon className="w-3.5 h-3.5" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Select Exam Filter */}
-      <div className="card" style={{ padding: '1.25rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-          <label className="form-label" style={{ marginBottom: 0 }}>Select Exam Event:</label>
-          <select className="form-select" style={{ maxWidth: '360px' }} value={selectedExamId} onChange={e => setSelectedExamId(e.target.value)}>
-            {exams.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-          </select>
+      {/* ── 2. FILTER & SELECTION BAR ────────────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Exam Event */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Examination Event
+            </label>
+            <select
+              className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none font-semibold"
+              value={selectedExamId}
+              onChange={e => setSelectedExamId(e.target.value)}
+            >
+              {exams.map(e => (
+                <option key={e.id} value={e.id}>
+                  {e.name} ({e.session || 'Summer 2026'})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Program Filter (Admin only) */}
+          {!isStudent && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Program / Degree
+              </label>
+              <select
+                className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                value={selectedProgramId}
+                onChange={e => setSelectedProgramId(e.target.value)}
+              >
+                <option value="ALL">All Programs &amp; Branches</option>
+                {programs.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Semester Filter (Admin only) */}
+          {!isStudent && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Semester
+              </label>
+              <select
+                className="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-lg p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                value={selectedSemesterId}
+                onChange={e => setSelectedSemesterId(e.target.value)}
+              >
+                <option value="ALL">All Semesters</option>
+                {semesters.map(s => (
+                  <option key={s.id} value={s.id}>{s.name || s.code}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Search Input */}
+          <div className={isStudent ? 'lg:col-span-3' : ''}>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Search Candidate
+            </label>
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search by student name, enrollment no, hall ticket no..."
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
-      {role === 'STUDENT' && (
-        <div>
-          {!currentForm ? (
-            <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-              <AlertTriangle size={48} color="var(--brand-gold)" style={{ margin: '0 auto 1rem', opacity: 0.7 }} />
-              <h4 style={{ fontSize: '1.125rem', fontWeight: 700 }}>No Hall Ticket Available</h4>
-              <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>You have not submitted an exam form for this examination event yet.</p>
+      {/* ── 3. STUDENT VIEW: OFFICIAL LIVE HALL TICKET CARD ─────────────────── */}
+      {isStudent && (
+        <div className="space-y-6">
+          {!currentStudentForm ? (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
+              <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-3 opacity-80" />
+              <h3 className="text-lg font-bold text-slate-900">No Exam Form Submitted</h3>
+              <p className="text-sm text-slate-600 mt-1 max-w-md mx-auto">
+                You have not registered or submitted an examination form for <strong>{currentExam?.name}</strong> yet.
+              </p>
+              {setActiveTab && (
+                <button
+                  onClick={() => setActiveTab('exam-forms')}
+                  className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white text-xs font-bold rounded-lg transition"
+                >
+                  <FileText className="w-4 h-4" /> Go to Exam Forms
+                </button>
+              )}
             </div>
-          ) : currentForm.status !== 'HALL_TICKET_ISSUED' && currentForm.status !== 'APPROVED' ? (
-            <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-              <Clock size={48} color="var(--brand-orange)" style={{ margin: '0 auto 1rem', opacity: 0.7 }} />
-              <h4 style={{ fontSize: '1.125rem', fontWeight: 700 }}>Hall Ticket Under Verification</h4>
-              <p style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                Your exam form status is <strong>{currentForm.status}</strong>. Hall tickets will be issued once documents &amp; form approval are finalized by Admin.
+          ) : !studentHallTicket ? (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
+              <Clock className="w-12 h-12 text-orange-500 mx-auto mb-3 opacity-80" />
+              <h3 className="text-lg font-bold text-slate-900">Hall Ticket Under Verification</h3>
+              <p className="text-sm text-slate-600 mt-1 max-w-md mx-auto">
+                Your exam form status is <Badge variant="active">{currentStudentForm.status}</Badge>.
+                Hall tickets are issued once form verification and seating allocations are finalized by the Controller of Examinations.
               </p>
             </div>
           ) : (
-            <div className="card" style={{ padding: '2rem', borderTop: '6px solid var(--brand-navy)' }}>
-              {/* Hall Ticket Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid var(--brand-orange)', paddingBottom: '1.25rem', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
-                <img src={logoSvg} alt="Swarrnim Logo" style={{ height: '56px', objectFit: 'contain' }} />
-                <div style={{ textAlign: 'right' }}>
-                  <Badge variant="active">HALL TICKET ISSUED</Badge>
-                  <div style={{ fontSize: '0.8125rem', fontWeight: 800, color: 'var(--brand-navy)', marginTop: '0.35rem' }}>
-                    HALL TICKET NO: <span style={{ color: 'var(--brand-orange)' }}>{currentForm.hallTicketNo || 'HT-2024-001'}</span>
+            <div className="bg-white rounded-xl shadow-md border-2 border-blue-900 overflow-hidden">
+              {/* Top Banner with Actions */}
+              <div className="bg-gradient-to-r from-blue-950 via-blue-900 to-blue-950 text-white p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 border-orange-500">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-500 text-white">
+                      ✓ HALL TICKET ISSUED &amp; VERIFIED
+                    </span>
+                    <span className="text-xs text-blue-200">AY {studentHallTicket.academicYear}</span>
                   </div>
+                  <h2 className="text-xl font-black tracking-tight mt-1">
+                    {studentHallTicket.documentTitle}
+                  </h2>
+                  <p className="text-xs text-blue-200 mt-0.5">
+                    Hall Ticket No: <strong className="text-orange-400">{studentHallTicket.hallTicketNo}</strong> • Seat No: <strong className="text-emerald-300">{studentHallTicket.examSeatNo}</strong>
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <button
+                    onClick={() => handleViewPdf(studentHallTicket)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-lg shadow-sm transition"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> View Hall Ticket (PDF)
+                  </button>
+
+                  <button
+                    onClick={() => handleDownloadPdf(studentHallTicket)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-800 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition border border-blue-600"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Download PDF
+                  </button>
+
+                  <button
+                    onClick={() => handlePrintPdf(studentHallTicket)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-lg shadow-sm transition"
+                  >
+                    <Printer className="w-3.5 h-3.5" /> Print
+                  </button>
                 </div>
               </div>
 
               {/* Student Metadata Card Grid */}
-              <div className="grid-3" style={{ background: 'var(--bg-surface-hover)', padding: '1.25rem', borderRadius: 'var(--radius-sm)', marginBottom: '1.5rem' }}>
-                <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Candidate Name:</span> <div style={{ fontWeight: 800 }}>{currentForm.studentName}</div></div>
-                <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Enrollment No:</span> <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>{currentForm.enrollmentNo}</div></div>
-                <div><span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Examination:</span> <div style={{ fontWeight: 800 }}>{currentExam?.name}</div></div>
-              </div>
+              <div className="p-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                  <div>
+                    <span className="text-xs text-slate-500 font-semibold uppercase">Candidate Name</span>
+                    <div className="text-sm font-bold text-blue-950 mt-0.5">{studentHallTicket.studentName}</div>
+                  </div>
+                  <div>
+                    <span className="text-xs text-slate-500 font-semibold uppercase">Enrollment Number</span>
+                    <div className="text-sm font-bold text-slate-900 mt-0.5">{studentHallTicket.enrollmentNo}</div>
+                  </div>
+                  <div>
+                    <span className="text-xs text-slate-500 font-semibold uppercase">Program &amp; Branch</span>
+                    <div className="text-sm font-semibold text-slate-900 mt-0.5">{studentHallTicket.programName}</div>
+                  </div>
+                  <div>
+                    <span className="text-xs text-slate-500 font-semibold uppercase">Allocated Exam Centre</span>
+                    <div className="text-sm font-bold text-orange-600 mt-0.5">{studentHallTicket.centreName}</div>
+                  </div>
+                </div>
 
-              {/* Timetable & Room Allocation Table */}
-              <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '0.75rem' }}>
-                Allocated Exam Sessions &amp; Seating Plan
-              </h4>
+                {/* Examination Subject Timetable Table */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-blue-900" /> Allocated Exam Sessions &amp; Seating Plan
+                    </h3>
+                    <span className="text-xs font-semibold text-slate-500">
+                      {studentHallTicket.subjects.length} Registered Subject(s)
+                    </span>
+                  </div>
 
-              <div className="table-responsive" style={{ marginBottom: '1.5rem' }}>
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Subject Code &amp; Name</th>
-                      <th>Exam Date</th>
-                      <th>Timing</th>
-                      <th>Hall Room No</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentTimetable.length === 0 ? (
-                      <tr><td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Timetable schedule pending publishing.</td></tr>
-                    ) : (
-                      currentTimetable.map(t => {
-                        const subj = subjects.find(s => s.id === t.subjectId);
-                        return (
-                          <tr key={t.id}>
-                            <td style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>
-                              {subj?.code} - {subj?.name}
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-blue-950 text-white uppercase text-[11px] tracking-wider">
+                        <tr>
+                          <th className="py-3 px-3 text-center">Sr.</th>
+                          <th className="py-3 px-3">Subject Code</th>
+                          <th className="py-3 px-4">Subject Title</th>
+                          <th className="py-3 px-3">Exam Date</th>
+                          <th className="py-3 px-3">Day</th>
+                          <th className="py-3 px-3">Timing</th>
+                          <th className="py-3 px-3 text-center">Room / Block</th>
+                          <th className="py-3 px-3 text-center">Seat No.</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {studentHallTicket.subjects.map((sub, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                            <td className="py-2.5 px-3 text-center text-slate-500 font-medium">{sub.sr}</td>
+                            <td className="py-2.5 px-3 font-bold text-blue-950">{sub.subjectCode}</td>
+                            <td className="py-2.5 px-4 font-semibold text-slate-800">{sub.subjectName}</td>
+                            <td className="py-2.5 px-3 font-semibold text-slate-700">{sub.examDate}</td>
+                            <td className="py-2.5 px-3 text-slate-600">{sub.examDay}</td>
+                            <td className="py-2.5 px-3 font-medium text-slate-700">{sub.examTime}</td>
+                            <td className="py-2.5 px-3 text-center">
+                              <span className="px-2 py-0.5 bg-blue-50 text-blue-800 rounded font-bold text-[11px] border border-blue-200">
+                                {sub.roomNo}
+                              </span>
                             </td>
-                            <td><Calendar size={14} style={{ display: 'inline', marginRight: '4px' }} /> {t.date}</td>
-                            <td><Clock size={14} style={{ display: 'inline', marginRight: '4px' }} /> {t.startTime} to {t.endTime}</td>
-                            <td><Badge variant="orange"><MapPin size={12} /> Room {t.roomNo}</Badge></td>
+                            <td className="py-2.5 px-3 text-center">
+                              <span className="px-2 py-0.5 bg-orange-50 text-orange-800 rounded font-black text-[11px] border border-orange-200">
+                                {sub.seatNo}
+                              </span>
+                            </td>
                           </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button className="btn btn-primary" onClick={() => handleDownloadHallTicket(currentForm)}>
-                  <Download size={16} /> Download Official Admit Card / Hall Ticket
-                </button>
+                {/* Important Instructions Box */}
+                <div className="bg-amber-50/70 border border-amber-200 rounded-lg p-4 text-xs text-amber-900 space-y-1.5">
+                  <div className="font-bold flex items-center gap-1.5 text-amber-950 mb-1">
+                    <AlertTriangle className="w-4 h-4 text-amber-700" />
+                    IMPORTANT CANDIDATE INSTRUCTIONS:
+                  </div>
+                  <p>• Carry this printed Hall Ticket along with your Valid University ID Card to every exam session.</p>
+                  <p>• Report to the allocated exam centre at least 30 minutes before exam commencement ({studentHallTicket.reportingTime}).</p>
+                  <p>• Mobile phones, smart watches, digital watches, and unauthorized material are strictly prohibited.</p>
+                </div>
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Admin View Table */}
-      {(role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') && (
-        <div className="card" style={{ padding: '1.5rem' }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '1.25rem' }}>
-            Issued Hall Tickets Directory ({currentExam?.name})
-          </h3>
+      {/* ── 4. ADMIN & CONTROLLER VIEW: BULK ACTIONS & MANAGEMENT DIRECTORY ── */}
+      {isAdminOrFaculty && (
+        <div className="space-y-6">
+          {/* KPI Metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-slate-500">Registered Candidates</span>
+                  <div className="text-2xl font-black text-slate-900 mt-1">{forms.filter(f => f.examId === selectedExamId).length}</div>
+                </div>
+                <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
+                  <Users className="w-5 h-5" />
+                </div>
+              </div>
+            </div>
 
-          <div className="table-responsive">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Enrollment No</th>
-                  <th>Student Name</th>
-                  <th>Hall Ticket No</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {forms.filter(f => f.examId === selectedExamId).length === 0 ? (
-                  <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No hall tickets issued.</td></tr>
-                ) : (
-                  forms.filter(f => f.examId === selectedExamId).map(f => (
-                    <tr key={f.id}>
-                      <td>{f.enrollmentNo}</td>
-                      <td style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{f.studentName}</td>
-                      <td style={{ fontWeight: 800, color: 'var(--brand-orange)' }}>{f.hallTicketNo || 'HT-2024-001'}</td>
-                      <td>
-                        <Badge variant={f.status === 'HALL_TICKET_ISSUED' ? 'active' : 'navy'}>
-                          {f.status}
-                        </Badge>
-                      </td>
-                      <td>
-                        <button className="btn btn-secondary btn-sm" onClick={() => handleDownloadHallTicket(f)}>
-                          <Download size={14} /> Download
-                        </button>
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-slate-500">Hall Tickets Ready</span>
+                  <div className="text-2xl font-black text-emerald-600 mt-1">{adminHallTickets.length}</div>
+                </div>
+                <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-slate-500">Exam Session</span>
+                  <div className="text-sm font-bold text-slate-900 mt-1">{currentExam.session || 'Summer 2026'}</div>
+                </div>
+                <div className="w-10 h-10 rounded-lg bg-orange-50 text-orange-700 flex items-center justify-center">
+                  <Calendar className="w-5 h-5" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-slate-500">Exam Centre</span>
+                  <div className="text-sm font-bold text-slate-900 mt-1">SSIU Main Campus</div>
+                </div>
+                <div className="w-10 h-10 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center">
+                  <Building className="w-5 h-5" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Directory Card */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Issued Hall Tickets Directory ({adminHallTickets.length} Students)
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Examination: <strong>{currentExam?.name}</strong> (Code: {currentExam?.code})
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={handleDownloadBulk}
+                  disabled={adminHallTickets.length === 0 || generatingBulk}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-900 hover:bg-blue-800 disabled:bg-slate-400 text-white text-xs font-bold rounded-lg shadow-sm transition"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  {generatingBulk ? 'Generating Bulk PDF...' : `Download Bulk Hall Tickets (${adminHallTickets.length})`}
+                </button>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-700 uppercase text-[11px] font-bold tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th className="py-3 px-4">Enrollment No</th>
+                    <th className="py-3 px-4">Student Name</th>
+                    <th className="py-3 px-4">Program &amp; Branch</th>
+                    <th className="py-3 px-4">Hall Ticket No</th>
+                    <th className="py-3 px-4 text-center">Seat No</th>
+                    <th className="py-3 px-4 text-center">Papers</th>
+                    <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {adminHallTickets.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-slate-500">
+                        No issued hall tickets found matching the selected filters.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    adminHallTickets.map((ticket, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3 px-4 font-mono font-bold text-slate-900">{ticket.enrollmentNo}</td>
+                        <td className="py-3 px-4 font-bold text-blue-950">{ticket.studentName}</td>
+                        <td className="py-3 px-4 text-slate-600 max-w-xs truncate">{ticket.programName}</td>
+                        <td className="py-3 px-4 font-mono font-bold text-orange-600">{ticket.hallTicketNo}</td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="px-2 py-0.5 bg-orange-50 text-orange-800 rounded font-black text-[11px] border border-orange-200">
+                            {ticket.examSeatNo}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center font-bold text-slate-700">{ticket.subjects.length}</td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            ISSUED
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleViewPdf(ticket)}
+                              title="View Hall Ticket PDF"
+                              className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded transition border border-blue-200"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDownloadPdf(ticket)}
+                              title="Download PDF"
+                              className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded transition border border-slate-300"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handlePrintPdf(ticket)}
+                              title="Print Hall Ticket"
+                              className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded transition border border-slate-300"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

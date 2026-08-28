@@ -47,28 +47,35 @@ export const ALL_NAV_ITEMS: Record<string, NavItemConfig> = {
     id: 'subjects',
     label: 'Subjects',
     icon: BookOpen,
-    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'],
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'MENTOR', 'STUDENT'],
     category: 'Academic'
   },
   'timetable': {
     id: 'timetable',
     label: 'Timetable',
     icon: Clock,
-    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'],
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'MENTOR', 'STUDENT'],
     category: 'Academic'
   },
   'session-plan': {
     id: 'session-plan',
     label: 'Session Plan',
     icon: BookOpen,
-    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'],
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'MENTOR', 'STUDENT'],
     category: 'Academic'
   },
   'materials': {
     id: 'materials',
     label: 'Study Material',
     icon: FileText,
-    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'],
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'MENTOR', 'STUDENT'],
+    category: 'Academic'
+  },
+  'study-material': {
+    id: 'study-material',
+    label: 'Study Material',
+    icon: FileText,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'MENTOR', 'STUDENT'],
     category: 'Academic'
   },
   'assignments': {
@@ -332,6 +339,27 @@ export const ALL_NAV_ITEMS: Record<string, NavItemConfig> = {
   'feedback': {
     id: 'feedback',
     label: 'Feedback',
+    icon: MessageSquare,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'IQAC'],
+    category: 'Support & Campus'
+  },
+  'feedback-give': {
+    id: 'feedback-give',
+    label: 'Give Feedback',
+    icon: MessageSquare,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'IQAC'],
+    category: 'Support & Campus'
+  },
+  'feedback-my': {
+    id: 'feedback-my',
+    label: 'My Feedback',
+    icon: MessageSquare,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'IQAC'],
+    category: 'Support & Campus'
+  },
+  'feedback-suggestions': {
+    id: 'feedback-suggestions',
+    label: 'Suggestions',
     icon: MessageSquare,
     allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'IQAC'],
     category: 'Support & Campus'
@@ -642,7 +670,7 @@ export const ALL_NAV_ITEMS: Record<string, NavItemConfig> = {
     id: 'settings',
     label: 'System Settings',
     icon: Settings,
-    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN'],
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'ERP_COORDINATOR', 'REGISTRAR'],
     category: 'System'
   },
   'profile': {
@@ -714,7 +742,6 @@ export const STUDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     defaultTab: 'fees-semester',
     children: [
       { id: 'fees-semester', label: 'Semester Fees', targetTab: 'fees-semester' },
-      { id: 'fees-history', label: 'Payment History', targetTab: 'fees-history' },
       { id: 'fees-receipts', label: 'Receipts', targetTab: 'fees-receipts' },
       { id: 'fees-query', label: 'Fee Query', targetTab: 'fees-query' }
     ]
@@ -746,11 +773,11 @@ export const STUDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     id: 'feedback',
     label: 'Feedback & Suggestions',
     icon: MessageSquare,
-    defaultTab: 'feedback',
+    defaultTab: 'feedback-give',
     children: [
-      { id: 'feedback-give', label: 'Give Feedback', targetTab: 'feedback' },
-      { id: 'feedback-my', label: 'My Feedback', targetTab: 'feedback' },
-      { id: 'feedback-suggestions', label: 'Suggestions', targetTab: 'feedback' }
+      { id: 'feedback-give', label: 'Give Feedback', targetTab: 'feedback-give' },
+      { id: 'feedback-my', label: 'My Feedback', targetTab: 'feedback-my' },
+      { id: 'feedback-suggestions', label: 'Suggestions', targetTab: 'feedback-suggestions' }
     ]
   },
   {
@@ -895,7 +922,8 @@ export const FACULTY_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
       { id: 'faculty-mark-attendance', label: 'Mark Attendance', targetTab: 'attendance' },
       { id: 'faculty-attendance-history', label: 'Attendance History', targetTab: 'attendance-history' },
       { id: 'faculty-subject-attendance', label: 'Subject Attendance', targetTab: 'subject-attendance' },
-      { id: 'faculty-attendance-reports', label: 'Attendance Reports', targetTab: 'attendance-reports' }
+      { id: 'faculty-attendance-reports', label: 'Reports', targetTab: 'attendance-reports' },
+      { id: 'faculty-attendance-import', label: 'Import / Export', targetTab: 'attendance-import' }
     ]
   },
   {
@@ -1183,6 +1211,17 @@ export const HOD_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
       { id: 'hod-feedback-faculty', label: 'Faculty Feedback', targetTab: 'hod-feedback-faculty' },
       { id: 'hod-feedback-student', label: 'Student Feedback', targetTab: 'hod-feedback-student' },
       { id: 'hod-feedback-department', label: 'Department Feedback', targetTab: 'hod-feedback-department' }
+    ]
+  },
+  {
+    id: 'resource-assets-group',
+    label: 'Department Resources & Assets',
+    icon: Package,
+    defaultTab: 'university-asset-management',
+    children: [
+      { id: 'university-asset-management', label: 'My Department Assets', targetTab: 'university-asset-management' },
+      { id: 'asset-allocation-requests', label: 'Asset Requisitions', targetTab: 'asset-allocation-requests' },
+      { id: 'classroom-allocation', label: 'Allocated Classrooms & Labs', targetTab: 'classroom-allocation' }
     ]
   },
   {
@@ -1526,6 +1565,68 @@ export const STUDENT_SECTION_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     label: 'Settings',
     icon: Settings,
     defaultTab: 'settings'
+  }
+];
+
+/**
+ * FINAL STUDENT ADMINISTRATION & ONBOARDING SIDEBAR STRUCTURE (5 Primary Sections)
+ */
+export const STUDENT_ADMIN_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    defaultTab: 'dashboard'
+  },
+  {
+    id: 'onboarding-group',
+    label: 'Admission & Onboarding',
+    icon: UserPlus,
+    defaultTab: 'onboarding-applications',
+    children: [
+      { id: 'onboarding-applications', label: 'Admission Applications', targetTab: 'onboarding-applications' },
+      { id: 'onboarding-doc-verification', label: 'Document Verification', targetTab: 'onboarding-doc-verification' },
+      { id: 'onboarding-fee-verification', label: 'Fee Verification', targetTab: 'onboarding-fee-verification' },
+      { id: 'onboarding-student-creation', label: 'Student Creation', targetTab: 'onboarding-student-creation' },
+      { id: 'onboarding-enrollment', label: 'Student ID / Enrollment', targetTab: 'onboarding-enrollment' },
+      { id: 'students-directory', label: 'Student Master', targetTab: 'students-directory' }
+    ]
+  },
+  {
+    id: 'reports-group',
+    label: 'Reports',
+    icon: BarChart3,
+    defaultTab: 'onboarding-reports',
+    children: [
+      { id: 'onboarding-reports', label: 'Onboarding Report', targetTab: 'onboarding-reports' },
+      { id: 'onboarding-pending-verification', label: 'Pending Verification', targetTab: 'onboarding-pending-verification' },
+      { id: 'onboarding-export-register', label: 'Export Register', targetTab: 'onboarding-export-register' }
+    ]
+  },
+  {
+    id: 'resource-assets-group',
+    label: 'Resource & Asset Allocation',
+    icon: Package,
+    defaultTab: 'university-asset-management',
+    children: [
+      { id: 'university-asset-management', label: 'Resource & Asset Workspace', targetTab: 'university-asset-management' },
+      { id: 'asset-master-register', label: 'Asset Master Catalog', targetTab: 'asset-master-register' },
+      { id: 'department-asset-allocation', label: 'Department Allocation', targetTab: 'department-asset-allocation' },
+      { id: 'classroom-allocation', label: 'Classrooms & Labs', targetTab: 'classroom-allocation' },
+      { id: 'faculty-workload-allocation', label: 'Faculty Teaching Load', targetTab: 'faculty-workload-allocation' },
+      { id: 'asset-transfers-returns', label: 'Transfers & Returns', targetTab: 'asset-transfers-returns' },
+      { id: 'asset-allocation-requests', label: 'Asset Requisitions', targetTab: 'asset-allocation-requests' },
+      { id: 'asset-reports', label: 'Asset & Allocation Reports', targetTab: 'asset-reports' }
+    ]
+  },
+  {
+    id: 'system-group',
+    label: 'System',
+    icon: Bell,
+    defaultTab: 'notifications',
+    children: [
+      { id: 'notifications', label: 'Notifications', targetTab: 'notifications' }
+    ]
   }
 ];
 
@@ -1927,12 +2028,15 @@ export const VICE_PRESIDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   },
   {
     id: 'hr-group',
-    label: 'Human Resources',
+    label: 'University HRMS',
     icon: UserCheck,
-    defaultTab: 'hr',
+    defaultTab: 'university-hrms',
     children: [
-      { id: 'hr', label: 'Staff Overview', targetTab: 'hr' },
-      { id: 'leave', label: 'Leave Management', targetTab: 'leave' }
+      { id: 'university-hrms', label: 'HRMS Dashboard', targetTab: 'university-hrms' },
+      { id: 'hr', label: 'Employee Master', targetTab: 'hr' },
+      { id: 'recruitment', label: 'Recruitment & Vacancies', targetTab: 'recruitment' },
+      { id: 'leave', label: 'Leave Management', targetTab: 'leave' },
+      { id: 'payroll', label: 'Payroll & Payslips', targetTab: 'payroll' }
     ]
   },
   {
@@ -1958,6 +2062,74 @@ export const VICE_PRESIDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     label: 'Settings',
     icon: Settings,
     defaultTab: 'settings'
+  }
+];
+
+export const ERP_COORDINATOR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
+  {
+    id: 'dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    defaultTab: 'dashboard'
+  },
+  {
+    id: 'settings',
+    label: 'Settings',
+    icon: Settings,
+    defaultTab: 'settings',
+    children: [
+      {
+        id: 'settings-users',
+        label: 'User Accounts & Access',
+        targetTab: 'settings'
+      },
+      {
+        id: 'settings-roles',
+        label: 'Role Permissions Matrix',
+        targetTab: 'settings'
+      },
+      {
+        id: 'settings-security',
+        label: 'Account Security & Locks',
+        targetTab: 'settings'
+      }
+    ]
+  },
+  {
+    id: 'inventory-assets',
+    label: 'Inventory & Assets',
+    icon: Boxes,
+    defaultTab: 'inventory-assets'
+  },
+  {
+    id: 'feedback',
+    label: 'Student Feedback',
+    icon: MessageSquare,
+    defaultTab: 'feedback'
+  },
+  {
+    id: 'security-audit',
+    label: 'Security Audit Center',
+    icon: ShieldCheck,
+    defaultTab: 'security-audit'
+  },
+  {
+    id: 'reports',
+    label: 'Reports & Analytics',
+    icon: BarChart3,
+    defaultTab: 'reports'
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    icon: Bell,
+    defaultTab: 'notifications'
+  },
+  {
+    id: 'profile',
+    label: 'My Profile & Security',
+    icon: User,
+    defaultTab: 'profile'
   }
 ];
 
@@ -1996,7 +2168,7 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
     'hostel', 'maintenance', 'inventory-assets',
     'student-requests', 'support-tickets', 'certificates', 'student-section',
     'hr', 'leave',
-    'security-audit', 'reports', 'notifications', 'settings'
+    'security-audit', 'reports', 'notifications'
   ],
   PROVOST: [
     'dashboard',
@@ -2008,7 +2180,7 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
     'hostel', 'maintenance', 'inventory-assets',
     'student-requests', 'support-tickets', 'certificates', 'student-section',
     'hr', 'leave',
-    'security-audit', 'reports', 'notifications', 'settings'
+    'security-audit', 'reports', 'notifications'
   ],
   UNIVERSITY_ADMIN: [
     'dashboard',
@@ -2022,6 +2194,15 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
     'hr', 'leave',
     'security-audit', 'reports', 'notifications', 'settings'
   ],
+  ERP_COORDINATOR: [
+    'dashboard',
+    'settings',
+    'security-audit',
+    'inventory-assets',
+    'reports',
+    'notifications',
+    'profile'
+  ],
   VICE_PRESIDENT: [
     'dashboard',
     'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'notesheet-history',
@@ -2032,7 +2213,7 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
     'hostel', 'maintenance', 'inventory-assets',
     'student-requests', 'support-tickets', 'certificates', 'student-section',
     'hr', 'leave',
-    'security-audit', 'reports', 'notifications', 'settings'
+    'security-audit', 'reports', 'notifications'
   ],
   DEPUTY_REGISTRAR: [
     'dashboard',
@@ -2042,8 +2223,7 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
     'reg-corr-incoming', 'reg-corr-outgoing', 'reg-corr-circulars', 'reg-corr-external', 'reg-corr-register',
     'reg-approvals-pending', 'reg-approvals-academic', 'reg-approvals-admin', 'reg-approvals-financial', 'reg-approvals-special',
     'notifications',
-    'reg-rep-uni', 'reg-rep-inst', 'reg-rep-dept',
-    'settings'
+    'reg-rep-uni', 'reg-rep-inst', 'reg-rep-dept'
   ],
   REGISTRAR: [
     'dashboard',
@@ -2066,6 +2246,7 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
     'notifications',
     'reg-audit-log', 'reg-audit-login', 'reg-audit-approvals', 'reg-audit-notesheets', 'reg-audit-system',
     'reg-excel-templates', 'reg-excel-history', 'reg-excel-failed', 'reg-excel-export',
+    'settings',
     'reg-preferences', 'reg-change-password',
     'logout'
   ],
@@ -2079,8 +2260,7 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
     'section-id-generate', 'section-id-replacement', 'section-id-active', 'section-id-blocked', 'section-id-replaced', 'section-id-verify',
     'section-academic-records', 'section-academic-semesters', 'section-academic-results', 'section-academic-transcripts', 'section-academic-completion',
     'notices', 'notifications', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary',
-    'section-reports-student', 'section-reports-docs', 'section-reports-service', 'section-reports-requests', 'section-reports-payments',
-    'settings'
+    'section-reports-student', 'section-reports-docs', 'section-reports-service', 'section-reports-requests', 'section-reports-payments'
   ],
   PRINCIPAL: [
     'dashboard',
@@ -2094,12 +2274,12 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
     'hoi-docs-students', 'hoi-docs-overview',
     'hoi-feedback-student', 'hoi-feedback-faculty', 'hoi-feedback-department', 'hoi-feedback-institute',
     'hoi-reports-academic', 'hoi-reports-student', 'hoi-reports-faculty', 'hoi-reports-attendance', 'hoi-reports-examination', 'hoi-reports-institute',
-    'notices', 'events', 'notifications', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary', 'settings'
+    'notices', 'events', 'notifications', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary'
   ],
   HOD: [
     'dashboard',
     'hod-dept-overview', 'hod-dept-students', 'hod-dept-faculty', 'hod-dept-programs', 'hod-dept-semesters', 'hod-dept-sections',
-    'hod-academic-subjects', 'hod-faculty-allocation', 'hod-timetable', 'hod-session-plans', 'hod-materials', 'hod-assignments', 'hod-quiz', 'hod-calendar',
+    'hod-academic-subjects', 'hod-faculty-allocation', 'hod-timetable', 'session-plan', 'mentor-session-plan', 'hod-session-plans', 'study-material', 'mentor-study-material', 'materials', 'hod-materials', 'hod-assignments', 'hod-quiz', 'hod-calendar',
     'hod-attendance-overview', 'hod-attendance-shortage', 'hod-subject-attendance', 'hod-attendance-approvals',
     'student-search', 'hod-students-list', 'hod-students-profile', 'hod-students-performance', 'hod-students-at-risk', 'hod-students-documents',
     'hod-faculty-list', 'hod-faculty-workload', 'hod-faculty-subject-allocation', 'hod-faculty-performance',
@@ -2109,19 +2289,38 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
     'hod-feedback-faculty', 'hod-feedback-student', 'hod-feedback-department',
     'notices', 'events', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary',
     'hod-reports-academic', 'hod-reports-attendance', 'hod-reports-student', 'hod-reports-faculty', 'hod-reports-department',
-    'notifications', 'settings'
+    'notifications'
   ],
   MENTOR: [
     'dashboard',
     'student-search', 'mentee-list', 'mentee-profile', 'mentee-academic-overview', 'mentee-attendance', 'mentee-academic-performance',
-    'mentee-subjects', 'mentee-timetable', 'mentee-assignments', 'mentee-academic-progress',
+    'mentee-subjects', 'session-plan', 'mentor-session-plan', 'study-material', 'mentor-study-material', 'materials', 'mentee-timetable', 'mentee-assignments', 'mentee-academic-progress',
     'mentee-attendance-overview', 'mentee-attendance-shortage', 'mentee-attendance-applications',
     'mentee-exam-eligibility', 'mentee-exam-attendance-approvals', 'mentee-exam-requests',
     'mentee-docs-pending', 'mentee-docs-verified', 'mentee-docs-history',
     'mentee-requests-pending', 'mentee-requests-assigned', 'mentee-requests-history',
     'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed',
-    'feedback', 'notices', 'events', 'notifications', 'settings'
+    'feedback', 'notices', 'events', 'notifications'
   ],
+  STUDENT_ADMIN: [
+    'dashboard',
+    'onboarding-applications',
+    'onboarding-doc-verification',
+    'onboarding-fee-verification',
+    'onboarding-student-creation',
+    'onboarding-enrollment',
+    'onboarding-mentor-assignment',
+    'onboarding-account-activation',
+    'onboarding-register',
+    'students-directory',
+    'student-search',
+    'students-profile',
+    'onboarding-reports',
+    'onboarding-pending-verification',
+    'onboarding-export-register',
+    'notifications'
+  ],
+
   STUDENT: [
     'dashboard',
     'academic', 'subjects', 'timetable', 'attendance', 'assignments', 'materials', 'quiz',
@@ -2129,7 +2328,7 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
     'fees', 'fees-semester', 'fees-history', 'fees-receipts', 'fees-query',
     'student-section', 'student-section-services', 'student-section-requests', 'student-section-documents', 'certificates',
     'requests', 'requests-subject-query', 'requests-complaint', 'requests-my-requests',
-    'student-ptm', 'feedback',
+    'student-ptm', 'feedback', 'feedback-give', 'feedback-my', 'feedback-suggestions',
     'notices', 'events', 'hostel', 'transport', 'tickets', 'service-desk', 'notifications'
   ],
 
@@ -2139,16 +2338,25 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
 
   FACULTY: [
     'dashboard',
-    'subjects', 'timetable', 'session-plan', 'materials', 'assignments', 'quiz', 'calendar',
-    'attendance', 'attendance-history', 'subject-attendance', 'attendance-reports',
+    'subjects', 'timetable', 'session-plan', 'mentor-session-plan', 'materials', 'study-material', 'mentor-study-material', 'assignments', 'quiz', 'calendar',
+    'attendance', 'attendance-history', 'subject-attendance', 'attendance-reports', 'attendance-import', 'attendance-templates',
     'exam-duties', 'exam-schedule', 'attendance-applications', 'exam-dashboard',
     'student-search', 'my-students', 'student-academics', 'student-requests', 'students',
     'ptm-management', 'ptm-dashboard', 'ptm-schedule', 'ptm-my', 'ptm-records', 'ptm-feedback', 'ptm-followups', 'ptm-reports',
     'requests', 'requests-subject-query', 'requests-my-requests', 'requests-assigned',
     'documents', 'student-documents', 'pending-verification', 'document-master',
     'feedback', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary',
-    'notices', 'events', 'notifications', 'settings',
+    'notices', 'events', 'notifications',
     'edp-duties', 'mentor', 'tickets'
+  ],
+
+  STAFF: [
+    'dashboard',
+    'inventory-assets',
+    'notices',
+    'events',
+    'notifications',
+    'profile'
   ],
 
   EXAM_CELL: [
@@ -2201,15 +2409,25 @@ export const getRoleNavigationItems = (role?: UserRole | null): NavItemConfig[] 
 
 export const isTabPermittedForRole = (tab: string, role?: UserRole | null): boolean => {
   if (!role) return false;
+  if (tab === 'dashboard') return true;
+  if (tab === 'settings') {
+    return ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'ERP_COORDINATOR', 'REGISTRAR'].includes(role);
+  }
+  if (tab === 'inventory-assets' || tab === 'faculty-assets') {
+    return ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'ERP_COORDINATOR', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'VICE_PRESIDENT', 'PRINCIPAL', 'HOD', 'FACULTY', 'STAFF', 'ACCOUNTS_ADMIN', 'MAINTENANCE_ADMIN', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'STUDENT_SECTION', 'IQAC', 'EXAM_CELL'].includes(role);
+  }
+  if (tab === 'feedback' || tab === 'feedback-give' || tab === 'feedback-my' || tab === 'feedback-suggestions') {
+    return ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'ERP_COORDINATOR', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'IQAC', 'VICE_PRESIDENT', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'STAFF'].includes(role);
+  }
   if (role === 'STUDENT') {
-    if (['student-search', 'students-search', 'students-directory', 'work-transfer', 'work-transfer-new', 'work-transfer-received', 'work-transfer-active', 'work-transfer-history', 'work-transfer-audit'].includes(tab)) {
+    if (['settings', 'security-audit', 'student-search', 'students-search', 'students-directory', 'work-transfer', 'work-transfer-new', 'work-transfer-received', 'work-transfer-active', 'work-transfer-history', 'work-transfer-audit'].includes(tab)) {
       return false;
     }
   }
   if ([
     'student-search', 'students-search', 'students-directory', 
     'profile', 'mentor-profile', 'hod-profile', 'hoi-profile', 'section-profile', 'id-card', 
-    'settings', 'notifications',
+    'notifications',
     'work-transfer', 'work-transfer-new', 'work-transfer-received', 'work-transfer-active', 'work-transfer-history',
     'workload-transfer', 'delegate-work', 'faculty-work-transfer', 'hod-work-transfer', 'hoi-work-transfer'
   ].includes(tab)) {

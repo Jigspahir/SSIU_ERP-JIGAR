@@ -340,7 +340,12 @@ async function runMentorBackendTests() {
   console.log('========================================================================\n');
 }
 
-runMentorBackendTests().catch(err => {
-  console.error('Fatal test execution error:', err);
-  throw err;
+import { describe, it, expect } from 'vitest';
+
+describe('Mentor Backend Workflow & Security Test Suite', () => {
+  it('executes all 50 backend security and workflow assertions without failure', async () => {
+    await runMentorBackendTests();
+    expect(passedTests).toBe(50);
+    expect(totalTests).toBe(50);
+  });
 });

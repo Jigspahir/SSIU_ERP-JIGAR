@@ -164,4 +164,101 @@ export class AssetsController {
   getDisposals(@Query('status') status?: string) {
     return this.assetsService.getDisposals(status);
   }
+
+  // ── My Assets (Faculty / Staff Scoped)
+  @Get('my-assets/list')
+  @ApiOperation({ summary: 'Get assets assigned to current logged-in user' })
+  getMyAssets(@Req() req: any) {
+    return this.assetsService.getMyAssets(req.user.id);
+  }
+
+  // ── Receive Stock
+  @Post('receive')
+  @RequirePermission('ASSET', 'CREATE')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Receive and inward new stock into Central Store' })
+  receiveStock(@Body() dto: any, @Req() req: any) {
+    return this.assetsService.receiveStock(dto, req.user.id);
+  }
+
+  // ── Issue Stock
+  @Post('issue')
+  @RequirePermission('ASSET', 'EDIT')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Issue stock from Store to HOI or Department' })
+  issueStock(@Body() dto: any, @Req() req: any) {
+    return this.assetsService.issueStock(dto, req.user.id);
+  }
+
+  // ── Transfer Requests Workflow
+  @Post('transfer-request')
+  @ApiOperation({ summary: 'Faculty/Staff requests custody transfer to a colleague' })
+  createTransferRequest(@Body() dto: any, @Req() req: any) {
+    return this.assetsService.createTransferRequest(dto, req.user.id);
+  }
+
+  @Post('transfer-request/:id/approve')
+  @RequirePermission('ASSET', 'EDIT')
+  @ApiOperation({ summary: 'HOD approves transfer request' })
+  approveTransferRequest(@Param('id') id: string, @Body('remarks') remarks: string, @Req() req: any) {
+    return this.assetsService.approveTransferRequest(id, remarks, req.user.id);
+  }
+
+  @Post('transfer-request/:id/reject')
+  @RequirePermission('ASSET', 'EDIT')
+  @ApiOperation({ summary: 'HOD rejects transfer request' })
+  rejectTransferRequest(@Param('id') id: string, @Body('remarks') remarks: string, @Req() req: any) {
+    return this.assetsService.rejectTransferRequest(id, remarks, req.user.id);
+  }
+
+  // ── Return Requests Workflow
+  @Post('return-request')
+  @ApiOperation({ summary: 'Faculty/Staff requests return of asset to store' })
+  createReturnRequest(@Body() dto: any, @Req() req: any) {
+    return this.assetsService.createReturnRequest(dto, req.user.id);
+  }
+
+  @Post('return-request/:id/approve')
+  @RequirePermission('ASSET', 'EDIT')
+  @ApiOperation({ summary: 'HOD inspects and accepts return into store' })
+  approveReturnRequest(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
+    return this.assetsService.approveReturnRequest(id, dto, req.user.id);
+  }
+
+  // ── Replacement Requests Workflow
+  @Post('replacement-request')
+  @ApiOperation({ summary: 'Faculty/Staff requests replacement of defective asset' })
+  createReplacementRequest(@Body() dto: any, @Req() req: any) {
+    return this.assetsService.createReplacementRequest(dto, req.user.id);
+  }
+
+  @Post('replacement-request/:id/approve')
+  @RequirePermission('ASSET', 'APPROVE')
+  @ApiOperation({ summary: 'HOI authorizes replacement and allocates replacement unit' })
+  approveReplacementRequest(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
+    return this.assetsService.approveReplacementRequest(id, dto, req.user.id);
+  }
+
+  // ── Issue / Damage Reporting
+  @Post('issue-report')
+  @ApiOperation({ summary: 'Faculty/Staff reports damage or technical defect' })
+  createIssueReport(@Body() dto: any, @Req() req: any) {
+    return this.assetsService.createIssueReport(dto, req.user.id);
+  }
+
+  // ── Physical Verification
+  @Post('verification')
+  @RequirePermission('ASSET', 'VIEW')
+  @ApiOperation({ summary: 'Log physical verification audit record' })
+  createVerification(@Body() dto: any, @Req() req: any) {
+    return this.assetsService.createVerification(dto, req.user.id);
+  }
+
+  // ── Archive Asset
+  @Post(':id/archive')
+  @RequirePermission('ASSET', 'APPROVE')
+  @ApiOperation({ summary: 'Archive asset while preserving history' })
+  archiveAsset(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
+    return this.assetsService.archiveAsset(id, dto, req.user.id);
+  }
 }

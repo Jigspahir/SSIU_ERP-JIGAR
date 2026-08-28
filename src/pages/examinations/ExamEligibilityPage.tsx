@@ -335,75 +335,162 @@ export const ExamEligibilityPage: React.FC = () => {
           </div>
 
           {/* Institutional Matrix Table */}
-          <div className="card" style={{ padding: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '1.25rem' }}>
-              Institutional Student Exam Eligibility Clearance Matrix ({filteredMatrix.length} Students)
-            </h3>
-
-            <div className="table-responsive">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Enrollment No</th>
-                    <th>Student Name</th>
-                    <th>Department</th>
-                    <th>Subject Breakdown & Attendance %</th>
-                    <th>Shortage Count</th>
-                    <th>Overall Exam Clearance</th>
-                    <th>Audit Details</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredMatrix.map(item => (
-                    <tr key={item.student.id}>
-                      <td><code>{item.student.enrollmentNo}</code></td>
-                      <td style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{item.student.name}</td>
-                      <td>{db.getDepartmentById(item.student.departmentId)?.name || item.student.departmentId}</td>
-                      <td>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                          {item.subjects.map((s: any) => (
-                            <div key={s.subjectId} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem' }}>
-                              <span style={{ fontWeight: 600, minWidth: '70px' }}>{s.subjectCode}:</span>
-                              <span style={{ color: s.percentage >= 75 ? '#10B981' : '#EF4444', fontWeight: 700 }}>{s.percentage}%</span>
-                              {s.percentage >= 75 ? (
-                                <Badge variant="active">Attendance Eligible</Badge>
-                              ) : s.status === 'CONDONED_APPROVAL' ? (
-                                <Badge variant="navy">Condoned ({s.applicationNo || 'HOI Granted'})</Badge>
-                              ) : (
-                                <Badge variant="danger">Shortage ({s.shortagePercentage}%)</Badge>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-                      <td>
-                        {item.shortageCount > 0 ? (
-                          <span style={{ color: '#EF4444', fontWeight: 800 }}>{item.shortageCount} Shortages</span>
-                        ) : (
-                          <span style={{ color: '#10B981', fontWeight: 700 }}>0 Shortages</span>
-                        )}
-                      </td>
-                      <td>
-                        {item.allEligible ? (
-                          <Badge variant="active">EXAM FORM CLEARED</Badge>
-                        ) : (
-                          <Badge variant="danger">EXAM FORM BLOCKED</Badge>
-                        )}
-                      </td>
-                      <td>
-                        <button
-                          className="btn btn-sm btn-secondary"
-                          onClick={() => setInspectingRow(item)}
-                          style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                        >
-                          <FileText size={12} /> Inspect
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="card" style={{ padding: '1.25rem', overflow: 'hidden', border: '1px solid var(--border-color)', background: '#FFFFFF', borderRadius: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0 }}>
+                  Institutional Student Exam Eligibility Clearance Matrix ({filteredMatrix.length} Students)
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Statutory 75% Rule Attendance Matrix &amp; Condonation Approvals across all course papers
+                </span>
+              </div>
             </div>
+
+            {(() => {
+              const allSubjectCodes = Array.from(
+                new Set(
+                  filteredMatrix.flatMap(item => (item.subjects || []).map((s: any) => s.subjectCode || s.subjectId))
+                )
+              );
+
+              return (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table" style={{ width: '100%', fontSize: '0.8125rem', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#0F2C59', color: '#FFFFFF' }}>
+                        <th style={{ width: '40px', padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Sr</th>
+                        <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Enrollment No</th>
+                        <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Student Name</th>
+                        <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Department</th>
+                        <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Program</th>
+                        <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Semester</th>
+                        
+                        {/* Dynamic Subject Columns */}
+                        {allSubjectCodes.map(sCode => (
+                          <th key={sCode} style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)', minWidth: '100px' }}>
+                            {sCode}
+                          </th>
+                        ))}
+
+                        <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Shortages</th>
+                        <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Overall Clearance</th>
+                        <th style={{ padding: '0.625rem 0.75rem', textAlign: 'right', fontWeight: 800 }}>Audit &amp; Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredMatrix.length === 0 ? (
+                        <tr>
+                          <td colSpan={7 + allSubjectCodes.length} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                            No student eligibility records found matching the filter criteria.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredMatrix.map((item, idx) => {
+                          const deptName = db.getDepartmentById(item.student.departmentId)?.name || item.student.departmentId || 'Computer Engineering';
+                          const progName = db.getProgramById(item.student.programId)?.name || db.getProgramById(item.student.programId)?.code || 'B.Tech CSE';
+                          const semNum = item.student.semesterId ? (db.getSemesters().find(s => s.id === item.student.semesterId)?.number || 4) : 4;
+                          const isEven = idx % 2 === 0;
+
+                          return (
+                            <tr key={item.student.id} style={{ background: isEven ? '#FFFFFF' : '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+                              <td style={{ textAlign: 'center', padding: '0.5rem', borderRight: '1px solid #E2E8F0', color: '#64748B', fontWeight: 600 }}>
+                                {idx + 1}
+                              </td>
+                              <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0' }}>
+                                <strong style={{ fontFamily: 'monospace', color: '#0F2C59', fontSize: '0.78125rem' }}>
+                                  {item.student.enrollmentNo}
+                                </strong>
+                              </td>
+                              <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0', fontWeight: 700, color: '#0F2C59' }}>
+                                {item.student.name}
+                              </td>
+                              <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0', fontSize: '0.78125rem' }}>
+                                {deptName}
+                              </td>
+                              <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0', fontSize: '0.78125rem' }}>
+                                {progName}
+                              </td>
+                              <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 700, color: '#0F2C59' }}>
+                                Sem {semNum}
+                              </td>
+
+                              {/* Subject Status Cells */}
+                              {allSubjectCodes.map(sCode => {
+                                const sub = (item.subjects || []).find((s: any) => (s.subjectCode || s.subjectId) === sCode);
+                                if (!sub) {
+                                  return (
+                                    <td key={sCode} style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', color: '#94A3B8' }}>
+                                      —
+                                    </td>
+                                  );
+                                }
+
+                                const isElig = sub.percentage >= 75;
+                                const isCond = sub.status === 'CONDONED_APPROVAL';
+
+                                return (
+                                  <td key={sCode} style={{ padding: '0.4rem 0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0' }}>
+                                    <div style={{ fontWeight: 800, fontSize: '0.75rem', color: isElig ? '#047857' : isCond ? '#1D4ED8' : '#DC2626' }}>
+                                      {sub.percentage}%
+                                    </div>
+                                    <div style={{ marginTop: '2px' }}>
+                                      {isElig ? (
+                                        <span style={{ fontSize: '0.65625rem', fontWeight: 800, color: '#047857', background: '#ECFDF5', padding: '1px 4px', borderRadius: '3px', border: '1px solid #A7F3D0' }}>
+                                          ELIGIBLE
+                                        </span>
+                                      ) : isCond ? (
+                                        <span style={{ fontSize: '0.65625rem', fontWeight: 800, color: '#1D4ED8', background: '#EFF6FF', padding: '1px 4px', borderRadius: '3px', border: '1px solid #BFDBFE' }}>
+                                          CONDONED
+                                        </span>
+                                      ) : (
+                                        <span style={{ fontSize: '0.65625rem', fontWeight: 800, color: '#DC2626', background: '#FEF2F2', padding: '1px 4px', borderRadius: '3px', border: '1px solid #FECACA' }}>
+                                          SHORTAGE
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                );
+                              })}
+
+                              {/* Shortage Count */}
+                              <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0' }}>
+                                {item.shortageCount > 0 ? (
+                                  <Badge variant="danger">{item.shortageCount} Shortages</Badge>
+                                ) : (
+                                  <span style={{ color: '#047857', fontWeight: 700 }}>0 Shortages</span>
+                                )}
+                              </td>
+
+                              {/* Overall Exam Clearance */}
+                              <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0' }}>
+                                {item.allEligible ? (
+                                  <Badge variant="active">CLEARED</Badge>
+                                ) : (
+                                  <Badge variant="danger">BLOCKED</Badge>
+                                )}
+                              </td>
+
+                              {/* Audit & Action */}
+                              <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => setInspectingRow(item)}
+                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                                >
+                                  <FileText size={13} /> Audit
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

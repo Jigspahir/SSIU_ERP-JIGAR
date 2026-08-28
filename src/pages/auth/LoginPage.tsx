@@ -67,7 +67,7 @@ export const LoginPage: React.FC = () => {
       const res = login(cleanId, password);
       setIsLoading(false);
       if (!res.success) {
-        setError('Invalid username or password. Please check your credentials and try again.');
+        setError(res.error || 'Invalid username or password. Please check your credentials and try again.');
       }
     }, 300);
   };
@@ -153,6 +153,15 @@ export const LoginPage: React.FC = () => {
       badge: 'System Controller',
       icon: KeyRound,
       accentColor: '#0F2C59'
+    },
+    {
+      role: 'ERP_COORDINATOR',
+      title: 'Central ERP Coordinator',
+      userId: 'erpcoordinator',
+      pass: 'Admin@123',
+      badge: 'Central ERP Coordinator',
+      icon: ShieldCheck,
+      accentColor: '#D97706'
     },
     {
       role: 'EXAM_CELL',

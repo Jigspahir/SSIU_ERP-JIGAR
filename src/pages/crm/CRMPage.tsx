@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { exportToExcel } from '../../services/exportService';
 import { DashboardReportModal } from '../../components/reports/DashboardReportModal';
+import { StudentOnboardingTab } from '../../components/admission/StudentOnboardingTab';
 
 export const CRMPage: React.FC = () => {
   const { user, role, canMutate } = useAuth();
@@ -34,7 +35,7 @@ export const CRMPage: React.FC = () => {
   const semesters = db.getSemesters();
   const divisions = db.getDivisions();
 
-  const [activeTab, setActiveTab] = useState<'LEADS' | 'APPLICATIONS' | 'REPORTS'>('LEADS');
+  const [activeTab, setActiveTab] = useState<'LEADS' | 'APPLICATIONS' | 'ONBOARDING' | 'REPORTS'>('LEADS');
 
   // Multi-Criteria Filters State
   const [filterInstitute, setFilterInstitute] = useState('ALL');
@@ -593,7 +594,7 @@ export const CRMPage: React.FC = () => {
       </div>
 
       {/* Navigation Tabs */}
-      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', flexWrap: 'wrap' }}>
         <button
           className={`btn ${activeTab === 'LEADS' ? 'btn-primary' : 'btn-ghost'}`}
           onClick={() => setActiveTab('LEADS')}
@@ -605,6 +606,13 @@ export const CRMPage: React.FC = () => {
           onClick={() => setActiveTab('APPLICATIONS')}
         >
           <FileCheck size={16} /> Admission Applications ({filteredApplications.length})
+        </button>
+        <button
+          className={`btn ${activeTab === 'ONBOARDING' ? 'btn-primary' : 'btn-ghost'}`}
+          onClick={() => setActiveTab('ONBOARDING')}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 800 }}
+        >
+          <UserPlus size={16} /> Student Onboarding Desk
         </button>
       </div>
 
@@ -967,6 +975,11 @@ export const CRMPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* TAB 3: STUDENT ONBOARDING DESK */}
+      {activeTab === 'ONBOARDING' && (
+        <StudentOnboardingTab />
       )}
 
       {/* CREATE / EDIT LEAD MODAL */}

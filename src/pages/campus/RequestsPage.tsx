@@ -6,6 +6,7 @@ import { exportToExcel } from '../../services/exportService';
 import { StudentRequest, StudentRequestStatus } from '../../types/studentRequest';
 import { StatCard } from '../../components/common/StatCard';
 import { Badge } from '../../components/common/Badge';
+import { ExcelTableContainer, ExcelTable, ExcelTh, ExcelTd } from '../../components/common/ExcelTable';
 import { StudentRequestModal } from '../../components/approval/StudentRequestModal';
 import { StudentRequestDetailModal } from '../../components/approval/StudentRequestDetailModal';
 import { 
@@ -387,8 +388,8 @@ export const RequestsPage: React.FC<RequestsPageProps> = ({
       </div>
 
       {/* Filter Bar */}
-      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', backgroundColor: '#FFF', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-        <div style={{ flex: 1, minWidth: '240px', position: 'relative' }}>
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', backgroundColor: '#FFF', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', alignItems: 'center' }}>
+        <div style={{ flex: '1 1 260px', position: 'relative' }}>
           <Search size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             type="text"
@@ -404,7 +405,7 @@ export const RequestsPage: React.FC<RequestsPageProps> = ({
           value={filterCategory}
           onChange={e => setFilterCategory(e.target.value)}
           className="input-field"
-          style={{ minWidth: '170px' }}
+          style={{ minWidth: '160px', flex: '0 1 auto' }}
         >
           <option value="ALL">All Categories</option>
           <option value="SUBJECT_RELATED">Subject Related</option>
@@ -422,7 +423,7 @@ export const RequestsPage: React.FC<RequestsPageProps> = ({
           value={filterPriority}
           onChange={e => setFilterPriority(e.target.value)}
           className="input-field"
-          style={{ minWidth: '140px' }}
+          style={{ minWidth: '140px', flex: '0 1 auto' }}
         >
           <option value="ALL">All Priorities</option>
           <option value="LOW">Low</option>
@@ -435,7 +436,7 @@ export const RequestsPage: React.FC<RequestsPageProps> = ({
           value={filterStatus}
           onChange={e => setFilterStatus(e.target.value)}
           className="input-field"
-          style={{ minWidth: '160px' }}
+          style={{ minWidth: '160px', flex: '0 1 auto' }}
         >
           <option value="ALL">All Statuses</option>
           <option value="SUBMITTED">Submitted</option>
@@ -451,92 +452,103 @@ export const RequestsPage: React.FC<RequestsPageProps> = ({
       </div>
 
       {/* Requests Table */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
-            <thead>
-              <tr style={{ backgroundColor: 'var(--bg-main)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
-                <th style={{ padding: '0.875rem 1rem' }}>Request No</th>
-                <th style={{ padding: '0.875rem 1rem' }}>Student Details</th>
-                <th style={{ padding: '0.875rem 1rem' }}>Category &amp; Subject</th>
-                <th style={{ padding: '0.875rem 1rem' }}>Assigned Mentor</th>
-                <th style={{ padding: '0.875rem 1rem' }}>Current Desk</th>
-                <th style={{ padding: '0.875rem 1rem' }}>Priority</th>
-                <th style={{ padding: '0.875rem 1rem' }}>Status</th>
-                <th style={{ padding: '0.875rem 1rem', textAlign: 'right' }}>Actions</th>
+      <ExcelTableContainer minWidth="1200px">
+        <ExcelTable>
+          <thead>
+            <tr>
+              <ExcelTh align="left" style={{ minWidth: '130px' }}>Request No</ExcelTh>
+              <ExcelTh align="left" style={{ minWidth: '220px' }}>Student Details</ExcelTh>
+              <ExcelTh align="center" style={{ minWidth: '140px' }}>Category</ExcelTh>
+              <ExcelTh align="left" style={{ minWidth: '240px' }}>Subject</ExcelTh>
+              <ExcelTh align="left" style={{ minWidth: '160px' }}>Assigned Mentor</ExcelTh>
+              <ExcelTh align="left" style={{ minWidth: '170px' }}>Current Desk</ExcelTh>
+              <ExcelTh align="center" style={{ minWidth: '95px' }}>Priority</ExcelTh>
+              <ExcelTh align="center" style={{ minWidth: '140px' }}>Status</ExcelTh>
+              <ExcelTh align="center" style={{ minWidth: '130px' }}>Actions</ExcelTh>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredRequests.length === 0 ? (
+              <tr>
+                <ExcelTd colSpan={9} align="center" style={{ padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+                  <UserCheck size={40} style={{ margin: '0 auto 0.75rem auto', color: 'var(--border-color)', opacity: 0.6 }} />
+                  <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem', color: 'var(--brand-navy)' }}>No student requests found in this view</p>
+                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.825rem' }}>Try adjusting your search query or tab filters</p>
+                </ExcelTd>
               </tr>
-            </thead>
-            <tbody>
-              {filteredRequests.length === 0 ? (
-                <tr>
-                  <td colSpan={8} style={{ padding: '2.5rem 1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    <UserCheck size={36} style={{ margin: '0 auto 0.75rem auto', color: 'var(--border-color)' }} />
-                    <p style={{ margin: 0, fontWeight: 600, fontSize: '0.95rem' }}>No student requests found in this view</p>
-                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.825rem' }}>Try adjusting your search or tab filters</p>
-                  </td>
-                </tr>
-              ) : (
-                filteredRequests.map(r => (
-                  <tr
-                    key={r.id}
-                    style={{ borderBottom: '1px solid var(--border-color)', transition: 'background-color var(--transition-fast)' }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(240, 244, 248, 0.4)'}
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-                  >
-                    <td style={{ padding: '0.875rem 1rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
-                      {r.requestNo}
-                    </td>
+            ) : (
+              filteredRequests.map(r => (
+                <tr key={r.id}>
+                  <ExcelTd align="left" mono color="#1E40AF">
+                    <span style={{ fontWeight: 800, whiteSpace: 'nowrap' }}>{r.requestNo}</span>
+                  </ExcelTd>
 
-                    <td style={{ padding: '0.875rem 1rem' }}>
-                      <div style={{ fontWeight: 600 }}>{r.studentName}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {r.enrollmentNo} • {r.departmentName}
+                  <ExcelTd align="left">
+                    <div style={{ fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '0.15rem' }}>
+                      {r.studentName}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.3 }}>
+                      {r.enrollmentNo} • {r.departmentName}
+                    </div>
+                  </ExcelTd>
+
+                  <ExcelTd align="center">
+                    <Badge variant="navy">
+                      {r.category.replace(/_/g, ' ')}
+                    </Badge>
+                  </ExcelTd>
+
+                  <ExcelTd align="left">
+                    <div style={{ fontWeight: 600, color: 'var(--text-main)', lineHeight: 1.4, wordBreak: 'break-word' }}>
+                      {r.subject}
+                    </div>
+                    {r.subjectCode && (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
+                        Subject Code: {r.subjectCode}
                       </div>
-                    </td>
+                    )}
+                  </ExcelTd>
 
-                    <td style={{ padding: '0.875rem 1rem' }}>
-                      <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{r.subject}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {r.category.replace(/_/g, ' ')} {r.subjectCode && `(${r.subjectCode})`}
-                      </div>
-                    </td>
+                  <ExcelTd align="left" bold color="var(--brand-green)">
+                    {r.mentorName || 'Not Assigned'}
+                  </ExcelTd>
 
-                    <td style={{ padding: '0.875rem 1rem', color: 'var(--brand-green)', fontWeight: 600 }}>
-                      {r.mentorName}
-                    </td>
-
-                    <td style={{ padding: '0.875rem 1rem' }}>
-                      <span style={{ fontWeight: 600, fontSize: '0.825rem', color: 'var(--brand-navy)' }}>
-                        {r.currentHandlerName || r.currentHandler}
+                  <ExcelTd align="left">
+                    <span style={{ fontWeight: 700, fontSize: '0.8125rem', color: 'var(--brand-navy)', display: 'block' }}>
+                      {r.currentHandlerName || r.currentHandler.replace(/_/g, ' ')}
+                    </span>
+                    {r.currentHandlerRole && (
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        ({r.currentHandlerRole})
                       </span>
-                    </td>
+                    )}
+                  </ExcelTd>
 
-                    <td style={{ padding: '0.875rem 1rem' }}>
-                      <Badge variant={r.priority === 'URGENT' ? 'danger' : r.priority === 'HIGH' ? 'warning' : 'navy'}>
-                        {r.priority}
-                      </Badge>
-                    </td>
+                  <ExcelTd align="center">
+                    <Badge variant={r.priority === 'URGENT' ? 'danger' : r.priority === 'HIGH' ? 'warning' : 'navy'}>
+                      {r.priority}
+                    </Badge>
+                  </ExcelTd>
 
-                    <td style={{ padding: '0.875rem 1rem' }}>
-                      {getStatusBadge(r.status)}
-                    </td>
+                  <ExcelTd align="center">
+                    {getStatusBadge(r.status)}
+                  </ExcelTd>
 
-                    <td style={{ padding: '0.875rem 1rem', textAlign: 'right' }}>
-                      <button
-                        onClick={() => setSelectedStudentRequest(r)}
-                        className="btn btn-secondary"
-                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
-                      >
-                        <Eye size={14} /> Open &amp; Action
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                  <ExcelTd align="center">
+                    <button
+                      onClick={() => setSelectedStudentRequest(r)}
+                      className="btn btn-secondary btn-sm"
+                      style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}
+                    >
+                      <Eye size={13} /> View &amp; Action
+                    </button>
+                  </ExcelTd>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </ExcelTable>
+      </ExcelTableContainer>
 
     </div>
   );

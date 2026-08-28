@@ -6,23 +6,32 @@ import { mentorBackendService } from '../../services/mentorBackendService';
 import { attendanceApprovalService } from '../../services/attendanceApprovalService';
 import { documentMasterService } from '../../services/documentMasterService';
 import { MentorAssignmentTab } from '../../components/mentor/MentorAssignmentTab';
+import { MenteeAttendanceManager } from '../../components/mentor/MenteeAttendanceManager';
+import { MenteeExamEligibilityManager } from '../../components/mentor/MenteeExamEligibilityManager';
 import { Badge } from '../../components/common/Badge';
 import { StatCard } from '../../components/common/StatCard';
 import { Modal } from '../../components/common/Modal';
 import { StudentProfileModal } from '../../components/profile/StudentProfileModal';
 import { StudentDocumentsSection } from '../../components/profile/StudentDocumentsSection';
+import { StudentDocumentsVerificationGrid } from '../../components/mentor/StudentDocumentsVerificationGrid';
 import { StudentRowActionMenu } from '../../components/common/StudentRowActionMenu';
 import { 
   UserCheck, Calendar, Clock, MessageSquare, Plus, CheckCircle, 
   User, Users, AlertCircle, FileText, CheckCircle2, Search,
   Mail, Phone, Award, BookOpen, ChevronRight, Eye, ShieldCheck, CheckSquare,
   FolderCheck, Lock, XCircle, Download, Check, AlertTriangle, FileSpreadsheet,
-  HelpCircle, Sparkles, Filter, RefreshCw, CheckCheck, ListFilter
+  HelpCircle, Sparkles, Filter, RefreshCw, CheckCheck, ListFilter, Upload,
+  Printer, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronsLeft, ChevronsRight
 } from 'lucide-react';
 import { AttendanceApplication, Student, Subject, Assignment } from '../../types';
 import { StudentAcademicDocumentItem } from '../../types/documentMaster';
 import { MentoringSessionRecord } from '../../types/mentorAssignment';
 import { studentProfileAccessService } from '../../services/studentProfileAccessService';
+import { studentDataChangeRequestService } from '../../services/studentDataChangeRequestService';
+import { studentEnrollmentMappingService } from '../../services/studentEnrollmentMappingService';
+import { BulkStudentMappingModal } from '../../components/students/BulkStudentMappingModal';
+import { StudentMappingHistoryModal } from '../../components/students/StudentMappingHistoryModal';
+import { StudentDataChangeTab } from '../../components/profile/StudentDataChangeTab';
 import * as XLSX from 'xlsx';
 
 export type MentorTabType = 
@@ -43,9 +52,13 @@ export type MentorTabType =
   | 'PENDING_VERIFICATION' 
   | 'VERIFIED_DOCUMENTS'
   | 'DOCUMENT_HISTORY'
+  | 'STUDENT_REQUESTS'
+  | 'DATA_CHANGE_REQUESTS'
   | 'REQUESTS' 
   | 'SESSIONS' 
-  | 'ALLOCATION';
+  | 'MENTORING_SESSIONS' 
+  | 'ALLOCATION'
+  | 'MENTEE_ALLOCATION';
 
 export interface MentorPageProps {
   initialTab?: MentorTabType;
@@ -61,16 +74,23 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
     }
   }, [initialTab]);
 
+  // Mentoring session booking modal state
   const [showModal, setShowModal] = useState(false);
   const [selectedMenteeId, setSelectedMenteeId] = useState('');
   const [topic, setTopic] = useState('');
   const [discussion, setDiscussion] = useState('');
+  const [discussionPoints, setDiscussionPoints] = useState('');
+  const [actionItems, setActionItems] = useState('');
+  const [sessionNotes, setSessionNotes] = useState('');
   const [date, setDate] = useState('');
   const [timeSlot, setTimeSlot] = useState('02:00 PM - 02:30 PM');
   const [academicConcern, setAcademicConcern] = useState('');
   const [attendanceConcern, setAttendanceConcern] = useState('');
   const [actionTaken, setActionTaken] = useState('');
   const [remarks, setRemarks] = useState('');
+  const [sessionType, setSessionType] = useState<'ONE_ON_ONE' | 'GROUP' | 'PARENT_MEETING' | 'ACADEMIC_REVIEW' | 'CRISIS_COUNSELING'>('ONE_ON_ONE');
+  const [category, setCategory] = useState<'ACADEMIC' | 'CAREER' | 'PERSONAL' | 'ATTENDANCE' | 'BEHAVIORAL' | 'FEE_RELATED' | 'EXAM_STRESS' | 'GENERAL'>('ACADEMIC');
+  const [urgencyLevel, setUrgencyLevel] = useState<'ROUTINE' | 'MODERATE' | 'CRITICAL'>('ROUTINE');
   const [followUpRequired, setFollowUpRequired] = useState(false);
   const [followUpDate, setFollowUpDate] = useState('');
   const [followUpAction, setFollowUpAction] = useState('');
@@ -78,12 +98,30 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
   const [selectedStudentForProfile, setSelectedStudentForProfile] = useState<Student | null>(null);
   const [selectedStudentForDocs, setSelectedStudentForDocs] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Hierarchical Filter States
   const [filterInstituteId, setFilterInstituteId] = useState<string>('ALL');
   const [filterDepartmentId, setFilterDepartmentId] = useState<string>('ALL');
   const [filterProgramId, setFilterProgramId] = useState<string>('ALL');
+  const [filterAcademicYear, setFilterAcademicYear] = useState<string>('ALL');
   const [filterSemesterId, setFilterSemesterId] = useState<string>('ALL');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE' | 'SHORTAGE' | 'RISK' | 'ELIGIBLE'>('ALL');
+  const [filterDivision, setFilterDivision] = useState<string>('ALL');
+  const [filterBatch, setFilterBatch] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [standingFilter, setStandingFilter] = useState<'ALL' | 'GOOD_STANDING' | 'ATTENDANCE_SHORTAGE' | 'ACADEMIC_RISK'>('ALL');
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Sorting & Pagination States
+  const [sortField, setSortField] = useState<string>('srNo');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(25);
+
+  // Bulk Mapping Modal States
+  const [showBulkMapModal, setShowBulkMapModal] = useState(false);
+  const [bulkMapInitialStep, setBulkMapInitialStep] = useState<1 | 2>(1);
+  const [showMappingHistoryModal, setShowMappingHistoryModal] = useState(false);
+  const canBulkMap = studentEnrollmentMappingService.canUserPerformBulkMapping(user, role);
 
   // Document Verification Action Modal
   const [rejectingDoc, setRejectingDoc] = useState<StudentAcademicDocumentItem | null>(null);
@@ -160,6 +198,80 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
     return menteeDocuments.filter(d => d.status === 'VERIFIED' && d.isLocked);
   }, [menteeDocuments]);
 
+  // Cascading Academic Filter Collections
+  const availableInstitutes = useMemo(() => db.getInstitutes(), []);
+  
+  const availableDepartments = useMemo(() => {
+    const all = db.getDepartments();
+    if (filterInstituteId === 'ALL') return all;
+    return all.filter(d => d.instituteId === filterInstituteId);
+  }, [filterInstituteId]);
+
+  const availablePrograms = useMemo(() => {
+    let progs = db.getPrograms();
+    if (filterDepartmentId !== 'ALL') {
+      progs = progs.filter(p => p.departmentId === filterDepartmentId);
+    } else if (filterInstituteId !== 'ALL') {
+      progs = progs.filter(p => p.instituteId === filterInstituteId);
+    }
+    return progs;
+  }, [filterDepartmentId, filterInstituteId]);
+
+  const availableSemesters = useMemo(() => {
+    let sems = db.getSemesters();
+    if (filterProgramId !== 'ALL') {
+      sems = sems.filter(s => s.programId === filterProgramId);
+    }
+    return sems;
+  }, [filterProgramId]);
+
+  const availableDivisions = useMemo(() => {
+    let divs = db.getDivisions();
+    if (filterSemesterId !== 'ALL') {
+      divs = divs.filter(d => d.semesterId === filterSemesterId);
+    }
+    return divs;
+  }, [filterSemesterId]);
+
+  const availableBatches = useMemo(() => db.getBatches(), []);
+
+  // Dynamic KPIs for "My Students" Top Summary
+  const kpiMetrics = useMemo(() => {
+    const totalAssigned = authorizedStudents.length;
+    const activeAssigned = authorizedStudents.filter(s => s.status === 'ACTIVE').length;
+    
+    // Dynamic Program Breakdown
+    const progMap: Record<string, number> = {};
+    authorizedStudents.forEach(s => {
+      const prog = db.getProgramById(s.programId)?.code || s.programId || 'General';
+      progMap[prog] = (progMap[prog] || 0) + 1;
+    });
+
+    // Dynamic Semester Breakdown
+    const semMap: Record<string, number> = {};
+    authorizedStudents.forEach(s => {
+      const sem = db.getSemesterById(s.semesterId)?.number;
+      const key = sem ? `Semester ${sem}` : 'Other';
+      semMap[key] = (semMap[key] || 0) + 1;
+    });
+
+    // Dynamic Division Breakdown
+    const divMap: Record<string, number> = {};
+    authorizedStudents.forEach(s => {
+      const divObj = db.getDivisions().find(d => d.id === s.divisionId);
+      const divName = divObj?.name ? (divObj.name.startsWith('Division ') ? divObj.name : `Division ${divObj.name}`) : `Div ${s.divisionId || 'A'}`;
+      divMap[divName] = (divMap[divName] || 0) + 1;
+    });
+
+    return {
+      totalAssigned,
+      activeAssigned,
+      programBreakdown: Object.entries(progMap).sort((a, b) => b[1] - a[1]),
+      semesterBreakdown: Object.entries(semMap).sort((a, b) => a[0].localeCompare(b[0])),
+      divisionBreakdown: Object.entries(divMap).sort((a, b) => a[0].localeCompare(b[0]))
+    };
+  }, [authorizedStudents]);
+
   // 6. Filter authorized students by text search and dropdown criteria
   const filteredStudents = useMemo(() => {
     const cleanQuery = searchQuery.trim().toLowerCase();
@@ -167,14 +279,16 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
     const departments = db.getDepartments();
     const institutes = db.getInstitutes();
     const semesters = db.getSemesters();
+    const divisions = db.getDivisions();
 
     return authorizedStudents.filter(student => {
-      // Query text search
+      // Query text search matching Name, Enrollment No, University ID, Email, Mobile
       if (cleanQuery) {
         const nameMatch = student.name?.toLowerCase().includes(cleanQuery);
         const enrollMatch = student.enrollmentNo?.toLowerCase().includes(cleanQuery);
+        const univMatch = (student.universityId || student.id)?.toLowerCase().includes(cleanQuery);
         const emailMatch = student.email?.toLowerCase().includes(cleanQuery);
-        const phoneMatch = student.phone?.includes(cleanQuery);
+        const phoneMatch = (student.phone || student.mobile)?.includes(cleanQuery);
         const prog = programs.find(p => p.id === student.programId);
         const progMatch = prog?.name?.toLowerCase().includes(cleanQuery) || prog?.code?.toLowerCase().includes(cleanQuery);
         const dept = departments.find(d => d.id === student.departmentId);
@@ -184,30 +298,43 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
         const sem = semesters.find(s => s.id === student.semesterId);
         const semMatch = sem ? `sem ${sem.number}`.includes(cleanQuery) || `${sem.number}` === cleanQuery : false;
 
-        if (!nameMatch && !enrollMatch && !emailMatch && !phoneMatch && !progMatch && !deptMatch && !instMatch && !semMatch) {
+        if (!nameMatch && !enrollMatch && !univMatch && !emailMatch && !phoneMatch && !progMatch && !deptMatch && !instMatch && !semMatch) {
           return false;
         }
       }
 
       // Dropdown filters
-      if (filterInstituteId && filterInstituteId !== 'ALL' && student.instituteId !== filterInstituteId) {
+      if (filterInstituteId !== 'ALL' && student.instituteId !== filterInstituteId) {
         return false;
       }
-      if (filterDepartmentId && filterDepartmentId !== 'ALL' && student.departmentId !== filterDepartmentId) {
+      if (filterDepartmentId !== 'ALL' && student.departmentId !== filterDepartmentId) {
         return false;
       }
-      if (filterProgramId && filterProgramId !== 'ALL' && student.programId !== filterProgramId) {
+      if (filterProgramId !== 'ALL' && student.programId !== filterProgramId) {
         return false;
       }
-      if (filterSemesterId && filterSemesterId !== 'ALL' && student.semesterId !== filterSemesterId) {
+      if (filterAcademicYear !== 'ALL' && student.academicYear !== filterAcademicYear && student.academicYearId !== filterAcademicYear) {
         return false;
       }
-      if (statusFilter === 'ACTIVE' && student.status !== 'ACTIVE') return false;
-      if (statusFilter === 'INACTIVE' && student.status === 'ACTIVE') return false;
+      if (filterSemesterId !== 'ALL' && student.semesterId !== filterSemesterId) {
+        return false;
+      }
+      if (filterDivision !== 'ALL') {
+        const divObj = divisions.find(d => d.id === student.divisionId);
+        const divName = divObj?.name || student.divisionId || '';
+        const matchDiv = divName.toLowerCase().includes(filterDivision.toLowerCase());
+        if (!matchDiv) return false;
+      }
+      if (filterBatch !== 'ALL' && student.batchId !== filterBatch) {
+        return false;
+      }
+      if (statusFilter !== 'ALL' && student.status !== statusFilter) {
+        return false;
+      }
 
       return true;
     });
-  }, [authorizedStudents, searchQuery, filterInstituteId, filterDepartmentId, filterProgramId, filterSemesterId, statusFilter]);
+  }, [authorizedStudents, searchQuery, filterInstituteId, filterDepartmentId, filterProgramId, filterAcademicYear, filterSemesterId, filterDivision, filterBatch, statusFilter]);
 
   // 7. Attendance Shortage Calculation & Academic Risk Tracker
   const menteeAttendanceData = useMemo(() => {
@@ -245,21 +372,100 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
     return menteeAttendanceData.filter(m => m.isRisk);
   }, [menteeAttendanceData]);
 
-  // Filtered mentees by quick status filter
+  // Filtered mentees by quick status & standing filter
   const filteredMenteeData = useMemo(() => {
-    if (statusFilter === 'SHORTAGE') {
-      return menteeAttendanceData.filter(m => m.hasShortage);
+    let result = menteeAttendanceData;
+    if (standingFilter === 'GOOD_STANDING') {
+      result = result.filter(m => !m.hasShortage && !m.isRisk);
+    } else if (standingFilter === 'ATTENDANCE_SHORTAGE') {
+      result = result.filter(m => m.hasShortage);
+    } else if (standingFilter === 'ACADEMIC_RISK') {
+      result = result.filter(m => m.isRisk);
     }
-    if (statusFilter === 'ELIGIBLE') {
-      return menteeAttendanceData.filter(m => !m.hasShortage);
+    return result;
+  }, [menteeAttendanceData, standingFilter]);
+
+  // Sorted & Paginated Data
+  const sortedMenteeData = useMemo(() => {
+    const data = [...filteredMenteeData];
+    data.sort((a, b) => {
+      let valA: any = '';
+      let valB: any = '';
+
+      switch (sortField) {
+        case 'name':
+          valA = (a.student.name || '').toLowerCase();
+          valB = (b.student.name || '').toLowerCase();
+          break;
+        case 'enrollmentNo':
+          valA = (a.student.enrollmentNo || '').toLowerCase();
+          valB = (b.student.enrollmentNo || '').toLowerCase();
+          break;
+        case 'universityId':
+          valA = (a.student.universityId || a.student.id || '').toLowerCase();
+          valB = (b.student.universityId || b.student.id || '').toLowerCase();
+          break;
+        case 'program':
+          valA = (db.getProgramById(a.student.programId)?.code || '').toLowerCase();
+          valB = (db.getProgramById(b.student.programId)?.code || '').toLowerCase();
+          break;
+        case 'department':
+          valA = (db.getDepartments().find(d => d.id === a.student.departmentId)?.code || '').toLowerCase();
+          valB = (db.getDepartments().find(d => d.id === b.student.departmentId)?.code || '').toLowerCase();
+          break;
+        case 'semester':
+          valA = db.getSemesterById(a.student.semesterId)?.number || 0;
+          valB = db.getSemesterById(b.student.semesterId)?.number || 0;
+          break;
+        case 'division':
+          valA = (a.student.divisionId || '').toLowerCase();
+          valB = (b.student.divisionId || '').toLowerCase();
+          break;
+        case 'status':
+          valA = a.student.status || '';
+          valB = b.student.status || '';
+          break;
+        case 'standing':
+          valA = a.isRisk ? 'RISK' : 'GOOD';
+          valB = b.isRisk ? 'RISK' : 'GOOD';
+          break;
+        case 'attendance':
+          valA = a.stats.percentage;
+          valB = b.stats.percentage;
+          break;
+        default:
+          valA = a.student.enrollmentNo || '';
+          valB = b.student.enrollmentNo || '';
+      }
+
+      if (valA < valB) return sortDirection === 'asc' ? -1 : 1;
+      if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return data;
+  }, [filteredMenteeData, sortField, sortDirection]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedMenteeData.length / pageSize));
+  const paginatedMenteeData = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return sortedMenteeData.slice(start, start + pageSize);
+  }, [sortedMenteeData, currentPage, pageSize]);
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
     }
-    if (statusFilter === 'RISK') {
-      return menteeAttendanceData.filter(m => m.isRisk);
-    }
-    return menteeAttendanceData;
-  }, [menteeAttendanceData, statusFilter]);
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   const pendingRequestsCount = myMentorRequests.filter(r => r.status === 'SUBMITTED' || r.status === 'WORK_IN_PROGRESS' || r.status === 'WITH_MENTOR').length;
+  const pendingDataChangeCount = studentDataChangeRequestService.getScopedRequests(user, role, { status: 'MENTOR_PENDING' }).length;
 
   const handleExportExcel = () => {
     const exportData = filteredMenteeData.map(({ student, stats, hasShortage, verifiedDocsCount, pendingDocsCount }) => {
@@ -585,6 +791,12 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
               <FolderCheck size={14} /> Document Verification ({pendingMenteesDocs.length})
             </button>
             <button 
+              className={`btn btn-sm ${activeTab === 'DATA_CHANGE_REQUESTS' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => { setActiveTab('DATA_CHANGE_REQUESTS'); setSelectedStudentForDocs(null); }}
+            >
+              <ShieldCheck size={14} /> Data Change Requests ({pendingDataChangeCount})
+            </button>
+            <button 
               className={`btn btn-sm ${activeTab === 'REQUESTS' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => { setActiveTab('REQUESTS'); setSelectedStudentForDocs(null); }}
             >
@@ -607,15 +819,17 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
           </div>
 
           {/* ─────────────────────────────────────────────────────────────
+              TAB: Data Change Requests Queue (Mentor Review)
+              {/* ─────────────────────────────────────────────────────────────
               TAB 1: My Students / Mentee List (Unified Student Management)
               ───────────────────────────────────────────────────────────── */}
           {activeTab === 'MY_STUDENTS' && (
             <div className="card" style={{ padding: '1.25rem' }}>
-              {/* Header with Title and Export Button */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              {/* Header with Title and Action Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-                  <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Users size={20} color="var(--brand-orange)" />
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Users size={22} color="var(--brand-orange)" />
                     {role === 'FACULTY' 
                       ? 'My Students — Department & Assigned Classes' 
                       : role === 'MENTOR' 
@@ -626,10 +840,64 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
                             ? 'Institute Students Directory'
                             : 'University Students Directory'}
                   </h3>
-                  <Badge variant="navy">{filteredMenteeData.length} Authorized Records</Badge>
+                  <Badge variant="navy">{sortedMenteeData.length} Authorized Records</Badge>
                 </div>
 
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                  {canBulkMap && (
+                    <button 
+                      className="btn btn-sm btn-primary"
+                      onClick={() => {
+                        setBulkMapInitialStep(1);
+                        setShowBulkMapModal(true);
+                      }}
+                      title="Bulk Map / Register Students from Excel"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        fontSize: '0.8rem',
+                        fontWeight: 700,
+                        background: 'linear-gradient(135deg, var(--brand-orange) 0%, #D95300 100%)',
+                        boxShadow: '0 2px 6px rgba(243, 112, 35, 0.3)'
+                      }}
+                    >
+                      <Plus size={14} /> + Bulk Map Students
+                    </button>
+                  )}
+
+                  <button 
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => studentEnrollmentMappingService.downloadExcelTemplate()}
+                    title="Download official bulk mapping template (.xlsx)"
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem' }}
+                  >
+                    <Download size={14} /> Download Excel Template
+                  </button>
+
+                  {canBulkMap && (
+                    <button 
+                      className="btn btn-sm btn-secondary"
+                      onClick={() => {
+                        setBulkMapInitialStep(2);
+                        setShowBulkMapModal(true);
+                      }}
+                      title="Directly upload filled student mapping Excel"
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem' }}
+                    >
+                      <Upload size={14} /> Upload Filled Excel
+                    </button>
+                  )}
+
+                  <button 
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => setShowMappingHistoryModal(true)}
+                    title="View historical student mapping audit sessions"
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem' }}
+                  >
+                    <FileText size={14} /> Mapping History
+                  </button>
+
                   <button 
                     className="btn btn-sm btn-navy"
                     onClick={handleExportExcel}
@@ -638,6 +906,16 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
                   >
                     <FileSpreadsheet size={14} /> Export to Excel
                   </button>
+
+                  <button 
+                    className="btn btn-sm btn-secondary"
+                    onClick={handlePrint}
+                    title="Print student master directory"
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem' }}
+                  >
+                    <Printer size={14} /> Print
+                  </button>
+
                   <button 
                     className="btn btn-sm btn-secondary"
                     onClick={() => {
@@ -645,8 +923,13 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
                       setFilterInstituteId('ALL');
                       setFilterDepartmentId('ALL');
                       setFilterProgramId('ALL');
+                      setFilterAcademicYear('ALL');
                       setFilterSemesterId('ALL');
+                      setFilterDivision('ALL');
+                      setFilterBatch('ALL');
                       setStatusFilter('ALL');
+                      setStandingFilter('ALL');
+                      setCurrentPage(1);
                       setRefreshKey(k => k + 1);
                     }}
                     title="Reset all filters"
@@ -657,14 +940,156 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
                 </div>
               </div>
 
+              {/* ─────────────────────────────────────────────────────────────
+                  DYNAMIC UNIVERSITY STUDENT SUMMARY KPI CARDS (Calculated Dynamically)
+                  ───────────────────────────────────────────────────────────── */}
+              <div 
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '1rem',
+                  marginBottom: '1.25rem'
+                }}
+              >
+                {/* 1. Total Assigned */}
+                <div 
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '10px',
+                    padding: '1rem',
+                    border: '1px solid #E2E8F0',
+                    borderLeft: '4px solid var(--brand-navy)',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                  }}
+                >
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', letterSpacing: '0.5px' }}>
+                    Total Assigned Students
+                  </div>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--brand-navy)', marginTop: '0.2rem' }}>
+                    {kpiMetrics.totalAssigned}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#16A34A', fontWeight: 700, marginTop: '0.15rem' }}>
+                    {kpiMetrics.activeAssigned} Active Students
+                  </div>
+                </div>
+
+                {/* 2. Students by Program */}
+                <div 
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '10px',
+                    padding: '1rem',
+                    border: '1px solid #E2E8F0',
+                    borderLeft: '4px solid var(--brand-orange)',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                  }}
+                >
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', letterSpacing: '0.5px' }}>
+                    Students by Program
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.4rem' }}>
+                    {kpiMetrics.programBreakdown.map(([prog, count]) => (
+                      <span 
+                        key={prog} 
+                        style={{
+                          backgroundColor: '#FFF7ED',
+                          color: '#C2410C',
+                          border: '1px solid #FFEDD5',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: '6px'
+                        }}
+                      >
+                        {prog}: <strong>{count}</strong>
+                      </span>
+                    ))}
+                    {kpiMetrics.programBreakdown.length === 0 && <span style={{ color: '#94A3B8', fontSize: '0.75rem' }}>None</span>}
+                  </div>
+                </div>
+
+                {/* 3. Students by Semester */}
+                <div 
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '10px',
+                    padding: '1rem',
+                    border: '1px solid #E2E8F0',
+                    borderLeft: '4px solid #3B82F6',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                  }}
+                >
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', letterSpacing: '0.5px' }}>
+                    Students by Semester
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.4rem' }}>
+                    {kpiMetrics.semesterBreakdown.map(([sem, count]) => (
+                      <span 
+                        key={sem} 
+                        style={{
+                          backgroundColor: '#EFF6FF',
+                          color: '#1D4ED8',
+                          border: '1px solid #DBEAFE',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: '6px'
+                        }}
+                      >
+                        {sem}: <strong>{count}</strong>
+                      </span>
+                    ))}
+                    {kpiMetrics.semesterBreakdown.length === 0 && <span style={{ color: '#94A3B8', fontSize: '0.75rem' }}>None</span>}
+                  </div>
+                </div>
+
+                {/* 4. Students by Division */}
+                <div 
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: '10px',
+                    padding: '1rem',
+                    border: '1px solid #E2E8F0',
+                    borderLeft: '4px solid #8B5CF6',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                  }}
+                >
+                  <div style={{ fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', color: '#64748B', letterSpacing: '0.5px' }}>
+                    Students by Division
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.4rem' }}>
+                    {kpiMetrics.divisionBreakdown.map(([div, count]) => (
+                      <span 
+                        key={div} 
+                        style={{
+                          backgroundColor: '#F5F3FF',
+                          color: '#6D28D9',
+                          border: '1px solid #EDE9FE',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          padding: '0.2rem 0.5rem',
+                          borderRadius: '6px'
+                        }}
+                      >
+                        {div}: <strong>{count}</strong>
+                      </span>
+                    ))}
+                    {kpiMetrics.divisionBreakdown.length === 0 && <span style={{ color: '#94A3B8', fontSize: '0.75rem' }}>None</span>}
+                  </div>
+                </div>
+              </div>
+
               {/* Main Search Input Bar */}
               <div style={{ marginBottom: '1rem' }}>
                 <div style={{ position: 'relative', width: '100%' }}>
                   <input 
                     className="form-control" 
-                    placeholder="Search student by name, enrollment number or email..." 
+                    placeholder="Search by Student Name, Enrollment No, University ID, Email, or Mobile number..." 
                     value={searchQuery} 
-                    onChange={e => setSearchQuery(e.target.value)} 
+                    onChange={e => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }} 
                     style={{ 
                       paddingLeft: '2.5rem', 
                       paddingRight: searchQuery ? '2.5rem' : '1rem',
@@ -686,200 +1111,497 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
                 </div>
               </div>
 
-              {/* Structured Filter Controls Row */}
+              {/* ─────────────────────────────────────────────────────────────
+                  DEPENDENT CASCADING FILTER CONTROLS ROW
+                  ───────────────────────────────────────────────────────────── */}
               <div style={{ 
                 display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', 
-                gap: '0.75rem', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))', 
+                gap: '0.65rem', 
                 padding: '0.875rem', 
                 backgroundColor: '#F8FAFC', 
                 borderRadius: '8px', 
                 marginBottom: '1.25rem',
                 border: '1px solid #E2E8F0'
               }}>
+                {/* 1. Institute */}
                 <div>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Institute</label>
+                  <label style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Institute</label>
                   <select 
                     className="form-control" 
                     value={filterInstituteId} 
-                    onChange={e => setFilterInstituteId(e.target.value)}
-                    style={{ fontSize: '0.8rem', height: '34px', padding: '0.25rem 0.5rem' }}
+                    onChange={e => {
+                      setFilterInstituteId(e.target.value);
+                      setFilterDepartmentId('ALL');
+                      setFilterProgramId('ALL');
+                      setFilterSemesterId('ALL');
+                      setCurrentPage(1);
+                    }}
+                    style={{ fontSize: '0.78rem', height: '32px', padding: '0.2rem 0.4rem' }}
                   >
                     <option value="ALL">All Institutes</option>
-                    {db.getInstitutes().map(i => (
+                    {availableInstitutes.map(i => (
                       <option key={i.id} value={i.id}>{i.name} ({i.code})</option>
                     ))}
                   </select>
                 </div>
 
+                {/* 2. Department (Dependent on Institute) */}
                 <div>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Department</label>
+                  <label style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Department</label>
                   <select 
                     className="form-control" 
                     value={filterDepartmentId} 
-                    onChange={e => setFilterDepartmentId(e.target.value)}
-                    style={{ fontSize: '0.8rem', height: '34px', padding: '0.25rem 0.5rem' }}
+                    onChange={e => {
+                      setFilterDepartmentId(e.target.value);
+                      setFilterProgramId('ALL');
+                      setFilterSemesterId('ALL');
+                      setCurrentPage(1);
+                    }}
+                    style={{ fontSize: '0.78rem', height: '32px', padding: '0.2rem 0.4rem' }}
                   >
                     <option value="ALL">All Departments</option>
-                    {db.getDepartments().map(d => (
+                    {availableDepartments.map(d => (
                       <option key={d.id} value={d.id}>{d.name}</option>
                     ))}
                   </select>
                 </div>
 
+                {/* 3. Program (Dependent on Department) */}
                 <div>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Program</label>
+                  <label style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Program</label>
                   <select 
                     className="form-control" 
                     value={filterProgramId} 
-                    onChange={e => setFilterProgramId(e.target.value)}
-                    style={{ fontSize: '0.8rem', height: '34px', padding: '0.25rem 0.5rem' }}
+                    onChange={e => {
+                      setFilterProgramId(e.target.value);
+                      setFilterSemesterId('ALL');
+                      setCurrentPage(1);
+                    }}
+                    style={{ fontSize: '0.78rem', height: '32px', padding: '0.2rem 0.4rem' }}
                   >
                     <option value="ALL">All Programs</option>
-                    {db.getPrograms().map(p => (
+                    {availablePrograms.map(p => (
                       <option key={p.id} value={p.id}>{p.code} - {p.name}</option>
                     ))}
                   </select>
                 </div>
 
+                {/* 4. Academic Year */}
                 <div>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Semester</label>
+                  <label style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Academic Year</label>
+                  <select 
+                    className="form-control" 
+                    value={filterAcademicYear} 
+                    onChange={e => {
+                      setFilterAcademicYear(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    style={{ fontSize: '0.78rem', height: '32px', padding: '0.2rem 0.4rem' }}
+                  >
+                    <option value="ALL">All Academic Years</option>
+                    <option value="2025-26">2025-26</option>
+                    <option value="2024-25">2024-25</option>
+                    <option value="2026-27">2026-27</option>
+                  </select>
+                </div>
+
+                {/* 5. Semester (Dependent on Program) */}
+                <div>
+                  <label style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Semester</label>
                   <select 
                     className="form-control" 
                     value={filterSemesterId} 
-                    onChange={e => setFilterSemesterId(e.target.value)}
-                    style={{ fontSize: '0.8rem', height: '34px', padding: '0.25rem 0.5rem' }}
+                    onChange={e => {
+                      setFilterSemesterId(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    style={{ fontSize: '0.78rem', height: '32px', padding: '0.2rem 0.4rem' }}
                   >
                     <option value="ALL">All Semesters</option>
-                    {db.getSemesters().map(s => (
+                    {availableSemesters.map(s => (
                       <option key={s.id} value={s.id}>Semester {s.number}</option>
                     ))}
                   </select>
                 </div>
 
+                {/* 6. Division (Dependent on Semester) */}
                 <div>
-                  <label style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase' }}>Status / Standing</label>
+                  <label style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Division</label>
+                  <select 
+                    className="form-control" 
+                    value={filterDivision} 
+                    onChange={e => {
+                      setFilterDivision(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    style={{ fontSize: '0.78rem', height: '32px', padding: '0.2rem 0.4rem' }}
+                  >
+                    <option value="ALL">All Divisions</option>
+                    <option value="A">Division A</option>
+                    <option value="B">Division B</option>
+                    <option value="C">Division C</option>
+                    <option value="D">Division D</option>
+                  </select>
+                </div>
+
+                {/* 7. Batch */}
+                <div>
+                  <label style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Batch</label>
+                  <select 
+                    className="form-control" 
+                    value={filterBatch} 
+                    onChange={e => {
+                      setFilterBatch(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    style={{ fontSize: '0.78rem', height: '32px', padding: '0.2rem 0.4rem' }}
+                  >
+                    <option value="ALL">All Batches</option>
+                    {availableBatches.map(b => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 8. Student Status */}
+                <div>
+                  <label style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Student Status</label>
                   <select 
                     className="form-control" 
                     value={statusFilter} 
-                    onChange={e => setStatusFilter(e.target.value as any)}
-                    style={{ fontSize: '0.8rem', height: '34px', padding: '0.25rem 0.5rem' }}
+                    onChange={e => {
+                      setStatusFilter(e.target.value as any);
+                      setCurrentPage(1);
+                    }}
+                    style={{ fontSize: '0.78rem', height: '32px', padding: '0.2rem 0.4rem' }}
                   >
-                    <option value="ALL">All Statuses ({authorizedStudents.length})</option>
-                    <option value="ACTIVE">Active Students</option>
-                    <option value="SHORTAGE">Attendance Shortage (&lt;75%)</option>
-                    <option value="RISK">Academic Risk (Shortage / Docs)</option>
-                    <option value="INACTIVE">Inactive Students</option>
+                    <option value="ALL">All Statuses</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="INACTIVE">Inactive</option>
+                    <option value="ON_LEAVE">On Leave</option>
+                    <option value="DETRAINED">Detrained / Withheld</option>
+                  </select>
+                </div>
+
+                {/* 9. Academic Standing */}
+                <div>
+                  <label style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'block', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Academic Standing</label>
+                  <select 
+                    className="form-control" 
+                    value={standingFilter} 
+                    onChange={e => {
+                      setStandingFilter(e.target.value as any);
+                      setCurrentPage(1);
+                    }}
+                    style={{ fontSize: '0.78rem', height: '32px', padding: '0.2rem 0.4rem' }}
+                  >
+                    <option value="ALL">All Standings</option>
+                    <option value="GOOD_STANDING">Good Standing</option>
+                    <option value="ATTENDANCE_SHORTAGE">Attendance Shortage (&lt;75%)</option>
+                    <option value="ACADEMIC_RISK">Academic Risk (Shortage / Docs)</option>
                   </select>
                 </div>
               </div>
 
-              {/* Data Table */}
-              {filteredMenteeData.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-muted)', backgroundColor: '#FAFAFA', borderRadius: '8px' }}>
+              {/* ─────────────────────────────────────────────────────────────
+                  OFFICIAL 16-COLUMN UNIVERSITY STUDENT MASTER TABLE
+                  ───────────────────────────────────────────────────────────── */}
+              {paginatedMenteeData.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-muted)', backgroundColor: '#FAFAFA', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
                   <Users size={48} style={{ opacity: 0.25, margin: '0 auto 1rem' }} />
-                  <p style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--brand-navy)', margin: '0 0 0.25rem 0' }}>No authorized students found</p>
-                  <p style={{ fontSize: '0.8125rem', color: '#64748B', margin: 0 }}>Try clearing your search query or adjusting the filters.</p>
+                  <p style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--brand-navy)', margin: '0 0 0.25rem 0' }}>No student master records found</p>
+                  <p style={{ fontSize: '0.8125rem', color: '#64748B', margin: 0 }}>Try adjusting your search criteria or resetting filters.</p>
                 </div>
               ) : (
-                <div className="table-responsive" style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-                  <table className="table" style={{ width: '100%', minWidth: '1320px', borderCollapse: 'collapse', verticalAlign: 'middle', margin: 0 }}>
-                    <thead>
-                      <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #CBD5E1' }}>
-                        <th style={{ minWidth: '220px', width: '220px', textAlign: 'left', padding: '0.85rem 1rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Student Name</th>
-                        <th style={{ minWidth: '130px', width: '130px', textAlign: 'left', padding: '0.85rem 0.75rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Enrollment No.</th>
-                        <th style={{ minWidth: '200px', width: '200px', textAlign: 'left', padding: '0.85rem 0.75rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Program</th>
-                        <th style={{ minWidth: '90px', width: '90px', textAlign: 'center', padding: '0.85rem 0.5rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Semester</th>
-                        <th style={{ minWidth: '100px', width: '100px', textAlign: 'left', padding: '0.85rem 0.75rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Department</th>
-                        <th style={{ minWidth: '100px', width: '100px', textAlign: 'left', padding: '0.85rem 0.75rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Institute</th>
-                        <th style={{ minWidth: '110px', width: '110px', textAlign: 'center', padding: '0.85rem 0.5rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Status</th>
-                        <th style={{ minWidth: '170px', width: '170px', textAlign: 'center', padding: '0.85rem 0.5rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Academic Status</th>
-                        <th style={{ minWidth: '130px', width: '130px', textAlign: 'center', padding: '0.85rem 0.5rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Attendance %</th>
-                        <th style={{ minWidth: '150px', width: '150px', textAlign: 'center', padding: '0.85rem 0.5rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Document Status</th>
-                        <th style={{ minWidth: '70px', width: '70px', textAlign: 'center', padding: '0.85rem 0.75rem', whiteSpace: 'nowrap', fontWeight: 800, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>Action</th>
+                <div className="table-responsive" style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #CBD5E1', boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}>
+                  <table className="table" style={{ width: '100%', minWidth: '1750px', borderCollapse: 'collapse', verticalAlign: 'middle', margin: 0, fontSize: '0.8125rem' }}>
+                    <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#F8FAFC', borderBottom: '2px solid #94A3B8' }}>
+                      <tr>
+                        {/* 1. Sr. No. */}
+                        <th style={{ width: '60px', padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--brand-navy)' }}>
+                          Sr. No.
+                        </th>
+
+                        {/* 2. Student Name */}
+                        <th 
+                          onClick={() => handleSort('name')}
+                          style={{ width: '220px', padding: '0.75rem 0.75rem', textAlign: 'left', fontWeight: 800, color: 'var(--brand-navy)', cursor: 'pointer', userSelect: 'none' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <span>Student Name</span>
+                            {sortField === 'name' ? (sortDirection === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />) : <ArrowUpDown size={13} style={{ opacity: 0.4 }} />}
+                          </div>
+                        </th>
+
+                        {/* 3. Enrollment No. */}
+                        <th 
+                          onClick={() => handleSort('enrollmentNo')}
+                          style={{ width: '130px', padding: '0.75rem 0.6rem', textAlign: 'left', fontWeight: 800, color: 'var(--brand-navy)', cursor: 'pointer', userSelect: 'none' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <span>Enrollment No.</span>
+                            {sortField === 'enrollmentNo' ? (sortDirection === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />) : <ArrowUpDown size={13} style={{ opacity: 0.4 }} />}
+                          </div>
+                        </th>
+
+                        {/* 4. University ID */}
+                        <th 
+                          onClick={() => handleSort('universityId')}
+                          style={{ width: '140px', padding: '0.75rem 0.6rem', textAlign: 'left', fontWeight: 800, color: 'var(--brand-navy)', cursor: 'pointer', userSelect: 'none' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <span>University ID</span>
+                            {sortField === 'universityId' ? (sortDirection === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />) : <ArrowUpDown size={13} style={{ opacity: 0.4 }} />}
+                          </div>
+                        </th>
+
+                        {/* 5. Program */}
+                        <th 
+                          onClick={() => handleSort('program')}
+                          style={{ width: '130px', padding: '0.75rem 0.6rem', textAlign: 'left', fontWeight: 800, color: 'var(--brand-navy)', cursor: 'pointer', userSelect: 'none' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <span>Program</span>
+                            {sortField === 'program' ? (sortDirection === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />) : <ArrowUpDown size={13} style={{ opacity: 0.4 }} />}
+                          </div>
+                        </th>
+
+                        {/* 6. Branch / Department */}
+                        <th 
+                          onClick={() => handleSort('department')}
+                          style={{ width: '180px', padding: '0.75rem 0.6rem', textAlign: 'left', fontWeight: 800, color: 'var(--brand-navy)', cursor: 'pointer', userSelect: 'none' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <span>Branch / Department</span>
+                            {sortField === 'department' ? (sortDirection === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />) : <ArrowUpDown size={13} style={{ opacity: 0.4 }} />}
+                          </div>
+                        </th>
+
+                        {/* 7. Academic Year */}
+                        <th style={{ width: '100px', padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--brand-navy)' }}>
+                          Academic Year
+                        </th>
+
+                        {/* 8. Semester */}
+                        <th 
+                          onClick={() => handleSort('semester')}
+                          style={{ width: '90px', padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--brand-navy)', cursor: 'pointer', userSelect: 'none' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}>
+                            <span>Semester</span>
+                            {sortField === 'semester' ? (sortDirection === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />) : <ArrowUpDown size={13} style={{ opacity: 0.4 }} />}
+                          </div>
+                        </th>
+
+                        {/* 9. Division */}
+                        <th 
+                          onClick={() => handleSort('division')}
+                          style={{ width: '80px', padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--brand-navy)', cursor: 'pointer', userSelect: 'none' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}>
+                            <span>Division</span>
+                            {sortField === 'division' ? (sortDirection === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />) : <ArrowUpDown size={13} style={{ opacity: 0.4 }} />}
+                          </div>
+                        </th>
+
+                        {/* 10. Batch */}
+                        <th style={{ width: '100px', padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--brand-navy)' }}>
+                          Batch
+                        </th>
+
+                        {/* 11. Institute */}
+                        <th style={{ width: '100px', padding: '0.75rem 0.6rem', textAlign: 'left', fontWeight: 800, color: 'var(--brand-navy)' }}>
+                          Institute
+                        </th>
+
+                        {/* 12. Email */}
+                        <th style={{ width: '180px', padding: '0.75rem 0.6rem', textAlign: 'left', fontWeight: 800, color: 'var(--brand-navy)' }}>
+                          Email
+                        </th>
+
+                        {/* 13. Mobile */}
+                        <th style={{ width: '120px', padding: '0.75rem 0.6rem', textAlign: 'left', fontWeight: 800, color: 'var(--brand-navy)' }}>
+                          Mobile
+                        </th>
+
+                        {/* 14. Status */}
+                        <th 
+                          onClick={() => handleSort('status')}
+                          style={{ width: '100px', padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--brand-navy)', cursor: 'pointer', userSelect: 'none' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}>
+                            <span>Status</span>
+                            {sortField === 'status' ? (sortDirection === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />) : <ArrowUpDown size={13} style={{ opacity: 0.4 }} />}
+                          </div>
+                        </th>
+
+                        {/* 15. Academic Standing */}
+                        <th 
+                          onClick={() => handleSort('standing')}
+                          style={{ width: '160px', padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--brand-navy)', cursor: 'pointer', userSelect: 'none' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}>
+                            <span>Academic Standing</span>
+                            {sortField === 'standing' ? (sortDirection === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />) : <ArrowUpDown size={13} style={{ opacity: 0.4 }} />}
+                          </div>
+                        </th>
+
+                        {/* 16. Actions */}
+                        <th style={{ width: '80px', padding: '0.75rem 0.5rem', textAlign: 'center', fontWeight: 800, color: 'var(--brand-navy)', position: 'sticky', right: 0, backgroundColor: '#F8FAFC', zIndex: 11 }}>
+                          Actions
+                        </th>
                       </tr>
                     </thead>
+
                     <tbody>
-                      {filteredMenteeData.map(({ student, stats, verifiedDocsCount, pendingDocsCount, hasShortage, isRisk, reqsCount }) => {
+                      {paginatedMenteeData.map(({ student, stats, verifiedDocsCount, pendingDocsCount, hasShortage, isRisk, reqsCount }, idx) => {
+                        const srNo = (currentPage - 1) * pageSize + idx + 1;
                         const prog = db.getProgramById(student.programId);
                         const sem = db.getSemesterById(student.semesterId);
                         const dept = db.getDepartments().find(d => d.id === student.departmentId);
                         const inst = db.getInstitutes().find(i => i.id === student.instituteId);
+                        const divObj = db.getDivisions().find(d => d.id === student.divisionId);
+                        const batchObj = db.getBatches().find(b => b.id === student.batchId);
+
+                        const formattedDiv = divObj?.name ? (divObj.name.replace(/^Division\s*/i, '')) : (student.divisionId || 'A');
+                        const formattedBatch = batchObj?.name || student.batchId || '2023-2027';
+                        const univId = student.universityId || `SSIU-${student.enrollmentNo}`;
 
                         return (
-                          <tr key={student.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                            {/* 1. Student Name */}
-                            <td style={{ padding: '0.75rem 1rem', verticalAlign: 'middle', cursor: 'pointer' }} onClick={() => setSelectedStudentForProfile(student)}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                          <tr 
+                            key={student.id} 
+                            style={{ 
+                              borderBottom: '1px solid #F1F5F9',
+                              backgroundColor: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA'
+                            }}
+                          >
+                            {/* 1. Sr. No. */}
+                            <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center', fontWeight: 700, color: '#64748B' }}>
+                              {srNo}
+                            </td>
+
+                            {/* 2. Student Name */}
+                            <td 
+                              style={{ padding: '0.65rem 0.75rem', cursor: 'pointer' }}
+                              onClick={() => setSelectedStudentForProfile(student)}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
                                 <div style={{ 
-                                  width: '32px', 
-                                  height: '32px', 
+                                  width: '30px', 
+                                  height: '30px', 
                                   borderRadius: '50%', 
-                                  background: 'linear-gradient(135deg, #1E3A8A, #3B82F6)', 
-                                  color: '#fff', 
+                                  background: 'linear-gradient(135deg, #001F3F 0%, #1E3A8A 100%)', 
+                                  color: '#FFFFFF', 
                                   fontWeight: 800, 
-                                  fontSize: '0.75rem',
+                                  fontSize: '0.72rem',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   flexShrink: 0
                                 }}>
-                                  {student.name.charAt(0)}
+                                  {student.name ? student.name.charAt(0) : 'S'}
                                 </div>
                                 <div style={{ overflow: 'hidden' }}>
-                                  <div style={{ fontWeight: 800, color: 'var(--brand-navy)', fontSize: '0.875rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{student.name}</div>
-                                  <div style={{ fontSize: '0.725rem', color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{student.email}</div>
+                                  <div style={{ fontWeight: 800, color: 'var(--brand-navy)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {student.name}
+                                  </div>
+                                  <div style={{ fontSize: '0.7rem', color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {student.email}
+                                  </div>
                                 </div>
                               </div>
                             </td>
 
-                            {/* 2. Enrollment No. */}
-                            <td style={{ padding: '0.75rem 0.75rem', verticalAlign: 'middle', cursor: 'pointer' }} onClick={() => setSelectedStudentForProfile(student)}>
-                              <code style={{ fontSize: '0.775rem', fontWeight: 700, color: 'var(--brand-orange)', background: '#FFF7ED', padding: '0.2rem 0.45rem', borderRadius: '4px', border: '1px solid #FFEDD5', display: 'inline-block' }}>
+                            {/* 3. Enrollment No. */}
+                            <td 
+                              style={{ padding: '0.65rem 0.6rem', cursor: 'pointer' }}
+                              onClick={() => setSelectedStudentForProfile(student)}
+                            >
+                              <code style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-orange)', background: '#FFF7ED', padding: '0.2rem 0.4rem', borderRadius: '4px', border: '1px solid #FFEDD5', display: 'inline-block' }}>
                                 {student.enrollmentNo}
                               </code>
                             </td>
 
-                            {/* 3. Program */}
-                            <td style={{ padding: '0.75rem 0.75rem', verticalAlign: 'middle', maxWidth: '200px' }}>
-                              <div style={{ fontWeight: 800, color: 'var(--brand-navy)', fontSize: '0.8125rem' }}>{prog?.code || 'B.Tech'}</div>
-                              <div style={{ fontSize: '0.7rem', color: '#64748B', lineHeight: 1.3 }}>{prog?.name || 'Computer Science & Engineering'}</div>
-                            </td>
-
-                            {/* 4. Semester */}
-                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
-                              <Badge variant="navy">Sem {sem?.number || 4}</Badge>
-                            </td>
-
-                            {/* 5. Department */}
-                            <td style={{ padding: '0.75rem 0.75rem', verticalAlign: 'middle' }}>
-                              <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#334155' }}>
-                                {dept?.code || dept?.name || '-'}
+                            {/* 4. University ID */}
+                            <td style={{ padding: '0.65rem 0.6rem' }}>
+                              <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#334155' }}>
+                                {univId}
                               </span>
                             </td>
 
-                            {/* 6. Institute */}
-                            <td style={{ padding: '0.75rem 0.75rem', verticalAlign: 'middle' }}>
-                              <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#334155' }}>
-                                {inst?.code || inst?.name || 'SSCIT'}
+                            {/* 5. Program */}
+                            <td style={{ padding: '0.65rem 0.6rem' }}>
+                              <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>{prog?.code || 'B.Tech CSE'}</div>
+                              <div style={{ fontSize: '0.68rem', color: '#64748B' }}>{prog?.name || 'Computer Engineering'}</div>
+                            </td>
+
+                            {/* 6. Branch / Department */}
+                            <td style={{ padding: '0.65rem 0.6rem' }}>
+                              <div style={{ fontWeight: 700, color: '#334155' }}>{student.branch || dept?.name || 'Computer Science & Engineering'}</div>
+                              <div style={{ fontSize: '0.68rem', color: '#64748B' }}>{dept?.code || 'CSE'}</div>
+                            </td>
+
+                            {/* 7. Academic Year */}
+                            <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
+                              <Badge variant="navy">{student.academicYear || '2025-26'}</Badge>
+                            </td>
+
+                            {/* 8. Semester */}
+                            <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
+                              <span style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>
+                                Sem {sem?.number || 4}
                               </span>
                             </td>
 
-                            {/* 7. General Status */}
-                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                            {/* 9. Division */}
+                            <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
+                              <span style={{ fontWeight: 800, color: 'var(--brand-orange)', backgroundColor: '#FFF7ED', padding: '0.15rem 0.45rem', borderRadius: '4px', border: '1px solid #FFEDD5' }}>
+                                Div {formattedDiv}
+                              </span>
+                            </td>
+
+                            {/* 10. Batch */}
+                            <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
+                              <span style={{ fontSize: '0.75rem', color: '#475569' }}>
+                                {formattedBatch}
+                              </span>
+                            </td>
+
+                            {/* 11. Institute */}
+                            <td style={{ padding: '0.65rem 0.6rem' }}>
+                              <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>
+                                {inst?.code || 'SSCIT'}
+                              </span>
+                            </td>
+
+                            {/* 12. Email */}
+                            <td style={{ padding: '0.65rem 0.6rem' }}>
+                              <span style={{ fontSize: '0.73rem', color: '#475569' }}>
+                                {student.email}
+                              </span>
+                            </td>
+
+                            {/* 13. Mobile */}
+                            <td style={{ padding: '0.65rem 0.6rem' }}>
+                              <span style={{ fontSize: '0.73rem', color: '#475569', fontWeight: 600 }}>
+                                {student.mobile || student.phone || '-'}
+                              </span>
+                            </td>
+
+                            {/* 14. Status */}
+                            <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
                               {student.status === 'ACTIVE' ? (
                                 <Badge variant="active">ACTIVE</Badge>
-                              ) : (student.status as string) === 'WARNING' ? (
-                                <Badge variant="warning">WARNING</Badge>
                               ) : (
                                 <Badge variant="danger">{student.status || 'INACTIVE'}</Badge>
                               )}
                             </td>
 
-                            {/* 8. Academic Status */}
-                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                            {/* 15. Academic Standing */}
+                            <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center' }}>
                               {!isRisk ? (
-                                <Badge variant="active">IN GOOD STANDING</Badge>
+                                <Badge variant="active">GOOD STANDING</Badge>
                               ) : stats.percentage < 60 ? (
                                 <Badge variant="danger">CRITICAL RISK</Badge>
                               ) : (
@@ -887,40 +1609,8 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
                               )}
                             </td>
 
-                            {/* 9. Attendance % */}
-                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
-                              {stats.percentage >= 75 ? (
-                                <Badge variant="active">{stats.percentage}%</Badge>
-                              ) : stats.percentage >= 60 ? (
-                                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
-                                  <Badge variant="warning">{stats.percentage}%</Badge>
-                                  <span title="Attendance Warning (60%-74%)" style={{ display: 'inline-flex' }}>
-                                    <AlertCircle size={13} color="#D97706" />
-                                  </span>
-                                </div>
-                              ) : (
-                                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
-                                  <Badge variant="danger">{stats.percentage}%</Badge>
-                                  <span title="Critical Attendance Shortage (<60%)" style={{ display: 'inline-flex' }}>
-                                    <AlertCircle size={13} color="#EF4444" />
-                                  </span>
-                                </div>
-                              )}
-                            </td>
-
-                            {/* 10. Document Status */}
-                            <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
-                              {pendingDocsCount === 0 && verifiedDocsCount > 0 ? (
-                                <Badge variant="active">{verifiedDocsCount} Verified</Badge>
-                              ) : pendingDocsCount > 0 && verifiedDocsCount > 0 ? (
-                                <Badge variant="warning">{verifiedDocsCount} Verified ({pendingDocsCount} Pending)</Badge>
-                              ) : (
-                                <Badge variant="danger">{pendingDocsCount > 0 ? `${pendingDocsCount} Missing / Pending` : 'Pending'}</Badge>
-                              )}
-                            </td>
-
-                            {/* 11. Action Menu with Status Dot Indicator */}
-                            <td style={{ padding: '0.75rem 0.75rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                            {/* 16. Actions */}
+                            <td style={{ padding: '0.65rem 0.5rem', textAlign: 'center', position: 'sticky', right: 0, backgroundColor: idx % 2 === 0 ? '#FFFFFF' : '#FAFAFA', zIndex: 5 }}>
                               <StudentRowActionMenu
                                 student={student}
                                 statusLevel={
@@ -938,7 +1628,7 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
                                 onViewAcademic={() => setActiveTab('ACADEMIC_OVERVIEW')}
                                 onViewAttendance={() => setActiveTab('ATTENDANCE')}
                                 onViewExamination={() => setActiveTab('EXAM_ELIGIBILITY')}
-                                onViewRequests={() => setActiveTab('REQUESTS')}
+                                onViewRequests={() => setActiveTab('STUDENT_REQUESTS')}
                               />
                             </td>
                           </tr>
@@ -948,6 +1638,96 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
                   </table>
                 </div>
               )}
+
+              {/* ─────────────────────────────────────────────────────────────
+                  PAGINATION CONTROLS FOOTER
+                  ───────────────────────────────────────────────────────────── */}
+              <div 
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginTop: '1.25rem',
+                  paddingTop: '1rem',
+                  borderTop: '1px solid #E2E8F0',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem'
+                }}
+              >
+                {/* Left: Entries info & page size */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.8125rem', color: '#64748B' }}>
+                  <span>
+                    Showing <strong>{sortedMenteeData.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}</strong> to{' '}
+                    <strong>{Math.min(currentPage * pageSize, sortedMenteeData.length)}</strong> of{' '}
+                    <strong>{sortedMenteeData.length}</strong> students
+                  </span>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span>Rows per page:</span>
+                    <select
+                      className="form-control"
+                      value={pageSize}
+                      onChange={e => {
+                        setPageSize(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      style={{ width: '70px', height: '30px', fontSize: '0.78rem', padding: '0.1rem 0.3rem' }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Right: Page navigation */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    title="First Page"
+                    style={{ padding: '0.25rem 0.5rem', opacity: currentPage === 1 ? 0.5 : 1 }}
+                  >
+                    <ChevronsLeft size={14} />
+                  </button>
+
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    title="Previous Page"
+                    style={{ padding: '0.25rem 0.5rem', opacity: currentPage === 1 ? 0.5 : 1 }}
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+
+                  <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--brand-navy)', padding: '0 0.5rem' }}>
+                    Page {currentPage} of {totalPages}
+                  </span>
+
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    title="Next Page"
+                    style={{ padding: '0.25rem 0.5rem', opacity: currentPage === totalPages ? 0.5 : 1 }}
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    title="Last Page"
+                    style={{ padding: '0.25rem 0.5rem', opacity: currentPage === totalPages ? 0.5 : 1 }}
+                  >
+                    <ChevronsRight size={14} />
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1031,75 +1811,12 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
           )}
 
           {/* ─────────────────────────────────────────────────────────────
-              TAB 3: Mentee Attendance & Shortage View
+              TAB 3: Mentee Attendance & Shortage View (Excel-Style Ledger)
               ───────────────────────────────────────────────────────────── */}
-          {activeTab === 'ATTENDANCE' && (
-            <div className="card" style={{ padding: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-                <div>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
-                    Subject-Wise Attendance Breakdown for Mentees
-                  </h3>
-                  <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                    Official centralized attendance metrics, total lectures attended, and exam condonation eligibility
-                  </p>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button className="btn btn-sm btn-secondary" onClick={() => setActiveTab('ATTENDANCE_APPROVALS')}>
-                    View Condonation Queue →
-                  </button>
-                </div>
-              </div>
-
-              <div className="table-responsive">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Student Mentee</th>
-                      <th>Total Sessions</th>
-                      <th>Present</th>
-                      <th>Absent</th>
-                      <th>Attendance %</th>
-                      <th>Required %</th>
-                      <th>Eligibility Status</th>
-                      <th style={{ textAlign: 'right' }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {menteeAttendanceData.map(({ student, stats, hasShortage }) => (
-                      <tr key={student.id}>
-                        <td>
-                          <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>{student.name}</div>
-                          <code style={{ fontSize: '0.75rem', color: 'var(--brand-orange)' }}>{student.enrollmentNo}</code>
-                        </td>
-                        <td><strong>{stats.totalClasses} Classes</strong></td>
-                        <td><span style={{ color: '#10B981', fontWeight: 700 }}>{stats.presentClasses}</span></td>
-                        <td><span style={{ color: '#EF4444', fontWeight: 700 }}>{stats.absentClasses}</span></td>
-                        <td>
-                          <span style={{ fontSize: '1rem', fontWeight: 800, color: !hasShortage ? '#10B981' : '#EF4444' }}>
-                            {stats.percentage}%
-                          </span>
-                        </td>
-                        <td><strong>75%</strong></td>
-                        <td>
-                          <Badge variant={!hasShortage ? 'active' : 'danger'}>
-                            {!hasShortage ? 'EXAM ELIGIBLE' : `SHORTAGE (${75 - stats.percentage}%)`}
-                          </Badge>
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
-                          <button 
-                            className="btn btn-sm btn-secondary"
-                            onClick={() => setSelectedStudentForProfile(student)}
-                          >
-                            <Eye size={13} /> Breakdown
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          {(activeTab === 'ATTENDANCE' || activeTab === 'ATTENDANCE_SHORTAGE') && (
+            <MenteeAttendanceManager
+              onNavigateToCondonations={() => setActiveTab('ATTENDANCE_APPROVALS')}
+            />
           )}
 
           {/* ─────────────────────────────────────────────────────────────
@@ -1208,67 +1925,12 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
           )}
 
           {/* ─────────────────────────────────────────────────────────────
-              TAB 5: Exam Eligibility Official View
+              TAB 5: Exam Eligibility Official View (Excel-Style Register)
               ───────────────────────────────────────────────────────────── */}
           {activeTab === 'EXAM_ELIGIBILITY' && (
-            <div className="card" style={{ padding: '1.25rem' }}>
-              <div style={{ marginBottom: '1rem' }}>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
-                  Centralized Exam Eligibility Register
-                </h3>
-                <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                  Official semester examination admittance status governed by academic attendance rules and approved condonations.
-                </p>
-              </div>
-
-              <div className="table-responsive">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Student Mentee</th>
-                      <th>Attendance %</th>
-                      <th>Faculty Endorsement</th>
-                      <th>Mentor Endorsement</th>
-                      <th>HOD / HOI Approval</th>
-                      <th>Final Eligibility</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {menteeAttendanceData.map(({ student, stats, hasShortage }) => (
-                      <tr key={student.id}>
-                        <td>
-                          <strong>{student.name}</strong>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{student.enrollmentNo}</div>
-                        </td>
-                        <td>
-                          <Badge variant={!hasShortage ? 'active' : 'danger'}>
-                            {stats.percentage}%
-                          </Badge>
-                        </td>
-                        <td>
-                          <Badge variant="active">VALIDATED</Badge>
-                        </td>
-                        <td>
-                          <Badge variant={!hasShortage ? 'active' : 'gold'}>
-                            {!hasShortage ? 'CLEARED' : 'PENDING CONDONATION'}
-                          </Badge>
-                        </td>
-                        <td>
-                          <Badge variant={!hasShortage ? 'active' : 'navy'}>
-                            {!hasShortage ? 'APPROVED' : 'WITH HOD'}
-                          </Badge>
-                        </td>
-                        <td>
-                          <Badge variant={!hasShortage ? 'active' : 'danger'}>
-                            {!hasShortage ? 'ELIGIBLE FOR EXAM' : 'PROVISIONAL / SHORTAGE'}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <MenteeExamEligibilityManager
+              onNavigateToCondonations={() => setActiveTab('ATTENDANCE_APPROVALS')}
+            />
           )}
 
           {/* ─────────────────────────────────────────────────────────────
@@ -1394,73 +2056,69 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {selectedStudentForDocs ? (
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-                    <div>
-                      <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
-                        Document Vault: {selectedStudentForDocs.name} ({selectedStudentForDocs.enrollmentNo})
-                      </h3>
-                      <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                        Verify uploaded student credentials, government certificates, and DigiLocker ABC ID
-                      </p>
+                  {/* Student Document Vault Header with Complete Academic Metadata */}
+                  <div className="card" style={{ padding: '1.25rem', marginBottom: '1rem', background: '#FFFFFF', border: '1px solid #CBD5E1', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                      <div>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
+                          Student Document Verification Vault: {selectedStudentForDocs.name}
+                        </h3>
+                        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                          Verify uploaded student credentials, university records, certificates, and DigiLocker ABC ID
+                        </p>
+                      </div>
+                      <button 
+                        className="btn btn-secondary btn-sm" 
+                        onClick={() => setSelectedStudentForDocs(null)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        ← Back to Document Register
+                      </button>
                     </div>
-                    <button className="btn btn-secondary btn-sm" onClick={() => setSelectedStudentForDocs(null)}>
-                      ← Back to Student List
-                    </button>
+
+                    {/* Metadata Strip */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', background: '#F8FAFC', padding: '0.75rem 1rem', borderRadius: '6px', border: '1px solid #E2E8F0', fontSize: '0.78125rem' }}>
+                      <div>
+                        <span style={{ color: '#64748B', display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase' }}>Enrollment No</span>
+                        <code style={{ fontWeight: 700 }}>{selectedStudentForDocs.enrollmentNo}</code>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748B', display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase' }}>Program</span>
+                        <strong>{db.getProgramById(selectedStudentForDocs.programId)?.name || 'B.Tech Computer Engineering'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748B', display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase' }}>Department</span>
+                        <strong>{db.getDepartmentById(selectedStudentForDocs.departmentId)?.name || 'Computer Engineering'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748B', display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase' }}>Academic Year / Sem</span>
+                        <strong>2026-2027 (Sem {db.getSemesterById(selectedStudentForDocs.semesterId)?.number || 4})</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748B', display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase' }}>Division</span>
+                        <strong>{db.getDivisionById(selectedStudentForDocs.divisionId)?.name || 'Division A'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748B', display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase' }}>Faculty Mentor</span>
+                        <strong>{user?.name || 'Dr. Rajesh Sharma'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#64748B', display: 'block', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase' }}>ABC ID Status</span>
+                        <Badge variant={selectedStudentForDocs.abcIdStatus === 'VERIFIED' ? 'active' : (selectedStudentForDocs.abcIdStatus === 'PENDING_VERIFICATION' ? 'orange' : 'inactive')}>
+                          {selectedStudentForDocs.abcIdStatus || 'NOT_SUBMITTED'}
+                        </Badge>
+                      </div>
+                    </div>
                   </div>
 
                   <StudentDocumentsSection student={selectedStudentForDocs} onRefresh={() => setRefreshKey(k => k + 1)} />
                 </div>
               ) : (
-                <div className="card" style={{ padding: '1.5rem' }}>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '0.5rem' }}>
-                    Select Student to Access Document Verification Vault
-                  </h3>
-                  <div className="table-responsive">
-                    <table className="table">
-                      <thead>
-                        <tr>
-                          <th>Student Name</th>
-                          <th>Enrollment No</th>
-                          <th>Program &amp; Sem</th>
-                          <th>ABC ID Status</th>
-                          <th>Uploaded Docs</th>
-                          <th style={{ textAlign: 'right' }}>Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {myMentees.map(student => {
-                          const studentDocs = db.getStudentAcademicDocumentsByStudentId(student.id);
-                          const prog = db.getProgramById(student.programId);
-
-                          return (
-                            <tr key={student.id}>
-                              <td><strong>{student.name}</strong></td>
-                              <td><code>{student.enrollmentNo}</code></td>
-                              <td>{prog?.code || 'B.Tech'} - Sem 4</td>
-                              <td>
-                                <Badge variant={student.abcIdStatus === 'VERIFIED' ? 'active' : (student.abcIdStatus === 'PENDING_VERIFICATION' ? 'orange' : 'inactive')}>
-                                  {student.abcIdStatus || 'NOT_SUBMITTED'}
-                                </Badge>
-                              </td>
-                              <td>
-                                <strong>{studentDocs.length} Documents</strong>
-                              </td>
-                              <td style={{ textAlign: 'right' }}>
-                                <button 
-                                  className="btn btn-sm btn-primary"
-                                  onClick={() => setSelectedStudentForDocs(student)}
-                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-                                >
-                                  <FolderCheck size={14} /> Open Document Vault
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                <StudentDocumentsVerificationGrid
+                  students={myMentees}
+                  onOpenVault={(student) => setSelectedStudentForDocs(student)}
+                  currentUser={user}
+                />
               )}
             </div>
           )}
@@ -1896,6 +2554,36 @@ export const MentorPage: React.FC<MentorPageProps> = ({ initialTab = 'MY_STUDENT
       {/* Student Profile Modal */}
       {selectedStudentForProfile && (
         <StudentProfileModal isOpen={true} student={selectedStudentForProfile} onClose={() => setSelectedStudentForProfile(null)} />
+      )}
+
+      {/* Central Bulk Student Mapping Wizard Modal */}
+      {showBulkMapModal && (
+        <BulkStudentMappingModal
+          isOpen={showBulkMapModal}
+          initialStep={bulkMapInitialStep}
+          onClose={() => setShowBulkMapModal(false)}
+          onImportSuccess={() => {
+            setRefreshKey(k => k + 1);
+            showToast('Student enrollment mappings updated successfully!');
+          }}
+          onViewHistory={() => {
+            setShowBulkMapModal(false);
+            setShowMappingHistoryModal(true);
+          }}
+        />
+      )}
+
+      {/* Student Mapping History & Audit Trail Modal */}
+      {showMappingHistoryModal && (
+        <StudentMappingHistoryModal
+          isOpen={showMappingHistoryModal}
+          onClose={() => setShowMappingHistoryModal(false)}
+          onOpenBulkMapModal={() => {
+            setShowMappingHistoryModal(false);
+            setBulkMapInitialStep(1);
+            setShowBulkMapModal(true);
+          }}
+        />
       )}
     </div>
   );

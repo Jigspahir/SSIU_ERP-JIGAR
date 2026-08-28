@@ -7,6 +7,11 @@ import { mentorAssignmentService } from '../../services/mentorAssignmentService'
 import { studentProfileAccessService } from '../../services/studentProfileAccessService';
 import { useAuth } from '../../context/AuthContext';
 import { StudentDocumentsSection } from './StudentDocumentsSection';
+import { StudentDataChangeTab } from './StudentDataChangeTab';
+import { StudentDataChangeRequestModal } from './StudentDataChangeRequestModal';
+import { StudentFeeDashboard } from '../finance/StudentFeeDashboard';
+import { AdmissionRecordPdfModal } from '../admission/AdmissionRecordPdfModal';
+import { studentAdmissionRecordPdfService } from '../../services/studentAdmissionRecordPdfService';
 import { 
   GraduationCap, Mail, Phone, Calendar, User, ShieldCheck, 
   Edit3, FileText, Download, Lock, Unlock, Plus, Trash2, Check, XCircle, AlertCircle, Eye, RefreshCw,
@@ -67,6 +72,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
 
   const [activeTab, setActiveTab] = useState<StudentProfileTabType>(normalizedInitialTab);
   const [previewingDoc, setPreviewingDoc] = useState<StudentDocument | null>(null);
+  const [showAdmissionPdfModal, setShowAdmissionPdfModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -372,20 +378,22 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0 2rem' }}>
               <div>
                 <InfoRow label="Full Name" value={student.name} />
-                <InfoRow label="Name as per Document" value={student.name} />
+                <InfoRow label="First / Last Name" value={`${student.firstName || ''} ${student.lastName || ''}`.trim() || student.name} />
                 <InfoRow label="Gender" value={student.gender} />
                 <InfoRow label="Date of Birth" value={student.dateOfBirth || '2004-03-15'} />
                 <InfoRow label="Blood Group" value={student.bloodGroup || 'O+'} badge={<Badge variant="orange">{student.bloodGroup || 'O+'}</Badge>} />
                 <InfoRow label="Nationality" value={student.nationality || 'Indian'} />
-                <InfoRow label="Mother Tongue" value="Gujarati" />
+                <InfoRow label="Mother Tongue" value={student.motherTongue || 'Gujarati'} />
+                <InfoRow label="Marital Status" value={student.maritalStatus || 'Unmarried'} />
+                <InfoRow label="Aadhaar / ID No." value={student.aadhaarNo || 'XXXX-XXXX-4589'} isCode />
               </div>
               <div>
-                <InfoRow label="Category" value="SEBC / OBC" />
-                <InfoRow label="Caste" value="Ahir" />
-                <InfoRow label="Religion" value="Hindu" />
-                <InfoRow label="Domicile State" value="Gujarat" />
-                <InfoRow label="Disability Status" value="None (No)" badge={<span style={{ background: '#F1F5F9', color: '#475569', padding: '1px 6px', borderRadius: '4px', fontSize: '0.6875rem', fontWeight: 700 }}>No</span>} />
-                <InfoRow label="Hostel Status" value="Yes - Campus Hostel Block A" badge={<span style={{ background: '#D1FAE5', color: '#065F46', padding: '1px 6px', borderRadius: '4px', fontSize: '0.6875rem', fontWeight: 700 }}>Resident</span>} />
+                <InfoRow label="Category" value={student.category || 'General / SEBC'} />
+                <InfoRow label="Caste & Sub-Caste" value={student.caste ? `${student.caste} ${student.subCaste ? `(${student.subCaste})` : ''}` : 'General'} />
+                <InfoRow label="Religion" value={student.religion || 'Hindu'} />
+                <InfoRow label="Birth Place & State" value={`${student.birthPlace || 'Ahmedabad'}, ${student.birthState || 'Gujarat'}`} />
+                <InfoRow label="Disability Status" value={student.physicallyChallenged ? `Yes (${student.disabilityDetails || 'PwD'})` : 'None (No)'} badge={<span style={{ background: student.physicallyChallenged ? '#FEF2F2' : '#F1F5F9', color: student.physicallyChallenged ? '#B91C1C' : '#475569', padding: '1px 6px', borderRadius: '4px', fontSize: '0.6875rem', fontWeight: 700 }}>{student.physicallyChallenged ? 'PwD' : 'No'}</span>} />
+                <InfoRow label="Hostel Status" value={student.hostelRequired ? 'Yes - Campus Hostel Block A' : 'No (Day Scholar)'} badge={<span style={{ background: student.hostelRequired ? '#D1FAE5' : '#F1F5F9', color: student.hostelRequired ? '#065F46' : '#475569', padding: '1px 6px', borderRadius: '4px', fontSize: '0.6875rem', fontWeight: 700 }}>{student.hostelRequired ? 'Resident' : 'Day Scholar'}</span>} />
                 <InfoRow label="ABC ID" value={student.abcId || '9842-1056-7890'} isCode />
               </div>
             </div>
@@ -401,6 +409,44 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       case 'ACADEMIC_HISTORY':
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {/* Official Admission Record PDF Dossier Card */}
+            <div className="card" style={{ padding: '1rem 1.25rem', background: 'linear-gradient(135deg, rgba(11,25,44,0.04) 0%, rgba(243,112,35,0.05) 100%)', border: '1px solid #CBD5E1', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <div style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <FileText size={16} color="var(--brand-orange, #F37023)" /> Official Admission &amp; Onboarding Record PDF
+                </div>
+                <div style={{ fontSize: '0.71875rem', color: '#64748B', marginTop: '2px' }}>
+                  Complete university dossier with student demographics, verified credentials, signatures, and annexed documents ({student.id}_Admission_Record.pdf).
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-xs"
+                  onClick={() => setShowAdmissionPdfModal(true)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}
+                >
+                  <Eye size={12} /> View PDF
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-xs"
+                  onClick={() => studentAdmissionRecordPdfService.printAdmissionRecord(student)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}
+                >
+                  <Printer size={12} /> Print PDF
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-xs"
+                  onClick={() => studentAdmissionRecordPdfService.downloadAdmissionRecord(student)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700, background: 'var(--brand-orange, #F37023)', border: 'none' }}
+                >
+                  <Download size={12} /> Download PDF
+                </button>
+              </div>
+            </div>
+
             {/* Admission Information Card */}
             <div className="card" style={{ padding: '1.25rem', background: 'var(--bg-surface, #FFFFFF)' }}>
               <h4 style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', marginBottom: '0.85rem', borderBottom: '1px solid var(--border-color, #E2E8F0)', paddingBottom: '0.4rem' }}>
@@ -408,13 +454,12 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
               </h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0 2rem' }}>
                 <div>
-                  <InfoRow label="Admission Number" value={`ADM-${student.enrollmentNo}`} isCode />
+                  <InfoRow label="Admission Number" value={student.admissionNumber || `ADM-${student.enrollmentNo}`} isCode />
+                  <InfoRow label="Application Number" value={student.applicationNumber || `APP/2026/${student.id}`} isCode />
                   <InfoRow label="Admission Date" value={student.admissionDate || '2023-07-15'} />
-                  <InfoRow label="Admission Year" value="2023" />
                   <InfoRow label="Academic Year" value={academicYear?.name || '2026–2027'} />
-                  <InfoRow label="Admission Type" value="Regular (First Year)" />
-                  <InfoRow label="Admission Quota" value="State Quota (ACPC)" />
-                  <InfoRow label="Admission Category" value="SEBC / OPEN" />
+                  <InfoRow label="Admission Type" value={student.admissionType || 'Regular (First Year)'} />
+                  <InfoRow label="Admission Category" value={student.admissionCategory || 'General / Merit'} />
                 </div>
                 <div>
                   <InfoRow label="Institute" value={institute?.name || 'Swarrnim Institute of Technology'} />
@@ -423,7 +468,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   <InfoRow label="Batch" value={batchName} />
                   <InfoRow label="Semester" value={`${semesterName} (Sem ${semester?.number || 4})`} />
                   <InfoRow label="Division" value={divisionName} />
-                  <InfoRow label="Roll Number" value={mockRoll} isCode />
+                  <InfoRow label="Roll Number" value={student.rollNumber || mockRoll} isCode />
                   <InfoRow label="ABC ID" value={student.abcId || '9842-1056-7890'} isCode />
                 </div>
               </div>
@@ -441,7 +486,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                 <InfoRow label="Current SGPA" value="8.65" isCode />
                 <InfoRow label="Cumulative CGPA" value="8.42" isCode />
                 <InfoRow label="Active Backlogs" value="0 (All Cleared)" badge={<Badge variant="active">CLEARED</Badge>} />
-                <InfoRow label="Academic Standing" value="Good Standing" badge={<Badge variant="active">REGULAR</Badge>} />
+                <InfoRow label="Academic Standing" value={student.academicStatus || 'Active / Pursuing'} badge={<Badge variant="active">{student.academicStatus || 'ACTIVE'}</Badge>} />
               </div>
             </div>
 
@@ -465,18 +510,18 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   <tbody>
                     <tr>
                       <td><strong>10th (SSC)</strong></td>
-                      <td>Lalpur High School</td>
-                      <td>GSEB (Gujarat Board)</td>
-                      <td>2021</td>
-                      <td style={{ fontWeight: 800, color: 'var(--brand-orange, #F37023)' }}>86.50%</td>
+                      <td>{student.tenthSchool || 'Lalpur High School'}</td>
+                      <td>{student.tenthBoard || 'GSEB (Gujarat Board)'}</td>
+                      <td>{student.tenthPassingYear || '2021'}</td>
+                      <td style={{ fontWeight: 800, color: 'var(--brand-orange, #F37023)' }}>{student.tenthPercentage ? `${student.tenthPercentage}%` : '86.50%'}</td>
                       <td><Badge variant="active">DISTINCTION</Badge></td>
                     </tr>
                     <tr>
                       <td><strong>12th (HSC Science)</strong></td>
-                      <td>Vikas Science School</td>
-                      <td>GSEB (Gujarat Board)</td>
-                      <td>2023</td>
-                      <td style={{ fontWeight: 800, color: 'var(--brand-orange, #F37023)' }}>82.40%</td>
+                      <td>{student.twelfthSchool || 'Vikas Science School'}</td>
+                      <td>{student.twelfthBoard || 'GSEB (Gujarat Board)'}</td>
+                      <td>{student.twelfthPassingYear || '2023'}</td>
+                      <td style={{ fontWeight: 800, color: 'var(--brand-orange, #F37023)' }}>{student.twelfthPercentage ? `${student.twelfthPercentage}%` : '82.40%'}</td>
                       <td><Badge variant="active">FIRST CLASS</Badge></td>
                     </tr>
                     {(student.academicHistory || []).map((ah, idx) => (
@@ -512,11 +557,12 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0 2rem' }}>
                 <div>
                   <InfoRow label="Official Email" value={student.email} />
-                  <InfoRow label="Personal Email" value={student.email ? student.email.replace('@swarrnim.edu.in', '@gmail.com').replace('@university.edu', '@gmail.com') : 'student@gmail.com'} />
+                  <InfoRow label="Personal Email" value={student.alternateEmail || (student.email ? student.email.replace('@swarrnim.edu.in', '@gmail.com').replace('@university.edu', '@gmail.com') : 'student@gmail.com')} />
                 </div>
                 <div>
                   <InfoRow label="Mobile Number" value={student.phone || '+91 91234 56789'} />
-                  <InfoRow label="Alternate Mobile" value="+91 98765 43210" />
+                  <InfoRow label="WhatsApp Number" value={student.whatsappNumber || student.phone || '+91 98765 43210'} />
+                  <InfoRow label="Alternate Mobile" value={student.alternatePhone || '+91 98765 43210'} />
                 </div>
               </div>
             </div>
@@ -529,14 +575,13 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   <MapPin size={16} color="var(--brand-orange, #F37023)" /> Permanent Address
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <InfoRow label="Address Line 1" value="Patel Sheri, Plot No. 42" />
-                  <InfoRow label="Address Line 2" value="Behind Taluka Panchayat Office" />
-                  <InfoRow label="City / Village" value="Lalpur" />
-                  <InfoRow label="Taluka" value="Lalpur" />
-                  <InfoRow label="District" value="Jamnagar" />
-                  <InfoRow label="State" value="Gujarat" />
-                  <InfoRow label="Pincode" value="361170" />
-                  <InfoRow label="Country" value="India" />
+                  <InfoRow label="Address Line 1" value={student.permanentAddressLine1 || student.address || 'Patel Sheri, Plot No. 42'} />
+                  <InfoRow label="Address Line 2" value={student.permanentAddressLine2 || 'Near SSIU Campus'} />
+                  <InfoRow label="City / Village" value={student.permanentCity || 'Gandhinagar'} />
+                  <InfoRow label="District" value={student.permanentDistrict || 'Gandhinagar'} />
+                  <InfoRow label="State" value={student.permanentState || 'Gujarat'} />
+                  <InfoRow label="Pincode" value={student.permanentPincode || '382421'} />
+                  <InfoRow label="Country" value={student.permanentCountry || 'India'} />
                 </div>
               </div>
 
@@ -547,18 +592,17 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                     <MapPin size={16} color="var(--brand-navy, #0B192C)" /> Current Address
                   </h4>
                   <span style={{ fontSize: '0.6875rem', background: '#D1FAE5', color: '#065F46', padding: '2px 6px', borderRadius: '4px', fontWeight: 700 }}>
-                    Same as Permanent Address
+                    Communication Address
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <InfoRow label="Address Line 1" value="Patel Sheri, Plot No. 42" />
-                  <InfoRow label="Address Line 2" value="Behind Taluka Panchayat Office" />
-                  <InfoRow label="City / Village" value="Lalpur" />
-                  <InfoRow label="Taluka" value="Lalpur" />
-                  <InfoRow label="District" value="Jamnagar" />
-                  <InfoRow label="State" value="Gujarat" />
-                  <InfoRow label="Pincode" value="361170" />
-                  <InfoRow label="Country" value="India" />
+                  <InfoRow label="Address Line 1" value={student.currentAddressLine1 || student.address || 'Patel Sheri, Plot No. 42'} />
+                  <InfoRow label="Address Line 2" value={student.currentAddressLine2 || 'Near SSIU Campus'} />
+                  <InfoRow label="City / Village" value={student.currentCity || 'Gandhinagar'} />
+                  <InfoRow label="District" value={student.currentDistrict || 'Gandhinagar'} />
+                  <InfoRow label="State" value={student.currentState || 'Gujarat'} />
+                  <InfoRow label="Pincode" value={student.currentPincode || '382421'} />
+                  <InfoRow label="Country" value={student.currentCountry || 'India'} />
                 </div>
               </div>
             </div>
@@ -571,12 +615,11 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   Father Details
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <InfoRow label="Full Name" value={student.guardianName || 'Varu Punjabhai Hebhabhai'} />
-                  <InfoRow label="Mobile" value={student.guardianPhone || '+91 98250 11223'} />
-                  <InfoRow label="Email" value="punjabhai.varu@gmail.com" />
-                  <InfoRow label="Occupation" value="Government Service" />
-                  <InfoRow label="Organization" value="Education Department" />
-                  <InfoRow label="Designation" value="Senior Educator" />
+                  <InfoRow label="Full Name" value={student.fatherName || student.guardianName || 'Varu Punjabhai Hebhabhai'} />
+                  <InfoRow label="Mobile" value={student.fatherPhone || student.guardianPhone || '+91 98250 11223'} />
+                  <InfoRow label="Email" value={student.fatherEmail || 'father@gmail.com'} />
+                  <InfoRow label="Occupation" value={student.fatherOccupation || 'Business / Service'} />
+                  <InfoRow label="Annual Income" value={student.fatherAnnualIncome ? `₹${Number(student.fatherAnnualIncome).toLocaleString('en-IN')}` : '₹6,50,000'} />
                 </div>
               </div>
 
@@ -586,27 +629,24 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   Mother Details
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <InfoRow label="Full Name" value="Radhaben Varu" />
-                  <InfoRow label="Mobile" value="+91 98765 43210" />
-                  <InfoRow label="Email" value="radhaben.varu@gmail.com" />
-                  <InfoRow label="Occupation" value="Homemaker" />
-                  <InfoRow label="Organization" value="-" />
-                  <InfoRow label="Designation" value="-" />
+                  <InfoRow label="Full Name" value={student.motherName || 'Varu Lilaben Punjabhai'} />
+                  <InfoRow label="Mobile" value={student.motherPhone || '+91 98250 99887'} />
+                  <InfoRow label="Email" value={student.motherEmail || 'mother@gmail.com'} />
+                  <InfoRow label="Occupation" value={student.motherOccupation || 'Homemaker'} />
+                  <InfoRow label="Annual Income" value={student.motherAnnualIncome ? `₹${Number(student.motherAnnualIncome).toLocaleString('en-IN')}` : '₹0'} />
                 </div>
               </div>
 
               {/* Guardian */}
               <div className="card" style={{ padding: '1.25rem', background: 'var(--bg-surface, #FFFFFF)' }}>
                 <h4 style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', marginBottom: '0.75rem', borderBottom: '1px solid var(--border-color, #E2E8F0)', paddingBottom: '0.3rem' }}>
-                  Local Guardian
+                  Guardian Details
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <InfoRow label="Full Name" value={student.guardianName || 'Varu Karsanbhai'} />
-                  <InfoRow label="Relation" value="Father / Local Guardian" />
-                  <InfoRow label="Mobile" value={student.guardianPhone || '+91 98250 11223'} />
-                  <InfoRow label="Email" value="guardian@swarrnim.edu.in" />
-                  <InfoRow label="Occupation" value="Legal Consultant" />
-                  <InfoRow label="Organization" value="District Legal Office" />
+                  <InfoRow label="Full Name" value={student.guardianName || student.fatherName || 'Varu Punjabhai Hebhabhai'} />
+                  <InfoRow label="Mobile" value={student.guardianPhone || student.fatherPhone || '+91 98250 11223'} />
+                  <InfoRow label="Email" value={student.guardianEmail || student.fatherEmail || 'guardian@gmail.com'} />
+                  <InfoRow label="Relationship" value={student.guardianRelation || 'Father'} />
                 </div>
               </div>
             </div>
@@ -797,97 +837,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       // 7. FEES
       // ══════════════════════════════════════════════════════════════════════
       case 'FEES':
-        return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {/* Fee Summary Cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
-              <div className="card" style={{ padding: '1rem', background: 'var(--bg-surface-hover, #F8FAFC)' }}>
-                <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-muted, #64748B)' }}>TOTAL APPLICABLE FEES</div>
-                <div style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', marginTop: '2px' }}>
-                  ₹{totalFees.toLocaleString('en-IN')}
-                </div>
-              </div>
-              <div className="card" style={{ padding: '1rem', background: '#ECFDF5', border: '1px solid #A7F3D0' }}>
-                <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: '#065F46' }}>PAID AMOUNT</div>
-                <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#047857', marginTop: '2px' }}>
-                  ₹{paidFees.toLocaleString('en-IN')}
-                </div>
-              </div>
-              <div className="card" style={{ padding: '1rem', background: pendingFees > 0 ? '#FFFBEB' : '#F8FAFC', border: pendingFees > 0 ? '1px solid #FDE68A' : 'none' }}>
-                <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: pendingFees > 0 ? '#92400E' : 'var(--text-muted, #64748B)' }}>PENDING AMOUNT</div>
-                <div style={{ fontSize: '1.35rem', fontWeight: 800, color: pendingFees > 0 ? '#D97706' : '#10B981', marginTop: '2px' }}>
-                  {pendingFees === 0 ? '₹ 0 (Cleared)' : `₹${pendingFees.toLocaleString('en-IN')}`}
-                </div>
-              </div>
-              <div className="card" style={{ padding: '1rem', background: 'var(--bg-surface-hover, #F8FAFC)' }}>
-                <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-muted, #64748B)' }}>OVERDUE AMOUNT</div>
-                <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#10B981', marginTop: '2px' }}>
-                  ₹{overdueFees}
-                </div>
-              </div>
-            </div>
-
-            {/* Payment History Table */}
-            <div className="card" style={{ padding: '1.25rem', background: 'var(--bg-surface, #FFFFFF)' }}>
-              <h4 style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', marginBottom: '0.75rem' }}>
-                Official Payment Transactions &amp; Receipts
-              </h4>
-              <div className="table-responsive">
-                <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr>
-                      <th>Receipt Number</th>
-                      <th>Payment Date</th>
-                      <th>Amount</th>
-                      <th>Payment Mode</th>
-                      <th>Status</th>
-                      <th>Receipt Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {feeTxs.length === 0 ? (
-                      <tr>
-                        <td><code>REC-2026-00412</code></td>
-                        <td>2026-07-20</td>
-                        <td style={{ fontWeight: 800, color: 'var(--brand-orange, #F37023)' }}>₹75,000</td>
-                        <td>ONLINE_GATEWAY</td>
-                        <td><Badge variant="active">SUCCESS</Badge></td>
-                        <td>
-                          <button
-                            onClick={() => window.print()}
-                            className="btn btn-secondary btn-sm"
-                            style={{ fontSize: '0.725rem', padding: '2px 8px' }}
-                          >
-                            <Download size={12} /> Download
-                          </button>
-                        </td>
-                      </tr>
-                    ) : (
-                      feeTxs.map(tx => (
-                        <tr key={tx.id}>
-                          <td style={{ fontWeight: 700, color: 'var(--brand-navy, #0B192C)' }}>{tx.receiptNo}</td>
-                          <td>{tx.paymentDate}</td>
-                          <td style={{ fontWeight: 800, color: 'var(--brand-orange, #F37023)' }}>₹{tx.paidAmount.toLocaleString('en-IN')}</td>
-                          <td>{tx.paymentMode}</td>
-                          <td><Badge variant={tx.status === 'SUCCESS' ? 'active' : 'inactive'}>{tx.status}</Badge></td>
-                          <td>
-                            <button
-                              onClick={() => window.print()}
-                              className="btn btn-secondary btn-sm"
-                              style={{ fontSize: '0.725rem', padding: '2px 8px' }}
-                            >
-                              <Download size={12} /> Download
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        );
+        return <StudentFeeDashboard student={student} onRefresh={() => setRefreshKey(k => k + 1)} />;
 
       // ══════════════════════════════════════════════════════════════════════
       // 8. DOCUMENTS
@@ -900,55 +850,68 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       // ══════════════════════════════════════════════════════════════════════
       case 'REQUESTS':
         return (
-          <div className="card" style={{ padding: '1.25rem', background: 'var(--bg-surface, #FFFFFF)' }}>
-            <h4 style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', marginBottom: '0.75rem' }}>
-              Student Official Service Requests, Certificates &amp; Grievances
-            </h4>
-            <div className="table-responsive">
-              <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th>Request ID</th>
-                    <th>Request Type</th>
-                    <th>Created Date</th>
-                    <th>Status</th>
-                    <th>Last Updated</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {serviceRequests.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {/* Student Data Change Requests Workflow Section */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h4 style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <ShieldCheck size={18} color="var(--brand-orange, #F37023)" /> Student Master Data Change Requests &amp; Approval History
+                </h4>
+              </div>
+              <StudentDataChangeTab student={student} />
+            </div>
+
+            {/* General Certificates & Service Requests */}
+            <div className="card" style={{ padding: '1.25rem', background: 'var(--bg-surface, #FFFFFF)' }}>
+              <h4 style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', marginBottom: '0.75rem' }}>
+                Other Official Service Requests &amp; Certificates
+              </h4>
+              <div className="table-responsive">
+                <table className="table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
                     <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted, #64748B)' }}>
-                        No active or past service requests submitted by this student.
-                      </td>
+                      <th>Request ID</th>
+                      <th>Request Type</th>
+                      <th>Created Date</th>
+                      <th>Status</th>
+                      <th>Last Updated</th>
+                      <th>Action</th>
                     </tr>
-                  ) : (
-                    serviceRequests.map((r: any) => (
-                      <tr key={r.id}>
-                        <td><code>{r.requestNo || r.id}</code></td>
-                        <td style={{ fontWeight: 700, color: 'var(--brand-navy, #0B192C)' }}>{r.serviceName || r.type || 'Bonafide Certificate'}</td>
-                        <td>{r.createdAt ? r.createdAt.slice(0, 10) : '2026-08-01'}</td>
-                        <td>
-                          <Badge variant={
-                            r.status === 'COMPLETED' || r.status === 'APPROVED' ? 'active' :
-                            r.status === 'PENDING' || r.status === 'IN_REVIEW' ? 'orange' :
-                            'danger'
-                          }>
-                            {r.status}
-                          </Badge>
-                        </td>
-                        <td>{r.updatedAt ? r.updatedAt.slice(0, 10) : '2026-08-10'}</td>
-                        <td>
-                          <button className="btn btn-secondary btn-sm" style={{ fontSize: '0.725rem', padding: '2px 8px' }}>
-                            <Eye size={12} /> View
-                          </button>
+                  </thead>
+                  <tbody>
+                    {serviceRequests.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-muted, #64748B)' }}>
+                          No additional service requests.
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      serviceRequests.map((r: any) => (
+                        <tr key={r.id}>
+                          <td><code>{r.requestNo || r.id}</code></td>
+                          <td style={{ fontWeight: 700, color: 'var(--brand-navy, #0B192C)' }}>{r.serviceName || r.type || 'Bonafide Certificate'}</td>
+                          <td>{r.createdAt ? r.createdAt.slice(0, 10) : '2026-08-01'}</td>
+                          <td>
+                            <Badge variant={
+                              r.status === 'COMPLETED' || r.status === 'APPROVED' ? 'active' :
+                              r.status === 'PENDING' || r.status === 'IN_REVIEW' ? 'orange' :
+                              'danger'
+                            }>
+                              {r.status}
+                            </Badge>
+                          </td>
+                          <td>{r.updatedAt ? r.updatedAt.slice(0, 10) : '2026-08-10'}</td>
+                          <td>
+                            <button className="btn btn-secondary btn-sm" style={{ fontSize: '0.725rem', padding: '2px 8px' }}>
+                              <Eye size={12} /> View
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         );
@@ -1102,11 +1065,22 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
                   }}>
-                    {student.status === 'ACTIVE' ? 'PASSOUT / ACTIVE' : student.status}
+                    {student.status === 'ACTIVE' ? 'ACTIVE' : student.status}
+                  </span>
+                  <span style={{
+                    background: (student.enrollmentStatus === 'FINAL' || student.finalEnrollmentNumber) ? '#10B981' : 'var(--brand-orange, #F37023)',
+                    color: '#FFFFFF',
+                    fontSize: '0.6875rem',
+                    fontWeight: 800,
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    letterSpacing: '0.5px'
+                  }}>
+                    {(student.enrollmentStatus === 'FINAL' || student.finalEnrollmentNumber) ? 'FINAL ENROLLMENT' : 'TEMPORARY ENROLLMENT'}
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '3px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginTop: '4px', flexWrap: 'wrap' }}>
                   <span style={{
                     background: 'rgba(255,255,255,0.15)',
                     color: '#FFFFFF',
@@ -1116,7 +1090,18 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                     padding: '2px 8px',
                     borderRadius: '4px'
                   }}>
-                    {student.enrollmentNo}
+                    Temp: {student.temporaryEnrollmentNumber || (student.enrollmentNo.startsWith('TEMP-') ? student.enrollmentNo : 'TEMP-2026-00001')}
+                  </span>
+                  <span style={{
+                    background: 'rgba(255,255,255,0.15)',
+                    color: student.finalEnrollmentNumber ? '#A7F3D0' : '#FDE68A',
+                    fontFamily: 'monospace',
+                    fontWeight: 800,
+                    fontSize: '0.8125rem',
+                    padding: '2px 8px',
+                    borderRadius: '4px'
+                  }}>
+                    Final: {student.finalEnrollmentNumber || 'PENDING'}
                   </span>
                   <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.8125rem' }}>
                     ID: <code>{student.id}</code>
@@ -1134,21 +1119,29 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
             </div>
 
             {/* Right: Role-Permitted Actions */}
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setShowAdmissionPdfModal(true)}
+                className="btn btn-sm"
+                style={{ background: 'var(--brand-orange, #F37023)', color: '#FFFFFF', border: 'none', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '4px' }}
+                title="View, Print & Download Official Admission Record PDF"
+              >
+                <FileText size={13} /> Admission PDF
+              </button>
               {onEditClick && canMutate && (
                 <button
                   onClick={() => {
                     onClose();
                     onEditClick(student);
                   }}
-                  className="btn btn-sm"
-                  style={{ background: 'var(--brand-orange, #F37023)', color: '#FFFFFF', border: 'none', fontSize: '0.75rem', fontWeight: 700 }}
+                  className="btn btn-secondary btn-sm"
+                  style={{ background: 'rgba(255,255,255,0.15)', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.25)', fontSize: '0.75rem', fontWeight: 700 }}
                 >
                   <Edit3 size={13} /> Edit Profile
                 </button>
               )}
               <button
-                onClick={() => window.print()}
+                onClick={() => studentAdmissionRecordPdfService.printAdmissionRecord(student)}
                 className="btn btn-secondary btn-sm"
                 style={{ background: 'rgba(255,255,255,0.15)', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.25)', fontSize: '0.75rem' }}
               >
@@ -1260,6 +1253,22 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Official Admission Record PDF Modal */}
+      {showAdmissionPdfModal && student && (
+        <AdmissionRecordPdfModal
+          isOpen={showAdmissionPdfModal}
+          onClose={() => setShowAdmissionPdfModal(false)}
+          student={student}
+          documents={docsList.map(d => ({
+            name: d.title,
+            category: d.category,
+            fileName: d.fileName,
+            fileUrl: d.fileUrl,
+            status: d.status
+          }))}
+        />
       )}
     </>
   );

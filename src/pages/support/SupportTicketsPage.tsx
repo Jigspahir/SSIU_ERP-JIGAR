@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../../services/db';
 import { SupportTicket, SupportTicketMessage, TicketStatus, TicketPriority, TicketCategory, Faculty, Student } from '../../types';
 import { Badge } from '../../components/common/Badge';
+import { ExcelTableContainer, ExcelTable, ExcelTh, ExcelTd } from '../../components/common/ExcelTable';
 import { PieChart } from '../../components/common/Charts';
 import { 
   HelpCircle, Plus, Search, MessageSquare, Send, Paperclip, 
@@ -209,10 +210,11 @@ export const SupportTicketsPage: React.FC = () => {
 
   const getPriorityBadge = (priority: TicketPriority) => {
     switch (priority) {
-      case 'URGENT': return <span style={{ color: '#EF4444', fontWeight: 800, fontSize: '0.75rem' }}>🔥 URGENT</span>;
-      case 'HIGH': return <span style={{ color: '#F37023', fontWeight: 800, fontSize: '0.75rem' }}>⚡ HIGH</span>;
-      case 'MEDIUM': return <span style={{ color: '#3B82F6', fontWeight: 700, fontSize: '0.75rem' }}>● MEDIUM</span>;
-      case 'LOW': return <span style={{ color: '#10B981', fontWeight: 600, fontSize: '0.75rem' }}>● LOW</span>;
+      case 'URGENT': return <Badge variant="danger">URGENT</Badge>;
+      case 'HIGH': return <Badge variant="warning">HIGH</Badge>;
+      case 'MEDIUM': return <Badge variant="navy">MEDIUM</Badge>;
+      case 'LOW': return <Badge variant="active">LOW</Badge>;
+      default: return <Badge variant="inactive">{priority}</Badge>;
     }
   };
 
@@ -344,43 +346,79 @@ export const SupportTicketsPage: React.FC = () => {
           Support Ticket Register ({displayedTickets.length} Records)
         </h3>
 
-        <div className="table-responsive">
-          <table className="table">
+        <ExcelTableContainer minWidth="1240px">
+          <ExcelTable>
             <thead>
               <tr>
-                <th>Ticket No</th>
-                <th>Student / Candidate</th>
-                <th>Subject &amp; Category</th>
-                <th>Priority</th>
-                <th>Assigned Mentor</th>
-                <th>Status</th>
-                <th>Action</th>
+                <ExcelTh align="left" style={{ width: '130px', minWidth: '130px' }}>Ticket No</ExcelTh>
+                <ExcelTh align="center" style={{ width: '100px', minWidth: '100px' }}>Date</ExcelTh>
+                <ExcelTh align="left" style={{ width: '180px', minWidth: '180px' }}>Student / Candidate</ExcelTh>
+                <ExcelTh align="left" style={{ width: '130px', minWidth: '130px' }}>Enrollment No</ExcelTh>
+                <ExcelTh align="left" style={{ width: '280px', minWidth: '280px' }}>Subject &amp; Category</ExcelTh>
+                <ExcelTh align="center" style={{ width: '100px', minWidth: '100px' }}>Priority</ExcelTh>
+                <ExcelTh align="left" style={{ width: '180px', minWidth: '180px' }}>Assigned Mentor</ExcelTh>
+                <ExcelTh align="center" style={{ width: '130px', minWidth: '130px' }}>Status</ExcelTh>
+                <ExcelTh align="center" style={{ width: '140px', minWidth: '140px' }}>Action</ExcelTh>
               </tr>
             </thead>
             <tbody>
               {displayedTickets.length === 0 ? (
-                <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>No support tickets found.</td></tr>
+                <tr>
+                  <ExcelTd colSpan={9} align="center" style={{ padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+                    <HelpCircle size={36} style={{ margin: '0 auto 0.75rem auto', color: 'var(--border-color)', opacity: 0.6 }} />
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem', color: 'var(--brand-navy)' }}>No support tickets found</p>
+                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.825rem' }}>Try adjusting your search query or status filters</p>
+                  </ExcelTd>
+                </tr>
               ) : (
                 displayedTickets.map(tkt => (
                   <tr key={tkt.id}>
-                    <td>
-                      <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>{tkt.ticketNo}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{tkt.createdAt}</div>
-                    </td>
-                    <td>
-                      <div style={{ fontWeight: 700 }}>{tkt.studentName}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{tkt.enrollmentNo}</div>
-                    </td>
-                    <td style={{ maxWidth: '240px' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{tkt.subject}</div>
-                      <span style={{ display: 'inline-block', marginTop: '0.2rem' }}><Badge variant="navy">{tkt.category}</Badge></span>
-                    </td>
-                    <td>{getPriorityBadge(tkt.priority)}</td>
-                    <td>
+                    <ExcelTd align="left" mono color="#1E40AF">
+                      <span style={{ fontWeight: 800, whiteSpace: 'nowrap' }}>{tkt.ticketNo}</span>
+                    </ExcelTd>
+
+                    <ExcelTd align="center">
+                      <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{tkt.createdAt}</span>
+                    </ExcelTd>
+
+                    <ExcelTd align="left">
+                      <div style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{tkt.studentName}</div>
+                    </ExcelTd>
+
+                    <ExcelTd align="left" mono color="var(--brand-navy)">
+                      <span style={{ fontWeight: 600, fontSize: '0.8125rem' }}>{tkt.enrollmentNo}</span>
+                    </ExcelTd>
+
+                    <ExcelTd align="left">
+                      <div 
+                        style={{ 
+                          fontWeight: 700, 
+                          color: 'var(--brand-navy)',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          lineHeight: 1.35,
+                          fontSize: '0.825rem'
+                        }}
+                        title={tkt.subject}
+                      >
+                        {tkt.subject}
+                      </div>
+                      <span style={{ display: 'inline-block', marginTop: '0.25rem' }}>
+                        <Badge variant="navy">{tkt.category.replace(/_/g, ' ')}</Badge>
+                      </span>
+                    </ExcelTd>
+
+                    <ExcelTd align="center">
+                      {getPriorityBadge(tkt.priority)}
+                    </ExcelTd>
+
+                    <ExcelTd align="left">
                       {(role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') ? (
                         <select 
                           className="form-select" 
-                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem' }}
+                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.8125rem', width: '100%', borderColor: '#CBD5E1' }}
                           value={tkt.assignedFacultyId || ''} 
                           onChange={e => handleAssignFaculty(tkt.id, e.target.value)}
                         >
@@ -388,21 +426,31 @@ export const SupportTicketsPage: React.FC = () => {
                           {facultyList.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                         </select>
                       ) : (
-                        <div style={{ fontSize: '0.8125rem', fontWeight: 600 }}>{tkt.assignedFacultyName || 'Unassigned'}</div>
+                        <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: tkt.assignedFacultyName ? 'var(--brand-green)' : 'var(--text-muted)' }}>
+                          {tkt.assignedFacultyName || 'Unassigned'}
+                        </div>
                       )}
-                    </td>
-                    <td>{getStatusBadge(tkt.status)}</td>
-                    <td>
-                      <button onClick={() => setActiveTicket(tkt)} className="btn btn-secondary btn-sm" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                        <MessageSquare size={14} /> Open Thread
+                    </ExcelTd>
+
+                    <ExcelTd align="center">
+                      {getStatusBadge(tkt.status)}
+                    </ExcelTd>
+
+                    <ExcelTd align="center">
+                      <button 
+                        onClick={() => setActiveTicket(tkt)} 
+                        className="btn btn-secondary btn-sm" 
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap', padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
+                      >
+                        <MessageSquare size={13} /> Open Thread
                       </button>
-                    </td>
+                    </ExcelTd>
                   </tr>
                 ))
               )}
             </tbody>
-          </table>
-        </div>
+          </ExcelTable>
+        </ExcelTableContainer>
       </div>
 
       {/* CREATE TICKET MODAL (STUDENT) */}

@@ -237,6 +237,16 @@ model Student {
   abcIdAcademicYear     String?
   abcIdRemarks          String?
   
+  // Temporary & Final Enrollment Lifecycle
+  temporaryEnrollmentNumber String?   @unique // e.g. TEMP-2026-00001
+  finalEnrollmentNumber     String?   @unique // e.g. 2026CE000123
+  enrollmentStatus          String    @default("TEMPORARY") // TEMPORARY | FINAL
+  studentAccessCode         String?   // 5-digit secure access code e.g. "48271"
+  onboardingCompletedAt     DateTime?
+  finalEnrollmentAssignedAt DateTime?
+  finalEnrollmentAssignedBy String?
+  firstLoginAt              DateTime?
+  
   status       String   @default("ACTIVE") // ACTIVE | INACTIVE | GRADUATED | DROPPED
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -282,6 +292,8 @@ model Student {
   paymentTransactions    PaymentTransaction[]
   paymentReceipts        PaymentReceipt[]
   seatAllocations        ExamSeatAllocation[]
+  dataChangeRequests     StudentDataChangeRequest[]
+  dataChangeAudits       StudentDataChangeRequestAuditLog[]
 
   @@index([instituteId])
   @@index([departmentId])
@@ -333,6 +345,11 @@ model User {
   failedLoginAttempts  Int       @default(0)
   lockedUntil          DateTime?
   lastLoginAt          DateTime?
+  temporaryEnrollmentNumber String?   @unique
+  finalEnrollmentNumber     String?   @unique
+  enrollmentStatus          String    @default("TEMPORARY") // TEMPORARY | FINAL
+  studentAccessCode         String?
+  isFirstLogin              Boolean   @default(true)
   studentId            String?   @unique
   facultyId            String?   @unique
   createdAt            DateTime  @default(now())
@@ -6945,5 +6962,76 @@ model WorkTransfer {
   @@index([trackingCode])
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// 41. STUDENT DATA CHANGE REQUEST & APPROVAL WORKFLOW
+// ──────────────────────────────────────────────────────────────────────────────
 
+model StudentDataChangeRequest {
+  id              String    @id @default(uuid())
+  requestNo       String    @unique // e.g. DCR-2026-000001
+  studentId       String
+  fieldCategory   String    // PERSONAL | CONTACT | PARENT | ACADEMIC | OTHER
+  fieldName       String    // e.g. phone, address, bloodGroup, fatherName, dateOfBirth
+  fieldLabel      String    // e.g. "Mobile Number", "Date of Birth", "Permanent Address"
+  oldValue        String?
+  newValue        String
+  reason          String
+  attachmentUrl   String?
+  attachmentName  String?
+  attachmentSize  String?
+  status          String    @default("MENTOR_PENDING") // DRAFT | SUBMITTED | MENTOR_PENDING | MENTOR_APPROVED | HOD_PENDING | APPROVED | REJECTED_BY_MENTOR | REJECTED_BY_HOD | SENT_BACK | CANCELLED
+  
+  // Mentor Review details
+  mentorId        String?
+  mentorName      String?
+  mentorRemarks   String?
+  mentorActionAt  DateTime?
 
+  // HOD Final Approval details
+  hodId           String?
+  hodName         String?
+  hodRemarks      String?
+  hodActionAt     DateTime?
+
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  student         Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  auditLogs       StudentDataChangeRequestAuditLog[]
+
+  @@index([studentId])
+  @@index([status])
+  @@index([fieldCategory])
+  @@index([fieldName])
+  @@index([mentorId])
+  @@index([hodId])
+  @@index([createdAt])
+}
+
+model StudentDataChangeRequestAuditLog {
+  id                String   @id @default(uuid())
+  requestId         String
+  studentId         String
+  action            String   // CREATED | MENTOR_APPROVED | MENTOR_REJECTED | MENTOR_SENT_BACK | HOD_APPROVED | HOD_REJECTED | HOD_SENT_BACK | CANCELLED
+  fromStatus        String
+  toStatus          String
+  performedByUserId String
+  performedByName   String
+  performedByRole   String   // STUDENT | FACULTY | MENTOR | HOD | PRINCIPAL | SUPER_ADMIN
+  fieldName         String?
+  oldValue          String?
+  newValue          String?
+  remarks           String?
+  ipAddress         String?  @default("127.0.0.1")
+  userAgent         String?
+  createdAt         DateTime @default(now())
+
+  request           StudentDataChangeRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  student           Student                  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([studentId])
+  @@index([performedByUserId])
+  @@index([createdAt])
+}

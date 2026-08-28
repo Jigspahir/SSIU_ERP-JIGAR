@@ -12,7 +12,6 @@ import { EntityProfileModal } from '../../components/profile/EntityProfileModal'
 export const SubjectsPage: React.FC = () => {
   const { user, role, canMutate } = useAuth();
   const isFaculty = role === 'FACULTY';
-  const isStudent = role === 'STUDENT';
 
   const [subjects, setSubjects] = useState<Subject[]>(() => {
     const all = db.getSubjects();
@@ -116,43 +115,118 @@ export const SubjectsPage: React.FC = () => {
   };
 
   const columns: Column<Subject>[] = [
-    { key: 'code', header: 'Subject Code', sortable: true, width: '130px', accessor: s => <strong>{s.code}</strong> },
-    { key: 'name', header: 'Subject Name', sortable: true },
+    {
+      key: 'srNo',
+      header: 'Sr. No.',
+      width: '65px',
+      align: 'center',
+      accessor: (_s, idx) => (
+        <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>
+          {idx !== undefined ? idx + 1 : 1}
+        </span>
+      )
+    },
+    {
+      key: 'code',
+      header: 'Subject Code',
+      sortable: true,
+      width: '130px',
+      accessor: s => (
+        <span style={{ fontFamily: 'monospace', fontWeight: 800, color: '#1E40AF', fontSize: '0.875rem' }}>
+          {s.code}
+        </span>
+      )
+    },
+    {
+      key: 'name',
+      header: 'Subject Name',
+      sortable: true,
+      width: '260px',
+      accessor: s => (
+        <strong style={{ color: 'var(--brand-navy)', fontSize: '0.875rem' }}>
+          {s.name}
+        </strong>
+      )
+    },
     {
       key: 'type',
       header: 'Subject Type',
       sortable: true,
-      accessor: s => <Badge variant={s.type === 'THEORY' ? 'navy' : (s.type === 'PRACTICAL' ? 'orange' : 'warning')}>{s.type}</Badge>
+      width: '120px',
+      align: 'center',
+      accessor: s => (
+        <Badge variant={s.type === 'THEORY' ? 'navy' : (s.type === 'PRACTICAL' ? 'orange' : 'warning')}>
+          {s.type}
+        </Badge>
+      )
     },
     {
       key: 'program',
-      header: 'Program / Sem',
+      header: 'Program',
+      width: '120px',
       accessor: s => {
         const prog = programs.find(p => p.id === s.programId);
+        return <span style={{ fontWeight: 700, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>{prog?.code || 'BTECH-CSE'}</span>;
+      }
+    },
+    {
+      key: 'semester',
+      header: 'Semester',
+      width: '95px',
+      align: 'center',
+      accessor: s => {
         const sem = semesters.find(sm => sm.id === s.semesterId);
-        return (
-          <span style={{ fontSize: '0.8125rem' }}>
-            {prog?.code || 'B.Tech'} — Sem {sem?.number || 4}
-          </span>
-        );
+        return <span style={{ fontWeight: 600, fontSize: '0.8125rem' }}>Sem {sem?.number || 4}</span>;
       }
     },
     {
       key: 'section',
       header: 'Section',
+      width: '90px',
+      align: 'center',
       accessor: _s => <Badge variant="navy">Div A</Badge>
     },
-    { key: 'credits', header: 'Credits', sortable: true, accessor: s => <strong>{s.credits} Credits</strong> },
-    { key: 'hours', header: 'Weekly Hours', accessor: s => `${s.theoryHoursPerWeek} Th / ${s.labHoursPerWeek} Lab` },
+    {
+      key: 'credits',
+      header: 'Credits',
+      sortable: true,
+      width: '80px',
+      align: 'center',
+      accessor: s => <strong style={{ color: 'var(--brand-navy)' }}>{s.credits}</strong>
+    },
+    {
+      key: 'theoryHoursPerWeek',
+      header: 'Weekly Theory Hours',
+      sortable: true,
+      width: '150px',
+      align: 'center',
+      accessor: s => <span style={{ fontWeight: 600 }}>{s.theoryHoursPerWeek}</span>
+    },
+    {
+      key: 'labHoursPerWeek',
+      header: 'Weekly Lab Hours',
+      sortable: true,
+      width: '140px',
+      align: 'center',
+      accessor: s => <span style={{ fontWeight: 600 }}>{s.labHoursPerWeek}</span>
+    },
     {
       key: 'students',
       header: 'Enrolled Students',
+      width: '140px',
+      align: 'center',
       accessor: s => {
-        const count = students.filter(st => st.programId === s.programId && st.semesterId === s.semesterId).length || 64;
+        const count = students.filter(st => st.programId === s.programId && st.semesterId === s.semesterId).length || (s.code === 'SSI-101' ? 64 : 4);
         return <Badge variant="active">{count} Students</Badge>;
       }
     },
-    { key: 'status', header: 'Status', sortable: true }
+    {
+      key: 'status',
+      header: 'Status',
+      sortable: true,
+      width: '100px',
+      align: 'center'
+    }
   ];
 
   return (

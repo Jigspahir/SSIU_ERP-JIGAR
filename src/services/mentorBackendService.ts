@@ -465,6 +465,420 @@ export class MentorBackendService {
     return alerts;
   }
 
+  /**
+   * Return comprehensive Excel-style attendance rows for all assigned mentees
+   */
+  public getMenteeAttendanceTable(
+    user: User,
+    filters?: {
+      searchQuery?: string;
+      departmentId?: string;
+      programId?: string;
+      academicYear?: string;
+      semesterId?: string;
+      divisionId?: string;
+      subjectId?: string;
+      attendanceStatus?: string;
+      eligibilityStatus?: string;
+      riskLevel?: string;
+    }
+  ): Array<{
+    studentId: string;
+    studentName: string;
+    enrollmentNo: string;
+    universityId: string;
+    departmentName: string;
+    programCode: string;
+    programName: string;
+    semesterNumber: number;
+    divisionName: string;
+    subjectId: string;
+    subjectCode: string;
+    subjectName: string;
+    totalSessions: number;
+    presentSessions: number;
+    absentSessions: number;
+    attendancePercentage: number;
+    requiredPercentage: number;
+    eligibilityStatus: 'ELIGIBLE' | 'SHORTAGE' | 'CONDITIONAL' | 'NOT_ELIGIBLE';
+    riskStatus: 'NORMAL' | 'WARNING' | 'CRITICAL';
+    lastUpdatedDate: string;
+    mentorName: string;
+    mentorId: string;
+  }> {
+    this.validateMentorUser(user);
+    const minThreshold = db.getAttendanceEligibilityConfig().minimumAttendancePct || 75;
+    const menteesResponse = this.getMentees(user, { pageSize: 10000 });
+    const students = db.getStudents();
+    const programs = db.getPrograms();
+    const departments = db.getDepartments();
+    const semesters = db.getSemesters();
+    const divisions = db.getDivisions();
+    const allSubjects = db.getSubjects();
+    const allSessions = db.getAttendanceSessions();
+
+    const rows: Array<any> = [];
+
+    menteesResponse.records.forEach(m => {
+      const student = students.find(s => s.id === m.studentId);
+      if (!student) return;
+
+      const prog = programs.find(p => p.id === student.programId);
+      const dept = departments.find(d => d.id === student.departmentId);
+      const sem = semesters.find(s => s.id === student.semesterId);
+      const div = divisions.find(d => d.id === student.divisionId);
+
+      const progCode = prog?.code || 'B.Tech';
+      const progName = prog?.name || 'Computer Engineering';
+      const deptName = dept?.name || 'Department of Computer Engineering';
+      const semNum = sem?.number || 3;
+      const divName = div?.name ? (div.name.startsWith('Division') ? div.name : `Division ${div.name}`) : (student.divisionId || 'Div A');
+
+      // Student's specific attendance sessions
+      const studentSessions = allSessions.filter(s => 
+        s.records.some(r => r.studentId === student.id)
+      );
+
+      // Latest session date for last updated
+      const sortedSessions = [...studentSessions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const lastUpdatedDate = sortedSessions[0]?.date || '2026-08-26';
+
+      // 1. Overall Cumulative Row (if subject filter is ALL or not specified)
+      if (!filters?.subjectId || filters.subjectId === 'ALL') {
+        const total = m.totalAttendanceSessions;
+        const present = m.presentAttendanceSessions;
+        const absent = Math.max(0, total - present);
+        const pct = m.attendancePercentage;
+
+        let eligibility: 'ELIGIBLE' | 'SHORTAGE' | 'CONDITIONAL' | 'NOT_ELIGIBLE' = 'ELIGIBLE';
+        if (pct >= minThreshold) {
+          eligibility = 'ELIGIBLE';
+        } else if (pct >= minThreshold - 10) {
+          eligibility = 'CONDITIONAL';
+        } else {
+          eligibility = 'NOT_ELIGIBLE';
+        }
+
+        let risk: 'NORMAL' | 'WARNING' | 'CRITICAL' = 'NORMAL';
+        if (pct >= minThreshold + 10) {
+          risk = 'NORMAL';
+        } else if (pct >= minThreshold) {
+          risk = 'WARNING';
+        } else {
+          risk = 'CRITICAL';
+        }
+
+        rows.push({
+          studentId: student.id,
+          studentName: student.name,
+          enrollmentNo: student.enrollmentNo,
+          universityId: student.universityId || student.id,
+          departmentName: deptName,
+          programCode: progCode,
+          programName: progName,
+          semesterNumber: semNum,
+          divisionName: divName,
+          subjectId: 'ALL',
+          subjectCode: 'ALL_SUBJECTS',
+          subjectName: 'All Subjects (Cumulative)',
+          totalSessions: total,
+          presentSessions: present,
+          absentSessions: absent,
+          attendancePercentage: pct,
+          requiredPercentage: minThreshold,
+          eligibilityStatus: eligibility,
+          riskStatus: risk,
+          lastUpdatedDate,
+          mentorName: user.name || 'Assigned Mentor',
+          mentorId: user.id
+        });
+      }
+
+      // 2. Subject-wise rows (if subject filter is specified OR requested)
+      const deptSubjects = allSubjects.filter(s => s.departmentId === student.departmentId || s.departmentId === 'dept-1');
+      deptSubjects.forEach(sub => {
+        if (filters?.subjectId && filters.subjectId !== 'ALL' && filters.subjectId !== sub.id) {
+          return;
+        }
+
+        const subSessions = studentSessions.filter(s => s.subjectId === sub.id);
+        let subTotal = 0;
+        let subPresent = 0;
+        subSessions.forEach(s => {
+          const rec = s.records.find(r => r.studentId === student.id);
+          if (rec) {
+            subTotal++;
+            if (rec.status === 'PRESENT' || (rec.status as string) === 'LATE' || (rec.status as string) === 'ON_DUTY') {
+              subPresent++;
+            }
+          }
+        });
+
+        // Skip if subject has 0 sessions and we're showing specific subject search
+        if (subTotal === 0 && filters?.subjectId === 'ALL') return;
+
+        const subPct = subTotal > 0 ? Math.round((subPresent / subTotal) * 100) : 100;
+        const subAbsent = Math.max(0, subTotal - subPresent);
+
+        let subEligibility: 'ELIGIBLE' | 'SHORTAGE' | 'CONDITIONAL' | 'NOT_ELIGIBLE' = 'ELIGIBLE';
+        if (subPct >= minThreshold) {
+          subEligibility = 'ELIGIBLE';
+        } else if (subPct >= minThreshold - 10) {
+          subEligibility = 'CONDITIONAL';
+        } else {
+          subEligibility = 'NOT_ELIGIBLE';
+        }
+
+        let subRisk: 'NORMAL' | 'WARNING' | 'CRITICAL' = 'NORMAL';
+        if (subPct >= minThreshold + 10) {
+          subRisk = 'NORMAL';
+        } else if (subPct >= minThreshold) {
+          subRisk = 'WARNING';
+        } else {
+          subRisk = 'CRITICAL';
+        }
+
+        rows.push({
+          studentId: student.id,
+          studentName: student.name,
+          enrollmentNo: student.enrollmentNo,
+          universityId: student.universityId || student.id,
+          departmentName: deptName,
+          programCode: progCode,
+          programName: progName,
+          semesterNumber: semNum,
+          divisionName: divName,
+          subjectId: sub.id,
+          subjectCode: sub.code,
+          subjectName: sub.name,
+          totalSessions: subTotal,
+          presentSessions: subPresent,
+          absentSessions: subAbsent,
+          attendancePercentage: subPct,
+          requiredPercentage: minThreshold,
+          eligibilityStatus: subEligibility,
+          riskStatus: subRisk,
+          lastUpdatedDate: subSessions[0]?.date || lastUpdatedDate,
+          mentorName: user.name || 'Assigned Mentor',
+          mentorId: user.id
+        });
+      });
+    });
+
+    // Apply Filters
+    let filtered = rows;
+
+    if (filters?.searchQuery) {
+      const q = filters.searchQuery.trim().toLowerCase();
+      filtered = filtered.filter(r => 
+        r.studentName.toLowerCase().includes(q) ||
+        r.enrollmentNo.toLowerCase().includes(q) ||
+        r.universityId.toLowerCase().includes(q) ||
+        r.subjectName.toLowerCase().includes(q) ||
+        r.subjectCode.toLowerCase().includes(q)
+      );
+    }
+
+    if (filters?.departmentId && filters.departmentId !== 'ALL') {
+      filtered = filtered.filter(r => r.departmentName.toLowerCase().includes(filters.departmentId!.toLowerCase()));
+    }
+
+    if (filters?.programId && filters.programId !== 'ALL') {
+      filtered = filtered.filter(r => r.programCode === filters.programId || r.programName.toLowerCase().includes(filters.programId!.toLowerCase()));
+    }
+
+    if (filters?.semesterId && filters.semesterId !== 'ALL') {
+      filtered = filtered.filter(r => String(r.semesterNumber) === String(filters.semesterId));
+    }
+
+    if (filters?.divisionId && filters.divisionId !== 'ALL') {
+      filtered = filtered.filter(r => r.divisionName.toLowerCase().includes(filters.divisionId!.toLowerCase()));
+    }
+
+    if (filters?.attendanceStatus && filters.attendanceStatus !== 'ALL') {
+      if (filters.attendanceStatus === 'GOOD') {
+        filtered = filtered.filter(r => r.attendancePercentage >= minThreshold);
+      } else if (filters.attendanceStatus === 'SHORTAGE') {
+        filtered = filtered.filter(r => r.attendancePercentage < minThreshold);
+      } else if (filters.attendanceStatus === 'CRITICAL') {
+        filtered = filtered.filter(r => r.attendancePercentage < 60);
+      }
+    }
+
+    if (filters?.eligibilityStatus && filters.eligibilityStatus !== 'ALL') {
+      filtered = filtered.filter(r => r.eligibilityStatus === filters.eligibilityStatus);
+    }
+
+    if (filters?.riskLevel && filters.riskLevel !== 'ALL') {
+      filtered = filtered.filter(r => r.riskStatus === filters.riskLevel);
+    }
+
+    return filtered;
+  }
+
+  /**
+   * Return detailed session-by-session attendance log for a specific mentee
+   */
+  public getMenteeAttendanceSessionDetails(
+    user: User,
+    studentId: string,
+    subjectId?: string
+  ): {
+    student: Student;
+    mentorName: string;
+    summary: {
+      total: number;
+      present: number;
+      absent: number;
+      percentage: number;
+      requiredPercentage: number;
+      eligibility: string;
+      risk: string;
+    };
+    sessions: Array<{
+      id: string;
+      date: string;
+      subjectCode: string;
+      subjectName: string;
+      facultyName: string;
+      sessionNo: number | string;
+      status: 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED' | 'ON_DUTY';
+      remarks: string;
+    }>;
+  } {
+    const student = this.assertMentorAuthorizedForStudent(user, studentId);
+    const minThreshold = db.getAttendanceEligibilityConfig().minimumAttendancePct || 75;
+    const allSessions = db.getAttendanceSessions();
+    const allSubjects = db.getSubjects();
+    const allFaculty = db.getFaculty();
+
+    const studentSessions = allSessions.filter(s => {
+      if (subjectId && subjectId !== 'ALL' && s.subjectId !== subjectId) return false;
+      return s.records.some(r => r.studentId === student.id);
+    });
+
+    let total = 0;
+    let present = 0;
+    const sessionLogs: Array<any> = [];
+
+    studentSessions.forEach(s => {
+      const rec = s.records.find(r => r.studentId === student.id);
+      if (!rec) return;
+
+      total++;
+      const isPresent = rec.status === 'PRESENT' || (rec.status as string) === 'LATE' || (rec.status as string) === 'ON_DUTY';
+      if (isPresent) present++;
+
+      const subj = allSubjects.find(sub => sub.id === s.subjectId);
+      const fac = allFaculty.find(f => f.id === s.facultyId);
+
+      sessionLogs.push({
+        id: `${s.id}-${student.id}`,
+        date: s.date,
+        subjectCode: subj?.code || s.subjectId,
+        subjectName: subj?.name || 'Subject',
+        facultyName: fac?.name || s.facultyName || 'Course Faculty',
+        sessionNo: (s as any).session || (s as any).sessionNumber || 1,
+        status: rec.status || 'PRESENT',
+        remarks: rec.remarks || (rec.status === 'PRESENT' ? 'Attended lecture' : ((rec.status as string) === 'LATE' ? 'Late arrival' : 'Absent from lecture'))
+      });
+    });
+
+    sessionLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    const percentage = total > 0 ? Math.round((present / total) * 100) : 100;
+    const absent = Math.max(0, total - present);
+
+    let eligibility = 'ELIGIBLE';
+    if (percentage < minThreshold - 10) eligibility = 'NOT_ELIGIBLE';
+    else if (percentage < minThreshold) eligibility = 'CONDITIONAL';
+
+    let risk = 'NORMAL';
+    if (percentage < minThreshold) risk = 'CRITICAL';
+    else if (percentage < minThreshold + 10) risk = 'WARNING';
+
+    return {
+      student,
+      mentorName: user.name || 'Assigned Mentor',
+      summary: {
+        total,
+        present,
+        absent,
+        percentage,
+        requiredPercentage: minThreshold,
+        eligibility,
+        risk
+      },
+      sessions: sessionLogs
+    };
+  }
+
+  /**
+   * Raise Attendance Concern workflow
+   */
+  public raiseAttendanceConcern(
+    user: User,
+    dto: {
+      studentId: string;
+      subjectId?: string;
+      concernCategory: string;
+      remarks: string;
+      actionRequested: string;
+      notifyHOD?: boolean;
+      notifyParents?: boolean;
+    }
+  ): MentoringSessionRecord {
+    const student = this.assertMentorAuthorizedForStudent(user, dto.studentId);
+    const now = new Date().toISOString();
+
+    return db.runInTransaction(() => {
+      const newSession: MentoringSessionRecord = {
+        id: `ms-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        mentorId: user.id,
+        mentorName: user.name || 'Mentor',
+        studentId: student.id,
+        studentName: student.name,
+        studentEnrollmentNo: student.enrollmentNo,
+        date: now.split('T')[0],
+        timeSlot: '11:00 AM - 11:30 AM',
+        topic: `Attendance Concern: ${dto.concernCategory.replace(/_/g, ' ')}`,
+        category: 'ATTENDANCE',
+        attendanceConcern: dto.remarks,
+        discussion: dto.remarks,
+        academicConcern: dto.subjectId ? `Subject: ${dto.subjectId}` : 'Overall Attendance Shortage',
+        actionTaken: `Concern logged by Mentor ${user.name}. ${dto.notifyHOD ? 'Escalated to HOD.' : ''}`,
+        remarks: dto.remarks,
+        followUpRequired: true,
+        followUpStatus: 'OPEN',
+        status: 'COMPLETED',
+        createdAt: now,
+        updatedAt: now
+      };
+
+      db.addEntity<MentoringSessionRecord>('mentoringSessions', newSession, `Raised attendance concern for ${student.name}`);
+
+      if (dto.notifyHOD) {
+        db.addNotification({
+          title: `Attendance Concern Escalation: ${student.name}`,
+          message: `Mentor ${user.name} reported attendance concern: ${dto.remarks}`,
+          module: 'ATTENDANCE',
+          timestamp: 'Just now',
+          targetRole: 'HOD',
+          linkTab: 'hod-attendance-shortage'
+        });
+      }
+
+      this.logMentorAudit(
+        user,
+        'RAISE_ATTENDANCE_CONCERN',
+        student.id,
+        `Raised attendance concern '${dto.concernCategory}' for student ${student.name} (${student.enrollmentNo})`
+      );
+
+      return newSession;
+    });
+  }
+
   // ============================================================================
   // 7. ACADEMIC PERFORMANCE
   // ============================================================================

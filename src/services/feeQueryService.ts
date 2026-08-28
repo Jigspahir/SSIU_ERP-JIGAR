@@ -1,6 +1,6 @@
 import { db } from './db';
 import { FeeQuery, FeeQueryCategory, FeeQueryTimelineItem, ExamFeeConfigItem } from '../types/feeQuery';
-import { User, UserRole, Student } from '../types';
+import { User, UserRole, Student, StudentFeeRecord, FeePaymentTransaction } from '../types';
 
 export class FeeQueryServiceEngine {
   private static instance: FeeQueryServiceEngine;
@@ -121,6 +121,9 @@ export class FeeQueryServiceEngine {
       resolutionSummary: string;
       resolutionRemarks?: string;
       action?: 'RESOLVED' | 'REJECTED' | 'UNDER_REVIEW';
+      adjustmentAmount?: number;
+      adjustStudentRecordId?: string;
+      adjustmentType?: 'CREDIT_PAYMENT' | 'CONCESSION' | 'REFUND' | 'WAIVE_LATE_FEE';
     },
     accountsUser: User
   ): FeeQuery {
@@ -140,12 +143,90 @@ export class FeeQueryServiceEngine {
     }
     query.updatedAt = now;
 
+    // ── FINANCIAL LEDGER ADJUSTMENT (IF AUTHORIZED BY FINANCE) ──
+    if (action === 'RESOLVED' && params.adjustmentAmount && params.adjustmentAmount > 0) {
+      const targetRecordId = params.adjustStudentRecordId || query.studentFeeRecordId;
+      if (targetRecordId) {
+        const feeRecord = db.getStudentFeeRecords().find(r => r.id === targetRecordId);
+        if (feeRecord) {
+          const adj = params.adjustmentAmount;
+          const adjType = params.adjustmentType || 'CREDIT_PAYMENT';
+
+          if (adjType === 'CREDIT_PAYMENT' || adjType === 'CONCESSION') {
+            const newPaid = (feeRecord.paidAmount || 0) + adj;
+            const newPending = Math.max(0, (feeRecord.totalAmount || 0) - newPaid);
+            const newStatus = newPending === 0 ? 'PAID' : 'PARTIAL';
+
+            db.updateEntity<StudentFeeRecord>('studentFeeRecords', feeRecord.id, {
+              paidAmount: newPaid,
+              pendingAmount: newPending,
+              status: newStatus as any
+            }, `Finance adjustment applied for Query ${query.queryNo}: +₹${adj}`);
+
+            // Add official transaction record
+            const txId = `tx-adj-${Date.now()}`;
+            const receiptNo = `REC-ADJ-${Date.now().toString().slice(-6)}`;
+            const adjTx: FeePaymentTransaction = {
+              id: txId,
+              studentFeeRecordId: feeRecord.id,
+              studentId: query.studentId,
+              studentName: query.studentName,
+              enrollmentNo: query.enrollmentNo,
+              programId: query.programId || 'prog-1',
+              semesterId: feeRecord.semesterId,
+              semesterName: feeRecord.semesterName,
+              academicYear: feeRecord.academicYearCode || '2026-2027',
+              feeType: 'TUITION',
+              paidAmount: adj,
+              paymentMode: 'Bank Transfer / NEFT' as any,
+              transactionId: `UTR-ADJ-${Date.now()}`,
+              referenceNo: query.queryNo,
+              referenceDate: now.split('T')[0],
+              bankName: 'University Accounts Adjustment',
+              gatewayName: 'FINANCE_DIRECT',
+              paymentDate: now.split('T')[0],
+              receiptNo: receiptNo,
+              status: 'SUCCESS',
+              remarks: `Financial adjustment for Query ${query.queryNo}: ${params.resolutionSummary}`,
+              recordedBy: accountsUser.name
+            };
+
+            db.addEntity<FeePaymentTransaction>('feePaymentTransactions', adjTx, `Transaction generated from query resolution ${query.queryNo}`);
+
+            // Log Central Audit
+            db.logAudit(
+              'FINANCIAL_CORRECTION_APPLIED',
+              'StudentFeeRecord',
+              `Finance officer ${accountsUser.name} applied ₹${adj} adjustment to ${query.studentName} (${query.enrollmentNo}). Receipt: ${receiptNo}.`,
+              accountsUser.name,
+              accountsUser.role,
+              { recordId: feeRecord.id, module: 'FINANCE_FEES' }
+            );
+          } else if (adjType === 'REFUND') {
+            const newRefund = (feeRecord.refundedAmount || 0) + adj;
+            db.updateEntity<StudentFeeRecord>('studentFeeRecords', feeRecord.id, {
+              refundedAmount: newRefund
+            }, `Refund processed for Query ${query.queryNo}: ₹${adj}`);
+
+            db.logAudit(
+              'FINANCIAL_REFUND_PROCESSED',
+              'StudentFeeRecord',
+              `Refund of ₹${adj} processed for ${query.studentName} (${query.enrollmentNo}) on Query ${query.queryNo}.`,
+              accountsUser.name,
+              accountsUser.role,
+              { recordId: feeRecord.id, module: 'FINANCE_FEES' }
+            );
+          }
+        }
+      }
+    }
+
     query.timeline.push({
       id: `tl-${Date.now()}`,
       action: `QUERY_${action}`,
       fromUserId: accountsUser.id,
       fromUserName: accountsUser.name,
-      fromUserRole: 'ACCOUNTS_ADMIN',
+      fromUserRole: accountsUser.role || 'ACCOUNTS_ADMIN',
       toUserId: query.studentId,
       toUserName: query.studentName,
       toUserRole: 'STUDENT',

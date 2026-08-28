@@ -14,10 +14,10 @@ import {
 } from 'lucide-react';
 import { 
   getRoleNavigationItems, NavItemConfig, 
-  STUDENT_NAVIGATION_STRUCTURE, FACULTY_NAVIGATION_STRUCTURE, MENTOR_NAVIGATION_STRUCTURE, 
+  STUDENT_NAVIGATION_STRUCTURE, STUDENT_ADMIN_NAVIGATION_STRUCTURE, FACULTY_NAVIGATION_STRUCTURE, MENTOR_NAVIGATION_STRUCTURE, 
   HOD_NAVIGATION_STRUCTURE, PRINCIPAL_NAVIGATION_STRUCTURE, STUDENT_SECTION_NAVIGATION_STRUCTURE, 
   REGISTRAR_NAVIGATION_STRUCTURE, DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE, VICE_PRESIDENT_NAVIGATION_STRUCTURE,
-  PARENT_NAVIGATION_STRUCTURE
+  PARENT_NAVIGATION_STRUCTURE, ERP_COORDINATOR_NAVIGATION_STRUCTURE
 } from '../../constants/navigationConfig';
 import { mentorAssignmentService } from '../../services/mentorAssignmentService';
 import { quickAccessService, QuickAccessItem } from '../../services/quickAccessService';
@@ -53,8 +53,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { user, role, activeRole, setActiveRole, logout } = useAuth();
   const userId = user?.id || (user as any)?.username || 'default_user';
 
+  const isERPCoordinator = role === 'ERP_COORDINATOR';
   const isParent = role === 'PARENT';
   const isStudent = role === 'STUDENT';
+  const isStudentAdmin = role === 'STUDENT_ADMIN';
   const isFaculty = role === 'FACULTY';
   const isMentor = role === 'MENTOR';
   const isHOD = role === 'HOD';
@@ -67,6 +69,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Check if user has dual Faculty / Mentor authority
   const isFacultyUser = useMemo(() => {
     if (!user) return false;
+    if (user.role === 'STUDENT_ADMIN') return false;
     if (user.role === 'FACULTY' || (user as any).isMentor) return true;
     const assignments = mentorAssignmentService.getAssignments({}, user);
     return Boolean((assignments.students && assignments.students.length > 0));
@@ -100,28 +103,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Build searchable index from authorized navigation structures only
   const searchableItems: SearchableMenuItem[] = useMemo(() => {
-    const isStructured = isParent || isVicePresident || isStudent || isFaculty || isMentor || isHOD || isPrincipal || isRegistrar || isDeputyRegistrar || isStudentSection;
+    const isStructured = isERPCoordinator || isParent || isVicePresident || isStudent || isStudentAdmin || isFaculty || isMentor || isHOD || isPrincipal || isRegistrar || isDeputyRegistrar || isStudentSection;
 
     if (isStructured) {
-      const navStructure = isParent
-        ? PARENT_NAVIGATION_STRUCTURE
-        : (isVicePresident
-            ? VICE_PRESIDENT_NAVIGATION_STRUCTURE
-            : (isStudent 
-                ? STUDENT_NAVIGATION_STRUCTURE 
-                : (isRegistrar
-                    ? REGISTRAR_NAVIGATION_STRUCTURE
-                    : (isDeputyRegistrar
-                        ? DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE
-                        : (isStudentSection
-                            ? STUDENT_SECTION_NAVIGATION_STRUCTURE
-                            : (isPrincipal
-                                ? PRINCIPAL_NAVIGATION_STRUCTURE
-                                : (isHOD
-                                    ? HOD_NAVIGATION_STRUCTURE
-                                    : (isMentor
-                                        ? MENTOR_NAVIGATION_STRUCTURE
-                                        : (isFaculty ? FACULTY_NAVIGATION_STRUCTURE : [])))))))));
+      const navStructure = isERPCoordinator
+        ? ERP_COORDINATOR_NAVIGATION_STRUCTURE
+        : (isParent
+          ? PARENT_NAVIGATION_STRUCTURE
+          : (isVicePresident
+              ? VICE_PRESIDENT_NAVIGATION_STRUCTURE
+              : (isStudent 
+                  ? STUDENT_NAVIGATION_STRUCTURE 
+                  : (isStudentAdmin
+                      ? STUDENT_ADMIN_NAVIGATION_STRUCTURE
+                      : (isRegistrar
+                          ? REGISTRAR_NAVIGATION_STRUCTURE
+                          : (isDeputyRegistrar
+                              ? DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE
+                              : (isStudentSection
+                                  ? STUDENT_SECTION_NAVIGATION_STRUCTURE
+                                  : (isPrincipal
+                                      ? PRINCIPAL_NAVIGATION_STRUCTURE
+                                      : (isHOD
+                                          ? HOD_NAVIGATION_STRUCTURE
+                                          : (isMentor
+                                              ? MENTOR_NAVIGATION_STRUCTURE
+                                              : (isFaculty ? FACULTY_NAVIGATION_STRUCTURE : [])))))))))));
 
       const items: SearchableMenuItem[] = [];
 
@@ -372,12 +379,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Sidebar Header & Toggle */}
         <div
           style={{
-            padding: collapsed ? '1.25rem 0.5rem' : '1.25rem 1.5rem',
+            padding: collapsed ? '1.1rem 0.5rem 0.85rem 0.5rem' : '1.25rem 1.5rem',
             borderBottom: '1px solid rgba(255,255,255,0.08)',
             display: 'flex',
+            flexDirection: collapsed ? 'column' : 'row',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            minHeight: 'var(--topbar-height)'
+            justifyContent: collapsed ? 'center' : 'space-between',
+            gap: collapsed ? '0.65rem' : '0',
+            minHeight: 'var(--topbar-height)',
+            boxSizing: 'border-box'
           }}
         >
           <HeaderLogo collapsed={collapsed} />
@@ -386,11 +396,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => setCollapsed(!collapsed)}
             style={{
               background: 'rgba(255,255,255,0.08)',
-              border: 'none',
+              border: '1px solid rgba(255,255,255,0.12)',
               color: 'var(--brand-orange)',
-              width: '28px',
-              height: '28px',
-              borderRadius: '6px',
+              width: collapsed ? '34px' : '28px',
+              height: collapsed ? '34px' : '28px',
+              borderRadius: '8px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -398,37 +408,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
               transition: 'all var(--transition-fast)'
             }}
             title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            aria-label={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
           >
             {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
         </div>
 
         {/* Search Field */}
-        <div style={{ padding: collapsed ? '0.65rem 0.5rem 0.2rem 0.5rem' : '0.65rem 1rem 0.25rem 1rem' }}>
+        <div style={{ padding: collapsed ? '0.5rem 0 0.25rem 0' : '0.65rem 1rem 0.25rem 1rem', width: '100%', boxSizing: 'border-box' }}>
           {collapsed ? (
-            <button
-              onClick={() => {
-                setCollapsed(false);
-                setTimeout(() => searchInputRef.current?.focus(), 100);
-              }}
-              style={{
-                width: '100%',
-                height: '36px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.1)',
-                background: 'rgba(255,255,255,0.05)',
-                color: 'rgba(255,255,255,0.6)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-              title="Search menu (/)"
-              aria-label="Search menu"
-            >
-              <Search size={16} />
-            </button>
+            <div className="collapsed-nav-item-wrapper">
+              <button
+                onClick={() => {
+                  setCollapsed(false);
+                  setTimeout(() => searchInputRef.current?.focus(), 100);
+                }}
+                className="collapsed-nav-btn"
+                aria-label="Search menu (/)"
+              >
+                <Search size={20} className="collapsed-nav-icon" />
+              </button>
+              <span className="collapsed-nav-tooltip">Search Menu (/)</span>
+            </div>
           ) : (
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <Search
@@ -530,7 +531,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }}
             >
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#F5A623', boxShadow: '0 0 6px #F5A623' }}></span>
-              <span>⚡ {isStudent ? 'STUDENT PORTAL' : (isRegistrar ? 'REGISTRAR OFFICE PORTAL' : (isDeputyRegistrar ? 'DEPUTY REGISTRAR PORTAL' : (isStudentSection ? 'STUDENT SECTION PORTAL' : (isPrincipal ? 'PRINCIPAL / HOI PORTAL' : (isHOD ? 'HOD PORTAL' : (isMentor ? 'MENTOR PORTAL' : (isFaculty ? 'FACULTY PORTAL' : 'DEMO MODE ACTIVE')))))))}</span>
+              <span>⚡ {isStudentAdmin ? 'ONBOARDING OFFICER PORTAL' : (isStudent ? 'STUDENT PORTAL' : (isRegistrar ? 'REGISTRAR OFFICE PORTAL' : (isDeputyRegistrar ? 'DEPUTY REGISTRAR PORTAL' : (isStudentSection ? 'STUDENT SECTION PORTAL' : (isPrincipal ? 'PRINCIPAL / HOI PORTAL' : (isHOD ? 'HOD PORTAL' : (isMentor ? 'MENTOR PORTAL' : (isFaculty ? 'FACULTY PORTAL' : 'DEMO MODE ACTIVE'))))))))}</span>
             </div>
 
             {isFacultyUser && (
@@ -587,7 +588,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {/* Navigation Items Container / Search Results View */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: collapsed ? '0.75rem 0.5rem' : '0.85rem 0.85rem' }}>
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            padding: collapsed ? '0.65rem 0' : '0.85rem 0.85rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: collapsed ? '8px' : '0.35rem',
+            alignItems: collapsed ? 'center' : 'stretch',
+            width: '100%',
+            boxSizing: 'border-box'
+          }}
+        >
           {searchQuery.trim() ? (
             /* ─────────────────────────────────────────────────────────────
                SEARCH RESULTS LIST VIEW (PIN/UNPIN ON SUB-ITEMS ONLY)
@@ -808,7 +822,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                       {quickAccessList.map((qaItem) => {
                         const QAIcon = qaItem.icon || Star;
-                        const isQAActive = activeTab === qaItem.targetTab || activeTab === qaItem.id;
+                        const isQAActive = activeTab === qaItem.targetTab || (activeTab === 'feedback' && qaItem.targetTab === 'feedback-give') || (activeTab === qaItem.id && qaItem.id !== 'feedback');
 
                         return (
                           <div
@@ -898,10 +912,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {/* ─────────────────────────────────────────────────────────────
                  MAIN NAVIGATION MENUS (NO STAR ON PARENTS; STARS ON SUBMENUS ONLY)
                  ───────────────────────────────────────────────────────────── */}
-              {(isParent || isVicePresident || isStudent || isFaculty || isMentor || isHOD || isPrincipal || isRegistrar || isDeputyRegistrar || isStudentSection) ? (
+              {(isERPCoordinator || isParent || isVicePresident || isStudent || isStudentAdmin || isFaculty || isMentor || isHOD || isPrincipal || isRegistrar || isDeputyRegistrar || isStudentSection) ? (
                 /* ── STRUCTURED MENU WITH ACCORDIONS ── */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                  {(isParent ? PARENT_NAVIGATION_STRUCTURE : (isVicePresident ? VICE_PRESIDENT_NAVIGATION_STRUCTURE : (isStudent ? STUDENT_NAVIGATION_STRUCTURE : (isRegistrar ? REGISTRAR_NAVIGATION_STRUCTURE : (isDeputyRegistrar ? DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE : (isStudentSection ? STUDENT_SECTION_NAVIGATION_STRUCTURE : (isPrincipal ? PRINCIPAL_NAVIGATION_STRUCTURE : (isHOD ? HOD_NAVIGATION_STRUCTURE : (isMentor ? MENTOR_NAVIGATION_STRUCTURE : FACULTY_NAVIGATION_STRUCTURE))))))))).map((rawGroup) => {
+                <div style={{ display: 'flex', flexDirection: 'column', gap: collapsed ? '8px' : '0.35rem', width: '100%', alignItems: collapsed ? 'center' : 'stretch' }}>
+                  {(isERPCoordinator ? ERP_COORDINATOR_NAVIGATION_STRUCTURE : (isParent ? PARENT_NAVIGATION_STRUCTURE : (isVicePresident ? VICE_PRESIDENT_NAVIGATION_STRUCTURE : (isStudent ? STUDENT_NAVIGATION_STRUCTURE : (isStudentAdmin ? STUDENT_ADMIN_NAVIGATION_STRUCTURE : (isRegistrar ? REGISTRAR_NAVIGATION_STRUCTURE : (isDeputyRegistrar ? DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE : (isStudentSection ? STUDENT_SECTION_NAVIGATION_STRUCTURE : (isPrincipal ? PRINCIPAL_NAVIGATION_STRUCTURE : (isHOD ? HOD_NAVIGATION_STRUCTURE : (isMentor ? MENTOR_NAVIGATION_STRUCTURE : FACULTY_NAVIGATION_STRUCTURE))))))))))).map((rawGroup) => {
                     let group = rawGroup;
 
                     const Icon = group.icon;
@@ -919,6 +933,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     const isDirectActive = activeTab === group.id || activeTab === group.defaultTab || (isNotesheetItem && isNotesheetTabActive) || (isRequestsItem && isRequestsTabActive);
                     const isParentActive = isChildTabActive || isDirectActive;
 
+                    // ── COLLAPSED VIEW: UNIFORM CENTERED ICON CONTAINER ──
+                    if (collapsed) {
+                      return (
+                        <div key={group.id} className="collapsed-nav-item-wrapper">
+                          <button
+                            onClick={() => handleNavClick(group.defaultTab || group.children?.[0]?.targetTab || group.id)}
+                            className={`collapsed-nav-btn ${isParentActive ? 'active' : ''}`}
+                            aria-label={group.label}
+                          >
+                            <Icon size={20} className="collapsed-nav-icon" style={{ color: isParentActive ? '#FFFFFF' : 'var(--brand-gold)' }} />
+                          </button>
+                          <span className="collapsed-nav-tooltip">{group.label}</span>
+                        </div>
+                      );
+                    }
+
                     if (!hasChildren) {
                       // Direct Top-Level Link (NO STAR ICON)
                       return (
@@ -929,8 +959,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.75rem',
-                            padding: collapsed ? '0.75rem' : '0.625rem 0.75rem',
-                            justifyContent: collapsed ? 'center' : 'flex-start',
+                            padding: '0.625rem 0.75rem',
+                            justifyContent: 'flex-start',
                             borderRadius: 'var(--radius-md)',
                             border: 'none',
                             background: isParentActive
@@ -945,14 +975,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             width: '100%',
                             textAlign: 'left'
                           }}
-                          title={collapsed ? group.label : undefined}
                         >
                           <Icon size={18} style={{ color: isParentActive ? '#FFFFFF' : 'var(--brand-gold)', flexShrink: 0 }} />
-                          {!collapsed && (
-                            <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {group.label}
-                            </span>
-                          )}
+                          <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {group.label}
+                          </span>
                         </button>
                       );
                     }
@@ -961,19 +988,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     return (
                       <div key={group.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                         <button
-                          onClick={() => {
-                            if (collapsed) {
-                              setCollapsed(false);
-                              setExpandedGroup(group.id);
-                            } else {
-                              toggleGroup(group.id);
-                            }
-                          }}
+                          onClick={() => toggleGroup(group.id)}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
-                            padding: collapsed ? '0.75rem' : '0.625rem 0.75rem',
+                            padding: '0.625rem 0.75rem',
                             borderRadius: 'var(--radius-md)',
                             border: 'none',
                             background: isParentActive && !isGroupExpanded
@@ -988,25 +1008,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             transition: 'all var(--transition-fast)',
                             width: '100%'
                           }}
-                          title={collapsed ? group.label : undefined}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', overflow: 'hidden' }}>
                             <Icon size={18} style={{ color: isParentActive ? 'var(--brand-orange)' : 'var(--brand-gold)', flexShrink: 0 }} />
-                            {!collapsed && (
-                              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {group.label}
-                              </span>
-                            )}
-                          </div>
-                          {!collapsed && (
-                            <span style={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center' }}>
-                              {isGroupExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {group.label}
                             </span>
-                          )}
+                          </div>
+                          <span style={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center' }}>
+                            {isGroupExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                          </span>
                         </button>
 
                         {/* Sub-items List (EACH ELIGIBLE SUBMENU ITEM HAS ☆ / ★ PIN BUTTON) */}
-                        {!collapsed && isGroupExpanded && (
+                        {isGroupExpanded && (
                           <div style={{
                             display: 'flex',
                             flexDirection: 'column',
@@ -1031,7 +1046,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 return true;
                               })
                               .map(sub => {
-                              const isSubActive = activeTab === sub.targetTab || activeTab === sub.id;
+                              const isSubActive = activeTab === sub.targetTab || (activeTab === 'feedback' && sub.targetTab === 'feedback-give') || (activeTab === sub.id && sub.id !== 'feedback');
                               const isSubPinned = pinnedIdsSet.has(sub.targetTab);
 
                               return (
@@ -1107,66 +1122,85 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               ) : (
                 /* ── OTHER ROLES: CATEGORY NAVIGATION (DIRECT ACTIONS) ── */
-                categories.map(cat => {
-                  const itemsInCat = visibleItems.filter(i => (i.category || 'General') === cat);
-                  if (itemsInCat.length === 0) return null;
+                collapsed ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', alignItems: 'center' }}>
+                    {visibleItems.map(item => {
+                      const Icon = item.icon;
+                      const isActive = activeTab === item.id;
 
-                  return (
-                    <div key={cat} style={{ marginBottom: '1.5rem' }}>
-                      {!collapsed && cat !== 'Main' && (
-                        <div
-                          style={{
-                            fontSize: '0.6875rem',
-                            fontWeight: 700,
-                            textTransform: 'uppercase',
-                            letterSpacing: '1.2px',
-                            color: 'var(--brand-gold)',
-                            marginBottom: '0.5rem',
-                            paddingLeft: '0.75rem',
-                            opacity: 0.9
-                          }}
-                        >
-                          {cat}
+                      return (
+                        <div key={item.id} className="collapsed-nav-item-wrapper">
+                          <button
+                            onClick={() => handleNavClick(item.id)}
+                            className={`collapsed-nav-btn ${isActive ? 'active' : ''}`}
+                            aria-label={item.label}
+                          >
+                            <Icon size={20} className="collapsed-nav-icon" style={{ color: isActive ? '#FFFFFF' : 'var(--brand-gold)' }} />
+                          </button>
+                          <span className="collapsed-nav-tooltip">{item.label}</span>
                         </div>
-                      )}
+                      );
+                    })}
+                  </div>
+                ) : (
+                  categories.map(cat => {
+                    const itemsInCat = visibleItems.filter(i => (i.category || 'General') === cat);
+                    if (itemsInCat.length === 0) return null;
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                        {itemsInCat.map(item => {
-                          const Icon = item.icon;
-                          const isActive = activeTab === item.id;
-                          const isItemPinned = pinnedIdsSet.has(item.id);
+                    return (
+                      <div key={cat} style={{ marginBottom: '1.5rem' }}>
+                        {cat !== 'Main' && (
+                          <div
+                            style={{
+                              fontSize: '0.6875rem',
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              letterSpacing: '1.2px',
+                              color: 'var(--brand-gold)',
+                              marginBottom: '0.5rem',
+                              paddingLeft: '0.75rem',
+                              opacity: 0.9
+                            }}
+                          >
+                            {cat}
+                          </div>
+                        )}
 
-                          return (
-                            <div key={item.id} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                              <button
-                                onClick={() => handleNavClick(item.id)}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.75rem',
-                                  padding: collapsed ? '0.75rem' : '0.625rem 2rem 0.625rem 0.75rem',
-                                  justifyContent: collapsed ? 'center' : 'flex-start',
-                                  borderRadius: 'var(--radius-md)',
-                                  border: 'none',
-                                  background: isActive
-                                    ? 'linear-gradient(90deg, var(--brand-orange) 0%, #D95300 100%)'
-                                    : 'transparent',
-                                  color: isActive ? '#FFFFFF' : 'rgba(255,255,255,0.75)',
-                                  fontWeight: isActive ? 700 : 500,
-                                  fontSize: '0.875rem',
-                                  cursor: 'pointer',
-                                  transition: 'all var(--transition-fast)',
-                                  boxShadow: isActive ? '0 4px 12px rgba(243, 112, 35, 0.3)' : 'none',
-                                  width: '100%',
-                                  textAlign: 'left'
-                                }}
-                                title={collapsed ? item.label : undefined}
-                              >
-                                <Icon size={18} style={{ color: isActive ? '#FFFFFF' : 'var(--brand-gold)' }} />
-                                {!collapsed && <span>{item.label}</span>}
-                              </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          {itemsInCat.map(item => {
+                            const Icon = item.icon;
+                            const isActive = activeTab === item.id;
+                            const isItemPinned = pinnedIdsSet.has(item.id);
 
-                              {!collapsed && (
+                            return (
+                              <div key={item.id} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                <button
+                                  onClick={() => handleNavClick(item.id)}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.75rem',
+                                    padding: '0.625rem 2rem 0.625rem 0.75rem',
+                                    justifyContent: 'flex-start',
+                                    borderRadius: 'var(--radius-md)',
+                                    border: 'none',
+                                    background: isActive
+                                      ? 'linear-gradient(90deg, var(--brand-orange) 0%, #D95300 100%)'
+                                      : 'transparent',
+                                    color: isActive ? '#FFFFFF' : 'rgba(255,255,255,0.75)',
+                                    fontWeight: isActive ? 700 : 500,
+                                    fontSize: '0.875rem',
+                                    cursor: 'pointer',
+                                    transition: 'all var(--transition-fast)',
+                                    boxShadow: isActive ? '0 4px 12px rgba(243, 112, 35, 0.3)' : 'none',
+                                    width: '100%',
+                                    textAlign: 'left'
+                                  }}
+                                >
+                                  <Icon size={18} style={{ color: isActive ? '#FFFFFF' : 'var(--brand-gold)' }} />
+                                  <span>{item.label}</span>
+                                </button>
+
                                 <button
                                   type="button"
                                   onClick={(e) => handleTogglePin(item.id, e)}
@@ -1193,78 +1227,102 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     strokeWidth={isItemPinned ? 0 : 2}
                                   />
                                 </button>
-                              )}
-                            </div>
-                          );
-                        })}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })
+                    );
+                  })
+                )
               )}
             </>
           )}
 
           {/* Canonical Single Logout Action for All Roles */}
-          <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-            <button
-              onClick={() => logout()}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: collapsed ? '0.75rem' : '0.625rem 0.75rem',
-                justifyContent: collapsed ? 'center' : 'flex-start',
-                borderRadius: 'var(--radius-md)',
-                border: 'none',
-                background: 'transparent',
-                color: '#EF4444',
-                fontWeight: 600,
-                fontSize: '0.875rem',
-                cursor: 'pointer',
-                transition: 'all var(--transition-fast)',
-                width: '100%',
-                textAlign: 'left'
-              }}
-              title={collapsed ? "Logout" : undefined}
-              aria-label="Logout"
-            >
-              <LogOut size={18} style={{ color: '#EF4444', flexShrink: 0 }} />
-              {!collapsed && (
+          {collapsed ? (
+            <div className="collapsed-nav-item-wrapper" style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <button
+                onClick={() => logout()}
+                className="collapsed-nav-btn logout-btn"
+                aria-label="Logout"
+              >
+                <LogOut size={20} />
+              </button>
+              <span className="collapsed-nav-tooltip">Logout</span>
+            </div>
+          ) : (
+            <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <button
+                onClick={() => logout()}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.625rem 0.75rem',
+                  justifyContent: 'flex-start',
+                  borderRadius: 'var(--radius-md)',
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#EF4444',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  cursor: 'pointer',
+                  transition: 'all var(--transition-fast)',
+                  width: '100%',
+                  textAlign: 'left'
+                }}
+                aria-label="Logout"
+              >
+                <LogOut size={18} style={{ color: '#EF4444', flexShrink: 0 }} />
                 <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   Logout
                 </span>
-              )}
-            </button>
-          </div>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Sidebar Footer User Info */}
         <div
           style={{
-            padding: collapsed ? '1rem 0.5rem' : '1rem 1.25rem',
+            padding: collapsed ? '1rem 0' : '1rem 1.25rem',
             borderTop: '1px solid rgba(255,255,255,0.08)',
             backgroundColor: 'rgba(0,0,0,0.15)',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.75rem'
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            gap: '0.75rem',
+            width: '100%',
+            boxSizing: 'border-box'
           }}
         >
-          <div
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
-              backgroundColor: 'var(--brand-orange)',
-              color: '#FFFFFF',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 800,
-              fontSize: '0.875rem'
-            }}
-          >
-            {user?.name?.charAt(0) || 'U'}
+          <div className="collapsed-nav-item-wrapper" style={{ width: collapsed ? 'auto' : undefined }}>
+            <div
+              style={{
+                width: '40px',
+                height: '40px',
+                minWidth: '40px',
+                minHeight: '40px',
+                borderRadius: '50%',
+                backgroundColor: 'var(--brand-orange)',
+                color: '#FFFFFF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 800,
+                fontSize: '0.875rem',
+                border: '2px solid rgba(255,255,255,0.15)',
+                cursor: 'pointer'
+              }}
+            >
+              {user?.name?.charAt(0) || 'U'}
+            </div>
+            {collapsed && (
+              <span className="collapsed-nav-tooltip">
+                {user?.name || 'User'} ({role})
+              </span>
+            )}
           </div>
 
           {!collapsed && (

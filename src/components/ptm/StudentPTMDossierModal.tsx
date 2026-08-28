@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, User, BookOpen, Calendar, AlertTriangle, CheckCircle, 
   Clock, ShieldAlert, Sparkles, MessageSquare, Plus, Trash2, 
-  FileText, TrendingUp, CheckCircle2, Award, ExternalLink
+  FileText, TrendingUp, CheckCircle2, Award, ExternalLink,
+  Printer, Download, FileSpreadsheet
 } from 'lucide-react';
 import { Student } from '../../types';
 import { PTMRecord, PTMSchedule, PTMFollowUpAction, PTMRating, PTMOutcome, PTMAttendanceStatus } from '../../types/ptm';
@@ -27,6 +28,23 @@ export const StudentPTMDossierModal: React.FC<StudentPTMDossierModalProps> = ({
   onRecordSaved
 }) => {
   const { user, activeRole } = useAuth();
+
+  const handlePrintDossier = () => {
+    window.print();
+  };
+
+  const handleExportDossierExcel = () => {
+    if (schedule && user) {
+      ptmService.exportPTMReportToExcel({
+        filteredSchedules: [schedule],
+        studentId: student.id
+      }, user, activeRole || 'FACULTY');
+    } else if (user) {
+      ptmService.exportPTMReportToExcel({
+        studentId: student.id
+      }, user, activeRole || 'FACULTY');
+    }
+  };
 
   // Navigation tab inside modal
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'FORM' | 'HISTORY'>('OVERVIEW');
@@ -270,14 +288,58 @@ export const StudentPTMDossierModal: React.FC<StudentPTMDossierModalProps> = ({
               </div>
             </div>
           </div>
-          <button 
-            type="button" 
-            className="swarrnim-modal-close-btn" 
-            style={{ color: '#fff', background: 'rgba(255, 255, 255, 0.1)' }} 
-            onClick={onClose}
-          >
-            <X size={18} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              type="button"
+              onClick={handlePrintDossier}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.4rem 0.75rem',
+                background: 'rgba(255, 255, 255, 0.15)',
+                color: '#fff',
+                border: '1px solid rgba(255, 255, 255, 0.25)',
+                borderRadius: '6px',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+              title="Print official student PTM dossier report"
+            >
+              <Printer size={14} /> Print Dossier
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportDossierExcel}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.4rem 0.75rem',
+                background: 'rgba(255, 255, 255, 0.15)',
+                color: '#fff',
+                border: '1px solid rgba(255, 255, 255, 0.25)',
+                borderRadius: '6px',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+              title="Export dossier data to Excel report"
+            >
+              <FileSpreadsheet size={14} /> Export Excel
+            </button>
+
+            <button 
+              type="button" 
+              className="swarrnim-modal-close-btn" 
+              style={{ color: '#fff', background: 'rgba(255, 255, 255, 0.1)' }} 
+              onClick={onClose}
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Modal Sub-navigation Tabs */}

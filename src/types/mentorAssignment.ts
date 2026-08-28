@@ -110,6 +110,7 @@ export interface MentoringSessionRecord {
   date: string;
   timeSlot?: string;
   topic: string;
+  category?: string;
   discussion?: string;
   academicConcern?: string;
   attendanceConcern?: string;

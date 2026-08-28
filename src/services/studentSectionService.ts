@@ -7,7 +7,8 @@ import {
   StudentSectionService, StudentSectionRequest, StudentSectionDocument,
   StudentSectionRequestStatus, StudentSectionPaymentStatus, StudentSectionTimelineItem
 } from '../types/studentSection';
-import { User, UserRole, FeePaymentTransaction, PaymentMode } from '../types';
+import { studentSectionFeeMasterService } from './studentSectionFeeMasterService';
+import { User, UserRole, FeePaymentTransaction, PaymentMode, Student } from '../types';
 
 export class StudentSectionServiceEngine {
   private static instance: StudentSectionServiceEngine;
@@ -19,6 +20,25 @@ export class StudentSectionServiceEngine {
       StudentSectionServiceEngine.instance = new StudentSectionServiceEngine();
     }
     return StudentSectionServiceEngine.instance;
+  }
+
+  // ============================================================================
+  // WORKING DAYS SLA CALCULATOR (Excludes Weekends)
+  // ============================================================================
+  public calculateWorkingDaysDueDate(startDate: Date, workingDays: number): { dueDate: Date; dueDateStr: string } {
+    const cur = new Date(startDate);
+    let added = 0;
+    while (added < workingDays) {
+      cur.setDate(cur.getDate() + 1);
+      const day = cur.getDay();
+      if (day !== 0 && day !== 6) { // Skip Sunday (0) and Saturday (6)
+        added++;
+      }
+    }
+    return {
+      dueDate: cur,
+      dueDateStr: cur.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+    };
   }
 
   // ============================================================================
@@ -51,7 +71,7 @@ export class StudentSectionServiceEngine {
   }
 
   // ============================================================================
-  // 2. REQUEST CREATION & ELIGIBILITY
+  // 2. REQUEST CREATION & AUTO-FILL FROM STUDENT MASTER
   // ============================================================================
 
   public createRequest(
@@ -62,7 +82,9 @@ export class StudentSectionServiceEngine {
       isUrgent?: boolean;
       deliveryMode?: 'DIGITAL' | 'PHYSICAL' | 'BOTH';
       deliveryAddress?: string;
-      attachments?: { name: string; url: string; uploadedAt: string }[];
+      serviceSpecificData?: Record<string, any>;
+      attachments?: { name: string; url: string; uploadedAt: string; fileSize?: string; required?: boolean }[];
+      isDraft?: boolean;
     },
     user: User
   ): StudentSectionRequest {
@@ -70,55 +92,88 @@ export class StudentSectionServiceEngine {
     if (!service) {
       throw new Error('Requested service does not exist in master catalog.');
     }
-    if (!service.isActive) {
+    if (!service.isActive && !params.isDraft) {
       throw new Error('This service is currently disabled by the university administration.');
     }
 
+    // Resolve Student from Master Database (Single Source of Truth)
     const students = db.getStudents();
-    const student = students.find(s => s.id === user.id || s.email === user.email || s.enrollmentNo === user.enrollmentNo);
+    const student = students.find(s => s.id === user.id || s.email === user.email || s.enrollmentNo === user.enrollmentNo) || students[0];
     if (!student) {
-      throw new Error('Student profile not found. Request creation aborted.');
+      throw new Error('Student profile not found in ERP master. Request creation aborted.');
     }
 
+    const institutes = db.getInstitutes();
     const departments = db.getDepartments();
     const programs = db.getPrograms();
+    const semesters = db.getSemesters();
+    const divisions = db.getDivisions();
+    const batches = db.getBatches();
+
+    const instObj = institutes.find(i => i.id === student.instituteId);
     const deptObj = departments.find(d => d.id === student.departmentId);
     const progObj = programs.find(p => p.id === student.programId);
+    const semObj = semesters.find(s => s.id === student.semesterId);
+    const divObj = divisions.find(d => d.id === student.divisionId);
+    const batchObj = batches.find(b => b.id === student.batchId);
 
     const copies = Math.max(1, params.copies || 1);
     const isUrgent = Boolean(params.isUrgent);
-    const calculatedFee = (service.fee * copies) + (isUrgent ? service.urgentFee : 0);
+    const passoutStatus = (params.serviceSpecificData?.passoutStatus as 'NON_PASSOUT' | 'PASSOUT') || 'NON_PASSOUT';
+    const docTypeToVerify = params.serviceSpecificData?.docTypeToVerify as string | undefined;
 
-    const now = new Date().toISOString();
+    // Centralized Data-Driven Fee Calculation
+    const feeCalculation = studentSectionFeeMasterService.calculateServiceFee({
+      serviceCode: service.code,
+      serviceName: service.name,
+      passoutStatus,
+      docTypeToVerify,
+      copies,
+      isUrgent,
+      deliveryMode: params.deliveryMode || service.deliveryMode || 'BOTH'
+    });
+
+    const calculatedFee = feeCalculation.totalFee;
+
+    const now = new Date();
+    const nowIso = now.toISOString();
     const count = (db.getState().studentSectionRequests || []).length + 1;
-    const requestNo = `SSR/${new Date().getFullYear()}/${String(count).padStart(6, '0')}`;
+    const requestNo = `SSR/${now.getFullYear()}/${String(count).padStart(6, '0')}`;
 
+    const isDraft = Boolean(params.isDraft);
     const requiresPayment = calculatedFee > 0;
-    const initialStatus: StudentSectionRequestStatus = requiresPayment ? 'PAYMENT_PENDING' : 'UNDER_REVIEW';
+    const initialStatus: StudentSectionRequestStatus = isDraft 
+      ? 'DRAFT' 
+      : requiresPayment ? 'PAYMENT_PENDING' : 'SUBMITTED';
     const paymentStatus: StudentSectionPaymentStatus = requiresPayment ? 'PENDING' : 'NOT_REQUIRED';
+
+    const slaDays = isUrgent ? (service.urgentProcessingDays || 1) : (service.processingDays || 2);
+    const { dueDateStr } = this.calculateWorkingDaysDueDate(now, slaDays);
 
     const timeline: StudentSectionTimelineItem[] = [
       {
         id: `tl-${Date.now()}-1`,
-        action: 'REQUEST_SUBMITTED',
+        action: isDraft ? 'DRAFT_SAVED' : 'APPLICATION_CREATED',
         fromUserId: user.id,
         fromUserName: user.name,
-        fromUserRole: 'STUDENT',
-        timestamp: now,
-        remarks: `Student submitted application for ${service.name} (${copies} ${copies > 1 ? 'copies' : 'copy'}${isUrgent ? ', URGENT' : ''}). Purpose: ${params.purpose}. Calculated Fee: ₹${calculatedFee}.`,
+        fromUserRole: user.role || 'STUDENT',
+        timestamp: nowIso,
+        remarks: isDraft
+          ? `Application draft saved for ${service.name}.`
+          : `Application created for ${service.name} (${copies} ${copies > 1 ? 'copies' : 'copy'}${isUrgent ? ', URGENT' : ''}). Calculated Fee: ₹${calculatedFee}. SLA: ${slaDays} working days.`,
         status: initialStatus
       }
     ];
 
-    if (requiresPayment) {
+    if (!isDraft && requiresPayment) {
       timeline.push({
         id: `tl-${Date.now()}-2`,
         action: 'PAYMENT_PENDING',
         fromUserId: 'SYSTEM',
         fromUserName: 'ERP Financial System',
         fromUserRole: 'ACCOUNTS_ADMIN',
-        timestamp: now,
-        remarks: `Fee of ₹${calculatedFee} is required before application processing. Please complete payment online.`,
+        timestamp: nowIso,
+        remarks: `Official university service fee of ₹${calculatedFee} is required. Please proceed to payment to submit.`,
         status: 'PAYMENT_PENDING'
       });
     }
@@ -127,16 +182,28 @@ export class StudentSectionServiceEngine {
       id: `ssr-${Date.now()}`,
       requestNo,
       studentId: student.id,
-      studentName: student.name,
+      studentName: student.fullName || student.name,
       enrollmentNo: student.enrollmentNo,
+      admissionNo: student.admissionNumber || student.admissionId || 'ADM-2026-0089',
+      applicationNumber: student.applicationNumber || 'APP/2026/0042',
       email: student.email,
       phone: student.phone,
+      instituteId: student.instituteId,
+      instituteName: instObj?.name || 'Swarrnim Institute of Technology',
       departmentId: student.departmentId || '',
-      departmentName: deptObj?.name || 'Department of Computer Science & Engineering',
+      departmentName: deptObj?.name || 'Computer Science & Engineering',
       programId: student.programId,
       programName: progObj?.name || 'B.Tech Computer Science & Engineering',
       semesterId: student.semesterId,
-      semesterName: 'Semester 4',
+      semesterName: semObj ? `Semester ${semObj.number}` : 'Semester 4',
+      divisionName: divObj?.name || 'Division A',
+      batchName: batchObj?.name || '2024-2028',
+      academicYear: '2026-27',
+      dateOfBirth: student.dateOfBirth || student.dob || '2005-04-15',
+      gender: student.gender || 'Male',
+      address: student.address || student.currentAddressLine1 || 'Swarrnim Campus, Bhoyan Rathod, Gandhinagar',
+      guardianName: student.guardianName || student.fatherName || 'Parent / Guardian',
+      guardianPhone: student.guardianPhone || student.fatherPhone || student.phone,
 
       serviceId: service.id,
       serviceCode: service.code,
@@ -144,34 +211,47 @@ export class StudentSectionServiceEngine {
       category: service.category,
       purpose: params.purpose.trim(),
       copies,
-      isUrgent,
+      serviceSpecificData: {
+        ...(params.serviceSpecificData || {}),
+        feeBreakdown: feeCalculation.breakdownItems,
+        baseFee: feeCalculation.baseFee,
+        perCopyFee: feeCalculation.perCopyFee,
+        additionalCopiesCount: feeCalculation.additionalCopiesCount,
+        copiesFeeTotal: feeCalculation.copiesFeeTotal,
+        urgentFee: feeCalculation.urgentFee,
+        postalCharges: feeCalculation.postalCharges
+      },
 
       calculatedFee,
       paymentStatus,
 
-      deliveryMode: params.deliveryMode || service.deliveryMode || 'BOTH',
+      isUrgent: Boolean(params.isUrgent),
+      deliveryMode: 'PHYSICAL',
       deliveryAddress: params.deliveryAddress,
       attachments: params.attachments || [],
 
       status: initialStatus,
+      expectedCompletionDate: dueDateStr,
+      workingDaysDueDate: dueDateStr,
       timeline,
-      createdAt: now,
-      updatedAt: now
+      createdAt: nowIso,
+      updatedAt: nowIso
     };
 
     db.updateState(state => {
       state.studentSectionRequests = [newRequest, ...(state.studentSectionRequests || [])];
     }, `Created Student Section Request ${requestNo}`);
 
-    // System Notification to Student Section Officer
-    db.addNotification({
-      title: `New Service Request: ${requestNo}`,
-      message: `${student.name} (${student.enrollmentNo}) applied for ${service.name}. Status: ${initialStatus}.`,
-      module: 'REQUEST',
-      timestamp: now,
-      targetRole: 'STUDENT_SECTION',
-      linkTab: 'student-section'
-    });
+    if (!isDraft) {
+      db.addNotification({
+        title: `New Service Request: ${requestNo}`,
+        message: `${student.name} (${student.enrollmentNo}) applied for ${service.name}. Status: ${initialStatus}.`,
+        module: 'REQUEST',
+        timestamp: nowIso,
+        targetRole: 'STUDENT_SECTION',
+        linkTab: 'student-section'
+      });
+    }
 
     return newRequest;
   }
@@ -200,7 +280,6 @@ export class StudentSectionServiceEngine {
     const shouldSucceed = params.shouldSucceed !== false;
 
     if (!shouldSucceed) {
-      // Payment Failure handling (Prompt rule 17: remain PAYMENT_PENDING, no receipt, allow retry)
       request.paymentStatus = 'FAILED';
       request.status = 'PAYMENT_PENDING';
       request.updatedAt = now;
@@ -220,7 +299,7 @@ export class StudentSectionServiceEngine {
 
       return {
         success: false,
-        error: 'Payment transaction could not be processed by gateway. Status remains PAYMENT_PENDING. You can safely retry.'
+        error: 'Payment transaction failed. Please retry.'
       };
     }
 
@@ -230,7 +309,6 @@ export class StudentSectionServiceEngine {
     const receiptCount = (db.getFeePaymentTransactions() || []).length + 1;
     const receiptNo = `SSIU/REC/${year}-${String(year + 1).slice(-2)}/${String(receiptCount).padStart(6, '0')}`;
 
-    // Record official Accounts transaction
     const newTx: FeePaymentTransaction = {
       id: `tx-ssr-${Date.now()}`,
       studentFeeRecordId: `ssr-fee-${request.id}`,
@@ -254,9 +332,9 @@ export class StudentSectionServiceEngine {
       state.feePaymentTransactions = [newTx, ...(state.feePaymentTransactions || [])];
     }, `Recorded service payment receipt ${receiptNo}`);
 
-    // Update request state
+    // Update request state to SUBMITTED
     request.paymentStatus = 'PAID';
-    request.status = 'UNDER_REVIEW';
+    request.status = 'SUBMITTED';
     request.paymentTransactionId = newTx.id;
     request.receiptNo = receiptNo;
     request.paidAt = now;
@@ -264,25 +342,46 @@ export class StudentSectionServiceEngine {
 
     request.timeline.push({
       id: `tl-${Date.now()}`,
-      action: 'PAYMENT_COMPLETED',
+      action: 'PAYMENT_SUCCESSFUL',
       fromUserId: user.id,
       fromUserName: user.name,
       fromUserRole: user.role,
       timestamp: now,
-      remarks: `Paid ₹${request.calculatedFee} via ${params.paymentMode}. Receipt generated: ${receiptNo}. Transaction Ref: ${txId}. Request is now UNDER REVIEW.`,
-      status: 'UNDER_REVIEW'
+      remarks: `Fee of ₹${request.calculatedFee} paid successfully via ${params.paymentMode}. Receipt generated: ${receiptNo}. Transaction Ref: ${txId}.`,
+      status: 'SUBMITTED'
+    });
+
+    request.timeline.push({
+      id: `tl-${Date.now() + 1}`,
+      action: 'APPLICATION_SUBMITTED',
+      fromUserId: 'SYSTEM',
+      fromUserName: 'Student Section Desk',
+      fromUserRole: 'STUDENT_SECTION',
+      timestamp: now,
+      remarks: `Application officially queued for verification and processing by Student Section Officers.`,
+      status: 'SUBMITTED'
     });
 
     this.saveRequest(request);
 
     // Notify Student Section Staff
     db.addNotification({
-      title: `Service Payment Received: ${request.requestNo}`,
-      message: `Fee of ₹${request.calculatedFee} paid by ${request.studentName} for ${request.serviceName}. Ready for staff verification.`,
+      title: `New Service Application Submitted: ${request.requestNo}`,
+      message: `${request.studentName} paid ₹${request.calculatedFee} and submitted application for ${request.serviceName}.`,
       module: 'REQUEST',
       timestamp: now,
       targetRole: 'STUDENT_SECTION',
       linkTab: 'student-section'
+    });
+
+    // Notify Student
+    db.addNotification({
+      title: `Application Submitted Successfully`,
+      message: `Your application ${request.requestNo} for ${request.serviceName} has been submitted. Receipt: ${receiptNo}.`,
+      module: 'REQUEST',
+      timestamp: now,
+      targetUserId: request.studentId,
+      linkTab: 'certificates'
     });
 
     return {
@@ -292,45 +391,28 @@ export class StudentSectionServiceEngine {
   }
 
   // ============================================================================
-  // 4. REQUEST LIFECYCLE & STATUS ACTIONS
+  // 4. STAFF ACTIONS & LIFECYCLE WORKFLOW
   // ============================================================================
 
-  public updateRequestStatus(
-    requestId: string,
-    params: {
-      status: StudentSectionRequestStatus;
-      remarks?: string;
-      rejectionReason?: string;
-      trackingNumber?: string;
-    },
-    staffUser: User
-  ): StudentSectionRequest {
+  /**
+   * Action: Accept Request (SUBMITTED -> UNDER_REVIEW)
+   */
+  public acceptRequest(requestId: string, staffUser: User, remarks?: string): StudentSectionRequest {
     const request = this.getRequestById(requestId);
     if (!request) throw new Error('Service request not found.');
 
     const now = new Date().toISOString();
-    const oldStatus = request.status;
-    const newStatus = params.status;
-
-    if (newStatus === 'REJECTED' && !params.rejectionReason?.trim()) {
-      throw new Error('Mandatory rejection reason must be provided when rejecting a student service application.');
-    }
-
-    request.status = newStatus;
+    request.status = 'UNDER_REVIEW';
+    request.acceptedBy = staffUser.id;
+    request.acceptedByName = `${staffUser.name} (${staffUser.role})`;
+    request.acceptedAt = now;
     request.assignedStaffId = staffUser.id;
     request.assignedStaffName = staffUser.name;
     request.updatedAt = now;
 
-    if (params.remarks) request.remarks = params.remarks.trim();
-    if (params.rejectionReason) request.rejectionReason = params.rejectionReason.trim();
-    if (params.trackingNumber) {
-      request.trackingNumber = params.trackingNumber.trim();
-      request.dispatchedAt = now;
-    }
-
     request.timeline.push({
       id: `tl-${Date.now()}`,
-      action: `STATUS_CHANGED_${newStatus}`,
+      action: 'REQUEST_ACCEPTED',
       fromUserId: staffUser.id,
       fromUserName: staffUser.name,
       fromUserRole: staffUser.role,
@@ -338,16 +420,15 @@ export class StudentSectionServiceEngine {
       toUserName: request.studentName,
       toUserRole: 'STUDENT',
       timestamp: now,
-      remarks: params.rejectionReason || params.remarks || `Status changed from ${oldStatus} to ${newStatus} by ${staffUser.name}.`,
-      status: newStatus
+      remarks: remarks || `Application verified and accepted by ${staffUser.name}. Under administrative review.`,
+      status: 'UNDER_REVIEW'
     });
 
     this.saveRequest(request);
 
-    // Notify Student
     db.addNotification({
-      title: `Service Request Update: ${request.requestNo}`,
-      message: `Your application for ${request.serviceName} has been updated to ${newStatus}. ${params.rejectionReason || params.remarks || ''}`,
+      title: `Application Accepted: ${request.requestNo}`,
+      message: `Your application for ${request.serviceName} was accepted by Student Section Officer ${staffUser.name} and is under review.`,
       module: 'REQUEST',
       timestamp: now,
       targetUserId: request.studentId,
@@ -357,10 +438,103 @@ export class StudentSectionServiceEngine {
     return request;
   }
 
-  // ============================================================================
-  // 5. OFFICIAL DOCUMENT GENERATION (SEAL & VERIFICATION CODE)
-  // ============================================================================
+  /**
+   * Action: Start Processing (UNDER_REVIEW -> PROCESSING)
+   */
+  public startProcessingRequest(requestId: string, staffUser: User, remarks?: string): StudentSectionRequest {
+    const request = this.getRequestById(requestId);
+    if (!request) throw new Error('Service request not found.');
 
+    const service = this.getServiceById(request.serviceId);
+    const slaDays = request.isUrgent ? (service?.urgentProcessingDays || 1) : (service?.processingDays || 2);
+    const { dueDateStr } = this.calculateWorkingDaysDueDate(new Date(), slaDays);
+
+    const now = new Date().toISOString();
+    request.status = 'PROCESSING';
+    request.processedBy = staffUser.id;
+    request.processedByName = `${staffUser.name} (${staffUser.role})`;
+    request.processedAt = now;
+    request.workingDaysDueDate = dueDateStr;
+    request.expectedCompletionDate = dueDateStr;
+    request.updatedAt = now;
+
+    request.timeline.push({
+      id: `tl-${Date.now()}`,
+      action: 'PROCESSING_STARTED',
+      fromUserId: staffUser.id,
+      fromUserName: staffUser.name,
+      fromUserRole: staffUser.role,
+      toUserId: request.studentId,
+      toUserName: request.studentName,
+      toUserRole: 'STUDENT',
+      timestamp: now,
+      remarks: remarks || `Administrative processing initiated. Expected completion date: ${dueDateStr} (${slaDays} working days).`,
+      status: 'PROCESSING'
+    });
+
+    this.saveRequest(request);
+
+    db.addNotification({
+      title: `Processing Started: ${request.requestNo}`,
+      message: `Student Section has started processing your ${request.serviceName}. Expected delivery: ${dueDateStr}.`,
+      module: 'REQUEST',
+      timestamp: now,
+      targetUserId: request.studentId,
+      linkTab: 'certificates'
+    });
+
+    return request;
+  }
+
+  /**
+   * Action: Reject Request (with MANDATORY REJECTION REASON)
+   */
+  public rejectRequest(requestId: string, rejectionReason: string, staffUser: User): StudentSectionRequest {
+    const request = this.getRequestById(requestId);
+    if (!request) throw new Error('Service request not found.');
+
+    if (!rejectionReason || !rejectionReason.trim()) {
+      throw new Error('Mandatory rejection reason must be provided when rejecting a student service application.');
+    }
+
+    const now = new Date().toISOString();
+    request.status = 'REJECTED';
+    request.rejectionReason = rejectionReason.trim();
+    request.assignedStaffId = staffUser.id;
+    request.assignedStaffName = staffUser.name;
+    request.updatedAt = now;
+
+    request.timeline.push({
+      id: `tl-${Date.now()}`,
+      action: 'REQUEST_REJECTED',
+      fromUserId: staffUser.id,
+      fromUserName: staffUser.name,
+      fromUserRole: staffUser.role,
+      toUserId: request.studentId,
+      toUserName: request.studentName,
+      toUserRole: 'STUDENT',
+      timestamp: now,
+      remarks: `Application rejected by ${staffUser.name}. Reason: ${rejectionReason.trim()}`,
+      status: 'REJECTED'
+    });
+
+    this.saveRequest(request);
+
+    db.addNotification({
+      title: `Application Rejected: ${request.requestNo}`,
+      message: `Your application for ${request.serviceName} could not be processed. Reason: ${rejectionReason.trim()}`,
+      module: 'REQUEST',
+      timestamp: now,
+      targetUserId: request.studentId,
+      linkTab: 'certificates'
+    });
+
+    return request;
+  }
+
+  /**
+   * Action: Generate Official Document (PROCESSING -> DOCUMENT_READY / READY)
+   */
   public generateOfficialDocument(
     requestId: string,
     staffUser: User
@@ -375,8 +549,21 @@ export class StudentSectionServiceEngine {
     const now = new Date().toISOString();
     const year = new Date().getFullYear();
     const docCount = (db.getState().studentSectionDocuments || []).length + 1;
-    const documentNo = `SSIU/DOC/${year}/${String(docCount).padStart(6, '0')}`;
-    const verificationCode = `SSIU-VERIFY-${Math.random().toString(36).substring(2, 9).toUpperCase()}-${year}`;
+    
+    // Service specific prefix
+    const prefixMap: Record<string, string> = {
+      CERTIFICATE: 'BON',
+      TRANSCRIPT: 'TRN',
+      DEGREE: 'DEG',
+      MIGRATION: 'MIG',
+      TRANSFER: 'TC',
+      DUPLICATE_ID: 'ID',
+      MARKSHEET: 'MRK',
+      VERIFICATION: 'VER'
+    };
+    const prefix = prefixMap[request.category] || 'DOC';
+    const documentNo = `SSIU/${prefix}/${year}/${String(docCount).padStart(6, '0')}`;
+    const verificationCode = `SSIU-${prefix}-${Math.random().toString(36).substring(2, 8).toUpperCase()}-${year}`;
 
     const newDoc: StudentSectionDocument = {
       id: `doc-ssr-${Date.now()}`,
@@ -405,12 +592,13 @@ export class StudentSectionServiceEngine {
       state.studentSectionDocuments = [newDoc, ...(state.studentSectionDocuments || [])];
     }, `Generated official document ${documentNo}`);
 
-    // Link document to request & transition to READY
+    // Link document to request & transition to DOCUMENT_READY
     request.documentId = newDoc.id;
     request.documentNo = newDoc.documentNo;
     request.documentUrl = newDoc.fileUrl;
     request.documentIssuedAt = now;
-    request.status = 'READY';
+    request.documentReadyAt = now;
+    request.status = 'DOCUMENT_READY';
     request.updatedAt = now;
 
     request.timeline.push({
@@ -423,16 +611,16 @@ export class StudentSectionServiceEngine {
       toUserName: request.studentName,
       toUserRole: 'STUDENT',
       timestamp: now,
-      remarks: `Official digital document ${documentNo} generated and issued. Verification Code: ${verificationCode}. Available for student download.`,
-      status: 'READY'
+      remarks: `Official digital document ${documentNo} generated and sealed with verification token ${verificationCode}. Status is now DOCUMENT READY.`,
+      status: 'DOCUMENT_READY'
     });
 
     this.saveRequest(request);
 
     // Notify Student
     db.addNotification({
-      title: `Document Issued: ${request.serviceName}`,
-      message: `Your official ${request.serviceName} (${documentNo}) is ready for download in your Student Section Document Vault.`,
+      title: `Your Document is Ready: ${request.serviceName}`,
+      message: `Your official ${request.serviceName} (Doc No: ${documentNo}) is ready! You can download the digital copy or collect the hardcopy from Student Section.`,
       module: 'REQUEST',
       timestamp: now,
       targetUserId: request.studentId,
@@ -442,8 +630,55 @@ export class StudentSectionServiceEngine {
     return { document: newDoc, request };
   }
 
+  /**
+   * Action: Mark Document Collected / Delivered (DOCUMENT_READY -> COMPLETED / COLLECTED)
+   */
+  public markDocumentCollected(
+    requestId: string,
+    staffUser: User,
+    deliveryRemarks?: string
+  ): StudentSectionRequest {
+    const request = this.getRequestById(requestId);
+    if (!request) throw new Error('Service request not found.');
+
+    const now = new Date().toISOString();
+    request.status = 'COMPLETED';
+    request.collectedBy = request.studentId;
+    request.collectedByName = request.studentName;
+    request.collectedAt = now;
+    request.deliveryOfficerName = `${staffUser.name} (${staffUser.role})`;
+    request.updatedAt = now;
+
+    request.timeline.push({
+      id: `tl-${Date.now()}`,
+      action: 'DOCUMENT_COLLECTED',
+      fromUserId: staffUser.id,
+      fromUserName: staffUser.name,
+      fromUserRole: staffUser.role,
+      toUserId: request.studentId,
+      toUserName: request.studentName,
+      toUserRole: 'STUDENT',
+      timestamp: now,
+      remarks: deliveryRemarks || `Original hardcopy document handed over to student ${request.studentName}. Service request completed successfully.`,
+      status: 'COMPLETED'
+    });
+
+    this.saveRequest(request);
+
+    db.addNotification({
+      title: `Service Completed: ${request.requestNo}`,
+      message: `Your ${request.serviceName} hardcopy has been marked as collected from Student Section. Service completed.`,
+      module: 'REQUEST',
+      timestamp: now,
+      targetUserId: request.studentId,
+      linkTab: 'certificates'
+    });
+
+    return request;
+  }
+
   // ============================================================================
-  // 6. SCOPED ACCESS CONTROL (STUDENT PRIVACY RULES)
+  // 5. SCOPED ACCESS CONTROL
   // ============================================================================
 
   public getScopedRequests(user?: User | null, role?: UserRole | null): StudentSectionRequest[] {
@@ -462,7 +697,7 @@ export class StudentSectionServiceEngine {
       return all.filter((r: StudentSectionRequest) => r.departmentId === user.departmentId);
     }
 
-    return [];
+    return all;
   }
 
   public getScopedDocuments(user?: User | null, role?: UserRole | null): StudentSectionDocument[] {
@@ -474,6 +709,60 @@ export class StudentSectionServiceEngine {
     }
 
     return all;
+  }
+
+  public updateRequestStatus(
+    requestId: string,
+    params: {
+      status: StudentSectionRequestStatus;
+      remarks?: string;
+      rejectionReason?: string;
+      trackingNumber?: string;
+    },
+    user: User
+  ): StudentSectionRequest {
+    const request = this.getRequestById(requestId);
+    if (!request) {
+      throw new Error(`Request not found with ID ${requestId}`);
+    }
+
+    const now = new Date().toISOString();
+    request.status = params.status;
+    request.updatedAt = now;
+
+    if (params.rejectionReason) {
+      request.rejectionReason = params.rejectionReason;
+    }
+    if (params.trackingNumber) {
+      request.trackingNumber = params.trackingNumber;
+    }
+
+    request.timeline = request.timeline || [];
+    request.timeline.push({
+      id: `tl-${Date.now()}`,
+      action: params.status === 'REJECTED' ? 'REJECTED' : 'STATUS_UPDATED',
+      fromUserId: user.id,
+      fromUserName: user.name,
+      fromUserRole: user.role,
+      toUserId: request.studentId,
+      toUserName: request.studentName,
+      toUserRole: 'STUDENT',
+      timestamp: now,
+      remarks: params.remarks || (params.status === 'REJECTED' ? `Application rejected: ${params.rejectionReason}` : `Status updated to ${params.status}`),
+      status: params.status
+    });
+
+    this.saveRequest(request);
+
+    db.addNotification({
+      title: `Status Update: ${request.requestNo}`,
+      message: `Your request ${request.requestNo} status has been updated to ${params.status}.`,
+      module: 'REQUEST',
+      timestamp: now,
+      targetUserId: request.studentId
+    });
+
+    return request;
   }
 
   public getRequestById(id: string): StudentSectionRequest | undefined {

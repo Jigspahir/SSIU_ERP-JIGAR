@@ -70,7 +70,7 @@
   --transition-smooth: 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --sidebar-width: 250px;
-  --sidebar-collapsed-width: 70px;
+  --sidebar-collapsed-width: 80px;
   --topbar-height: 60px;
 }
 
@@ -362,64 +362,295 @@ a {
   color: var(--text-muted);
 }
 
-/* Modal Overlay & Card */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(7, 19, 37, 0.65);
-  backdrop-filter: blur(4px);
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  animation: fadeIn 0.2s ease-out;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+/* ==========================================================================
+   GLOBAL MODAL & DIALOG SYSTEM (VIEWPORT SAFE & SCROLL LOCKED)
+   ========================================================================== */
+
+/* 1. Global Body Scroll Lock */
+html.modal-open,
+body.modal-open {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  touch-action: none !important;
+  height: 100% !important;
 }
 
-.modal-container {
+/* 2. Modal Backdrop / Overlay */
+.modal-overlay,
+.swarrnim-modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(15, 23, 42, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  z-index: 1050 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 1rem !important;
+  animation: fadeIn 0.2s ease-out;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+@media (min-width: 640px) {
+  .modal-overlay,
+  .swarrnim-modal-overlay {
+    padding: 1.5rem !important;
+  }
+}
+
+/* ── Student Section Modal Overlay ─────────────────────────────────────────
+   Override the global .modal-overlay scroll behavior.
+   The global rule sets overflow-y: auto which causes the OVERLAY to scroll,
+   pushing the modal container down and creating a blank gap above the modal.
+   These overrides ensure ONLY the inner body div scrolls, never the backdrop.
+──────────────────────────────────────────────────────────────────────────── */
+.student-section-modal-overlay,
+.modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(15, 23, 42, 0.75) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  z-index: 9999 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 12px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+}
+
+@media (max-width: 640px) {
+  .student-section-modal-overlay,
+  .modal-overlay {
+    padding: 8px !important;
+  }
+}
+
+.service-modal,
+.student-section-modal-card {
+  background: #FFFFFF !important;
+  width: min(1100px, calc(100vw - 24px)) !important;
+  max-width: 1100px !important;
+  max-height: calc(100vh - 24px) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35) !important;
+  border: 1px solid #CBD5E1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  position: relative !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 640px) {
+  .service-modal,
+  .student-section-modal-card {
+    width: calc(100vw - 16px) !important;
+    max-height: calc(100vh - 16px) !important;
+  }
+}
+
+.student-section-payment-card {
+  background: #FFFFFF !important;
+  width: min(600px, calc(100vw - 24px)) !important;
+  max-width: 600px !important;
+  max-height: calc(100vh - 24px) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35) !important;
+  border: 1px solid #CBD5E1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  position: relative !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 640px) {
+  .student-section-payment-card {
+    width: calc(100vw - 16px) !important;
+    max-height: calc(100vh - 16px) !important;
+  }
+}
+
+.student-section-doc-card {
+  background: #FFFFFF !important;
+  width: min(820px, calc(100vw - 24px)) !important;
+  max-width: 820px !important;
+  max-height: calc(100vh - 24px) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35) !important;
+  border: 1px solid #CBD5E1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  position: relative !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 640px) {
+  .student-section-doc-card {
+    width: calc(100vw - 16px) !important;
+    max-height: calc(100vh - 16px) !important;
+  }
+}
+
+.student-section-modal-header {
+  flex-shrink: 0 !important;
+  background: linear-gradient(135deg, #0F2C59 0%, #1A365D 100%) !important;
+  color: #FFFFFF !important;
+  padding: 0.875rem 1.25rem !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 0.75rem !important;
+  border-bottom: 2px solid #F37023 !important;
+  z-index: 10 !important;
+  margin: 0 !important;
+}
+
+.service-modal-body,
+.student-section-modal-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding: 1.25rem 1.5rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1.25rem !important;
+  background: #FAFAFA !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+}
+
+.student-section-modal-footer {
+  flex-shrink: 0 !important;
+  background: #F8FAFC !important;
+  border-top: 1px solid #CBD5E1 !important;
+  padding: 0.875rem 1.25rem !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 0.75rem !important;
+  z-index: 10 !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+}
+
+/* 3. Modal Container / Card */
+.modal-container,
+.swarrnim-modal-container,
+.swarrnim-modal-card {
   background: var(--bg-surface);
-  width: 100%;
-  max-width: 600px;
-  max-height: calc(100vh - 3rem);
+  width: 100% !important;
+  max-width: 640px;
+  max-height: calc(100dvh - 2rem) !important;
+  max-height: calc(100vh - 2rem) !important;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
   animation: slideUp 0.25s ease-out;
-  position: relative;
-  margin: auto;
+  position: relative !important;
+  margin: auto !important;
+  overscroll-behavior: contain !important;
+  touch-action: auto !important;
 }
 
+@media (min-width: 640px) {
+  .modal-container,
+  .swarrnim-modal-container,
+  .swarrnim-modal-card {
+    max-height: calc(100dvh - 3rem) !important;
+    max-height: calc(100vh - 3rem) !important;
+  }
+}
+
+/* 4. Modal Header */
 .modal-header {
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid var(--border-color);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
   background: var(--bg-surface-hover);
-  flex-shrink: 0;
+  flex-shrink: 0 !important;
 }
 
+/* 5. Modal Scrollable Content Area */
 .modal-body {
   padding: 1.5rem;
-  overflow-y: auto;
-  flex: 1 1 auto;
-  min-height: 0;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
+  overflow-y: auto !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
 }
 
+/* 6. Modal Footer / Action Buttons */
 .modal-footer {
   padding: 1rem 1.5rem;
   border-top: 1px solid var(--border-color);
-  display: flex;
-  justify-content: flex-end;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
   gap: 0.75rem;
   background: var(--bg-surface-hover);
-  flex-shrink: 0;
+  flex-shrink: 0 !important;
+}
+
+/* 7. Catch-all for Custom Tailwind Modal Overlays and Dialogs */
+.fixed.inset-0[class*="z-50"],
+.fixed.inset-0[class*="z-40"],
+.fixed.inset-0[class*="z-[1050]"],
+.fixed.inset-0[class*="z-[1100]"] {
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Custom modal inner dialog cards */
+.fixed.inset-0[class*="z-50"] > div,
+.fixed.inset-0[class*="z-40"] > div,
+.fixed.inset-0[class*="z-[1050]"] > div,
+.fixed.inset-0[class*="z-[1100]"] > div {
+  max-height: calc(100dvh - 2rem) !important;
+  max-height: calc(100vh - 2rem) !important;
+}
+
+/* Modal scrollbar styling */
+.modal-body::-webkit-scrollbar,
+.modal-container [class*="overflow-y-auto"]::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track,
+.modal-container [class*="overflow-y-auto"]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb,
+.modal-container [class*="overflow-y-auto"]::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover,
+.modal-container [class*="overflow-y-auto"]::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.7);
 }
 
 /* Keyframe Animations (Enterprise ERP Motion System) */
@@ -482,6 +713,116 @@ a {
   display: none;
 }
 
+/* ==============================================================================
+   COLLAPSED / MINIMIZED ERP SIDEBAR NAVIGATION RAIL
+   ============================================================================== */
+.collapsed-sidebar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+}
+
+.collapsed-nav-item-wrapper {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.collapsed-nav-btn {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--brand-gold, #F5A623);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.collapsed-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #FFFFFF;
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.collapsed-nav-btn.active {
+  background: linear-gradient(135deg, var(--brand-orange, #F37023) 0%, #D95300 100%);
+  color: #FFFFFF !important;
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 14px rgba(243, 112, 35, 0.45);
+}
+
+.collapsed-nav-btn.active svg,
+.collapsed-nav-btn.active .collapsed-nav-icon {
+  color: #FFFFFF !important;
+}
+
+.collapsed-nav-btn.logout-btn {
+  color: #EF4444;
+}
+
+.collapsed-nav-btn.logout-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #F87171;
+}
+
+/* Floating Tooltip */
+.collapsed-nav-tooltip {
+  position: absolute;
+  left: calc(100% + 14px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-8px);
+  background: #0F172A;
+  color: #FFFFFF;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1000;
+  box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.collapsed-nav-tooltip::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  transform: translateY(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: transparent #0F172A transparent transparent;
+}
+
+.collapsed-nav-item-wrapper:hover .collapsed-nav-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(0);
+}
+
 .table-responsive {
   width: 100%;
   overflow-x: auto;
@@ -490,6 +831,108 @@ a {
 
 .table-responsive table {
   min-width: 600px;
+}
+
+/* ==============================================================================
+   EXCEL-STYLE ERP DATA TABLE SYSTEM
+   ============================================================================== */
+.erp-excel-table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.erp-excel-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  font-size: 0.8125rem;
+  font-family: inherit;
+  color: #1E293B;
+  background: #FFFFFF;
+  text-align: left;
+}
+
+.erp-excel-table thead th {
+  background-color: #F1F5F9;
+  color: #0F172A;
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.65rem 0.75rem;
+  border-right: 1px solid #CBD5E1;
+  border-bottom: 2px solid #94A3B8;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.erp-excel-table thead th:last-child {
+  border-right: none;
+}
+
+.erp-excel-table tbody td {
+  padding: 0.625rem 0.75rem;
+  border-right: 1px solid #E2E8F0;
+  border-bottom: 1px solid #E2E8F0;
+  vertical-align: middle;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.erp-excel-table tbody td:last-child {
+  border-right: none;
+}
+
+.erp-excel-table tbody tr:nth-child(even) {
+  background-color: #F8FAFC;
+}
+
+.erp-excel-table tbody tr:hover {
+  background-color: #EEF2F6 !important;
+}
+
+.erp-excel-table tfoot tr {
+  background-color: #F1F5F9;
+  font-weight: 800;
+  border-top: 2px solid #475569;
+  border-bottom: 2px solid #94A3B8;
+}
+
+.erp-excel-table tfoot td {
+  border-right: 1px solid #CBD5E1;
+  border-bottom: 1px solid #CBD5E1;
+  padding: 0.75rem 0.75rem;
+  font-size: 0.85rem;
+  color: #0F172A;
+}
+
+.erp-excel-table tfoot td:last-child {
+  border-right: none;
+}
+
+.erp-excel-table .cell-left {
+  text-align: left;
+}
+
+.erp-excel-table .cell-center {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.erp-excel-table .cell-right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.erp-excel-table .cell-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-weight: 700;
 }
 
 .topbar-mobile-btn {

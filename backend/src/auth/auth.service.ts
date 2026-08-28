@@ -26,16 +26,22 @@ export class AuthService {
     // 1. Search by ERP ID or Username
     let user;
     try {
+      const cleanLoginId = loginId.trim();
       user = await this.prisma.user.findFirst({
         where: {
           OR: [
-            { erpId: loginId.trim().toUpperCase() },
-            { username: loginId.trim() },
+            { erpId: cleanLoginId.toUpperCase() },
+            { username: cleanLoginId },
+            { temporaryEnrollmentNumber: cleanLoginId },
+            { finalEnrollmentNumber: cleanLoginId },
+            { student: { enrollmentNo: cleanLoginId } },
+            { student: { temporaryEnrollmentNumber: cleanLoginId } },
+            { student: { finalEnrollmentNumber: cleanLoginId } },
           ],
         },
         include: {
           userRoles: { include: { role: true } },
-          student: { select: { id: true, enrollmentNo: true, firstName: true, lastName: true, email: true } },
+          student: { select: { id: true, enrollmentNo: true, temporaryEnrollmentNumber: true, finalEnrollmentNumber: true, enrollmentStatus: true, firstName: true, lastName: true, email: true } },
           faculty: { select: { id: true, employeeCode: true, firstName: true, lastName: true, email: true, designation: true } },
         },
       });

@@ -44,6 +44,19 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab, mobileO
   const getBreadcrumbTitle = (tab: string) => {
     const map: Record<string, string> = {
       dashboard: 'Dashboard Overview',
+      settings: 'Settings • User Account Management & Access Governance',
+      'inventory-assets': 'Inventory & Asset Management',
+      'faculty-assets': 'Faculty My Assets & Custody',
+      feedback: 'Student Feedback & Suggestions Management',
+      'feedback-give': 'Give Student Feedback',
+      'feedback-my': 'My Submitted Feedback',
+      'feedback-suggestions': 'Student Suggestions Portal',
+      'student-search': 'Student Directory & Profile Search',
+      'my-students': 'My Assigned Mentee Students',
+      'student-academics': 'Student Academic Details',
+      'student-requests': 'Student Service Requests',
+      'security-audit': 'Central Security Audit Center',
+      'note-sheets': 'University NoteSheet Management',
       institutes: 'Institutes Master',
       departments: 'Departments Master',
       programs: 'Academic Programs Master',
@@ -54,7 +67,26 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab, mobileO
       subjects: 'Subjects Master',
       faculty: 'Faculty Directory',
       students: 'Student Directory',
-      profile: 'User Profile & Security'
+      attendance: 'Attendance Management',
+      timetable: 'Academic Timetable',
+      'session-plan': 'Session Plan & Course Outline',
+      materials: 'Study Materials & Unit Notes',
+      assignments: 'Assignments & Evaluations',
+      quiz: 'Online Quiz & Assessments',
+      calendar: 'University Academic Calendar',
+      'exam-dashboard': 'Examination & Results Directorate',
+      fees: 'Fees & Financial Accounts',
+      hr: 'Human Resource Management System (HRMS)',
+      crm: 'Admissions & CRM Inquiries',
+      reports: 'Central Reports & Analytics Hub',
+      tickets: 'Service Desk & Support Tickets',
+      mentor: 'Mentorship & Student Counseling',
+      notices: 'Official University Notices',
+      events: 'Campus Events & Activities',
+      library: 'Central Library Management',
+      notifications: 'System Notifications & Alerts',
+      profile: 'User Profile & Security Governance',
+      'id-card': 'Digital Student & Staff Identity Card'
     };
     return map[tab] || 'University Management';
   };

@@ -8,12 +8,12 @@ import {
   FileText, Plus, Search, Filter, CheckCircle2, XCircle, Clock,
   ArrowRight, ShieldCheck, Download, Upload, AlertCircle, RefreshCw,
   DollarSign, Settings, Eye, Edit3, Trash2, User as UserIcon, Info, Check, Calendar,
-  Landmark, Wallet, Receipt, RotateCcw, BarChart3, PieChart, Tag, Send,
+  Landmark, Receipt, RotateCcw, BarChart3, PieChart, Tag, Send,
   XSquare, Printer, MessageSquare, HelpCircle, FileCheck, Layers, GitFork,
   ArrowUpRight, ArrowDownLeft, Paperclip, ChevronRight, AlertTriangle,
   Network, GitCommit, GitPullRequest, GitMerge, ChevronDown, Share2, Building2,
   FileSpreadsheet, FilePlus, CornerUpLeft, MessageCircle, FileUp, Lock, ShieldAlert,
-  ListOrdered, CheckSquare, Sparkles, FolderArchive, TrendingUp
+  ListOrdered, CheckSquare, Sparkles, FolderArchive, TrendingUp, ClipboardCheck
 } from 'lucide-react';
 import {
   NoteSheet, NoteSheetStatus, NoteSheetAction, NoteSheetWorkflowConfig,
@@ -23,11 +23,12 @@ import {
 import * as XLSX from 'xlsx';
 import { notesheetImportService, NOTESHEET_TYPES_LIST } from '../../services/notesheetImportService';
 import { notesheetPdfService } from '../../services/notesheetPdfService';
-import { NoteSheetAccountsDashboard } from '../../components/notesheet/NoteSheetAccountsDashboard';
 import { NoteSheetReportsTab } from '../../components/notesheet/NoteSheetReportsTab';
 import { NoteSheetAnalyticsTab } from '../../components/notesheet/NoteSheetAnalyticsTab';
 import { NoteSheetVerificationPage } from '../public/NoteSheetVerificationPage';
 import { UniversityNoteSheetDocument } from '../../components/notesheet/UniversityNoteSheetDocument';
+import { NoteSheetTestingQATab } from '../../components/notesheet/NoteSheetTestingQATab';
+import { qaTestingService } from '../../services/qaTestingService';
 import { amountToWords, formatIndianNumber, formatIndianCurrency } from '../../utils/numberFormat';
 
 export const DOCUMENT_CATEGORIES = [
@@ -89,10 +90,11 @@ export type NotesheetTabType =
   | 'FINANCIAL_SHEETS'
   | 'WORKFLOW_CONFIG'
   | 'ORGANOGRAM'
-  | 'ACCOUNTS_FUND'
   | 'ANALYTICS'
   | 'REPORTS'
-  | 'VERIFICATION';
+  | 'VERIFICATION'
+  | 'TESTING_QA'
+  | 'PENDING_TESTING';
 
 export interface NoteSheetPageProps {
   initialTab?: NotesheetTabType;
@@ -380,7 +382,7 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
   const [formDepartmentId, setFormDepartmentId] = useState<string>(user?.departmentId || '');
   const [formDepartmentName, setFormDepartmentName] = useState<string>(defaultUserDept);
   const [formSubject, setFormSubject] = useState('');
-  const [formNotesheetType, setFormNotesheetType] = useState('Administrative');
+  const [formNotesheetType, setFormNotesheetType] = useState('Academic');
   const [formPriority, setFormPriority] = useState<NoteSheetPriority>('NORMAL');
   const [formVisibility, setFormVisibility] = useState<NoteSheetVisibility>('NORMAL');
   const [formSection, setFormSection] = useState('');
@@ -593,7 +595,7 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
     setFormInstituteId(defaultUserInst);
     setFormDepartmentName(defaultUserDept);
     setFormSubject('');
-    setFormNotesheetType('Administrative');
+    setFormNotesheetType('Academic');
     setFormPriority('NORMAL');
     setFormVisibility('NORMAL');
     setFormSection('');
@@ -615,7 +617,7 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
     setFormInstituteId(ns.instituteId || defaultUserInst);
     setFormDepartmentName(ns.department || defaultUserDept);
     setFormSubject(ns.subject || '');
-    setFormNotesheetType(ns.notesheetType || ns.category || 'Administrative');
+    setFormNotesheetType(ns.notesheetType || ns.category || 'Academic');
     setFormPriority(ns.priority || 'NORMAL');
     setFormVisibility(ns.visibility || 'NORMAL');
     setFormSection(ns.section || '');
@@ -1035,16 +1037,6 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('ACCOUNTS_FUND')}
-            className={`px-4 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2 ${
-              activeTab === 'ACCOUNTS_FUND' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Wallet className="w-4 h-4" />
-            <span>Accounts &amp; Fund Allocation</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('ANALYTICS')}
             className={`px-4 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2 ${
               activeTab === 'ANALYTICS' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -1073,32 +1065,38 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
             <ShieldCheck className="w-4 h-4" />
             <span>Document Verification</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('TESTING_QA')}
+            className={`px-4 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2 ${
+              activeTab === 'TESTING_QA' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <ClipboardCheck className="w-4 h-4 text-indigo-400" />
+            <span>Testing &amp; QA</span>
+            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200">
+              {qaTestingService.getManualTests().length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('PENDING_TESTING')}
+            className={`px-4 py-2.5 rounded-xl text-sm font-bold transition flex items-center gap-2 ${
+              activeTab === 'PENDING_TESTING' ? 'bg-amber-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <Clock className="w-4 h-4 text-amber-300" />
+            <span>Pending Testing</span>
+            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+              {qaTestingService.getManualTests().filter(t => t.status === 'Pending' || t.status === 'Fail' || t.status === 'Retest Required' || t.status === 'Blocked').length}
+            </span>
+          </button>
         </div>
       </div>
 
       {/* ─── TAB 1: DASHBOARD & 13 KPI VIEWS ─────────────────────────────────── */}
       {activeTab === 'DASHBOARD' && (
         <div className="space-y-6">
-          {/* Quick Action Banner */}
-          <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-indigo-800 rounded-2xl p-6 text-white shadow-lg flex items-center justify-between flex-wrap gap-4 border border-blue-400/30">
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2.5">
-                <Sparkles className="w-5 h-5 text-amber-300" />
-                <h3 className="text-lg font-bold text-white">Create New Official Notesheet</h3>
-              </div>
-              <p className="text-sm text-blue-100 leading-relaxed">
-                Initiate administrative proposals, budget approvals, sanctions, or department requests through the statutory approval organogram.
-              </p>
-            </div>
-            <button
-              onClick={() => { resetForm(); setActiveTab('CREATE'); }}
-              className="px-5 py-3 rounded-xl bg-white hover:bg-blue-50 text-blue-700 text-sm font-black flex items-center gap-2 shadow-md transition transform hover:scale-105 active:scale-95"
-            >
-              <Plus className="w-4 h-4 text-blue-700" />
-              + Create Notesheet
-            </button>
-          </div>
-
           {/* 13 KPI Cards Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
             {[
@@ -1250,6 +1248,9 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
                 {NOTESHEET_TYPES_LIST.map(t => (
                   <option key={t} value={t}>{t}</option>
                 ))}
+                {formNotesheetType && !(NOTESHEET_TYPES_LIST as readonly string[]).includes(formNotesheetType) && (
+                  <option value={formNotesheetType}>{formNotesheetType}</option>
+                )}
               </select>
             </div>
 
@@ -1725,6 +1726,18 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
                   <option value="IMMEDIATE">Immediate</option>
                 </select>
 
+                {/* Notesheet Type Filter */}
+                <select
+                  value={selectedTypeFilter}
+                  onChange={e => setSelectedTypeFilter(e.target.value)}
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm font-medium"
+                >
+                  <option value="ALL">All Notesheet Types</option>
+                  {NOTESHEET_TYPES_LIST.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+
                 {/* Export Excel Button */}
                 <button
                   onClick={handleExportExcel}
@@ -2022,11 +2035,6 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
         </div>
       )}
 
-      {/* ─── TAB 4: ACCOUNTS & FUND ALLOCATION ──────────────────────────────── */}
-      {activeTab === 'ACCOUNTS_FUND' && (
-        <NoteSheetAccountsDashboard onOpenNoteSheetFinance={(ns) => setSelectedNote(ns)} />
-      )}
-
       {/* ─── TAB 5: ANALYTICS & TURNAROUND SLA ──────────────────────────────── */}
       {activeTab === 'ANALYTICS' && (
         <NoteSheetAnalyticsTab notesheets={noteSheets} />
@@ -2048,6 +2056,28 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
                 setActiveTab('REGISTER');
               }
             }}
+          />
+        </div>
+      )}
+
+      {/* ─── TAB 8: DEDICATED TESTING & QA SECTION ───────────────────────────── */}
+      {activeTab === 'TESTING_QA' && (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
+          <NoteSheetTestingQATab
+            currentUser={user || { id: 'admin', name: 'QA Admin', role: 'SUPER_ADMIN', email: 'admin@ssiu.edu.in', status: 'ACTIVE', createdAt: '2026-01-01T00:00:00.000Z' }}
+            onRefresh={refreshData}
+            isPendingOnlyView={false}
+          />
+        </div>
+      )}
+
+      {/* ─── TAB 9: PENDING TESTING VIEW ─────────────────────────────────────── */}
+      {activeTab === 'PENDING_TESTING' && (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm">
+          <NoteSheetTestingQATab
+            currentUser={user || { id: 'admin', name: 'QA Admin', role: 'SUPER_ADMIN', email: 'admin@ssiu.edu.in', status: 'ACTIVE', createdAt: '2026-01-01T00:00:00.000Z' }}
+            onRefresh={refreshData}
+            isPendingOnlyView={true}
           />
         </div>
       )}

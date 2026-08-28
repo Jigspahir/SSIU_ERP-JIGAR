@@ -63,6 +63,8 @@ import { MentorAssignmentModule } from './mentor-assignment/mentor-assignment.mo
 import { FeedbackModule } from './feedback/feedback.module';
 // Document Master & International Student Documents
 import { DocumentsModule } from './documents/documents.module';
+// Student Data Change Request & Approval Workflow
+import { StudentDataChangeModule } from './student-data-change/student-data-change.module';
 
 @Module({
   imports: [
@@ -132,6 +134,8 @@ import { DocumentsModule } from './documents/documents.module';
     FeedbackModule,
     // Centralized Document Master & International Documents
     DocumentsModule,
+    // Student Data Change Request & Approval Workflow
+    StudentDataChangeModule,
   ],
 })
 export class AppModule {}

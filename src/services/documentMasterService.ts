@@ -1,5 +1,6 @@
 import { db } from './db';
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import {
   DocumentCategory,
   DocumentFilterOptions,
@@ -642,6 +643,422 @@ class DocumentMasterService {
 
       reader.readAsArrayBuffer(file);
     });
+  }
+
+  // ─── STUDENT DOCUMENT VERIFICATION GRID HELPERS ──────────────────────────
+
+  public getStudentDocumentMetrics(student: Student) {
+    const list = this.getApplicableDocumentsForStudent(student);
+    const totalDocs = list.length;
+    const requiredDocs = list.filter(item => item.masterDoc.required === 'REQUIRED').length;
+    const verifiedDocs = list.filter(item => item.status === 'VERIFIED').length;
+    const pendingDocs = list.filter(item => item.status === 'PENDING_VERIFICATION' || item.status === 'REUPLOAD_REQUIRED').length;
+    const missingDocs = list.filter(item => item.masterDoc.required === 'REQUIRED' && (item.status === 'NOT_UPLOADED' || item.status === 'REJECTED' || item.status === 'EXPIRED')).length;
+    
+    let overallStatus: 'COMPLETE' | 'PARTIALLY_COMPLETE' | 'MISSING_DOCUMENTS' | 'NOT_SUBMITTED' = 'NOT_SUBMITTED';
+    if (verifiedDocs >= requiredDocs && requiredDocs > 0) {
+      overallStatus = 'COMPLETE';
+    } else if (verifiedDocs > 0 || pendingDocs > 0) {
+      overallStatus = missingDocs > 0 ? 'MISSING_DOCUMENTS' : 'PARTIALLY_COMPLETE';
+    } else if (missingDocs > 0) {
+      overallStatus = 'MISSING_DOCUMENTS';
+    }
+
+    let lastUpdated = (student as any).updatedAt || (student as any).createdAt || '2026-08-20';
+    list.forEach(item => {
+      if (item.uploadedDoc?.updatedAt && item.uploadedDoc.updatedAt > lastUpdated) {
+        lastUpdated = item.uploadedDoc.updatedAt;
+      }
+      if (item.uploadedDoc?.createdAt && item.uploadedDoc.createdAt > lastUpdated) {
+        lastUpdated = item.uploadedDoc.createdAt;
+      }
+      if (item.uploadedDoc?.verifiedAt && item.uploadedDoc.verifiedAt > lastUpdated) {
+        lastUpdated = item.uploadedDoc.verifiedAt;
+      }
+    });
+
+    return {
+      totalDocs,
+      requiredDocs,
+      verifiedDocs,
+      pendingDocs,
+      missingDocs,
+      overallStatus,
+      lastUpdated: lastUpdated.slice(0, 10),
+      abcIdStatus: student.abcIdStatus || 'NOT_SUBMITTED'
+    };
+  }
+
+  public downloadStudentDocumentTemplate(): void {
+    const sampleRows = [
+      {
+        'Student Enrollment No': '230101001',
+        'Student Name': 'Jigar Patel',
+        'Academic Year': '2026-2027',
+        'Semester': 'Semester 4',
+        'Document Type': '10th Marksheet',
+        'Required': 'REQUIRED',
+        'Uploaded': 'YES',
+        'Upload Date': '2026-08-15',
+        'Verification Status': 'VERIFIED',
+        'Verified By': 'Dr. Rajesh Sharma',
+        'Verified Date': '2026-08-16',
+        'Remarks': 'Original verified against SSC Board marksheet'
+      },
+      {
+        'Student Enrollment No': '230101002',
+        'Student Name': 'Rahul Shah',
+        'Academic Year': '2026-2027',
+        'Semester': 'Semester 4',
+        'Document Type': 'Aadhaar Card',
+        'Required': 'REQUIRED',
+        'Uploaded': 'YES',
+        'Upload Date': '2026-08-18',
+        'Verification Status': 'PENDING_VERIFICATION',
+        'Verified By': '',
+        'Verified Date': '',
+        'Remarks': 'Awaiting mentor verification'
+      },
+      {
+        'Student Enrollment No': '230101003',
+        'Student Name': 'Harsh Parmar',
+        'Academic Year': '2026-2027',
+        'Semester': 'Semester 4',
+        'Document Type': 'Migration Certificate',
+        'Required': 'REQUIRED',
+        'Uploaded': 'NO',
+        'Upload Date': '',
+        'Verification Status': 'NOT_UPLOADED',
+        'Verified By': '',
+        'Verified Date': '',
+        'Remarks': 'Original certificate pending from previous board'
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(sampleRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Document_Verification_Template');
+
+    worksheet['!cols'] = [22, 24, 16, 14, 25, 14, 12, 14, 22, 22, 14, 35].map(w => ({ wch: w }));
+    XLSX.writeFile(workbook, 'SSIU_Student_Document_Verification_Template.xlsx');
+  }
+
+  public parseAndImportStudentDocumentsExcel(file: File): Promise<{
+    success: boolean;
+    importedCount: number;
+    failedCount: number;
+    errors: Array<{ row: number; enrollment: string; error: string }>;
+  }> {
+    return new Promise((resolve) => {
+      if (!file.name.toLowerCase().endsWith('.xlsx')) {
+        resolve({
+          success: false,
+          importedCount: 0,
+          failedCount: 0,
+          errors: [{ row: 0, enrollment: '', error: 'Invalid file format. Strictly only .xlsx Excel files are supported.' }]
+        });
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rawRows: any[] = XLSX.utils.sheet_to_json(firstSheet);
+
+          const allStudents = db.getStudents();
+          const studentMap = new Map<string, Student>();
+          allStudents.forEach(s => {
+            if (s.enrollmentNo) {
+              studentMap.set(s.enrollmentNo.trim().toUpperCase(), s);
+            }
+          });
+
+          const allMasters = this.getAllMasterDocuments();
+          const masterMap = new Map<string, DocumentMasterItem>();
+          allMasters.forEach(m => {
+            masterMap.set(m.name.trim().toLowerCase(), m);
+            masterMap.set(m.code.trim().toLowerCase(), m);
+          });
+
+          let importedCount = 0;
+          let failedCount = 0;
+          const errors: Array<{ row: number; enrollment: string; error: string }> = [];
+
+          rawRows.forEach((row, idx) => {
+            const rowNum = idx + 2;
+            const enroll = (row['Student Enrollment No'] || row['Enrollment No'] || row['EnrollmentNo'] || '').toString().trim().toUpperCase();
+            const docTypeName = (row['Document Type'] || row['Document Name'] || '').toString().trim();
+            const verStatus = (row['Verification Status'] || 'PENDING_VERIFICATION').toString().trim().toUpperCase();
+            const verifiedBy = (row['Verified By'] || '').toString().trim();
+            const remarks = (row['Remarks'] || '').toString().trim();
+
+            if (!enroll) {
+              failedCount++;
+              errors.push({ row: rowNum, enrollment: enroll || 'EMPTY', error: 'Missing Student Enrollment Number.' });
+              return;
+            }
+
+            const student = studentMap.get(enroll);
+            if (!student) {
+              failedCount++;
+              errors.push({ row: rowNum, enrollment: enroll, error: `Student with enrollment ${enroll} does not exist in Student Master.` });
+              return;
+            }
+
+            if (!docTypeName) {
+              failedCount++;
+              errors.push({ row: rowNum, enrollment: enroll, error: 'Document Type / Name is missing.' });
+              return;
+            }
+
+            const master = masterMap.get(docTypeName.toLowerCase());
+            if (!master) {
+              failedCount++;
+              errors.push({ row: rowNum, enrollment: enroll, error: `Document Type "${docTypeName}" not recognized in Document Master.` });
+              return;
+            }
+
+            const existingDocs = db.getStudentAcademicDocumentsByStudentId(student.id);
+            const existing = existingDocs.find(d => d.documentMasterId === master.id || d.documentCode === master.code);
+
+            const docId = existing ? existing.id : `stu-doc-${Date.now().toString(36)}-${idx}`;
+            const statusMapped = verStatus === 'VERIFIED' ? 'VERIFIED' : verStatus === 'REJECTED' ? 'REJECTED' : 'PENDING_VERIFICATION';
+
+            const updatedDoc: StudentAcademicDocumentItem = {
+              id: docId,
+              studentId: student.id,
+              enrollmentNo: student.enrollmentNo,
+              studentName: student.name,
+              documentMasterId: master.id,
+              documentCode: master.code,
+              documentName: master.name,
+              category: master.category,
+              subcategory: master.subcategory,
+              studentType: student.studentType === 'INTERNATIONAL' ? 'INTERNATIONAL' : 'DOMESTIC',
+              currentVersion: existing ? existing.currentVersion : 1,
+              fileName: existing?.fileName || `${master.code}_${enroll}.pdf`,
+              fileSize: existing?.fileSize || '1.5 MB',
+              fileUrl: existing?.fileUrl || '/sample-docs/document.pdf',
+              fileType: 'pdf',
+              status: statusMapped as any,
+              isLocked: statusMapped === 'VERIFIED',
+              verifiedByUserId: statusMapped === 'VERIFIED' ? (verifiedBy || 'fac-1') : undefined,
+              verifiedByName: statusMapped === 'VERIFIED' ? (verifiedBy || 'Faculty Mentor') : undefined,
+              verifiedAt: statusMapped === 'VERIFIED' ? new Date().toISOString() : undefined,
+              remarks: remarks || existing?.remarks || 'Imported via Excel Register',
+              createdAt: existing ? existing.createdAt : new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+
+            db.saveStudentAcademicDocument(updatedDoc);
+            importedCount++;
+          });
+
+          resolve({
+            success: failedCount === 0,
+            importedCount,
+            failedCount,
+            errors
+          });
+        } catch (err: any) {
+          resolve({
+            success: false,
+            importedCount: 0,
+            failedCount: 0,
+            errors: [{ row: 0, enrollment: '', error: `Failed to process Excel file: ${err.message}` }]
+          });
+        }
+      };
+
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  public async exportStudentDocumentRegisterToExcel(
+    students: Student[],
+    dataset: Array<{ student: Student; metrics: any }>
+  ): Promise<void> {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'Swarrnim Startup & Innovation University';
+    workbook.created = new Date();
+
+    const ws = workbook.addWorksheet('Student Documents Register', {
+      views: [{ state: 'frozen', ySplit: 6 }]
+    });
+
+    // University Header Block
+    ws.mergeCells('A1:P1');
+    const t1 = ws.getCell('A1');
+    t1.value = 'SWARRNIM STARTUP & INNOVATION UNIVERSITY';
+    t1.font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+    t1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF001F3F' } };
+    t1.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getRow(1).height = 30;
+
+    ws.mergeCells('A2:P2');
+    const t2 = ws.getCell('A2');
+    t2.value = 'SSIU ERP — MENTOR WORKSPACE & STUDENT DOCUMENT VERIFICATION REGISTER';
+    t2.font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFD700' } };
+    t2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F2C59' } };
+    t2.alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getRow(2).height = 22;
+
+    // Metadata
+    ws.getCell('A4').value = 'Total Students:';
+    ws.getCell('A4').font = { bold: true };
+    ws.getCell('B4').value = dataset.length;
+
+    ws.getCell('D4').value = 'Report Date:';
+    ws.getCell('D4').font = { bold: true };
+    ws.getCell('E4').value = new Date().toLocaleDateString('en-GB');
+
+    ws.getCell('G4').value = 'Generated By:';
+    ws.getCell('G4').font = { bold: true };
+    ws.getCell('H4').value = 'Faculty Mentor / Academic Office';
+
+    const headers = [
+      'Sr. No.', 'Student Name', 'Enrollment No.', 'Program', 'Department',
+      'Academic Year', 'Semester', 'Division', 'ABC ID Status', 'Total Required Docs',
+      'Verified', 'Pending Verification', 'Missing Documents', 'Overall Status', 'Last Updated', 'Verification Remarks'
+    ];
+
+    ws.getRow(6).values = headers;
+    ws.getRow(6).height = 25;
+    ws.getRow(6).eachCell(cell => {
+      cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF001F3F' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+        bottom: { style: 'medium', color: { argb: 'FF001F3F' } },
+        left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+        right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+      };
+    });
+
+    dataset.forEach((row, idx) => {
+      const st = row.student;
+      const m = row.metrics;
+      const prog = db.getProgramById(st.programId);
+      const dept = db.getDepartmentById(st.departmentId);
+      const sem = db.getSemesterById(st.semesterId);
+      const div = db.getDivisionById(st.divisionId);
+
+      const r = ws.addRow([
+        idx + 1,
+        st.name,
+        st.enrollmentNo,
+        prog?.name || 'B.Tech CSE',
+        dept?.name || 'Computer Engineering',
+        '2026-2027',
+        sem?.number ? `Sem ${sem.number}` : 'Sem 4',
+        div?.name || 'Division A',
+        st.abcIdStatus || 'NOT_SUBMITTED',
+        m.requiredDocs,
+        m.verifiedDocs,
+        m.pendingDocs,
+        m.missingDocs,
+        m.overallStatus,
+        m.lastUpdated,
+        m.missingDocs > 0 ? `${m.missingDocs} Required Document(s) Pending Upload` : 'All Required Credentials Verified'
+      ]);
+
+      r.height = 20;
+      r.eachCell((cell, colNum) => {
+        cell.font = { name: 'Calibri', size: 9 };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+          right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+        };
+        if ([1, 3, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].includes(colNum)) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        }
+      });
+    });
+
+    ws.columns = [
+      { width: 8 },  // Sr
+      { width: 22 }, // Name
+      { width: 16 }, // Enrollment
+      { width: 24 }, // Program
+      { width: 24 }, // Dept
+      { width: 14 }, // AY
+      { width: 10 }, // Sem
+      { width: 12 }, // Div
+      { width: 16 }, // ABC ID
+      { width: 14 }, // Total
+      { width: 12 }, // Verified
+      { width: 14 }, // Pending
+      { width: 14 }, // Missing
+      { width: 18 }, // Status
+      { width: 14 }, // Last Updated
+      { width: 35 }  // Remarks
+    ];
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const filename = `SSIU_Student_Document_Verification_Register_${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    }
+  }
+
+  public bulkVerifyStudentDocuments(studentIds: string[], actorUser: any): { verifiedCount: number } {
+    let verifiedCount = 0;
+    const now = new Date().toISOString();
+
+    studentIds.forEach(stId => {
+      const docs = db.getStudentAcademicDocumentsByStudentId(stId);
+      docs.forEach(doc => {
+        if (doc.status === 'PENDING_VERIFICATION' || doc.status === 'REUPLOAD_REQUIRED') {
+          doc.status = 'VERIFIED';
+          doc.isLocked = true;
+          doc.verifiedByUserId = actorUser?.id || 'fac-1';
+          doc.verifiedByName = actorUser?.name || 'Faculty Mentor';
+          doc.verifiedByRole = actorUser?.role || 'FACULTY_MENTOR';
+          doc.verifiedAt = now;
+          doc.updatedAt = now;
+          db.saveStudentAcademicDocument(doc);
+          verifiedCount++;
+        }
+      });
+    });
+
+    return { verifiedCount };
+  }
+
+  public bulkRequestMissingDocuments(studentIds: string[], actorUser: any): { requestedCount: number } {
+    let requestedCount = 0;
+
+    studentIds.forEach(stId => {
+      const student = db.getStudentById(stId);
+      if (student) {
+        db.addNotification({
+          targetUserId: student.id,
+          targetRole: 'STUDENT',
+          title: 'Required Academic Documents Pending',
+          message: `Your Faculty Mentor (${actorUser?.name || 'Mentor'}) has requested upload of missing academic credentials and certificates.`,
+          module: 'STUDENT_SECTION',
+          type: 'WARNING' as any
+        });
+        requestedCount++;
+      }
+    });
+
+    return { requestedCount };
   }
 }
 

@@ -295,163 +295,254 @@ export const ExamCentresPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Centres Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '1.25rem' }}>
-        {filteredCentres.map(c => {
-          const centreRooms = allRooms.filter(r => r.centreId === c.id);
-          const activeRoomsCount = centreRooms.filter(r => r.status === 'AVAILABLE' || r.status === 'ACTIVE').length;
-          const calculatedCapacity = centreRooms.reduce((acc, r) => acc + (r.capacity || 0), 0) || c.capacity;
+      {/* Main Centres Excel Table */}
+      <div className="card" style={{ padding: '1.25rem', overflow: 'hidden', border: '1px solid var(--border-color)', background: '#FFFFFF', borderRadius: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0 }}>
+              Designated Examination Centres ({filteredCentres.length})
+            </h3>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Official university infrastructure and seating blocks allocated for examination conduct
+            </span>
+          </div>
+        </div>
 
-          return (
-            <div key={c.id} className="card card-hover" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', borderTop: `4px solid ${c.status === 'ACTIVE' ? 'var(--brand-navy)' : '#9CA3AF'}` }}>
-              {/* Top Row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--brand-orange)', background: 'var(--brand-orange-light)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
-                      {c.code}
-                    </span>
-                    <Badge variant={c.status === 'ACTIVE' ? 'active' : 'inactive'}>
-                      {c.status}
-                    </Badge>
-                  </div>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--brand-navy)', marginTop: '0.4rem' }}>
-                    {c.name}
-                  </h3>
-                </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table className="table" style={{ width: '100%', fontSize: '0.8125rem', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#0F2C59', color: '#FFFFFF' }}>
+                <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Centre Code</th>
+                <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Centre Name</th>
+                <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Building/Block</th>
+                <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Contact Officer</th>
+                <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Phone</th>
+                <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Address</th>
+                <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Total Rooms</th>
+                <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Seating Capacity</th>
+                <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Status</th>
+                <th style={{ padding: '0.625rem 0.75rem', textAlign: 'right', fontWeight: 800 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCentres.length === 0 ? (
+                <tr>
+                  <td colSpan={10} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                    No examination centres found matching your search. Click "<strong>Add Centre</strong>" to configure.
+                  </td>
+                </tr>
+              ) : (
+                filteredCentres.map((c, idx) => {
+                  const centreRooms = allRooms.filter(r => r.centreId === c.id);
+                  const isSelected = selectedCentre?.id === c.id;
+                  const calculatedCapacity = centreRooms.reduce((acc, r) => acc + (r.capacity || 0), 0) || c.capacity;
+                  const isEven = idx % 2 === 0;
 
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  <button
-                    className="btn btn-outline btn-sm"
-                    title="View Rooms"
-                    onClick={() => setSelectedCentre(selectedCentre?.id === c.id ? null : c)}
-                  >
-                    <Eye size={14} /> {selectedCentre?.id === c.id ? 'Hide Rooms' : 'Rooms'} ({centreRooms.length})
-                  </button>
-                  {canManage && (
-                    <>
-                      <button
-                        className="btn btn-outline btn-sm"
-                        title="Edit Centre"
-                        onClick={() => handleOpenEditCentre(c)}
-                      >
-                        <Edit2 size={14} />
-                      </button>
-                      <button
-                        className={`btn btn-sm ${c.status === 'ACTIVE' ? 'btn-outline-danger' : 'btn-outline-success'}`}
-                        title={c.status === 'ACTIVE' ? 'Deactivate Centre' : 'Activate Centre'}
-                        onClick={() => handleToggleCentreStatus(c)}
-                      >
-                        {c.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Centre Details Info */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', fontSize: '0.85rem', background: '#F9FAFB', padding: '0.85rem', borderRadius: 'var(--radius-sm)' }}>
-                <div>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>BUILDING / BLOCK</span>
-                  <strong style={{ color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <Layers size={13} style={{ color: 'var(--brand-orange)' }} /> {c.building}
-                  </strong>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>TOTAL SEATING CAPACITY</span>
-                  <strong style={{ color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <Users size={13} style={{ color: '#10B981' }} /> {calculatedCapacity} Seats
-                  </strong>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>CONTACT OFFICER</span>
-                  <span style={{ color: '#374151', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <User size={13} style={{ color: 'var(--text-muted)' }} /> {c.contactPerson || 'Controller of Exams'}
-                  </span>
-                </div>
-                <div>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>PHONE / HELPLINE</span>
-                  <span style={{ color: '#374151', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                    <Phone size={13} style={{ color: 'var(--text-muted)' }} /> {c.contactNumber || '+91 7923245000'}
-                  </span>
-                </div>
-                {c.address && (
-                  <div style={{ gridColumn: 'span 2' }}>
-                    <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>ADDRESS</span>
-                    <span style={{ color: '#4B5563', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <MapPin size={13} style={{ color: 'var(--text-muted)' }} /> {c.address}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Rooms Section inside Centre Card */}
-              <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '0.75rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
-                    Configured Rooms ({centreRooms.length})
-                  </span>
-                  {canManage && (
-                    <button
-                      className="btn btn-navy btn-sm"
-                      style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}
-                      onClick={() => handleOpenAddRoom(c.id)}
-                    >
-                      <Plus size={12} /> Add Room
-                    </button>
-                  )}
-                </div>
-
-                {centreRooms.length === 0 ? (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic', margin: 0 }}>
-                    No rooms configured yet for this centre. Click "Add Room" to configure classrooms or halls.
-                  </p>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.5rem' }}>
-                    {centreRooms.map(r => (
-                      <div
-                        key={r.id}
-                        style={{
-                          border: `1px solid ${r.status === 'AVAILABLE' || r.status === 'ACTIVE' ? '#D1D5DB' : '#FECACA'}`,
-                          borderRadius: '6px',
-                          padding: '0.5rem',
-                          background: r.status === 'AVAILABLE' || r.status === 'ACTIVE' ? '#FFFFFF' : '#FEF2F2',
-                          fontSize: '0.8rem',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.25rem'
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <strong style={{ color: 'var(--brand-navy)' }}>{r.roomNumber}</strong>
-                          {r.hasCCTV && <span title="CCTV Active"><Video size={12} color="#10B981" /></span>}
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                          <span>Cap: {r.capacity}</span>
-                          <span>Fl: {r.floor}</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.2rem' }}>
-                          <span style={{ fontSize: '0.7rem', fontWeight: 600, color: r.roomType === 'HALL' ? '#8B5CF6' : r.roomType === 'LAB' ? '#3B82F6' : '#6B7280' }}>
-                            {r.roomType || 'CLASSROOM'}
-                          </span>
-                          {canManage && (
+                  return (
+                    <React.Fragment key={c.id}>
+                      <tr style={{ background: isSelected ? '#EFF6FF' : isEven ? '#FFFFFF' : '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+                        <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0' }}>
+                          <strong style={{ color: '#F37023', fontFamily: 'monospace', fontSize: '0.8125rem' }}>
+                            {c.code}
+                          </strong>
+                        </td>
+                        <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0', fontWeight: 700, color: '#0F2C59' }}>
+                          {c.name}
+                        </td>
+                        <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0', fontSize: '0.78125rem' }}>
+                          {c.building}
+                        </td>
+                        <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0', fontSize: '0.78125rem' }}>
+                          {c.contactPerson || 'Controller of Exams'}
+                        </td>
+                        <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontSize: '0.75rem', fontFamily: 'monospace' }}>
+                          {c.contactNumber || '+91 7923245000'}
+                        </td>
+                        <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0', fontSize: '0.75rem', color: '#64748B', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {c.address || 'Swarrnim University Campus'}
+                        </td>
+                        <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 700, color: '#0F2C59' }}>
+                          {centreRooms.length}
+                        </td>
+                        <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 800, color: '#047857' }}>
+                          {calculatedCapacity} Seats
+                        </td>
+                        <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0' }}>
+                          <Badge variant={c.status === 'ACTIVE' ? 'active' : 'inactive'}>
+                            {c.status}
+                          </Badge>
+                        </td>
+                        <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center', justifyContent: 'flex-end' }}>
                             <button
-                              onClick={() => handleOpenEditRoom(r)}
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 0 }}
-                              title="Edit Room"
+                              type="button"
+                              className={`btn btn-sm ${isSelected ? 'btn-navy' : 'btn-ghost'}`}
+                              onClick={() => setSelectedCentre(isSelected ? null : c)}
+                              style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', fontWeight: 700 }}
                             >
-                              <Edit2 size={11} />
+                              <Eye size={13} /> {isSelected ? 'Hide Rooms' : `Rooms (${centreRooms.length})`}
                             </button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+                            {canManage && (
+                              <>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  title="Add Room"
+                                  onClick={() => handleOpenAddRoom(c.id)}
+                                  style={{ padding: '0.25rem 0.45rem', color: '#047857' }}
+                                >
+                                  <Plus size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  title="Edit Centre"
+                                  onClick={() => handleOpenEditCentre(c)}
+                                  style={{ padding: '0.25rem 0.45rem' }}
+                                >
+                                  <Edit2 size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  title={c.status === 'ACTIVE' ? 'Deactivate Centre' : 'Activate Centre'}
+                                  onClick={() => handleToggleCentreStatus(c)}
+                                  style={{ padding: '0.25rem 0.45rem', color: c.status === 'ACTIVE' ? '#DC2626' : '#047857' }}
+                                >
+                                  {c.status === 'ACTIVE' ? <XCircle size={14} /> : <CheckCircle2 size={14} />}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Expanded Rooms Sub-Table */}
+                      {isSelected && (
+                        <tr>
+                          <td colSpan={10} style={{ padding: '1rem', background: '#F8FAFC', borderBottom: '2px solid #CBD5E1' }}>
+                            <div style={{ background: '#FFFFFF', borderRadius: '6px', border: '1px solid #CBD5E1', padding: '1rem' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                                <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0F2C59' }}>
+                                  Configured Rooms for {c.name} ({centreRooms.length} Rooms)
+                                </div>
+                                {canManage && (
+                                  <button
+                                    type="button"
+                                    className="btn btn-primary btn-sm"
+                                    onClick={() => handleOpenAddRoom(c.id)}
+                                    style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', fontWeight: 700, background: '#0F2C59', borderColor: '#0F2C59' }}
+                                  >
+                                    <Plus size={13} /> Add Room
+                                  </button>
+                                )}
+                              </div>
+
+                              <div style={{ overflowX: 'auto' }}>
+                                <table className="table" style={{ width: '100%', fontSize: '0.78125rem', borderCollapse: 'collapse' }}>
+                                  <thead>
+                                    <tr style={{ background: '#F1F5F9', color: '#0F2C59', borderBottom: '1px solid #CBD5E1' }}>
+                                      <th style={{ padding: '0.5rem 0.75rem', fontWeight: 800 }}>Room Code</th>
+                                      <th style={{ padding: '0.5rem 0.75rem', fontWeight: 800 }}>Room Type</th>
+                                      <th style={{ padding: '0.5rem', textAlign: 'center', fontWeight: 800 }}>Capacity</th>
+                                      <th style={{ padding: '0.5rem', textAlign: 'center', fontWeight: 800 }}>Floor</th>
+                                      <th style={{ padding: '0.5rem', textAlign: 'center', fontWeight: 800 }}>CCTV</th>
+                                      <th style={{ padding: '0.5rem', textAlign: 'center', fontWeight: 800 }}>Status</th>
+                                      <th style={{ padding: '0.5rem', textAlign: 'center', fontWeight: 800 }}>Seating Used</th>
+                                      <th style={{ padding: '0.5rem', textAlign: 'center', fontWeight: 800 }}>Free Seats</th>
+                                      <th style={{ padding: '0.5rem 0.75rem', textAlign: 'right', fontWeight: 800 }}>Actions</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {centreRooms.length === 0 ? (
+                                      <tr>
+                                        <td colSpan={9} style={{ textAlign: 'center', padding: '1.5rem', color: '#64748B' }}>
+                                          No rooms configured yet for this centre. Click "Add Room" to configure classrooms or exam halls.
+                                        </td>
+                                      </tr>
+                                    ) : (
+                                      centreRooms.map(r => {
+                                        const seatingUsed = 0;
+                                        const freeSeats = (r.capacity || 40) - seatingUsed;
+
+                                        return (
+                                          <tr key={r.id} style={{ borderBottom: '1px solid #E2E8F0' }}>
+                                            <td style={{ padding: '0.4rem 0.75rem' }}>
+                                              <strong style={{ color: '#0F2C59' }}>{r.roomNumber || r.roomCode}</strong>
+                                            </td>
+                                            <td style={{ padding: '0.4rem 0.75rem' }}>
+                                              <span style={{ fontSize: '0.71875rem', fontWeight: 700, color: r.roomType === 'HALL' ? '#7C3AED' : r.roomType === 'LAB' ? '#2563EB' : '#475569' }}>
+                                                {r.roomType || 'CLASSROOM'}
+                                              </span>
+                                            </td>
+                                            <td style={{ padding: '0.4rem', textAlign: 'center', fontWeight: 700 }}>
+                                              {r.capacity}
+                                            </td>
+                                            <td style={{ padding: '0.4rem', textAlign: 'center' }}>
+                                              Floor {r.floor || 1}
+                                            </td>
+                                            <td style={{ padding: '0.4rem', textAlign: 'center' }}>
+                                              {r.hasCCTV ? (
+                                                <span style={{ color: '#047857', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                                  <Video size={12} /> Yes
+                                                </span>
+                                              ) : (
+                                                <span style={{ color: '#94A3B8' }}>No</span>
+                                              )}
+                                            </td>
+                                            <td style={{ padding: '0.4rem', textAlign: 'center' }}>
+                                              <Badge variant={r.status === 'AVAILABLE' || r.status === 'ACTIVE' ? 'active' : 'danger'}>
+                                                {r.status}
+                                              </Badge>
+                                            </td>
+                                            <td style={{ padding: '0.4rem', textAlign: 'center', fontWeight: 600 }}>
+                                              {seatingUsed}
+                                            </td>
+                                            <td style={{ padding: '0.4rem', textAlign: 'center', fontWeight: 800, color: '#047857' }}>
+                                              {freeSeats}
+                                            </td>
+                                            <td style={{ padding: '0.4rem 0.75rem', textAlign: 'right' }}>
+                                              {canManage && (
+                                                <div style={{ display: 'inline-flex', gap: '0.25rem', alignItems: 'center' }}>
+                                                  <button
+                                                    type="button"
+                                                    className="btn btn-ghost btn-sm"
+                                                    title="Edit Room"
+                                                    onClick={() => handleOpenEditRoom(r)}
+                                                    style={{ padding: '0.2rem 0.35rem' }}
+                                                  >
+                                                    <Edit2 size={12} />
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    className="btn btn-ghost btn-sm"
+                                                    title={r.status === 'AVAILABLE' ? 'Mark Unavailable' : 'Mark Available'}
+                                                    onClick={() => handleToggleRoomStatus(r)}
+                                                    style={{ padding: '0.2rem 0.35rem', color: r.status === 'AVAILABLE' ? '#DC2626' : '#047857' }}
+                                                  >
+                                                    {r.status === 'AVAILABLE' ? <XCircle size={12} /> : <CheckCircle2 size={12} />}
+                                                  </button>
+                                                </div>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Centre Modal */}

@@ -534,3 +534,23 @@ export class ApplicationQueryDto {
   @IsString()
   search?: string;
 }
+
+export class AssignFinalEnrollmentDto {
+  @ApiProperty({ example: '2026CE000123', description: 'Final Enrollment Number assigned by University' })
+  @IsNotEmpty()
+  @IsString()
+  finalEnrollmentNo: string;
+
+  @ApiPropertyOptional({ example: 'Final university enrollment number verified and assigned.' })
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+}
+
+export class ResetAccessCodeDto {
+  @ApiPropertyOptional({ example: 'Student requested access code reset.' })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+

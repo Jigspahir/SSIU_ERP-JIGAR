@@ -1,16 +1,21 @@
+// ==============================================================================
+// SWARRNIM UNIVERSITY ERP — STANDARDIZED CONFIRMATION DIALOG
+// ==============================================================================
+
 import React from 'react';
 import { Modal } from './Modal';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, AlertCircle, CheckCircle2, HelpCircle, Loader2 } from 'lucide-react';
 
-interface ConfirmDialogProps {
+export interface ConfirmDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
   title: string;
-  message: string;
+  message: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
-  isLoading?: boolean;
+  variant?: 'danger' | 'warning' | 'primary' | 'success';
+  loading?: boolean;
 }
 
 export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
@@ -19,50 +24,88 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   title,
   message,
-  confirmLabel = 'Delete Item',
+  confirmLabel = 'Confirm Action',
   cancelLabel = 'Cancel',
-  isLoading = false
+  variant = 'primary',
+  loading = false
 }) => {
+  if (!isOpen) return null;
+
+  const getIcon = () => {
+    switch (variant) {
+      case 'danger':
+        return <AlertTriangle size={24} color="#EF4444" />;
+      case 'warning':
+        return <AlertCircle size={24} color="#F59E0B" />;
+      case 'success':
+        return <CheckCircle2 size={24} color="#10B981" />;
+      default:
+        return <HelpCircle size={24} color="var(--brand-orange, #F37023)" />;
+    }
+  };
+
+  const getConfirmBtnClass = () => {
+    switch (variant) {
+      case 'danger':
+        return 'btn btn-danger';
+      case 'warning':
+        return 'btn btn-warning';
+      case 'success':
+        return 'btn btn-active';
+      default:
+        return 'btn btn-primary';
+    }
+  };
+
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={title}
-      maxWidth="480px"
-      footer={
-        <>
-          <button className="btn btn-secondary" onClick={onClose} disabled={isLoading}>
-            {cancelLabel}
-          </button>
-          <button className="btn btn-danger" onClick={onConfirm} disabled={isLoading}>
-            {isLoading ? 'Processing...' : confirmLabel}
-          </button>
-        </>
-      }
-    >
-      <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-        <div
-          style={{
-            width: '44px',
-            height: '44px',
+    <Modal isOpen={isOpen} onClose={onClose} title={title}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '0.5rem 0' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
             borderRadius: '50%',
-            backgroundColor: '#FEF2F2',
-            color: '#EF4444',
+            background: variant === 'danger' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(243, 112, 35, 0.1)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0
-          }}
-        >
-          <AlertTriangle size={22} />
-        </div>
-        <div>
-          <p style={{ fontSize: '0.9375rem', color: 'var(--text-main)', lineHeight: 1.5 }}>
+          }}>
+            {getIcon()}
+          </div>
+
+          <div style={{ fontSize: '0.875rem', color: 'var(--text-color, #1E293B)', lineHeight: 1.5, flex: 1 }}>
             {message}
-          </p>
-          <p style={{ fontSize: '0.78125rem', color: 'var(--text-muted)', marginTop: '0.5rem' }}>
-            This action cannot be undone. Associated references may be affected.
-          </p>
+          </div>
+        </div>
+
+        <div style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: '0.75rem',
+          borderTop: '1px solid var(--border-color, #E2E8F0)',
+          paddingTop: '1rem',
+          marginTop: '0.5rem'
+        }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={onClose}
+            disabled={loading}
+          >
+            {cancelLabel}
+          </button>
+
+          <button
+            type="button"
+            className={getConfirmBtnClass()}
+            onClick={onConfirm}
+            disabled={loading}
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            {loading && <Loader2 size={14} className="animate-spin" />}
+            {confirmLabel}
+          </button>
         </div>
       </div>
     </Modal>

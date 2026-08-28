@@ -1,17 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
 import { Badge } from '../../components/common/Badge';
 import { UnitMaterial } from '../../types';
 import { FileText, Download, Plus, Trash2, BookOpen, Filter, Search, Eye, Edit2, Archive, CheckCircle2, Globe, Lock } from 'lucide-react';
 import { fileStorage } from '../../services/fileStorage';
+import { can } from '../../services/userAccountManagementService';
+import { sessionPlanService } from '../../services/sessionPlanService';
 
 export const UnitMaterialPage: React.FC = () => {
   const { user, role } = useAuth();
   const isStudent = role === 'STUDENT';
-  const isFaculty = role === 'FACULTY';
+  const isMentor = role === 'MENTOR';
+  const canCreate = can(user, 'STUDY_MATERIAL', 'CREATE') && !isStudent && !isMentor;
+  const canEdit = can(user, 'STUDY_MATERIAL', 'EDIT') && !isStudent && !isMentor;
+  const canDelete = can(user, 'STUDY_MATERIAL', 'DELETE') && !isStudent && !isMentor;
+  const isReadOnly = isStudent || isMentor || (!canCreate && !canEdit);
 
-  const subjects = db.getSubjects();
+  const subjects = useMemo(() => {
+    return sessionPlanService.getFacultySubjects(user, role || undefined);
+  }, [user, role]);
+
   const [materials, setMaterials] = useState<UnitMaterial[]>(() => db.getUnitMaterials());
 
   const [selectedSubjectId, setSelectedSubjectId] = useState(subjects[0]?.id || 'ALL');
@@ -193,7 +202,7 @@ export const UnitMaterialPage: React.FC = () => {
           </p>
         </div>
 
-        {!isStudent && (
+        {canCreate && (
           <button className="btn btn-primary" onClick={handleOpenUpload} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Plus size={16} /> Upload Study Material
           </button>
@@ -294,7 +303,7 @@ export const UnitMaterialPage: React.FC = () => {
                   </div>
 
                   <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                    {!isStudent && (
+                    {!isReadOnly && canEdit && (
                       <>
                         <button
                           className={`btn btn-sm ${status === 'PUBLISHED' ? 'btn-secondary' : 'btn-primary'}`}
@@ -308,9 +317,11 @@ export const UnitMaterialPage: React.FC = () => {
                         <button className="btn btn-secondary btn-sm" onClick={() => handleOpenEdit(mat)} title="Edit metadata">
                           <Edit2 size={13} />
                         </button>
-                        <button className="btn btn-danger btn-sm" onClick={() => handleDeleteMaterial(mat.id)} title="Delete material">
-                          <Trash2 size={13} />
-                        </button>
+                        {canDelete && (
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDeleteMaterial(mat.id)} title="Delete material">
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </>
                     )}
                     <button className="btn btn-secondary btn-sm" onClick={() => handleView(mat.fileUrl)} title="View Document">

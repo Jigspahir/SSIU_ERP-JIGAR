@@ -89,6 +89,11 @@ export const PERMITTED_CAMPUS_SERVICES: Record<UserRole, CampusServiceType[]> = 
   STUDENT_SECTION: ['Maintenance', 'IT Support', 'Furniture'],
   ACCOUNTS_ADMIN: ['IT Support', 'Maintenance', 'Furniture'],
   IQAC: ['Maintenance', 'IT Support'],
+  STUDENT_ADMIN: ['IT Support', 'Maintenance', 'Furniture'],
+  HR_ADMIN: ['IT Support', 'Maintenance', 'Furniture', 'Cleaning'],
+  HR_OFFICER: ['IT Support', 'Maintenance', 'Furniture', 'Cleaning'],
+  ERP_COORDINATOR: ['IT Support', 'Maintenance', 'Electrical', 'Cleaning', 'Furniture', 'Other'],
+  STAFF: ['IT Support', 'Maintenance', 'Electrical', 'Cleaning', 'Furniture', 'Other'],
   PARENT: []
 };
 
@@ -109,6 +114,11 @@ export const PERMITTED_APPROVAL_CATEGORIES: Record<UserRole, ApprovalRequestCate
     'EVENT_PERMISSION',
     'INFRASTRUCTURE_MAINTENANCE',
     'NO_OBJECTION_CERTIFICATE',
+    'GENERAL_ADMINISTRATIVE'
+  ],
+  STAFF: [
+    'LEAVE_APPLICATION',
+    'INFRASTRUCTURE_MAINTENANCE',
     'GENERAL_ADMINISTRATIVE'
   ],
   MENTOR: [
@@ -173,6 +183,10 @@ export const PERMITTED_APPROVAL_CATEGORIES: Record<UserRole, ApprovalRequestCate
   MAINTENANCE_ADMIN: ['INFRASTRUCTURE_MAINTENANCE'],
   ACCOUNTS_ADMIN: ['FEE_CONCESSION', 'GENERAL_ADMINISTRATIVE'],
   LIBRARY_ADMIN: ['GENERAL_ADMINISTRATIVE'],
+  STUDENT_ADMIN: ['GENERAL_ADMINISTRATIVE'],
+  HR_ADMIN: ['LEAVE_APPLICATION', 'GENERAL_ADMINISTRATIVE'],
+  HR_OFFICER: ['LEAVE_APPLICATION', 'GENERAL_ADMINISTRATIVE'],
+  ERP_COORDINATOR: ['GENERAL_ADMINISTRATIVE', 'INFRASTRUCTURE_MAINTENANCE'],
   PARENT: []
 };
 
@@ -524,6 +538,48 @@ export const ROLE_ERP_PERMISSIONS: Record<UserRole, ErpPermission[]> = {
   IQAC: [
     'FACULTY_VIEW', 'AUDIT_VIEW', 'SUBJECT_MANAGE',
     'NOTESHEET_VIEW', 'NOTESHEET_REVIEW'
+  ],
+  STUDENT_ADMIN: [
+    'STUDENT_VIEW',
+    'STUDENT_CREATE',
+    'STUDENT_EDIT',
+    'STUDENT_IMPORT'
+  ],
+  HR_ADMIN: [
+    'FACULTY_VIEW',
+    'FACULTY_CREATE',
+    'FACULTY_EDIT',
+    'FACULTY_IMPORT',
+    'NOTESHEET_VIEW',
+    'NOTESHEET_CREATE',
+    'NOTESHEET_REVIEW',
+    'NOTESHEET_APPROVE',
+    'APPROVAL_VIEW',
+    'APPROVAL_DECIDE'
+  ],
+  HR_OFFICER: [
+    'FACULTY_VIEW',
+    'FACULTY_CREATE',
+    'FACULTY_EDIT',
+    'FACULTY_IMPORT',
+    'NOTESHEET_VIEW',
+    'NOTESHEET_CREATE',
+    'APPROVAL_VIEW'
+  ],
+  ERP_COORDINATOR: [
+    'STUDENT_VIEW',
+    'FACULTY_VIEW',
+    'AUDIT_VIEW',
+    'NOTESHEET_VIEW',
+    'APPROVAL_VIEW',
+    'INVENTORY_MANAGE',
+    'SETTINGS_MANAGE'
+  ],
+  STAFF: [
+    'INVENTORY_MANAGE',
+    'NOTESHEET_VIEW',
+    'APPROVAL_SUBMIT',
+    'APPROVAL_VIEW'
   ],
   PARENT: []
 };

@@ -136,99 +136,110 @@ export const ExamDayControlPage: React.FC = () => {
         />
       </div>
 
-      {/* Centre Operations Breakdown */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0 }}>
-          Centre &amp; Room Operational Status
-        </h3>
+      {/* Operational Table */}
+      <div className="card" style={{ padding: '1.25rem', overflow: 'hidden', border: '1px solid var(--border-color)', background: '#FFFFFF', borderRadius: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0 }}>
+              Live Centre &amp; Room Operational Control Grid
+            </h3>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              Real-time room occupancy, candidate seating density, EDP invigilator assignments and surveillance
+            </span>
+          </div>
+        </div>
 
         {(!dayControlData?.centresSummary || dayControlData.centresSummary.length === 0) ? (
-          <div className="card" style={{ padding: '2.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            No exam centres configured for this session.
+          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+            No examination centres or rooms configured for this session.
           </div>
         ) : (
-          dayControlData.centresSummary.map((centre: any) => (
-            <div key={centre.centreId} className="card" style={{ padding: '1.5rem', borderTop: '4px solid var(--brand-navy)' }}>
-              {/* Centre Banner */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E5E7EB', paddingBottom: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontWeight: 800, fontSize: '0.8rem', color: 'var(--brand-orange)', background: 'var(--brand-orange-light)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
-                      {centre.centreCode}
-                    </span>
-                    <h4 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0 }}>
-                      {centre.centreName}
-                    </h4>
-                  </div>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.2rem 0 0' }}>
-                    Building: {centre.building} | Total Rooms: {centre.totalRooms} | Seated: {centre.seatedStudents} / {centre.totalCapacity} | EDP Staff: {centre.edpStaffCount}
-                  </p>
-                </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table" style={{ width: '100%', fontSize: '0.8125rem', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#0F2C59', color: '#FFFFFF' }}>
+                  <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Centre</th>
+                  <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Room</th>
+                  <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Capacity</th>
+                  <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Seated</th>
+                  <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Free Seats</th>
+                  <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)', minWidth: '150px' }}>Occupancy %</th>
+                  <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Status</th>
+                  <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>EDP Staff</th>
+                  <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>CCTV</th>
+                  <th style={{ padding: '0.625rem 0.75rem', textAlign: 'right', fontWeight: 800 }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dayControlData.centresSummary.flatMap((centre: any) =>
+                  (centre.rooms || []).map((room: any, rIdx: number) => {
+                    const occupancy = room.capacity > 0 ? Math.round((room.allocatedSeats / room.capacity) * 100) : 0;
+                    const freeSeats = room.remainingSeats !== undefined ? room.remainingSeats : Math.max(0, room.capacity - room.allocatedSeats);
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Capacity Utilized</div>
-                    <div style={{ fontWeight: 800, color: 'var(--brand-navy)', fontSize: '1rem' }}>
-                      {centre.totalCapacity > 0 ? Math.round((centre.seatedStudents / centre.totalCapacity) * 100) : 0}%
-                    </div>
-                  </div>
-                  <Badge variant={centre.seatedStudents > 0 ? 'active' : 'navy'}>
-                    {centre.seatedStudents > 0 ? 'ACTIVE OPERATIONAL' : 'STANDBY'}
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Room Cards Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem' }}>
-                {centre.rooms.map((room: any) => {
-                  const occupancy = room.capacity > 0 ? Math.round((room.allocatedSeats / room.capacity) * 100) : 0;
-
-                  return (
-                    <div
-                      key={room.roomId}
-                      style={{
-                        border: '1px solid #E2E8F0',
-                        borderRadius: '8px',
-                        padding: '0.85rem',
-                        background: room.allocatedSeats > 0 ? '#F8FAFC' : '#FFFFFF',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.35rem'
-                      }}
-                    >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <strong style={{ color: 'var(--brand-navy)', fontSize: '0.9rem' }}>{room.roomNumber}</strong>
-                        <Badge variant={room.status === 'AVAILABLE' ? 'active' : 'inactive'}>
-                          {room.status}
-                        </Badge>
-                      </div>
-
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        Seated: <strong style={{ color: 'var(--brand-navy)' }}>{room.allocatedSeats}</strong> / {room.capacity}
-                      </div>
-
-                      {/* Progress Bar */}
-                      <div style={{ width: '100%', height: '6px', background: '#E2E8F0', borderRadius: '3px', overflow: 'hidden', margin: '0.2rem 0' }}>
-                        <div
-                          style={{
-                            width: `${occupancy}%`,
-                            height: '100%',
-                            background: occupancy >= 90 ? '#10B981' : occupancy > 0 ? '#3B82F6' : '#9CA3AF',
-                            transition: 'width 0.3s ease'
-                          }}
-                        />
-                      </div>
-
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#64748B' }}>
-                        <span>Occupancy: {occupancy}%</span>
-                        <span>Free: {room.remainingSeats}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))
+                    return (
+                      <tr key={`${centre.centreId}-${room.roomId || rIdx}`} style={{ borderBottom: '1px solid #E2E8F0', background: rIdx % 2 === 0 ? '#FFFFFF' : '#F8FAFC' }}>
+                        <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0' }}>
+                          <strong style={{ color: '#0F2C59' }}>{centre.centreName}</strong>
+                          <div style={{ fontSize: '0.71875rem', color: '#64748B' }}>{centre.centreCode} • {centre.building}</div>
+                        </td>
+                        <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0' }}>
+                          <strong style={{ color: '#F37023', fontFamily: 'monospace' }}>{room.roomNumber}</strong>
+                        </td>
+                        <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 700 }}>
+                          {room.capacity}
+                        </td>
+                        <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 800, color: room.allocatedSeats > 0 ? '#047857' : '#64748B' }}>
+                          {room.allocatedSeats}
+                        </td>
+                        <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 700, color: freeSeats > 0 ? '#047857' : '#DC2626' }}>
+                          {freeSeats}
+                        </td>
+                        <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ flex: 1, height: '6px', background: '#E2E8F0', borderRadius: '3px', overflow: 'hidden' }}>
+                              <div
+                                style={{
+                                  width: `${Math.min(occupancy, 100)}%`,
+                                  height: '100%',
+                                  background: occupancy >= 90 ? '#10B981' : occupancy > 0 ? '#3B82F6' : '#94A3B8'
+                                }}
+                              />
+                            </div>
+                            <span style={{ fontWeight: 800, fontSize: '0.75rem', minWidth: '36px', textAlign: 'right' }}>
+                              {occupancy}%
+                            </span>
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0' }}>
+                          <Badge variant={room.allocatedSeats > 0 ? 'active' : 'navy'}>
+                            {room.allocatedSeats > 0 ? 'SEATED' : 'STANDBY'}
+                          </Badge>
+                        </td>
+                        <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontSize: '0.75rem', fontWeight: 600 }}>
+                          {centre.edpStaffCount > 0 ? `${centre.edpStaffCount} Assigned` : 'EDP Central'}
+                        </td>
+                        <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0' }}>
+                          <span style={{ color: '#047857', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.75rem' }}>
+                            <Video size={12} /> Active
+                          </span>
+                        </td>
+                        <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.71875rem', fontWeight: 700 }}
+                            onClick={() => alert(`Operational details for Room ${room.roomNumber} in ${centre.centreName}. Seated: ${room.allocatedSeats}/${room.capacity}`)}
+                          >
+                            Roster
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

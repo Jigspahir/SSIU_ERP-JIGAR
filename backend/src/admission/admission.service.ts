@@ -582,8 +582,19 @@ export class AdmissionService {
       targetBatchId = newBatch.id;
     }
 
-    // 2. Generate Standardized Enrollment Number and ERP ID
-    const enrollmentNo = dto?.customEnrollmentNo || `2026SSIU${Math.floor(100000 + Math.random() * 900000)}`;
+    // 2. Generate Safe Sequential Temporary Enrollment Number & 5-Digit Access Code
+    const year = '2026';
+    const tempEnrollCount = await this.prisma.student.count({
+      where: {
+        temporaryEnrollmentNumber: { startsWith: `TEMP-${year}-` },
+      },
+    });
+    const tempSeq = (tempEnrollCount + 1).toString().padStart(5, '0');
+    const temporaryEnrollmentNumber = `TEMP-${year}-${tempSeq}`;
+    
+    // Generate exactly 5-digit random access code with leading zeros
+    const studentAccessCode = Math.floor(Math.random() * 100000).toString().padStart(5, '0');
+    const enrollmentNo = temporaryEnrollmentNumber;
     const erpId = `STU${Math.floor(100000 + Math.random() * 900000)}`;
 
     return this.prisma.$transaction(async (tx) => {
@@ -595,6 +606,10 @@ export class AdmissionService {
         data: {
           erpId,
           enrollmentNo,
+          temporaryEnrollmentNumber,
+          enrollmentStatus: 'TEMPORARY',
+          studentAccessCode,
+          onboardingCompletedAt: new Date(),
           firstName: app.firstName,
           middleName: app.middleName,
           lastName: app.lastName,
@@ -610,14 +625,17 @@ export class AdmissionService {
         },
       });
 
-      // 4. Create User Account for Student login
-      const passwordHash = await bcrypt.hash('Student@123', 10);
+      // 4. Create User Account for Student login with Temporary Enrollment & Access Code
+      const passwordHash = await bcrypt.hash(studentAccessCode, 10);
       const studentRole = await tx.role.findUnique({ where: { code: 'STUDENT' } });
 
       const user = await tx.user.create({
         data: {
           erpId,
-          username: enrollmentNo,
+          username: temporaryEnrollmentNumber,
+          temporaryEnrollmentNumber,
+          enrollmentStatus: 'TEMPORARY',
+          studentAccessCode,
           passwordHash,
           accountStatus: 'ACTIVE',
           studentId: student.id,
@@ -637,7 +655,7 @@ export class AdmissionService {
         data: {
           applicationId: app.id,
           studentId: student.id,
-          enrollmentNo,
+          enrollmentNo: temporaryEnrollmentNumber,
           academicYearCode: dto?.academicYearCode || '2026-27',
           enrolledBy: enrolledByUserId,
         },
@@ -659,10 +677,116 @@ export class AdmissionService {
       return {
         enrollment,
         student,
+        temporaryEnrollmentNumber,
+        studentAccessCode,
         user: { id: user.id, username: user.username, erpId: user.erpId },
       };
     });
   }
+
+  async assignFinalEnrollment(studentId: string, officerUserId: string, finalEnrollmentNo: string, remarks?: string) {
+    const cleanFinalNo = finalEnrollmentNo.trim();
+    if (!cleanFinalNo) {
+      throw new BadRequestException('Final enrollment number cannot be empty.');
+    }
+
+    const student = await this.prisma.student.findUnique({ where: { id: studentId } });
+    if (!student) throw new NotFoundException('Student not found.');
+
+    // Duplicate check for final enrollment number
+    const existing = await this.prisma.student.findFirst({
+      where: {
+        OR: [
+          { enrollmentNo: cleanFinalNo },
+          { finalEnrollmentNumber: cleanFinalNo },
+        ],
+        NOT: { id: studentId },
+      },
+    });
+    if (existing) {
+      throw new ConflictException(`Final enrollment number "${cleanFinalNo}" is already assigned to student ${existing.firstName} ${existing.lastName}.`);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Update Student Record on SAME ID
+      const updatedStudent = await tx.student.update({
+        where: { id: studentId },
+        data: {
+          enrollmentNo: cleanFinalNo,
+          finalEnrollmentNumber: cleanFinalNo,
+          enrollmentStatus: 'FINAL',
+          finalEnrollmentAssignedAt: new Date(),
+          finalEnrollmentAssignedBy: officerUserId,
+        },
+      });
+
+      // 2. Update User Account on SAME ID
+      await tx.user.updateMany({
+        where: { studentId },
+        data: {
+          username: cleanFinalNo,
+          finalEnrollmentNumber: cleanFinalNo,
+          enrollmentStatus: 'FINAL',
+        },
+      });
+
+      // 3. Update Enrollment record if exists
+      await tx.enrollment.updateMany({
+        where: { studentId },
+        data: { enrollmentNo: cleanFinalNo },
+      });
+
+      return {
+        success: true,
+        student: updatedStudent,
+        temporaryEnrollmentNumber: student.temporaryEnrollmentNumber || student.enrollmentNo,
+        finalEnrollmentNumber: cleanFinalNo,
+        message: `Student ${student.firstName} ${student.lastName} successfully converted to Final Enrollment: ${cleanFinalNo}`,
+      };
+    });
+  }
+
+  async resetAccessCode(studentId: string, officerUserId: string, reason?: string) {
+    const student = await this.prisma.student.findUnique({ where: { id: studentId } });
+    if (!student) throw new NotFoundException('Student not found.');
+
+    const newCode = Math.floor(Math.random() * 100000).toString().padStart(5, '0');
+    const passwordHash = await bcrypt.hash(newCode, 10);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.student.update({
+        where: { id: studentId },
+        data: { studentAccessCode: newCode },
+      });
+
+      await tx.user.updateMany({
+        where: { studentId },
+        data: { passwordHash, studentAccessCode: newCode },
+      });
+    });
+
+    return {
+      success: true,
+      studentId,
+      studentName: `${student.firstName} ${student.lastName}`,
+      temporaryEnrollmentNumber: student.temporaryEnrollmentNumber,
+      studentAccessCode: newCode,
+      message: `Access code regenerated successfully.`,
+    };
+  }
+
+  async getTemporaryEnrollments() {
+    return this.prisma.student.findMany({
+      where: { enrollmentStatus: 'TEMPORARY' },
+      include: {
+        institute: true,
+        department: true,
+        batch: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
 
   // ── 5. Reports & Funnel Analytics ─────────────────────────────────────────
 

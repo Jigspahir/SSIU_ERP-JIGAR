@@ -4,10 +4,13 @@ export type UserRole =
   | 'VICE_PRESIDENT'
   | 'PROVOST'
   | 'UNIVERSITY_ADMIN' 
+  | 'ERP_COORDINATOR'
   | 'PRINCIPAL' 
   | 'HOD' 
   | 'FACULTY' 
+  | 'STAFF'
   | 'MENTOR'
+  | 'STUDENT_ADMIN'
   | 'STUDENT'
   | 'PARENT'
   | 'REGISTRAR'
@@ -19,10 +22,53 @@ export type UserRole =
   | 'LIBRARY_ADMIN'
   | 'TRANSPORT_ADMIN'
   | 'MAINTENANCE_ADMIN'
-  | 'ACCOUNTS_ADMIN';
+  | 'ACCOUNTS_ADMIN'
+  | 'HR_ADMIN'
+  | 'HR_OFFICER';
 
 export * from './ptm';
 
+
+export type AccountStatus = 'ACTIVE' | 'INACTIVE' | 'LOCKED' | 'DISABLED' | 'SUSPENDED' | 'PENDING';
+export type AccessStatusType = 'ENABLED' | 'RESTRICTED' | 'LOCKED' | 'SUSPENDED' | 'DISABLED';
+
+export type DataScopeType = 
+  | 'ALL_UNIVERSITY' 
+  | 'INSTITUTION' 
+  | 'DEPARTMENT' 
+  | 'PROGRAM' 
+  | 'CLASS' 
+  | 'SELF' 
+  | 'ASSIGNED_USERS' 
+  | 'ASSIGNED_ASSETS';
+
+export type ModuleActionType = 
+  | 'VIEW' 
+  | 'CREATE' 
+  | 'EDIT' 
+  | 'DELETE' 
+  | 'APPROVE' 
+  | 'REJECT' 
+  | 'EXPORT' 
+  | 'IMPORT' 
+  | 'PRINT' 
+  | 'ASSIGN' 
+  | 'TRANSFER' 
+  | 'VERIFY' 
+  | 'MANAGE'
+  | 'RETURN'
+  | 'REPLACE'
+  | 'MAINTENANCE'
+  | 'SUBMIT'
+  | 'FORWARD'
+  | 'ANALYTICS';
+
+export interface UserScopeConfig {
+  moduleKey: string;
+  scope: DataScopeType;
+  allowedDepartmentIds?: string[];
+  allowedInstituteIds?: string[];
+}
 
 export interface User {
   id: string;
@@ -39,13 +85,32 @@ export interface User {
   programId?: string;
   designation?: string;
   enrollmentNo?: string;
+  temporaryEnrollmentNumber?: string;
+  finalEnrollmentNumber?: string;
+  enrollmentStatus?: 'TEMPORARY' | 'FINAL';
+  studentAccessCode?: string;
+  isFirstLogin?: boolean;
   employeeId?: string;
   status: 'ACTIVE' | 'INACTIVE';
+  accountStatus?: AccountStatus;
+  accessStatus?: AccessStatusType;
+  lockedAt?: string;
+  lockedBy?: string;
+  lockReason?: string;
+  lastLoginAt?: string;
+  lastLoginIp?: string;
+  failedLoginAttempts?: number;
+  twoFactorEnabled?: boolean;
+  forcePasswordReset?: boolean;
+  accountExpiresAt?: string;
+  customPermissions?: Record<string, Record<string, boolean>>;
+  userScopes?: Record<string, DataScopeType>;
   signatureFile?: string;
   signatureStatus?: 'ACTIVE' | 'INACTIVE' | 'PENDING';
   signatureVersion?: number;
   signatureUpdatedAt?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface University {
@@ -108,6 +173,7 @@ export interface Program {
 export interface AcademicYear {
   id: string;
   name: string; // e.g. "2024-2025"
+  year?: string; // e.g. "2026-27"
   startDate: string;
   endDate: string;
   isCurrent: boolean;
@@ -128,6 +194,7 @@ export interface Semester {
   id: string;
   number: number; // e.g. 1 to 8
   code: string; // e.g. "SEM-1"
+  name?: string; // e.g. "Semester 1", "Semester 4"
   programId: string;
   academicYearId: string;
   status: 'ACTIVE' | 'COMPLETED' | 'UPCOMING';
@@ -199,18 +266,199 @@ export interface StudentAcademicHistoryRecord {
   remarks?: string;
 }
 
+export type StudentStatus = 
+  | 'APPLICANT'
+  | 'ADMISSION_CONFIRMED'
+  | 'DOCUMENT_PENDING'
+  | 'FEE_PENDING'
+  | 'READY_TO_ONBOARD'
+  | 'ONBOARDING'
+  | 'ACTIVE'
+  | 'INACTIVE'
+  | 'GRADUATED'
+  | 'SUSPENDED'
+  | 'CANCELLED'
+  | 'ALUMNI';
+
+export type StudentOnboardingStatus = 
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'UNDER_VERIFICATION'
+  | 'DOCUMENT_PENDING'
+  | 'FEE_PENDING'
+  | 'APPROVED'
+  | 'READY_TO_ONBOARD'
+  | 'ONBOARDED'
+  | 'REJECTED'
+  | 'CANCELLED'
+  // Backward compatibility aliases
+  | 'ONBOARDING_DRAFT'
+  | 'READY'
+  | 'HOLD'
+  | 'PENDING';
+
+export type CoreRbacRole = 
+  | 'SUPER_ADMIN'
+  | 'ADMISSION_OFFICER'
+  | 'STUDENT_ADMIN'
+  | 'ADMIN_OFFICER'
+  | 'UNIVERSITY_ADMIN'
+  | 'FACULTY'
+  | 'MENTOR'
+  | 'EXAM_OFFICER'
+  | 'EXAM_CELL'
+  | 'FINANCE_OFFICER'
+  | 'ACCOUNTS_ADMIN'
+  | 'HR_ADMIN'
+  | 'STUDENT';
+
+export interface StandardRolePermissions {
+  canView: boolean;
+  canCreate: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+  canApprove: boolean;
+  canVerify: boolean;
+  canExport: boolean;
+  canPrint: boolean;
+}
+
 export interface Student {
+  // ─── MASTER STUDENT DATA SCHEMA (Single Source of Truth) ───
+  // Core Identifiers
   id: string;
   enrollmentNo: string;
-  name: string;
-  email: string;
-  phone: string;
-  photo?: string;
-  gender: 'Male' | 'Female' | 'Other';
-  dateOfBirth?: string;
-  bloodGroup?: string;
-  address?: string;
+  universityId?: string; // e.g. SSIU-2023-CS-001
+  grNo?: string; // General Register No (Gr.No)
+  admissionId?: string;
+  admissionNumber?: string;
+  applicationNumber?: string;
   admissionDate?: string;
+  admissionYear?: string | number;
+  classToBeAdmitted?: string; // Class to be admitted
+  academicYear?: string;
+  instituteName?: string;
+  programName?: string;
+  branch?: string;
+  branchName?: string;
+  academicStanding?: 'GOOD_STANDING' | 'ATTENDANCE_SHORTAGE' | 'ACADEMIC_RISK';
+  mobile?: string;
+  rollNo?: string;
+
+  // Personal Information
+  name: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  fullName?: string;
+  fullNameAsPerMarksheet?: string; // Full Name as per SSC/HSC Marksheet
+  fullNameAsPerAadhar?: string; // Full Name As Per Aadhar
+  photo?: string;
+  signature?: string;
+  dateOfBirth?: string;
+  dob?: string;
+  dobWords?: string; // DOB in Words
+  dobInWords?: string;
+  gender: 'Male' | 'Female' | 'Other';
+  bloodGroup?: string;
+  nationality?: string;
+  religion?: string;
+  category?: string;
+  caste?: string;
+  subCaste?: string;
+  aadhaarNo?: string;
+  aadhaarCardNo?: string; // Aadhaar Card No
+  aadhaarDocRef?: string; // Aadhar Card / Document reference
+  isSpecialNeed?: boolean; // Is Special Need?
+  passportNumber?: string;
+  visaNumber?: string;
+  birthPlace?: string;
+  pob?: string; // Place of Birth (POB)
+  birthDistrict?: string;
+  birthState?: string;
+  maritalStatus?: 'Unmarried' | 'Married' | 'Other';
+  universityRegNo?: string;
+  abcNumber?: string; // Academic Bank of Credits (ABC Number)
+
+  // Contact Details
+  email: string;
+  officialEmail?: string; // Official Email ID
+  phone: string;
+  phoneNo?: string;
+  mobileNumber?: string; // Mobile Number
+  alternateMobile1?: string; // Alternate Mobile No. 1
+  alternateMobile2?: string; // Alternate Mobile No. 2
+  alternateMobile3?: string; // Alternate Mobile No. 3
+  whatsappNumber?: string;
+  alternatePhone?: string;
+  alternateEmail?: string;
+  emergencyContactName?: string;
+  emergencyContactNumber?: string;
+  emergencyContactRelation?: string;
+
+  // Family / Parent Details
+  fatherName?: string;
+  fatherPhone?: string;
+  fatherEmail?: string;
+  fatherOccupation?: string;
+  fatherAnnualIncome?: number | string;
+  motherName?: string;
+  motherPhone?: string;
+  motherEmail?: string;
+  motherOccupation?: string;
+  motherAnnualIncome?: number | string;
+  guardianName: string;
+  guardianPhone: string;
+  guardianEmail?: string;
+  guardianRelation?: string;
+  guardianOccupation?: string;
+  fatherIsGuardian?: boolean;
+  motherIsGuardian?: boolean;
+
+  // Address
+  address?: string;
+  city?: string;
+  district?: string;
+  taluka?: string;
+  state?: string;
+  country?: string;
+  pinCode?: string;
+  pincode?: string;
+  currentAddressLine1?: string;
+  currentAddressLine2?: string;
+  currentCity?: string;
+  currentDistrict?: string;
+  currentState?: string;
+  currentCountry?: string;
+  currentPincode?: string;
+  permanentAddressLine1?: string;
+  permanentAddressLine2?: string;
+  permanentCity?: string;
+  permanentDistrict?: string;
+  permanentState?: string;
+  permanentCountry?: string;
+  permanentPincode?: string;
+  isPermanentSameAsCurrent?: boolean;
+
+  // Previous Academic Qualifications
+  tenthBoard?: string;
+  tenthSchool?: string;
+  tenthPassingYear?: number | string;
+  tenthPercentage?: number | string;
+  twelfthBoard?: string;
+  twelfthSchool?: string;
+  twelfthPassingYear?: number | string;
+  twelfthPercentage?: number | string;
+  diplomaCollege?: string;
+  diplomaBranch?: string;
+  diplomaPassingYear?: number | string;
+  diplomaPercentage?: number | string;
+  graduationInstitute?: string;
+  graduationDegree?: string;
+  graduationPassingYear?: number | string;
+  graduationPercentage?: number | string;
+
+  // Current Academic Mapping
   instituteId: string;
   departmentId?: string;
   programId: string;
@@ -218,13 +466,48 @@ export interface Student {
   batchId: string;
   semesterId: string;
   divisionId: string;
-  guardianName: string;
-  guardianPhone: string;
+  rollNumber?: string;
+  admissionType?: string;
+  admissionCategory?: string;
+  admissionStatus?: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'ON_HOLD';
+  academicStatus?: 'ACTIVE' | 'INACTIVE' | 'COMPLETED' | 'DROPOUT' | 'TRANSFERRED';
+
+  // Additional Information & Amenities
+  physicallyChallenged?: boolean;
+  disabilityDetails?: string;
+  motherTongue?: string;
+  hostelRequired?: boolean;
+  transportRequired?: boolean;
+  bankName?: string;
+  accountHolderName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+
+  // Mentorship & ERP Account
   mentorId?: string;
+  mentorName?: string;
+  mentorAssignedBy?: string;
+  mentorAssignedDate?: string;
+  erpUsername?: string;
+  erpAccountStatus?: 'NOT_CREATED' | 'PENDING_ACTIVATION' | 'ACTIVE' | 'LOCKED' | 'DISABLED';
+  onboardingStatus?: StudentOnboardingStatus;
+  onboardingSource?: 'ADMISSION_APPLICATION' | 'MANUAL_ONBOARDING';
+  onboardedBy?: string;
+  onboardedDate?: string;
+
   studentType?: 'DOMESTIC' | 'INTERNATIONAL';
-  nationality?: string;
-  passportNumber?: string;
-  visaNumber?: string;
+  
+  // Temporary & Final Enrollment Lifecycles
+  temporaryEnrollmentNumber?: string; // e.g. "TEMP-2026-00001"
+  finalEnrollmentNumber?: string; // e.g. "2026CE000123"
+  enrollmentStatus?: 'TEMPORARY' | 'FINAL';
+  studentAccessCode?: string; // 5-digit secure access code e.g. "48271"
+  onboardingCompletedAt?: string;
+  finalEnrollmentAssignedAt?: string;
+  finalEnrollmentAssignedBy?: string;
+  firstLoginAt?: string;
+  isFirstLogin?: boolean;
+
   abcId?: string; // 12-digit Academic Bank of Credits ID e.g. "9842-1056-7890" or "984210567890"
   abcIdStatus?: 'NOT_SUBMITTED' | 'PENDING_VERIFICATION' | 'VERIFIED' | 'REJECTED';
   abcIdVerifiedByUserId?: string;
@@ -245,7 +528,8 @@ export interface Student {
   }[];
   academicHistory?: StudentAcademicHistoryRecord[];
   academicLifecycleStatus?: 'ADMITTED' | 'PURSUING' | 'GRADUATED' | 'ALUMNI';
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'GRADUATED';
+  studentStatus?: StudentStatus;
+  status: StudentStatus | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'GRADUATED';
 }
 
 export type DocumentVerificationStatus = 'PENDING_VERIFICATION' | 'VERIFIED' | 'REJECTED';
@@ -341,6 +625,8 @@ export interface AuditLog {
   details: string;
   status?: AuditStatus;
   severity?: AuditSeverity;
+  previousValue?: string | Record<string, any>;
+  newValue?: string | Record<string, any>;
   ipAddress?: string;
   userAgent?: string;
   deviceInfo?: string;
@@ -410,6 +696,11 @@ export interface TimetableEntry {
   divisionId: string;
   roomNo: string;
   departmentId: string;
+  academicYearId?: string;
+  semesterId?: string;
+  programId?: string;
+  lectureType?: 'THEORY' | 'PRACTICAL' | 'LAB' | 'TUTORIAL';
+  buildingName?: string;
   status: 'ACTIVE' | 'CANCELLED';
 }
 
@@ -417,14 +708,22 @@ export interface SessionPlanTopic {
   id: string;
   subjectId: string;
   unitNo: number;
+  unitTitle?: string;
   lectureNo: number;
   topicTitle: string;
-  teachingMethod: 'Chalk & Board' | 'PPT Presentation' | 'Lab Demonstration' | 'Interactive Case Study';
+  subTopic?: string;
+  teachingMethod: 'Chalk & Board' | 'PPT Presentation' | 'Lab Demonstration' | 'Interactive Case Study' | 'Lecture + Practical' | 'Board + PPT' | string;
   plannedDate: string;
   completedDate?: string;
-  status: 'COMPLETED' | 'PENDING' | 'IN_PROGRESS';
-  facultyId: string;
+  durationHours?: number;
+  referenceMaterial?: string;
+  remarks?: string;
   notes?: string;
+  divisionId?: string;
+  academicYearId?: string;
+  semesterId?: string;
+  status: 'COMPLETED' | 'PENDING' | 'IN_PROGRESS' | 'CANCELLED';
+  facultyId: string;
 }
 
 export interface UnitMaterial {
@@ -450,11 +749,17 @@ export interface AssignmentSubmission {
   studentName: string;
   enrollmentNo: string;
   submittedDate: string;
+  submittedTime?: string;
   fileUrl: string;
+  fileName?: string;
   notes?: string;
   status: 'SUBMITTED' | 'GRADED' | 'LATE';
+  lateStatus?: 'ON_TIME' | 'LATE';
   obtainedMarks?: number;
   feedback?: string;
+  academicYearId?: string;
+  semesterId?: string;
+  divisionId?: string;
 }
 
 export interface Assignment {
@@ -470,19 +775,25 @@ export interface Assignment {
   createdByFacultyName: string;
   createdDate: string;
   attachmentUrl?: string;
+  academicYearId?: string;
+  semesterId?: string;
   status: 'ACTIVE' | 'CLOSED';
 }
 
 export interface AcademicCalendarEvent {
   id: string;
   title: string;
-  eventType: 'HOLIDAY' | 'EXAM' | 'EVENT' | 'SEMINAR' | 'IMPORTANT';
+  eventType: 'HOLIDAY' | 'EXAM' | 'EVENT' | 'SEMINAR' | 'IMPORTANT' | 'WORKSHOP';
   startDate: string; // YYYY-MM-DD
   endDate: string;
   description: string;
   location?: string;
+  venue?: string;
+  time?: string;
   isImportant: boolean;
   createdBy: string;
+  organizedBy?: string;
+  status?: 'SCHEDULED' | 'COMPLETED' | 'POSTPONED' | 'CANCELLED';
 }
 
 // --- PHASE 1: FEE HEAD MASTER & FINANCE MANAGEMENT TYPES ---
@@ -634,11 +945,17 @@ export interface StudentFeeRecord {
   feeType?: 'TUITION' | 'EXAM' | 'HOSTEL' | 'ALL';
   totalAmount: number;
   paidAmount: number;
+  previouslyPaid?: number;
+  currentPaid?: number;
+  refundedAmount?: number;
   discountAmount?: number;
   waivedAmount?: number;
   pendingAmount: number;
   dueDate: string; // YYYY-MM-DD
   status: FeePaymentStatus;
+  academicYear?: string;
+  breakdown?: any[];
+  semesterName?: string;
   items?: StudentFeeItem[];
   auditLogs?: StudentFeeAccountAuditLog[];
   createdAt?: string;
@@ -705,7 +1022,7 @@ export interface FeeInvoice {
   updatedAt?: string;
 }
 
-export type PaymentMode = 'Online UPI' | 'Credit/Debit Card' | 'Net Banking' | 'Cheque' | 'Demand Draft' | 'Bank Transfer' | 'Cash' | 'UPI' | 'Other';
+export type PaymentMode = 'Online UPI' | 'Credit/Debit Card' | 'Debit Card' | 'Credit Card' | 'Net Banking' | 'Cheque' | 'Demand Draft' | 'Bank Transfer' | 'Cash' | 'UPI' | 'Other';
 
 export interface FeePaymentTransaction {
   id: string;
@@ -716,12 +1033,21 @@ export interface FeePaymentTransaction {
   enrollmentNo: string;
   programId: string;
   semesterId: string;
+  semesterName?: string;
+  academicYear?: string;
   paidAmount: number;
   paymentMode: PaymentMode;
   transactionId: string;
+  referenceNo?: string;
+  referenceDate?: string;
+  bankName?: string;
+  gatewayName?: string;
   gatewayRef?: string;
-  feeType?: 'TUITION' | 'EXAM' | 'OTHER';
-  status?: 'SUCCESS' | 'PENDING' | 'FAILED' | 'REFUNDED';
+  feeType?: 'TUITION' | 'EXAM' | 'HOSTEL' | 'TRANSPORT' | 'OTHER' | 'ALL';
+  status?: 'SUCCESS' | 'PENDING' | 'FAILED' | 'REFUNDED' | 'CANCELLED';
+  refundAmount?: number;
+  refundReason?: string;
+  refundDate?: string;
   paymentDate: string; // YYYY-MM-DD
   remarks?: string;
   recordedBy: string;
@@ -931,39 +1257,134 @@ export interface CRMLeadDashboardStats {
   conversionRate: number; // percentage
 }
 
-export type AdmissionApplicationStatus = 'APPLIED' | 'DOCUMENT_VERIFICATION' | 'SHORTLISTED' | 'APPROVED' | 'REJECTED' | 'CONVERTED';
+export type AdmissionApplicationStatus = 
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'APPLIED' 
+  | 'PENDING'
+  | 'UNDER_REVIEW'
+  | 'DOCUMENT_VERIFICATION' 
+  | 'DOCUMENTS_VERIFIED'
+  | 'SHORTLISTED' 
+  | 'FEE_PENDING'
+  | 'FEE_VERIFIED'
+  | 'APPROVED' 
+  | 'ADMISSION_CONFIRMED'
+  | 'READY_FOR_ONBOARDING'
+  | 'ONBOARDING_IN_PROGRESS'
+  | 'ONBOARDED'
+  | 'CONVERTED' 
+  | 'REJECTED' 
+  | 'HOLD'
+  | 'CANCELLED';
 
 export interface AdmissionDocument {
   id: string;
   name: string;
-  status: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  documentType?: string;
+  status: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'N/A';
   fileUrl?: string;
+  uploadDate?: string;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  rejectionReason?: string;
+  remarks?: string;
 }
 
 export interface AdmissionApplication {
   id: string;
   applicationNumber?: string;
+  admissionNumber?: string;
+  admissionType?: 'REGULAR' | 'MERIT' | 'MANAGEMENT' | 'INTERNATIONAL' | 'TRANSFER' | 'LATERAL_ENTRY';
   leadId?: string; // If converted from CRM lead
   studentId?: string; // Generated once converted to active Student
+  enrollmentNo?: string;
+  studentUserId?: string;
   applicantName: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
   email: string;
   phone: string;
+  whatsappNumber?: string;
   gender: 'Male' | 'Female' | 'Other';
   dateOfBirth: string;
   bloodGroup: string;
+  nationality?: string;
+  category?: string;
+  religion?: string;
+  maritalStatus?: string;
+  motherTongue?: string;
+  aadhaarNumber?: string;
+  photo?: string;
+  
+  // Address
   address: string;
+  currentAddress?: string;
+  permanentAddress?: string;
+  city?: string;
+  district?: string;
+  state?: string;
+  country?: string;
+  pincode?: string;
+
+  // Family Information
+  fatherName?: string;
+  fatherPhone?: string;
+  fatherEmail?: string;
+  fatherOccupation?: string;
+  motherName?: string;
+  motherPhone?: string;
+  motherEmail?: string;
+  motherOccupation?: string;
   guardianName: string;
   guardianPhone: string;
+  emergencyContact?: string;
+
+  // Academic Information
   instituteId?: string;
   instituteName?: string;
   departmentId?: string;
   departmentName?: string;
   academicYearId?: string;
+  admissionYear?: string;
   programId: string;
   semesterId: string;
   batchId: string;
   divisionId: string;
+  rollNumber?: string;
+
+  // Academic Qualification
+  qualifyingExam?: string;
+  qualifyingBoard?: string;
+  passingYear?: number;
+  percentage?: number;
+
+  // Fees
+  isFeePaid?: boolean;
+  feeAmountPaid?: number;
+  feeReceiptNo?: string;
+  feeStructureId?: string;
+  feeTotal?: number;
+  feePaid?: number;
+  feePending?: number;
+  feePaymentStatus?: 'PENDING' | 'PARTIALLY_PAID' | 'PAID' | 'FAILED' | 'WAIVED' | 'SUCCESS';
+  paymentTransactionId?: string;
+  paymentDate?: string;
+
+  // Academic Mapping & Mentorship
+  mentorId?: string;
+  mentorName?: string;
+  hodId?: string;
+  hodName?: string;
+  classCoordinatorId?: string;
+
+  // Status & Lifecycle
   status: AdmissionApplicationStatus;
+  onboardingStatus?: 'PENDING' | 'DOC_VERIFIED' | 'FEE_VERIFIED' | 'READY' | 'ONBOARDED' | 'HOLD' | 'REJECTED';
+  onboardingStep?: number; // 1 to 11
+  onboardedAt?: string;
+  onboardedBy?: string;
   documents: AdmissionDocument[];
   reviewerRemarks?: string;
   submittedAt: string; // YYYY-MM-DD
@@ -1053,6 +1474,7 @@ export interface Exam {
   type: ExamType | string;
   academicYearId: string;
   academicYearCode?: string;
+  academicYear?: string;
   instituteId?: string;
   departmentId?: string;
   programId: string;
@@ -1160,6 +1582,7 @@ export interface ExamForm {
   paymentStatus: 'PAID' | 'PENDING' | 'COMPLETED' | 'FAILED' | 'WAIVED' | 'SUCCESS' | 'INITIATED' | 'REFUNDED';
   regularSubjects?: string[]; // Subject IDs
   remedialSubjects?: string[]; // Subject IDs
+  backlogSubjects?: string[]; // Subject IDs
   formSubjects?: ExamFormSubjectItem[];
   examFeeAmount?: number;
   lateFeeAmount?: number;
@@ -1170,12 +1593,15 @@ export interface ExamForm {
   totalFee?: number;
   feePaid?: boolean;
   documents?: ExamFormDocument[];
+  receiptNo?: string;
+  receiptNumber?: string;
   paymentMode?: string;
   transactionId?: string;
   paymentTransactionId?: string;
   paidAt?: string;
   hallTicketNo?: string;
   isEligible?: boolean;
+  isVerified?: boolean;
   returnReason?: string;
   rejectionReason?: string;
   verifiedAt?: string;
@@ -2310,87 +2736,598 @@ export interface PatentRecord {
 
 // ─── HR MANAGEMENT MODULE TYPES ──────────────────────────────────────────
 
-export type EmployeeType = 'FACULTY' | 'ADMIN_STAFF' | 'TECHNICAL_STAFF' | 'SUPPORT_STAFF';
-export type EmployeeStatus = 'ACTIVE' | 'ON_LEAVE' | 'PROBATION' | 'RESIGNED' | 'RELIEVED';
-export type LeaveType = 'CASUAL' | 'MEDICAL' | 'EARNED' | 'DUTY_LEAVE' | 'MATERNITY';
+export type EmployeeType = 
+  | 'FACULTY' 
+  | 'ADMINISTRATIVE' 
+  | 'ADMIN_STAFF'
+  | 'TECHNICAL' 
+  | 'TECHNICAL_STAFF'
+  | 'NON_TEACHING' 
+  | 'LAB_STAFF' 
+  | 'LIBRARY' 
+  | 'IT' 
+  | 'SUPPORT' 
+  | 'SUPPORT_STAFF'
+  | 'SECURITY' 
+  | 'HOUSEKEEPING' 
+  | 'MAINTENANCE' 
+  | 'DRIVER' 
+  | 'OTHER';
+
+export type EmploymentType = 
+  | 'PERMANENT' 
+  | 'PROBATION' 
+  | 'CONTRACT' 
+  | 'TEMPORARY' 
+  | 'PART_TIME' 
+  | 'VISITING' 
+  | 'GUEST' 
+  | 'CONSULTANT' 
+  | 'OTHER';
+
+export type EmployeeStatus = 
+  | 'ACTIVE' 
+  | 'ON_LEAVE' 
+  | 'PROBATION' 
+  | 'RESIGNED' 
+  | 'RELIEVED' 
+  | 'RETIRED' 
+  | 'TERMINATED' 
+  | 'SUSPENDED' 
+  | 'TRANSFERRED';
+
+export type LeaveType = 
+  | 'CASUAL' 
+  | 'SICK' 
+  | 'MEDICAL' 
+  | 'EARNED' 
+  | 'MATERNITY' 
+  | 'PATERNITY' 
+  | 'STUDY_LEAVE' 
+  | 'DUTY_LEAVE' 
+  | 'SPECIAL_LEAVE' 
+  | 'UNPAID' 
+  | 'OTHER';
+
+export type AttendanceMark = 
+  | 'PRESENT' 
+  | 'ABSENT' 
+  | 'HALF_DAY' 
+  | 'LATE' 
+  | 'EARLY_EXIT' 
+  | 'WORK_FROM_HOME' 
+  | 'ON_DUTY' 
+  | 'HOLIDAY' 
+  | 'WEEKLY_OFF';
 
 export interface Employee {
   id: string;
-  employeeId: string; // e.g. "EMP-2024-001"
+  employeeId: string; // e.g. "EMP-2026-00001"
+  employeeCode?: string;
   name: string;
+  firstName?: string;
+  lastName?: string;
+  photo?: string;
   email: string;
   phone: string;
+  alternatePhone?: string;
+  dob?: string;
+  gender?: 'Male' | 'Female' | 'Other';
+  bloodGroup?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
+  
+  // Employment & Hierarchy
   designation: string;
   employeeType: EmployeeType;
+  employmentType?: EmploymentType;
+  employmentStatus?: string;
   instituteId: string;
+  instituteName?: string;
   departmentId: string;
+  departmentName?: string;
   joiningDate: string;
+  confirmationDate?: string;
+  reportingManagerId?: string;
+  reportingManagerName?: string;
+  hodHoiId?: string;
+  hodHoiName?: string;
+  workLocation?: string;
+  shift?: string;
+  status: EmployeeStatus;
+
+  // Compensation & Statutory
   salary: number; // monthly gross pay
+  basicSalary?: number;
+  hra?: number;
+  da?: number;
+  specialAllowance?: number;
+  otherAllowance?: number;
+  bankName?: string;
   bankAccountNo: string;
+  ifscCode?: string;
   panNo: string;
   aadhaarNo: string;
+  pfNumber?: string;
+  uanNumber?: string;
+  esicNumber?: string;
+
+  // Qualifications & Experience
   qualification: string;
+  highestDegree?: string;
+  specialization?: string;
   experienceYears: number;
-  status: EmployeeStatus;
+  previousInstitute?: string;
+
+  // Faculty-Specific Academic Profile (N/A for Non-Teaching)
+  isFaculty?: boolean;
+  programId?: string;
+  teachingLoadHours?: number;
+  researchInterests?: string[];
+  publicationsCount?: number;
+  fdpConductedCount?: number;
+  fdpAttendedCount?: number;
+  conferencesCount?: number;
+  certificationsCount?: number;
+  menteeStudentsCount?: number;
+
+  // System & Login Linkage
+  userId?: string;
+  username?: string;
+  loginActivated?: boolean;
+  assignedAssetIds?: string[];
+  
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export interface PayrollRecord {
+export interface EmployeeAttendanceRecord {
   id: string;
   employeeId: string;
   employeeName: string;
-  month: string; // e.g. "August 2026"
-  year: number;
-  basicPay: number;
-  hra: number;
-  da: number;
-  specialAllowance: number;
-  grossSalary: number;
-  pfDeduction: number;
-  taxDeduction: number;
-  netSalary: number;
-  status: 'DRAFT' | 'APPROVED' | 'PAID';
-  paidDate?: string;
+  employeeCode?: string;
+  departmentId: string;
+  departmentName?: string;
+  date: string; // YYYY-MM-DD
+  inTime?: string; // HH:mm
+  outTime?: string; // HH:mm
+  status: AttendanceMark;
+  workHours?: number;
+  isLate?: boolean;
+  lateMinutes?: number;
+  isEarlyExit?: boolean;
+  source: 'MANUAL' | 'BIOMETRIC' | 'BULK_IMPORT' | 'CORRECTION' | 'WEB';
+  remarks?: string;
+  verifiedBy?: string;
+}
+
+export interface AttendanceCorrectionRequest {
+  id: string;
+  requestNo: string; // e.g. "ATT-CORR-2026-00001"
+  employeeId: string;
+  employeeName: string;
+  departmentId: string;
+  date: string;
+  currentStatus: AttendanceMark;
+  requestedStatus: AttendanceMark;
+  requestedInTime?: string;
+  requestedOutTime?: string;
+  reason: string;
+  status: 'SUBMITTED' | 'MANAGER_APPROVED' | 'APPROVED' | 'REJECTED';
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewRemarks?: string;
+  createdAt: string;
+}
+
+export interface EmployeeLeaveBalance {
+  id: string;
+  employeeId: string;
+  academicYear: string;
+  leaveType: LeaveType;
+  openingBalance: number;
+  used: number;
+  pending: number;
+  remaining: number;
 }
 
 export interface EmployeeLeaveApplication {
   id: string;
+  applicationNo?: string;
   employeeId: string;
   employeeName: string;
   departmentId: string;
+  departmentName?: string;
   leaveType: LeaveType;
   startDate: string;
   endDate: string;
   totalDays: number;
   reason: string;
-  status: ApprovalStatus;
+  documentUrl?: string;
+  status: ApprovalStatus | 'SUBMITTED' | 'MANAGER_APPROVED' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  managerApproval?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  managerRemarks?: string;
+  hodApproval?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  hodRemarks?: string;
+  hrApproval?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  hrRemarks?: string;
   approvedByUserId?: string;
   approvedByUserName?: string;
+  approvedDate?: string;
   appliedDate: string;
+}
+
+export interface SalaryStructure {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  designation: string;
+  departmentName: string;
+  basicPay: number;
+  hra: number;
+  da: number;
+  specialAllowance: number;
+  otherAllowances: number;
+  grossSalary: number;
+  pfDeduction: number;
+  esicDeduction: number;
+  professionalTax: number;
+  tdsDeduction: number;
+  loanDeduction: number;
+  totalDeductions: number;
+  netSalary: number;
+  effectiveFrom: string;
+  status: 'ACTIVE' | 'REVISED' | 'INACTIVE';
+}
+
+export interface PayrollRecord {
+  id: string;
+  payrollNumber?: string;
+  employeeId: string;
+  employeeName: string;
+  employeeCode?: string;
+  designation?: string;
+  departmentId?: string;
+  departmentName?: string;
+  month: string; // e.g. "August 2026"
+  year: number;
+  workingDays: number;
+  presentDays: number;
+  paidLeaveDays: number;
+  unpaidLeaveDays: number;
+  basicPay: number;
+  hra: number;
+  da: number;
+  specialAllowance: number;
+  incentives?: number;
+  overtimePay?: number;
+  arrears?: number;
+  grossSalary: number;
+  pfDeduction: number;
+  esicDeduction?: number;
+  professionalTax?: number;
+  taxDeduction: number; // TDS
+  loanAdvanceDeduction?: number;
+  otherDeductions?: number;
+  totalDeductions: number;
+  netSalary: number;
+  bankName?: string;
+  bankAccountNo?: string;
+  paymentMode?: 'BANK_TRANSFER' | 'CHEQUE' | 'CASH';
+  transactionRef?: string;
+  status: 'DRAFT' | 'CALCULATED' | 'VERIFIED' | 'APPROVED' | 'PAID';
+  processedBy?: string;
+  processedAt?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  paidDate?: string;
+  payslipGenerated?: boolean;
+}
+
+export interface EmployeeDocumentItem {
+  id: string;
+  employeeId: string;
+  documentType: 
+    | 'ID_PROOF' 
+    | 'PAN_CARD' 
+    | 'AADHAAR_CARD' 
+    | 'ACADEMIC_CERTIFICATE' 
+    | 'DEGREE_CERTIFICATE' 
+    | 'MARKSHEET' 
+    | 'EXPERIENCE_CERTIFICATE' 
+    | 'APPOINTMENT_LETTER' 
+    | 'JOINING_REPORT' 
+    | 'BANK_PASSBOOK_CANCELLED_CHEQUE' 
+    | 'CONTRACT_AGREEMENT' 
+    | 'NOC' 
+    | 'RELIEVING_LETTER' 
+    | 'SALARY_SLIP_PREVIOUS' 
+    | 'OTHER';
+  documentTitle: string;
+  documentNumber?: string;
+  fileName: string;
+  fileUrl: string;
+  fileSize?: string;
+  uploadedDate: string;
+  uploadedBy: string;
+  expiryDate?: string;
+  verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
+  verifiedBy?: string;
+  verifiedAt?: string;
+  remarks?: string;
 }
 
 export interface PerformanceAppraisal {
   id: string;
+  appraisalNo?: string;
   employeeId: string;
   employeeName: string;
+  designation?: string;
+  departmentName?: string;
   academicYearId: string;
-  teachingRating: number; // out of 5.0
-  researchRating: number; // out of 5.0
+  academicYearCode?: string;
+  reviewCycle: 'ANNUAL' | 'PROBATION' | 'MID_YEAR';
+  kraList?: { kra: string; weightage: number; selfScore: number; managerScore: number }[];
+  selfAssessmentRemarks?: string;
+  managerAssessmentRemarks?: string;
+  hodRemarks?: string;
+  hrRemarks?: string;
+  teachingRating: number; // out of 5.0 (N/A for Non-Teaching)
+  researchRating: number; // out of 5.0 (N/A for Non-Teaching)
   administrativeRating: number; // out of 5.0
+  universityContributionRating?: number;
   overallScore: number; // out of 5.0
+  grade?: 'A+' | 'A' | 'B+' | 'B' | 'C' | 'D';
+  recommendation?: 'PROMOTION' | 'INCREMENT' | 'CONFIRMATION' | 'TRAINING_REQUIRED' | 'RETAIN_SAME';
   feedback: string;
   status: 'DRAFT' | 'SUBMITTED' | 'REVIEWED' | 'APPROVED';
+  reviewedBy?: string;
+  reviewedAt?: string;
+  approvedBy?: string;
+  approvedAt?: string;
 }
 
 export interface TrainingFdpRecord {
   id: string;
   employeeId: string;
   employeeName: string;
+  departmentName?: string;
+  trainingType: 'FDP' | 'WORKSHOP' | 'TRAINING' | 'CERTIFICATION' | 'CONFERENCE' | 'SEMINAR' | 'SKILL_DEVELOPMENT';
   title: string;
   organizer: string;
+  location?: string;
   startDate: string;
   endDate: string;
+  durationDays?: number;
+  costSponsoredByUniversity?: number;
   certificateUrl?: string;
-  status: 'ATTENDED' | 'COMPLETED' | 'VERIFIED';
+  certificateNumber?: string;
+  status: 'NOMINATED' | 'ATTENDED' | 'COMPLETED' | 'VERIFIED';
+  verifiedBy?: string;
+  verifiedAt?: string;
+}
+
+export interface JobVacancy {
+  id: string;
+  vacancyCode: string; // e.g. "VAC-2026-001"
+  positionTitle: string;
+  instituteId: string;
+  instituteName: string;
+  departmentId: string;
+  departmentName: string;
+  designation: string;
+  employeeType: EmployeeType;
+  employmentType: EmploymentType;
+  vacanciesCount: number;
+  requiredQualification: string;
+  minExperienceYears: number;
+  jobDescription: string;
+  postingDate: string;
+  closingDate: string;
+  status: 'DRAFT' | 'PUBLISHED' | 'SCREENING' | 'INTERVIEWS' | 'CLOSED' | 'CANCELLED';
+  applicantCount: number;
+}
+
+export interface JobApplication {
+  id: string;
+  applicationNo: string;
+  vacancyId: string;
+  vacancyTitle: string;
+  candidateName: string;
+  email: string;
+  phone: string;
+  currentDesignation?: string;
+  currentCompany?: string;
+  highestQualification: string;
+  totalExperienceYears: number;
+  resumeUrl?: string;
+  appliedDate: string;
+  screeningStatus: 'APPLIED' | 'SHORTLISTED' | 'INTERVIEW_SCHEDULED' | 'SELECTED' | 'OFFER_EXTENDED' | 'OFFER_ACCEPTED' | 'JOINED' | 'REJECTED';
+  interviewFeedback?: string;
+  interviewScore?: number;
+  offerDate?: string;
+  offeredSalary?: number;
+  joiningDate?: string;
+  remarks?: string;
+}
+
+export interface PromotionRecord {
+  id: string;
+  proposalNo: string; // e.g. "PROM-2026-0001"
+  employeeId: string;
+  employeeName: string;
+  departmentName: string;
+  currentDesignation: string;
+  proposedDesignation: string;
+  currentSalary: number;
+  proposedSalary: number;
+  effectiveDate: string;
+  reason: string;
+  evaluationScore?: number;
+  status: 'PROPOSED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'EXECUTED';
+  approvedBy?: string;
+  approvedAt?: string;
+  remarks?: string;
+}
+
+export interface SalaryIncrementRecord {
+  id: string;
+  incrementNo: string;
+  employeeId: string;
+  employeeName: string;
+  departmentName: string;
+  currentSalary: number;
+  incrementType: 'PERCENTAGE' | 'FLAT_AMOUNT';
+  incrementValue: number;
+  newSalary: number;
+  effectiveDate: string;
+  reason: string;
+  status: 'PROPOSED' | 'APPROVED' | 'REJECTED' | 'EXECUTED';
+  approvedBy?: string;
+  approvedAt?: string;
+}
+
+export interface EmployeeTransferRecord {
+  id: string;
+  transferNo: string;
+  employeeId: string;
+  employeeName: string;
+  fromInstituteId: string;
+  fromInstituteName: string;
+  fromDepartmentId: string;
+  fromDepartmentName: string;
+  fromDesignation: string;
+  toInstituteId: string;
+  toInstituteName: string;
+  toDepartmentId: string;
+  toDepartmentName: string;
+  toDesignation: string;
+  transferType: 'DEPARTMENT' | 'INSTITUTE' | 'ROLE' | 'LOCATION';
+  effectiveDate: string;
+  reason: string;
+  status: 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'COMPLETED';
+  approvedBy?: string;
+  approvedAt?: string;
+}
+
+export interface WorkloadTransferRecord {
+  id: string;
+  transferNo: string;
+  fromEmployeeId: string;
+  fromEmployeeName: string;
+  toEmployeeId: string;
+  toEmployeeName: string;
+  workloadType: 'TEACHING_SUBJECT' | 'LAB_SESSION' | 'ADMIN_RESPONSIBILITY' | 'COMMITTEE_DUTY';
+  subjectOrDutyName: string;
+  departmentName: string;
+  startDate: string;
+  endDate: string;
+  reason: 'ON_LEAVE' | 'VACATION' | 'OFFICIAL_DUTY' | 'MEDICAL' | 'OTHER';
+  status: 'ACTIVE' | 'RESTORED' | 'CANCELLED';
+  approvedBy?: string;
+  approvedAt?: string;
+}
+
+export interface EmployeeSeparationRecord {
+  id: string;
+  separationNo: string;
+  employeeId: string;
+  employeeName: string;
+  designation: string;
+  departmentName: string;
+  separationType: 'RESIGNATION' | 'RETIREMENT' | 'TERMINATION' | 'CONTRACT_END' | 'TRANSFERRED_OUT' | 'OTHER';
+  resignationDate: string;
+  noticePeriodDays: number;
+  lastWorkingDay: string;
+  reason: string;
+  status: 'SUBMITTED' | 'APPROVED' | 'CLEARANCE_IN_PROGRESS' | 'SETTLEMENT_COMPLETED' | 'RELIEVED' | 'REJECTED';
+  departmentClearance: boolean;
+  departmentClearanceRemarks?: string;
+  libraryClearance: boolean;
+  assetClearance: boolean;
+  itClearance: boolean;
+  financeClearance: boolean;
+  hrClearance: boolean;
+  gratuityAmount?: number;
+  leaveEncashmentAmount?: number;
+  netSettlementAmount?: number;
+  relievingLetterUrl?: string;
+  experienceLetterUrl?: string;
+  settledDate?: string;
+  clearedBy?: string;
+}
+
+export interface EmployeeSelfServiceRequest {
+  id: string;
+  requestNo: string;
+  employeeId: string;
+  employeeName: string;
+  departmentName: string;
+  requestType: 
+    | 'LEAVE' 
+    | 'ATTENDANCE_CORRECTION' 
+    | 'WORK_FROM_HOME' 
+    | 'ON_DUTY' 
+    | 'LATE_ENTRY' 
+    | 'EXPERIENCE_CERTIFICATE' 
+    | 'NOC_REQUEST' 
+    | 'SALARY_SLIP_COPY' 
+    | 'ASSET_REQUISITION' 
+    | 'TRANSFER_REQUEST' 
+    | 'PROMOTION_REQUEST' 
+    | 'PAYROLL_QUERY' 
+    | 'OTHER';
+  title: string;
+  description: string;
+  supportingDocUrl?: string;
+  status: 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED' | 'CLOSED';
+  submittedAt: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewRemarks?: string;
+}
+
+export interface HRAuditLogItem {
+  id: string;
+  timestamp: string;
+  performedByUserId: string;
+  performedByName: string;
+  performedByRole: string;
+  actionType: 
+    | 'CREATE_EMPLOYEE' 
+    | 'UPDATE_EMPLOYEE' 
+    | 'ACTIVATE_LOGIN' 
+    | 'ONBOARD_EMPLOYEE' 
+    | 'RECORD_ATTENDANCE' 
+    | 'APPROVE_LEAVE' 
+    | 'PROCESS_PAYROLL' 
+    | 'APPROVE_PAYROLL' 
+    | 'UPLOAD_DOCUMENT' 
+    | 'VERIFY_DOCUMENT' 
+    | 'SUBMIT_APPRAISAL' 
+    | 'ADD_TRAINING' 
+    | 'PROCESS_PROMOTION' 
+    | 'PROCESS_INCREMENT' 
+    | 'TRANSFER_EMPLOYEE' 
+    | 'TRANSFER_WORKLOAD' 
+    | 'ASSIGN_ASSET' 
+    | 'RETURN_ASSET' 
+    | 'INITIATE_SEPARATION' 
+    | 'COMPLETE_CLEARANCE' 
+    | 'DEACTIVATE_EMPLOYEE' 
+    | 'BULK_IMPORT';
+  moduleName: string;
+  entityId: string;
+  entityName: string;
+  details: string;
+  previousValue?: string | Record<string, any>;
+  newValue?: string | Record<string, any>;
+  ipAddress?: string;
 }
 
 // ─── INCUBATION & STARTUP MANAGEMENT MODULE TYPES ────────────────────────────
@@ -3088,6 +4025,33 @@ export const ROLE_NOTESHEET_PERMISSIONS: Record<UserRole, NoteSheetPermission[]>
     'NOTESHEET_ACTION',
     'NOTESHEET_REPORT',
   ],
+  HR_ADMIN: [
+    'NOTESHEET_VIEW',
+    'NOTESHEET_CREATE',
+    'NOTESHEET_EDIT',
+    'NOTESHEET_SUBMIT',
+    'NOTESHEET_REVIEW',
+    'NOTESHEET_FORWARD',
+    'NOTESHEET_APPROVE',
+    'NOTESHEET_REJECT',
+    'NOTESHEET_RETURN',
+    'NOTESHEET_CLARIFICATION',
+    'NOTESHEET_ACTION',
+    'NOTESHEET_REPORT',
+  ],
+  HR_OFFICER: [
+    'NOTESHEET_VIEW',
+    'NOTESHEET_CREATE',
+    'NOTESHEET_EDIT',
+    'NOTESHEET_SUBMIT',
+    'NOTESHEET_REVIEW',
+    'NOTESHEET_FORWARD',
+    'NOTESHEET_ACTION',
+    'NOTESHEET_REPORT',
+  ],
+  STUDENT_ADMIN: [],
+  ERP_COORDINATOR: ['NOTESHEET_VIEW', 'NOTESHEET_REPORT'],
+  STAFF: ['NOTESHEET_VIEW'],
   STUDENT: [],
   PARENT: [],
 };
@@ -3857,6 +4821,96 @@ export interface HostelVisitorDashboardStats {
   totalEntries: number;
 }
 
+// ─── STUDENT GATE PASS & HOSTEL OUTPASS TYPES ─────────────────────────────
+
+export type GatePassStatus = 
+  | 'PENDING' 
+  | 'APPROVED' 
+  | 'REJECTED' 
+  | 'CANCELLED' 
+  | 'ACTIVE' 
+  | 'OUT' 
+  | 'RETURNED' 
+  | 'EXPIRED';
+
+export type GatePassPurpose = 
+  | 'Personal'
+  | 'Medical'
+  | 'Family Visit'
+  | 'Academic'
+  | 'Emergency'
+  | 'Other';
+
+export interface GatePassAuditEntry {
+  id: string;
+  action: 'CREATED' | 'SUBMITTED' | 'VIEWED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'OUT_RECORDED' | 'IN_RECORDED';
+  userId: string;
+  userName: string;
+  userRole: string;
+  timestamp: string;
+  remarks?: string;
+}
+
+export interface StudentGatePass {
+  id: string;
+  gatePassNo: string; // e.g. "GP/2026/0001"
+  studentId: string;
+  studentName: string;
+  enrollmentNo: string;
+  studentPhoto?: string;
+  instituteId?: string;
+  instituteName?: string;
+  departmentId?: string;
+  departmentName?: string;
+  programId?: string;
+  programName?: string;
+  semester?: string | number;
+  hostelId: string;
+  hostelName: string;
+  roomNo: string;
+  bedNo: string;
+  
+  parentGuardianName: string;
+  parentGuardianMobile: string;
+  
+  purpose: GatePassPurpose;
+  destination: string;
+  outingDate: string; // YYYY-MM-DD
+  expectedOutTime: string; // HH:mm
+  expectedReturnTime: string; // HH:mm
+  modeOfTravel?: string;
+  emergencyContact: string;
+  studentRemarks?: string;
+  supportingDocument?: string;
+  
+  status: GatePassStatus;
+  
+  // Warden Approval
+  approvedBy?: string;
+  approvedByName?: string;
+  approvedAt?: string;
+  wardenRemarks?: string;
+  rejectedReason?: string;
+  
+  // Security / Gate Entry
+  actualOutDateTime?: string;
+  actualOutRecordedBy?: string;
+  actualOutRecordedByName?: string;
+  
+  actualInDateTime?: string;
+  actualInRecordedBy?: string;
+  actualInRecordedByName?: string;
+  isLateReturn?: boolean;
+  
+  qrCodeData?: string;
+  
+  createdAt: string;
+  updatedAt: string;
+  
+  history: GatePassAuditEntry[];
+}
+
+
 // ─── TRANSPORT MANAGEMENT & VEHICLE FLEET TYPES ───────────────────────────
 
 export type VehicleType = 
@@ -4310,6 +5364,21 @@ export const ROLE_BULK_IMPORT_PERMISSIONS: Record<UserRole, BulkImportPermission
   IQAC: [
     'FACULTY_IMPORT', 'SUBJECT_IMPORT'
   ],
+  STUDENT_ADMIN: [
+    'STUDENT_IMPORT'
+  ],
+  HR_ADMIN: [
+    'FACULTY_IMPORT'
+  ],
+  HR_OFFICER: [
+    'FACULTY_IMPORT'
+  ],
+  ERP_COORDINATOR: [
+    'STUDENT_IMPORT',
+    'FACULTY_IMPORT',
+    'INVENTORY_IMPORT'
+  ],
+  STAFF: [],
   FACULTY: [],
   MENTOR: [],
   STUDENT: [],
@@ -4702,15 +5771,31 @@ export type InventoryCategoryGroup =
   | 'FACILITY_ELECTRICAL';
 
 export type AssetStatus = 
-  | 'ACTIVE'
-  | 'IN_STORE'
-  | 'ASSIGNED'
+  | 'AVAILABLE'
+  | 'ASSIGNED_TO_HOI'
+  | 'ASSIGNED_TO_HOD'
+  | 'ASSIGNED_TO_FACULTY'
+  | 'ASSIGNED_TO_STAFF'
+  | 'TRANSFER_REQUESTED'
+  | 'RETURN_REQUESTED'
+  | 'RETURNED'
   | 'UNDER_MAINTENANCE'
+  | 'REPLACEMENT_REQUESTED'
   | 'DAMAGED'
   | 'LOST'
-  | 'TRANSFERRED'
+  | 'RETIRED'
   | 'DISPOSED'
-  | 'RETIRED';
+  | 'ARCHIVED'
+  | 'ACTIVE'
+  | 'IN_STORE'
+  | 'IN_STOCK'
+  | 'ALLOCATED'
+  | 'ASSIGNED'
+  | 'IN_USE'
+  | 'REPAIR'
+  | 'MISSING'
+  | 'TRANSFERRED'
+  | 'RESERVED';
 
 export type AssetCondition = 
   | 'NEW'
@@ -4719,6 +5804,8 @@ export type AssetCondition =
   | 'FAIR'
   | 'POOR'
   | 'DAMAGED'
+  | 'CRITICAL'
+  | 'NON_FUNCTIONAL'
   | 'OBSOLETE';
 
 export interface AssetCpuConfig {
@@ -4926,50 +6013,72 @@ export interface PhysicalFileRecord {
 
 export interface AssetTransferRecord {
   id: string;
-  transferNo: string; // TRF-2026-000001
+  transferNo?: string; // TRF-2026-000001
+  assetMasterId?: string;
   assetId: string;
-  assetTag: string;
+  assetTag?: string;
   assetName: string;
-  fromInstituteId: string;
-  fromInstituteName: string;
-  toInstituteId: string;
-  toInstituteName: string;
+  quantity?: number;
+  fromInstituteId?: string;
+  fromInstituteName?: string;
+  toInstituteId?: string;
+  toInstituteName?: string;
   fromDeptId?: string;
   fromDeptName?: string;
   toDeptId?: string;
   toDeptName?: string;
+  fromDepartmentId?: string;
+  fromDepartmentName?: string;
+  toDepartmentId?: string;
+  toDepartmentName?: string;
   fromLocation?: string;
   toLocation?: string;
   fromCustodian?: string;
   toCustodian?: string;
+  fromPersonId?: string;
+  fromPersonName?: string;
+  toPersonId?: string;
+  toPersonName?: string;
   transferDate: string;
-  transferredByName: string;
+  transferredBy?: string;
+  transferredByName?: string;
   authorizedByName?: string;
   receivedByName?: string;
   reason?: string;
-  status: 'PENDING' | 'APPROVED' | 'COMPLETED' | 'CANCELLED';
+  status: 'PENDING' | 'APPROVED' | 'COMPLETED' | 'CANCELLED' | 'REJECTED';
   remarks?: string;
+  approvedBy?: string;
+  approvedAt?: string;
 }
 
 export interface AssetMaintenanceRecord {
   id: string;
-  maintenanceNo: string; // MNT-2026-000001
+  maintenanceNo?: string; // MNT-2026-000001
+  assetMasterId?: string;
   assetId: string;
-  assetTag: string;
+  assetTag?: string;
   assetName: string;
-  maintenanceType: 'PREVENTIVE' | 'CORRECTIVE' | 'BREAKDOWN' | 'AMC' | 'CALIBRATION' | string;
+  maintenanceType?: 'PREVENTIVE' | 'CORRECTIVE' | 'BREAKDOWN' | 'AMC' | 'CALIBRATION' | string;
+  serviceType?: 'PREVENTIVE' | 'CORRECTIVE' | 'UPGRADE' | 'WARRANTY_SERVICE' | 'REPAIR' | string;
   issueDescription: string;
-  reportedByName: string;
-  reportedDate: string;
+  reportedByName?: string;
+  reportedDate?: string;
   scheduledDate?: string;
   completedDate?: string;
+  maintenanceDate?: string;
+  nextServiceDate?: string;
   vendorTechnician?: string;
+  vendor?: string;
   estimatedCost?: number;
   actualCost?: number;
+  cost?: number;
   partsReplaced?: string;
-  status: 'REPORTED' | 'ASSIGNED' | 'IN_PROGRESS' | 'WAITING_PARTS' | 'COMPLETED' | 'CANCELLED';
+  isUnderWarranty?: boolean;
+  status: 'REPORTED' | 'ASSIGNED' | 'SCHEDULED' | 'IN_PROGRESS' | 'WAITING_PARTS' | 'COMPLETED' | 'CANCELLED';
   remarks?: string;
   documentUrl?: string;
+  recordedBy?: string;
+  completedAt?: string;
 }
 
 export interface PhysicalVerificationRecord {
@@ -5022,6 +6131,173 @@ export interface InventoryAuditRecord {
   newValueJson?: string;
   remarks?: string;
   timestamp: string;
+}
+
+export interface AssetMovementRecord {
+  id: string;
+  assetId: string;
+  assetTag: string;
+  assetName: string;
+  fromUserId?: string;
+  fromUserName: string;
+  fromRole: 'CENTRAL_STORE' | 'HOI' | 'HOD' | 'FACULTY' | 'STAFF' | string;
+  toUserId?: string;
+  toUserName: string;
+  toRole: 'CENTRAL_STORE' | 'HOI' | 'HOD' | 'FACULTY' | 'STAFF' | string;
+  instituteId: string;
+  instituteName: string;
+  departmentId?: string;
+  departmentName?: string;
+  location: string;
+  action: 'CENTRAL_DISPATCH' | 'HOI_ALLOCATION' | 'HOD_ASSIGNMENT' | 'FACULTY_TRANSFER' | 'RETURN_TO_STORE' | 'MAINTENANCE_DISPATCH' | 'REPLACEMENT' | 'DISPOSAL';
+  reason?: string;
+  conditionBefore: AssetCondition;
+  conditionAfter: AssetCondition;
+  approvedById?: string;
+  approvedByName?: string;
+  approvalDate?: string;
+  remarks?: string;
+  documentUrl?: string;
+  timestamp: string;
+}
+
+export type AssetRequisitionType = 'NEW_ASSET' | 'ADDITIONAL_ASSET' | 'TEMPORARY_ASSET';
+
+export type AssetRequisitionStatus = 
+  | 'PENDING_HOD_APPROVAL'
+  | 'APPROVED_BY_HOD'
+  | 'REJECTED_BY_HOD'
+  | 'PENDING_STORE_FULFILLMENT'
+  | 'ASSIGNED'
+  | 'CANCELLED';
+
+export interface AssetRequestRecord {
+  id: string;
+  requestNo: string;
+  requestedByUserId: string;
+  requestedByName: string;
+  requestedByEmpCode?: string;
+  requestedByDesignation?: string;
+  departmentId: string;
+  departmentName: string;
+  instituteId: string;
+  instituteName: string;
+  requestType: AssetRequisitionType;
+  categoryId: string;
+  categoryName: string;
+  assetNameRequirement: string;
+  quantity: number;
+  purpose: string;
+  requiredFromDate: string;
+  requiredUntilDate?: string;
+  preferredLocation?: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  status: AssetRequisitionStatus;
+  remarks?: string;
+  attachmentUrl?: string;
+  hodId?: string;
+  hodName?: string;
+  hodAction?: 'APPROVED' | 'REJECTED';
+  hodActionAt?: string;
+  hodRejectionReason?: string;
+  hodRemarks?: string;
+  assignedAssetId?: string;
+  assignedAssetTag?: string;
+  assignedAssetName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssetTransferRequestRecord {
+  id: string;
+  requestNo: string;
+  assetId: string;
+  assetTag: string;
+  assetName: string;
+  fromUserId: string;
+  fromUserName: string;
+  toUserId: string;
+  toUserName: string;
+  departmentId: string;
+  departmentName: string;
+  reason: string;
+  status: 'PENDING_HOD' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  requestedDate: string;
+  reviewedByHODId?: string;
+  reviewedByHODName?: string;
+  reviewedDate?: string;
+  rejectionReason?: string;
+  remarks?: string;
+}
+
+export interface AssetReturnRequestRecord {
+  id: string;
+  requestNo: string;
+  assetId: string;
+  assetTag: string;
+  assetName: string;
+  requestedByUserId: string;
+  requestedByName: string;
+  departmentId: string;
+  departmentName: string;
+  returnReason: string;
+  conditionAtReturn: AssetCondition;
+  remarks?: string;
+  supportingPhoto?: string;
+  status: 'PENDING_INSPECTION' | 'ACCEPTED' | 'REJECTED';
+  requestedDate: string;
+  inspectedByHODId?: string;
+  inspectedByHODName?: string;
+  inspectedDate?: string;
+  inspectionRemarks?: string;
+}
+
+export interface AssetReplacementRequestRecord {
+  id: string;
+  requestNo: string;
+  assetId: string;
+  assetTag: string;
+  assetName: string;
+  requestedByUserId: string;
+  requestedByName: string;
+  departmentId: string;
+  departmentName: string;
+  instituteId: string;
+  instituteName: string;
+  reason: string;
+  problemDescription: string;
+  currentCondition: AssetCondition;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  supportingDocument?: string;
+  remarks?: string;
+  status: 'PENDING_HOD' | 'ESCALATED_TO_HOI' | 'APPROVED' | 'REJECTED' | 'REPLACED';
+  requestedDate: string;
+  hodReviewDate?: string;
+  hodReviewRemarks?: string;
+  hoiApprovedById?: string;
+  hoiApprovedByName?: string;
+  hoiApprovalDate?: string;
+  hoiRemarks?: string;
+  replacementAssetTag?: string;
+}
+
+export interface AssetIssueReportRecord {
+  id: string;
+  reportNo: string;
+  assetId: string;
+  assetTag: string;
+  assetName: string;
+  reportedByUserId: string;
+  reportedByName: string;
+  departmentId: string;
+  departmentName: string;
+  issueType: 'DAMAGED' | 'NOT_WORKING' | 'MISSING_PART' | 'TECHNICAL_PROBLEM' | 'PHYSICAL_DAMAGE' | 'LOST';
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  description: string;
+  status: 'REPORTED' | 'UNDER_REVIEW' | 'SENT_TO_MAINTENANCE' | 'MARKED_DAMAGED' | 'REPLACEMENT_INITIATED' | 'RESOLVED';
+  reportedDate: string;
+  hodActionRemarks?: string;
+  resolvedDate?: string;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -5187,5 +6463,474 @@ export interface DeputyRegistrarScopeAudit {
   details?: string;
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── UNIVERSITY ASSET MANAGEMENT & DEPARTMENT-WISE ALLOCATION TYPES ─────────
+// ══════════════════════════════════════════════════════════════════════════════
+
+export type AssetCategory = 
+  | 'FURNITURE'
+  | 'IT_ELECTRONICS'
+  | 'CLASSROOM'
+  | 'LABORATORY'
+  | 'OFFICE'
+  | 'SPORTS'
+  | 'LIBRARY'
+  | 'EVENT_CULTURAL'
+  | 'NETWORKING'
+  | 'SAFETY'
+  | 'VEHICLES'
+  | 'MISCELLANEOUS';
 
 
+
+export interface UniversityAsset {
+  id: string;
+  assetId: string; // Unique e.g. SSIU-PC-2026-00125
+  name: string;
+  category: AssetCategory;
+  subCategory: string;
+  brand?: string;
+  model?: string;
+  serialNumber?: string; // Unique for serialized assets
+  assetTag?: string;
+  isSerialized: boolean;
+  totalQuantity: number;
+  availableQuantity: number;
+  allocatedQuantity: number;
+  purchaseDate: string;
+  purchaseCost: number;
+  vendor?: string;
+  invoiceNumber?: string;
+  fundingSource?: string;
+  warrantyStart?: string;
+  warrantyEnd?: string;
+  warrantyProvider?: string;
+  warrantyNumber?: string;
+  condition: AssetCondition;
+  status: AssetStatus;
+  instituteId?: string;
+  departmentId?: string;
+  currentInstituteId?: string;
+  currentDepartmentId?: string;
+  building?: string;
+  floor?: string;
+  room?: string;
+  labId?: string;
+  classroomId?: string;
+  officeName?: string;
+  assignedPersonType?: 'FACULTY' | 'STAFF' | 'DEPARTMENT' | 'LAB' | 'CLASSROOM' | 'OFFICE' | 'STORE';
+  assignedPersonId?: string; // Uses existing Faculty Master ID / User ID
+  assignedPersonName?: string;
+  assignedDate?: string;
+  allottedDate?: string;
+  qrCodeData?: string;
+  image?: string;
+  documents?: { name: string; url: string; type: string }[];
+  remarks?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssetDepartmentAllocation {
+  id: string;
+  assetMasterId: string;
+  assetId: string; // SSIU-PC-2026-00125
+  assetName: string;
+  category: AssetCategory;
+  instituteId: string;
+  instituteName?: string;
+  departmentId: string;
+  departmentName?: string;
+  allocatedQuantity: number;
+  building?: string;
+  floor?: string;
+  room?: string;
+  labId?: string;
+  labName?: string;
+  classroomId?: string;
+  classroomName?: string;
+  officeName?: string;
+  assignedPersonId?: string;
+  assignedPersonName?: string;
+  allocatedAt: string;
+  allocatedBy: string;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  status: 'ACTIVE' | 'TRANSFERRED' | 'RETURNED' | 'UNDER_MAINTENANCE' | 'DISPOSED';
+  remarks?: string;
+}
+
+
+
+export interface AssetReturnRecord {
+  id: string;
+  assetMasterId: string;
+  assetId: string;
+  assetName: string;
+  quantity: number;
+  fromDepartmentId: string;
+  fromDepartmentName: string;
+  returnedBy: string;
+  receivedBy: string;
+  returnDate: string;
+  condition: AssetCondition;
+  remarks?: string;
+}
+
+
+
+export interface AssetAllocationRequest {
+  id: string;
+  requestNo: string; // e.g. REQ-ASSET-2026-0001
+  departmentId: string;
+  departmentName: string;
+  instituteId: string;
+  instituteName?: string;
+  category: AssetCategory;
+  subCategory: string;
+  requestedQuantity: number;
+  specifications?: string;
+  justification: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  targetLocation?: string;
+  status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'ALLOCATED' | 'REJECTED';
+  requestedBy: string;
+  requestedAt: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewRemarks?: string;
+  allocatedAssetMasterIds?: string[];
+  allocatedQuantity?: number;
+}
+
+export interface AssetHistoryEvent {
+  id: string;
+  assetMasterId: string;
+  assetId: string;
+  actionType: 
+    | 'CREATED'
+    | 'PURCHASED'
+    | 'ALLOCATED'
+    | 'TRANSFERRED'
+    | 'ASSIGNED'
+    | 'RETURNED'
+    | 'MAINTENANCE_LOGGED'
+    | 'REPAIRED'
+    | 'DAMAGED'
+    | 'LOST'
+    | 'RECOVERED'
+    | 'DISPOSED'
+    | 'BULK_IMPORTED';
+  actorName: string;
+  actorRole: string;
+  timestamp: string;
+  previousDepartment?: string;
+  newDepartment?: string;
+  previousLocation?: string;
+  newLocation?: string;
+  previousPerson?: string;
+  newPerson?: string;
+  previousStatus?: string;
+  newStatus?: string;
+  quantity?: number;
+  reason?: string;
+  remarks?: string;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ─── UNIVERSITY RESOURCE ALLOCATION (CLASSROOMS, LABS, FACULTY, SUBJECTS) ───
+// ══════════════════════════════════════════════════════════════════════════════
+
+export type InstitutionalResourceType = 
+  | 'CLASSROOM'
+  | 'LABORATORY'
+  | 'SEMINAR_HALL'
+  | 'COMPUTER_LAB'
+  | 'SMART_CLASSROOM'
+  | 'WORKSHOP'
+  | 'AUDITORIUM'
+  | 'DEPARTMENT_OFFICE'
+  | 'EQUIPMENT'
+  | 'OTHER';
+
+export interface InstitutionalResource {
+  id: string; // Unique resource ID
+  resourceCode: string; // e.g. A-101, LAB-CSE-1, SEM-HALL-1
+  name: string;
+  type: InstitutionalResourceType;
+  instituteId: string;
+  instituteName?: string;
+  departmentId?: string; // Optional default home department
+  departmentName?: string;
+  building: string;
+  floor: string;
+  roomNumber: string;
+  capacity: number;
+  labType?: string; // e.g. 'Software Lab', 'IoT & Embedded Systems', 'Hardware Lab'
+  computerCount?: number;
+  projectorAvailable: boolean;
+  smartBoardAvailable: boolean;
+  airConditioned: boolean;
+  softwareInstalled?: string[];
+  equipmentList?: string[];
+  status: 'AVAILABLE' | 'ALLOCATED' | 'PARTIALLY_ALLOCATED' | 'MAINTENANCE' | 'INACTIVE';
+  remarks?: string;
+}
+
+export interface ClassroomAllocation {
+  id: string;
+  academicYearId: string;
+  academicYearCode: string;
+  instituteId: string;
+  instituteName?: string;
+  departmentId: string;
+  departmentName?: string;
+  programId: string;
+  programName?: string;
+  semesterId: string;
+  semesterName?: string;
+  divisionId: string;
+  divisionName?: string;
+  resourceId: string;
+  roomNumber: string;
+  building: string;
+  floor: string;
+  capacity: number;
+  dayOfWeek?: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'ALL';
+  timeSlot?: string; // e.g. "09:00 AM - 10:00 AM" or "FULL_SEMESTER"
+  effectiveFrom: string;
+  effectiveTo: string;
+  status: 'ALLOCATED' | 'RELEASED' | 'TRANSFERRED';
+  allocatedBy: string;
+  allocatedAt: string;
+  remarks?: string;
+}
+
+export interface LaboratoryAllocation {
+  id: string;
+  academicYearId: string;
+  academicYearCode: string;
+  instituteId: string;
+  instituteName?: string;
+  departmentId: string;
+  departmentName?: string;
+  programId: string;
+  programName?: string;
+  semesterId: string;
+  semesterName?: string;
+  divisionId: string;
+  divisionName?: string;
+  resourceId: string;
+  labName: string;
+  roomNumber: string;
+  building: string;
+  floor: string;
+  capacity: number;
+  labType: string;
+  assignedFacultyId?: string;
+  assignedFacultyName?: string;
+  computerCount?: number;
+  softwareAvailability?: string[];
+  equipmentAvailability?: string[];
+  dayOfWeek?: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'ALL';
+  timeSlot?: string;
+  effectiveFrom: string;
+  effectiveTo: string;
+  status: 'ALLOCATED' | 'RELEASED' | 'TRANSFERRED';
+  allocatedBy: string;
+  allocatedAt: string;
+  remarks?: string;
+}
+
+export interface FacultyAllocation {
+  id: string;
+  facultyId: string; // Uses existing Faculty Master ID
+  facultyName: string;
+  employeeCode?: string;
+  instituteId: string;
+  instituteName?: string;
+  departmentId: string;
+  departmentName?: string;
+  programId: string;
+  programName?: string;
+  subjectId: string;
+  subjectName: string;
+  subjectCode: string;
+  semesterId: string;
+  semesterName?: string;
+  divisionId: string;
+  divisionName?: string;
+  academicYearId: string;
+  academicYearCode: string;
+  teachingLoad: number; // Hours per week
+  theoryHours: number;
+  practicalHours: number;
+  effectiveFrom: string;
+  effectiveTo: string;
+  status: 'ACTIVE' | 'RELEASED' | 'TRANSFERRED';
+  allocatedBy: string;
+  allocatedAt: string;
+  remarks?: string;
+}
+
+export interface SubjectAllocation {
+  id: string;
+  subjectId: string; // Uses existing Subject Master
+  subjectName: string;
+  subjectCode: string;
+  credits: number;
+  theoryHours: number;
+  practicalHours: number;
+  academicYearId: string;
+  academicYearCode: string;
+  instituteId: string;
+  departmentId: string;
+  departmentName?: string;
+  programId: string;
+  programName?: string;
+  semesterId: string;
+  semesterName?: string;
+  divisionId: string;
+  divisionName?: string;
+  assignedFacultyId?: string;
+  assignedFacultyName?: string;
+  classroomId?: string;
+  classroomName?: string;
+  laboratoryId?: string;
+  laboratoryName?: string;
+  status: 'ALLOCATED' | 'PENDING_FACULTY' | 'INACTIVE';
+  allocatedBy: string;
+  allocatedAt: string;
+}
+
+export interface DepartmentResourceAllocation {
+  id: string;
+  resourceType: 'CLASSROOM' | 'LAB' | 'FACULTY' | 'EQUIPMENT' | 'COMPUTERS' | 'PROJECTORS' | 'SMART_BOARDS' | 'FURNITURE' | 'SEMINAR_HALL' | 'OTHER';
+  resourceName: string;
+  instituteId: string;
+  instituteName?: string;
+  departmentId: string;
+  departmentName?: string;
+  quantity: number;
+  allocationDate: string;
+  effectiveFrom: string;
+  effectiveTo?: string;
+  status: 'ALLOCATED' | 'PARTIAL' | 'RELEASED' | 'TRANSFERRED';
+  allocatedBy: string;
+  remarks?: string;
+}
+
+export interface AllocationRequest {
+  id: string;
+  requestNo: string;
+  departmentId: string;
+  departmentName: string;
+  instituteId: string;
+  resourceType: 'CLASSROOM' | 'LAB' | 'FACULTY' | 'COMPUTERS' | 'EQUIPMENT' | 'FURNITURE' | 'OTHER';
+  requestedItem: string;
+  quantity: number;
+  justification: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'ALLOCATED' | 'REJECTED';
+  requestedBy: string;
+  requestedAt: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewRemarks?: string;
+  allocatedResourceId?: string;
+}
+
+export interface AllocationConflict {
+  id: string;
+  resourceId: string;
+  resourceName: string;
+  resourceType: 'CLASSROOM' | 'LABORATORY' | 'FACULTY' | 'SUBJECT' | 'DIVISION';
+  conflictType: 
+    | 'CLASSROOM_DOUBLE_BOOKING'
+    | 'LAB_DOUBLE_BOOKING'
+    | 'FACULTY_DOUBLE_BOOKING'
+    | 'DIVISION_SCHEDULE_CLASH'
+    | 'CAPACITY_OVERFLOW';
+  academicYear: string;
+  dayOfWeek?: string;
+  timeSlot?: string;
+  conflictingEntities: string[];
+  description: string;
+  severity: 'CRITICAL' | 'WARNING';
+  suggestedResolution: string;
+  detectedAt: string;
+}
+
+export interface AllocationHistoryRecord {
+  id: string;
+  resourceId: string;
+  resourceName: string;
+  resourceType: string;
+  academicYear: string;
+  previousDepartment?: string;
+  newDepartment: string;
+  previousAcademicPlacement?: string;
+  newAcademicPlacement: string;
+  changedBy: string;
+  dateTime: string;
+  actionType: 'ALLOCATED' | 'TRANSFERRED' | 'RELEASED' | 'EDITED';
+  reason?: string;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// NOTESHEET MANUAL TESTING & QA VERIFICATION TYPES
+// ══════════════════════════════════════════════════════════════════════════════
+export type ManualTestType = 
+  | 'Manual' 
+  | 'Functional' 
+  | 'UI' 
+  | 'Workflow' 
+  | 'Validation' 
+  | 'RBAC' 
+  | 'Regression' 
+  | 'Other';
+
+export type ManualTestStatus = 
+  | 'Pending' 
+  | 'Pass' 
+  | 'Fail' 
+  | 'Blocked' 
+  | 'Retest Required'
+  | 'Fixed';
+
+export type ManualTestPriority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+
+export interface ManualTestHistoryEntry {
+  id: string;
+  previousStatus: ManualTestStatus;
+  newStatus: ManualTestStatus;
+  changedBy: string;
+  changedDate: string;
+  remarks: string;
+}
+
+export interface ManualTestRecord {
+  id: string;
+  testId: string;
+  module: string;
+  feature: string;
+  testScenario: string;
+  testType: ManualTestType;
+  expectedResult: string;
+  actualResult: string;
+  status: ManualTestStatus;
+  priority: ManualTestPriority;
+  testedBy: string;
+  testDate: string;
+  remarks?: string;
+  bugIssue?: string;
+  fixStatus?: 'Open' | 'In Progress' | 'Fixed' | 'Verified' | 'Closed' | 'N/A';
+  retestResult?: string;
+  lastUpdated: string;
+  history: ManualTestHistoryEntry[];
+  notesheetId?: string;
+  notesheetNumber?: string;
+}
+
+export * from './studentDataChangeRequest';
+export * from './studentMapping';

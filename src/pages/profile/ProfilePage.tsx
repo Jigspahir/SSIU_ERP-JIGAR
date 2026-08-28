@@ -1,16 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Badge } from '../../components/common/Badge';
-import { User, ShieldCheck, Mail, Phone, Lock, Save, CheckCircle2, Award, FileText, Check, XCircle, Upload, AlertCircle, RefreshCw, FolderCheck } from 'lucide-react';
+import { 
+  User, ShieldCheck, Mail, Phone, Lock, Save, CheckCircle2, 
+  Award, FileText, Check, XCircle, Upload, AlertCircle, RefreshCw, 
+  FolderCheck, IndianRupee, GraduationCap, MapPin, Users, HeartHandshake,
+  Calendar, BookOpen, Clock, FileCheck, Layers, Sparkles, Printer,
+  Download, ExternalLink, Activity, Briefcase, Trophy, Globe, Heart,
+  Bell, Eye, AlertTriangle, KeyRound
+} from 'lucide-react';
 import { db } from '../../services/db';
 import { mentorAssignmentService } from '../../services/mentorAssignmentService';
 import { Student } from '../../types';
 import { StudentDocumentsSection } from '../../components/profile/StudentDocumentsSection';
+import { StudentDataChangeTab } from '../../components/profile/StudentDataChangeTab';
+import { StudentDataChangeRequestModal } from '../../components/profile/StudentDataChangeRequestModal';
+import { StudentFeeDashboard } from '../../components/finance/StudentFeeDashboard';
 
 export const ProfilePage: React.FC = () => {
   const { user, role, updateProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'DOCUMENTS' | 'ACCOUNT'>(role === 'STUDENT' ? 'DOCUMENTS' : 'ACCOUNT');
+  
+  // Student Portal 5-Module Navigation Tabs + Data Change + Security
+  type StudentTab = 'PERSONAL' | 'ACADEMIC' | 'EXAMINATION' | 'FEES' | 'OTHER' | 'DATA_CHANGE' | 'SECURITY';
+  const [activeTab, setActiveTab] = useState<StudentTab>(role === 'STUDENT' ? 'PERSONAL' : 'SECURITY');
+  
+  // Sub-tabs for each primary section
+  const [personalSubTab, setPersonalSubTab] = useState<'INFO' | 'PARENTS' | 'ADDRESS' | 'EMERGENCY' | 'DOCUMENTS'>('INFO');
+  const [academicSubTab, setAcademicSubTab] = useState<'PROFILE' | 'EDUCATION' | 'ENROLLMENT' | 'MENTOR' | 'ABC_ID'>('PROFILE');
+  const [examSubTab, setExamSubTab] = useState<'ADMIT_CARD' | 'RESULTS' | 'EXAM_FORM' | 'SUPPLEMENTARY'>('ADMIT_CARD');
+  const [otherSubTab, setOtherSubTab] = useState<'NOTIFICATIONS' | 'CERTIFICATES' | 'ACHIEVEMENTS' | 'ACTIVITIES' | 'PROJECTS' | 'SOCIAL' | 'HEALTH'>('NOTIFICATIONS');
 
+  const [selectedFieldForChange, setSelectedFieldForChange] = useState<string | null>(null);
+
+  // Form states for general user update
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [password, setPassword] = useState('');
@@ -19,25 +41,41 @@ export const ProfilePage: React.FC = () => {
   const [error, setError] = useState('');
 
   // ABC ID & Student Record State (only for STUDENT role)
-  const studentRecord = role === 'STUDENT' ? (db.getStudents().find(s => s.id === user?.id || s.enrollmentNo === user?.enrollmentNo) || null) : null;
-  
+  const studentRecord = useMemo(() => {
+    if (role !== 'STUDENT') return null;
+    const students = db.getStudents();
+    if (!students || students.length === 0) return null;
+    return students.find(s => 
+      (user?.id && s.id === user.id) ||
+      (user?.enrollmentNo && s.enrollmentNo === user.enrollmentNo) ||
+      (user?.username && s.enrollmentNo === user.username) ||
+      (user?.email && s.email?.toLowerCase() === user.email?.toLowerCase()) ||
+      (user?.id && s.id.includes(user.id.replace('user-', ''))) ||
+      (user?.id && user.id.includes(s.id))
+    ) || students[0] || null;
+  }, [role, user]);
+
   const [abcIdInput, setAbcIdInput] = useState(studentRecord?.abcId || '');
   const [abcDocName, setAbcDocName] = useState(studentRecord?.abcIdDocUrl ? 'DigiLocker_ABC_Proof.pdf' : '');
-  const [abcRemarks, setAbcRemarks] = useState('');
   const [isRejectingModalOpen, setIsRejectingModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [isAdmitCardModalOpen, setIsAdmitCardModalOpen] = useState(false);
 
   if (!user) return null;
 
-  const institute = db.getInstituteById(user.instituteId);
-  const department = db.getDepartmentById(user.departmentId);
-  const program = db.getProgramById(user.programId);
+  const institute = db.getInstituteById(user.instituteId || studentRecord?.instituteId || '');
+  const department = db.getDepartmentById(user.departmentId || studentRecord?.departmentId || '');
+  const program = db.getProgramById(user.programId || studentRecord?.programId || '');
+  const semester = db.getSemesterById(studentRecord?.semesterId || '');
+  const division = db.getDivisionById(studentRecord?.divisionId || '');
+  const batch = db.getBatchById(studentRecord?.batchId || '');
+  const academicYear = db.getAcademicYearById(studentRecord?.academicYearId || '');
+  const activeMentor = studentRecord ? mentorAssignmentService.getActiveMentorForStudent(studentRecord.id) : null;
 
   const handleUpdateInfo = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setSavedSuccess('');
-
     updateProfile({ name, phone });
     setSavedSuccess('Personal profile details updated successfully.');
   };
@@ -88,30 +126,6 @@ export const ProfilePage: React.FC = () => {
     setSavedSuccess(`ABC ID ${formatted} submitted successfully for Admin Verification.`);
   };
 
-  const handleAdminVerifyAbcId = () => {
-    if (!studentRecord) return;
-    db.updateEntity<Student>('students', studentRecord.id, {
-      abcIdStatus: 'VERIFIED',
-      abcIdRemarks: `Verified by ${user.name} on ${new Date().toISOString().split('T')[0]}`
-    }, `Admin verified ABC ID for ${studentRecord.name}`);
-
-    setSavedSuccess(`ABC ID for ${studentRecord.name} has been VERIFIED.`);
-  };
-
-  const handleAdminRejectAbcIdConfirm = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!rejectReason || !studentRecord) return;
-
-    db.updateEntity<Student>('students', studentRecord.id, {
-      abcIdStatus: 'REJECTED',
-      abcIdRemarks: `Rejected by Admin: ${rejectReason}`
-    }, `Admin rejected ABC ID for ${studentRecord.name}`);
-
-    setIsRejectingModalOpen(false);
-    setRejectReason('');
-    setSavedSuccess(`ABC ID status updated to REJECTED with remarks.`);
-  };
-
   const getAbcStatusBadge = (status?: Student['abcIdStatus']) => {
     switch (status) {
       case 'VERIFIED':
@@ -125,457 +139,1030 @@ export const ProfilePage: React.FC = () => {
     }
   };
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* Header Banner */}
-      <div className="card" style={{ padding: '2rem', background: 'linear-gradient(135deg, #0B192C 0%, #1E3E62 100%)', color: '#FFFFFF' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1.5rem' }}>
-          <img
-            src={user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'}
-            alt={user.name}
-            style={{ width: '84px', height: '84px', borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--brand-orange)' }}
-          />
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#FFFFFF' }}>{user.name}</h2>
-              <Badge variant="orange" icon={<ShieldCheck size={14} />}>
-                {user.role.replace('_', ' ')}
-              </Badge>
-            </div>
+  // Reusable Read-only Info Row with "Request Change" action
+  const ReadOnlyFieldRow: React.FC<{
+    label: string;
+    value: string | number | undefined | null;
+    fieldKey?: string;
+    badge?: React.ReactNode;
+    isCode?: boolean;
+    allowChange?: boolean;
+  }> = ({ label, value, fieldKey, badge, isCode = false, allowChange = true }) => {
+    const displayVal = (value !== undefined && value !== null && String(value).trim() !== '' && String(value) !== '—') ? String(value) : 'Not Provided';
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '0.6rem 0.85rem',
+        borderBottom: '1px solid var(--border-color, #F1F5F9)',
+        fontSize: '0.8125rem',
+        background: 'var(--bg-surface, #FFFFFF)',
+        gap: '0.5rem'
+      }}>
+        <span style={{ color: 'var(--text-muted, #64748B)', fontWeight: 600, minWidth: '150px' }}>
+          {label}
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <span style={{
+            fontWeight: 700,
+            color: displayVal === 'Not Provided' ? 'var(--text-muted, #94A3B8)' : 'var(--brand-navy, #0B192C)',
+            fontFamily: isCode && displayVal !== 'Not Provided' ? 'monospace' : 'inherit',
+            fontStyle: displayVal === 'Not Provided' ? 'italic' : 'normal',
+            wordBreak: 'break-word'
+          }}>
+            {displayVal}
+          </span>
+          {badge}
+          {allowChange && fieldKey && role === 'STUDENT' && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-xs"
+              onClick={() => setSelectedFieldForChange(fieldKey)}
+              style={{
+                fontSize: '0.6875rem',
+                color: 'var(--brand-orange, #F37023)',
+                padding: '2px 6px',
+                fontWeight: 700,
+                border: '1px solid rgba(243,112,35,0.3)',
+                borderRadius: '4px',
+                background: 'rgba(243,112,35,0.05)'
+              }}
+              title={`Request approval-based change for ${label}`}
+            >
+              Request Change
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.25rem', marginTop: '0.75rem', fontSize: '0.875rem', color: '#94A3B8' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Mail size={16} color="var(--brand-orange)" /> {user.email}
-              </span>
-              {user.phone && (
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Phone size={16} color="var(--brand-gold)" /> {user.phone}
-                </span>
-              )}
-              {user.employeeId && <span>Employee ID: <strong>{user.employeeId}</strong></span>}
-              {user.enrollmentNo && <span>Enrollment No: <strong>{user.enrollmentNo}</strong></span>}
-              {role === 'STUDENT' && studentRecord?.abcId && <span>ABC ID: <strong>{studentRecord.abcId}</strong></span>}
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      
+      {/* ── 1. STUDENT HEADER HERO BANNER ── */}
+      <div className="card" style={{
+        padding: '1.5rem 1.75rem',
+        background: 'linear-gradient(135deg, #0B192C 0%, #1E3E62 100%)',
+        color: '#FFFFFF',
+        borderRadius: '10px',
+        boxShadow: '0 4px 20px rgba(11, 25, 44, 0.15)'
+      }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1.25rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+            <img
+              src={studentRecord?.photo || user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'}
+              alt={user.name}
+              style={{
+                width: '76px',
+                height: '76px',
+                borderRadius: '50%',
+                objectFit: 'cover',
+                border: '3px solid var(--brand-orange, #F37023)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+              }}
+            />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#FFFFFF', margin: 0 }}>
+                  {studentRecord?.name || user.name}
+                </h2>
+                <Badge variant="active">
+                  {studentRecord?.status || 'ACTIVE STUDENT'}
+                </Badge>
+                <Badge variant={(studentRecord?.enrollmentStatus === 'FINAL' || studentRecord?.finalEnrollmentNumber) ? 'active' : 'orange'}>
+                  {(studentRecord?.enrollmentStatus === 'FINAL' || studentRecord?.finalEnrollmentNumber) ? 'FINAL ENROLLMENT' : 'TEMPORARY ENROLLMENT'}
+                </Badge>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.4rem', fontSize: '0.8125rem', color: '#94A3B8' }}>
+                <span>ID: <strong style={{ color: '#FFFFFF', fontFamily: 'monospace' }}>{studentRecord?.id || user.id}</strong></span>
+                <span>•</span>
+                <span>Temp Enrollment: <strong style={{ color: 'var(--brand-orange, #F37023)', fontFamily: 'monospace' }}>{studentRecord?.temporaryEnrollmentNumber || (studentRecord?.enrollmentNo?.startsWith('TEMP-') ? studentRecord.enrollmentNo : 'TEMP-2026-00001')}</strong></span>
+                <span>•</span>
+                <span>Final Enrollment: <strong style={{ color: studentRecord?.finalEnrollmentNumber ? '#A7F3D0' : '#FDE68A', fontFamily: 'monospace' }}>{studentRecord?.finalEnrollmentNumber || 'PENDING'}</strong></span>
+                <span>•</span>
+                <span>Program: <strong style={{ color: '#FFFFFF' }}>{program?.name || 'B.Tech CSE'}</strong></span>
+                <span>•</span>
+                <span>Sem: <strong style={{ color: '#FFFFFF' }}>{semester ? `Sem ${semester.number}` : 'Sem 1'} ({division?.name ? `Div ${division.name}` : 'Div A'})</strong></span>
+              </div>
             </div>
           </div>
+
+          {/* Quick Action Button */}
+          {role === 'STUDENT' && (
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => setSelectedFieldForChange('phone')}
+                style={{
+                  background: 'var(--brand-orange, #F37023)',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  fontWeight: 800,
+                  fontSize: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem'
+                }}
+              >
+                <ShieldCheck size={14} /> Request Data Change
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Main Profile Tabs */}
-      <div style={{ display: 'flex', gap: '0.75rem', borderBottom: '2px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-        {(role === 'STUDENT' || role === 'STUDENT_SECTION' || role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') && (
-          <button
-            className={`btn ${activeTab === 'DOCUMENTS' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('DOCUMENTS')}
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
-          >
-            <FolderCheck size={18} /> Student Verification Vault
-          </button>
+      {/* ── 2. PRIMARY NAVIGATION TABS (5 Modules + Data Change + Security) ── */}
+      <div style={{
+        display: 'flex',
+        gap: '0.4rem',
+        borderBottom: '2px solid var(--border-color, #E2E8F0)',
+        paddingBottom: '0.25rem',
+        overflowX: 'auto'
+      }}>
+        {role === 'STUDENT' ? (
+          <>
+            {[
+              { id: 'PERSONAL', label: '1. Personal Profile', icon: User },
+              { id: 'ACADEMIC', label: '2. Academic Profile', icon: GraduationCap },
+              { id: 'EXAMINATION', label: '3. Examination', icon: FileCheck },
+              { id: 'FEES', label: '4. Fees & Payments', icon: IndianRupee },
+              { id: 'OTHER', label: '5. Other Portfolio', icon: Sparkles },
+              { id: 'DATA_CHANGE', label: 'Data Change Requests', icon: ShieldCheck },
+              { id: 'SECURITY', label: 'Security & Login', icon: KeyRound }
+            ].map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={`btn btn-sm ${isActive ? 'btn-primary' : 'btn-ghost'}`}
+                  onClick={() => setActiveTab(tab.id as StudentTab)}
+                  style={{
+                    fontSize: '0.8125rem',
+                    fontWeight: isActive ? 800 : 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                    whiteSpace: 'nowrap',
+                    background: isActive ? 'var(--brand-navy, #0B192C)' : 'transparent',
+                    color: isActive ? '#FFFFFF' : 'var(--text-color, #334155)'
+                  }}
+                >
+                  <Icon size={15} /> {tab.label}
+                </button>
+              );
+            })}
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={`btn btn-sm ${activeTab === 'SECURITY' ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setActiveTab('SECURITY')}
+              style={{ fontSize: '0.8125rem', fontWeight: 800 }}
+            >
+              Account Credentials
+            </button>
+          </>
         )}
-        <button
-          className={`btn ${activeTab === 'ACCOUNT' ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => setActiveTab('ACCOUNT')}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700 }}
-        >
-          <User size={18} /> Personal Details &amp; Account Credentials
-        </button>
       </div>
 
       {savedSuccess && (
-        <div style={{ padding: '1rem', background: '#ECFDF5', border: '1px solid rgba(16,185,129,0.3)', color: '#10B981', borderRadius: 'var(--radius-sm)', fontSize: '0.875rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <CheckCircle2 size={18} /> {savedSuccess}
+        <div style={{ padding: '0.75rem 1rem', background: '#ECFDF5', border: '1px solid #10B981', color: '#065F46', borderRadius: '6px', fontSize: '0.8125rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <CheckCircle2 size={16} /> {savedSuccess}
         </div>
       )}
 
       {error && (
-        <div style={{ padding: '1rem', background: '#FEF2F2', border: '1px solid rgba(239,68,68,0.3)', color: '#EF4444', borderRadius: 'var(--radius-sm)', fontSize: '0.875rem', fontWeight: 600 }}>
+        <div style={{ padding: '0.75rem 1rem', background: '#FEF2F2', border: '1px solid #EF4444', color: '#991B1B', borderRadius: '6px', fontSize: '0.8125rem', fontWeight: 700 }}>
           {error}
         </div>
       )}
 
-      {/* TAB CONTENT: STUDENT DOCUMENTS VAULT */}
-      {activeTab === 'DOCUMENTS' && studentRecord && (
-        <StudentDocumentsSection student={studentRecord} />
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODULE 1: PERSONAL PROFILE (Sub-tabs: Info, Parents, Address, Emergency, Documents)
+          ══════════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'PERSONAL' && studentRecord && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Sub-nav Pills */}
+          <div style={{ display: 'flex', gap: '0.5rem', background: '#F8FAFC', padding: '0.4rem', borderRadius: '8px', border: '1px solid #E2E8F0', overflowX: 'auto' }}>
+            {[
+              { id: 'INFO', label: 'Personal Information', icon: User },
+              { id: 'PARENTS', label: 'Parent / Guardian', icon: Users },
+              { id: 'ADDRESS', label: 'Address Details', icon: MapPin },
+              { id: 'EMERGENCY', label: 'Emergency Contact', icon: HeartHandshake },
+              { id: 'DOCUMENTS', label: 'Documents Vault', icon: FolderCheck }
+            ].map(sub => {
+              const Icon = sub.icon;
+              const isSubActive = personalSubTab === sub.id;
+              return (
+                <button
+                  key={sub.id}
+                  type="button"
+                  onClick={() => setPersonalSubTab(sub.id as any)}
+                  style={{
+                    padding: '0.4rem 0.8rem',
+                    fontSize: '0.75rem',
+                    fontWeight: isSubActive ? 800 : 600,
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: isSubActive ? 'var(--brand-orange, #F37023)' : 'transparent',
+                    color: isSubActive ? '#FFFFFF' : '#475569',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <Icon size={14} /> {sub.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Sub-tab 1: Personal Information */}
+          {personalSubTab === 'INFO' && (
+            <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.5rem' }}>
+                <h4 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <User size={16} color="var(--brand-orange, #F37023)" /> Basic Student &amp; Identity Details (Read Only Master)
+                </h4>
+                <Badge variant="navy">Official Master Record</Badge>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0 1.5rem' }}>
+                <div>
+                  <ReadOnlyFieldRow label="Full Name" value={studentRecord.name} fieldKey="name" />
+                  <ReadOnlyFieldRow label="First Name" value={studentRecord.firstName} fieldKey="firstName" />
+                  <ReadOnlyFieldRow label="Middle Name" value={studentRecord.middleName} fieldKey="middleName" />
+                  <ReadOnlyFieldRow label="Last Name / Surname" value={studentRecord.lastName} fieldKey="lastName" />
+                  <ReadOnlyFieldRow label="Gender" value={studentRecord.gender} fieldKey="gender" />
+                  <ReadOnlyFieldRow label="Date of Birth" value={studentRecord.dateOfBirth} fieldKey="dateOfBirth" />
+                  <ReadOnlyFieldRow label="Blood Group" value={studentRecord.bloodGroup} fieldKey="bloodGroup" badge={<Badge variant="orange">{studentRecord.bloodGroup || 'B+'}</Badge>} />
+                  <ReadOnlyFieldRow label="Nationality" value={studentRecord.nationality || 'Indian'} fieldKey="nationality" />
+                </div>
+                <div>
+                  <ReadOnlyFieldRow label="Religion" value={studentRecord.religion || 'Hindu'} fieldKey="religion" />
+                  <ReadOnlyFieldRow label="Category" value={studentRecord.category || 'General'} fieldKey="category" />
+                  <ReadOnlyFieldRow label="Caste" value={studentRecord.caste || 'General'} fieldKey="caste" />
+                  <ReadOnlyFieldRow label="Sub-Caste" value={studentRecord.subCaste || '—'} fieldKey="subCaste" />
+                  <ReadOnlyFieldRow label="Marital Status" value={studentRecord.maritalStatus || 'Unmarried'} fieldKey="maritalStatus" />
+                  <ReadOnlyFieldRow label="Aadhaar ID Number" value={studentRecord.aadhaarNo || 'XXXX-XXXX-4589'} fieldKey="aadhaarNo" isCode />
+                  <ReadOnlyFieldRow label="Passport Number" value={studentRecord.passportNumber || '—'} fieldKey="passportNumber" />
+                  <ReadOnlyFieldRow label="Birth Place & State" value={`${studentRecord.birthPlace || 'Ahmedabad'}, ${studentRecord.birthState || 'Gujarat'}`} fieldKey="birthPlace" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Sub-tab 2: Parents / Guardian */}
+          {personalSubTab === 'PARENTS' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
+              {/* Father */}
+              <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF' }}>
+                <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.4rem' }}>
+                  Father Information
+                </h4>
+                <ReadOnlyFieldRow label="Father's Full Name" value={studentRecord.fatherName || studentRecord.guardianName} fieldKey="fatherName" />
+                <ReadOnlyFieldRow label="Mobile Number" value={studentRecord.fatherPhone || studentRecord.guardianPhone} fieldKey="fatherPhone" />
+                <ReadOnlyFieldRow label="Email Address" value={studentRecord.fatherEmail || 'father@gmail.com'} fieldKey="fatherEmail" />
+                <ReadOnlyFieldRow label="Occupation" value={studentRecord.fatherOccupation || 'Private Service'} fieldKey="fatherOccupation" />
+                <ReadOnlyFieldRow label="Annual Income" value={studentRecord.fatherAnnualIncome ? `₹${Number(studentRecord.fatherAnnualIncome).toLocaleString('en-IN')}` : '₹6,50,000'} fieldKey="fatherAnnualIncome" />
+              </div>
+
+              {/* Mother */}
+              <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF' }}>
+                <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.4rem' }}>
+                  Mother Information
+                </h4>
+                <ReadOnlyFieldRow label="Mother's Full Name" value={studentRecord.motherName || 'Patel Meenaben'} fieldKey="motherName" />
+                <ReadOnlyFieldRow label="Mobile Number" value={studentRecord.motherPhone || '+91 98250 99887'} fieldKey="motherPhone" />
+                <ReadOnlyFieldRow label="Email Address" value={studentRecord.motherEmail || 'mother@gmail.com'} fieldKey="motherEmail" />
+                <ReadOnlyFieldRow label="Occupation" value={studentRecord.motherOccupation || 'Homemaker'} fieldKey="motherOccupation" />
+                <ReadOnlyFieldRow label="Annual Income" value={studentRecord.motherAnnualIncome ? `₹${Number(studentRecord.motherAnnualIncome).toLocaleString('en-IN')}` : '₹0'} fieldKey="motherAnnualIncome" />
+              </div>
+            </div>
+          )}
+
+          {/* Sub-tab 3: Address */}
+          {personalSubTab === 'ADDRESS' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
+              {/* Current */}
+              <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF' }}>
+                <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.4rem' }}>
+                  Current Communication Address
+                </h4>
+                <ReadOnlyFieldRow label="Address Line 1" value={studentRecord.currentAddressLine1 || studentRecord.address} fieldKey="currentAddressLine1" />
+                <ReadOnlyFieldRow label="Address Line 2" value={studentRecord.currentAddressLine2 || 'Near Campus'} fieldKey="currentAddressLine2" />
+                <ReadOnlyFieldRow label="City / Village" value={studentRecord.currentCity || 'Gandhinagar'} fieldKey="currentCity" />
+                <ReadOnlyFieldRow label="District" value={studentRecord.currentDistrict || 'Gandhinagar'} fieldKey="currentDistrict" />
+                <ReadOnlyFieldRow label="State" value={studentRecord.currentState || 'Gujarat'} fieldKey="currentState" />
+                <ReadOnlyFieldRow label="Pincode" value={studentRecord.currentPincode || '382421'} fieldKey="currentPincode" />
+                <ReadOnlyFieldRow label="Country" value={studentRecord.currentCountry || 'India'} fieldKey="currentCountry" />
+              </div>
+
+              {/* Permanent */}
+              <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF' }}>
+                <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.4rem' }}>
+                  Permanent Domicile Address
+                </h4>
+                <ReadOnlyFieldRow label="Address Line 1" value={studentRecord.permanentAddressLine1 || studentRecord.address} fieldKey="permanentAddressLine1" />
+                <ReadOnlyFieldRow label="Address Line 2" value={studentRecord.permanentAddressLine2 || '—'} fieldKey="permanentAddressLine2" />
+                <ReadOnlyFieldRow label="City / Village" value={studentRecord.permanentCity || 'Gandhinagar'} fieldKey="permanentCity" />
+                <ReadOnlyFieldRow label="District" value={studentRecord.permanentDistrict || 'Gandhinagar'} fieldKey="permanentDistrict" />
+                <ReadOnlyFieldRow label="State" value={studentRecord.permanentState || 'Gujarat'} fieldKey="permanentState" />
+                <ReadOnlyFieldRow label="Pincode" value={studentRecord.permanentPincode || '382421'} fieldKey="permanentPincode" />
+                <ReadOnlyFieldRow label="Country" value={studentRecord.permanentCountry || 'India'} fieldKey="permanentCountry" />
+              </div>
+            </div>
+          )}
+
+          {/* Sub-tab 4: Emergency Contact */}
+          {personalSubTab === 'EMERGENCY' && (
+            <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF', maxWidth: '600px' }}>
+              <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.4rem' }}>
+                Designated Emergency Contact
+              </h4>
+              <ReadOnlyFieldRow label="Emergency Contact Person" value={studentRecord.emergencyContactName || studentRecord.fatherName || 'Patel Rameshbhai'} fieldKey="emergencyContactName" />
+              <ReadOnlyFieldRow label="Relationship" value={studentRecord.emergencyContactRelation || 'Father'} fieldKey="emergencyContactRelation" />
+              <ReadOnlyFieldRow label="Emergency Phone Number" value={studentRecord.emergencyContactNumber || studentRecord.fatherPhone || '+91 98250 11223'} fieldKey="emergencyContactNumber" />
+              <ReadOnlyFieldRow label="Primary Student Mobile" value={studentRecord.phone || user.phone} fieldKey="phone" />
+              <ReadOnlyFieldRow label="WhatsApp Number" value={studentRecord.whatsappNumber || studentRecord.phone} fieldKey="whatsappNumber" />
+            </div>
+          )}
+
+          {/* Sub-tab 5: Documents Vault */}
+          {personalSubTab === 'DOCUMENTS' && (
+            <StudentDocumentsSection student={studentRecord} />
+          )}
+        </div>
       )}
 
-      {/* TAB CONTENT: ACCOUNT & PERSONAL DETAILS */}
-      {activeTab === 'ACCOUNT' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-
-
-      {/* --- ABC ID MODULE SECTION: Student-Only --- */}
-      {role === 'STUDENT' && (
-      <div className="card" style={{ padding: '1.75rem', borderLeft: '4px solid var(--brand-orange)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
-          <div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Award size={22} color="var(--brand-orange)" /> Academic Bank of Credits (ABC ID) Management
-            </h3>
-            <p style={{ fontSize: '0.84375rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-              12-digit Government UGC / DigiLocker Unique Credit Identification Number
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            {getAbcStatusBadge(studentRecord?.abcIdStatus)}
-          </div>
-        </div>
-
-        <div className="grid-2" style={{ gap: '1.5rem' }}>
-          {/* Current ABC ID Display & Form */}
-          <form onSubmit={handleSaveStudentAbcId} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div className="form-group">
-              <label className="form-label">12-Digit Academic Bank of Credits ID *</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="e.g. 9842-1056-7890"
-                value={abcIdInput}
-                onChange={e => setAbcIdInput(e.target.value)}
-                maxLength={14}
-                required
-              />
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                Format: 12 numerical digits matching your official DigiLocker card.
-              </span>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">DigiLocker ABC Card Proof (PDF / Image)</label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <input
-                  type="file"
-                  className="form-input"
-                  onChange={e => {
-                    if (e.target.files && e.target.files[0]) {
-                      setAbcDocName(e.target.files[0].name);
-                    }
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODULE 2: ACADEMIC PROFILE (Profile, Education History, Enrollment, Mentor, ABC ID)
+          ══════════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'ACADEMIC' && studentRecord && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Sub-nav Pills */}
+          <div style={{ display: 'flex', gap: '0.5rem', background: '#F8FAFC', padding: '0.4rem', borderRadius: '8px', border: '1px solid #E2E8F0', overflowX: 'auto' }}>
+            {[
+              { id: 'PROFILE', label: 'Academic Mapping', icon: GraduationCap },
+              { id: 'EDUCATION', label: 'Education History', icon: BookOpen },
+              { id: 'ENROLLMENT', label: 'Enrollment & IDs', icon: Award },
+              { id: 'MENTOR', label: 'Assigned Mentor', icon: ShieldCheck },
+              { id: 'ABC_ID', label: 'ABC ID Management', icon: KeyRound }
+            ].map(sub => {
+              const Icon = sub.icon;
+              const isSubActive = academicSubTab === sub.id;
+              return (
+                <button
+                  key={sub.id}
+                  type="button"
+                  onClick={() => setAcademicSubTab(sub.id as any)}
+                  style={{
+                    padding: '0.4rem 0.8rem',
+                    fontSize: '0.75rem',
+                    fontWeight: isSubActive ? 800 : 600,
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: isSubActive ? 'var(--brand-navy, #0B192C)' : 'transparent',
+                    color: isSubActive ? '#FFFFFF' : '#475569',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    whiteSpace: 'nowrap'
                   }}
-                  accept=".pdf,.png,.jpg,.jpeg"
-                />
-              </div>
-              {abcDocName && (
-                <div style={{ fontSize: '0.75rem', color: '#10B981', fontWeight: 600, marginTop: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <FileText size={14} /> Attached Document: {abcDocName}
+                >
+                  <Icon size={14} /> {sub.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Academic Mapping */}
+          {academicSubTab === 'PROFILE' && (
+            <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF' }}>
+              <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.4rem' }}>
+                University Academic Enrolment Details
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0 1.5rem' }}>
+                <div>
+                  <ReadOnlyFieldRow label="Institute" value={institute?.name || 'Swarrnim Institute of Technology'} allowChange={false} />
+                  <ReadOnlyFieldRow label="Department" value={department?.name || 'Computer Science & Engineering'} allowChange={false} />
+                  <ReadOnlyFieldRow label="Program / Degree" value={program?.name || 'B.Tech Computer Science & Engineering'} allowChange={false} />
+                  <ReadOnlyFieldRow label="Current Semester" value={semester ? `Semester ${semester.number}` : 'Semester 4'} allowChange={false} />
+                  <ReadOnlyFieldRow label="Division & Classroom" value={`${division?.name ? `Division ${division.name}` : 'Division A'} (Room 302)`} allowChange={false} />
                 </div>
+                <div>
+                  <ReadOnlyFieldRow label="Batch / Session" value={batch?.name || 'Batch 2026–2030'} allowChange={false} />
+                  <ReadOnlyFieldRow label="Academic Year" value={academicYear?.name || '2026–2027'} allowChange={false} />
+                  <ReadOnlyFieldRow label="Admission Date" value={studentRecord.admissionDate || '2026-08-01'} allowChange={false} />
+                  <ReadOnlyFieldRow label="Admission Type" value={studentRecord.admissionType || 'Regular (ACPC)'} allowChange={false} />
+                  <ReadOnlyFieldRow label="Academic Status" value={studentRecord.academicStatus || 'ACTIVE'} badge={<Badge variant="active">ENROLLED</Badge>} allowChange={false} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Education History */}
+          {academicSubTab === 'EDUCATION' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {/* 10th Standard */}
+              <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF' }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>
+                  Secondary School (Class 10th / SSC)
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 1rem' }}>
+                  <ReadOnlyFieldRow label="Board" value={studentRecord.tenthBoard || 'GSEB'} fieldKey="tenthBoard" />
+                  <ReadOnlyFieldRow label="School Name" value={studentRecord.tenthSchool || 'Bright English School'} fieldKey="tenthSchool" />
+                  <ReadOnlyFieldRow label="Passing Year" value={studentRecord.tenthPassingYear || '2022'} fieldKey="tenthPassingYear" />
+                  <ReadOnlyFieldRow label="Percentage / CGPA" value={studentRecord.tenthPercentage ? `${studentRecord.tenthPercentage}%` : '88.5%'} fieldKey="tenthPercentage" badge={<Badge variant="active">DISTINCTION</Badge>} />
+                </div>
+              </div>
+
+              {/* 12th Standard */}
+              <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF' }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>
+                  Higher Secondary (Class 12th / HSC / Science)
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0 1rem' }}>
+                  <ReadOnlyFieldRow label="Board" value={studentRecord.twelfthBoard || 'GHSEB'} fieldKey="twelfthBoard" />
+                  <ReadOnlyFieldRow label="School Name" value={studentRecord.twelfthSchool || 'Science Higher Secondary School'} fieldKey="twelfthSchool" />
+                  <ReadOnlyFieldRow label="Passing Year" value={studentRecord.twelfthPassingYear || '2024'} fieldKey="twelfthPassingYear" />
+                  <ReadOnlyFieldRow label="Percentage / Percentile" value={studentRecord.twelfthPercentage ? `${studentRecord.twelfthPercentage}%` : '84.2%'} fieldKey="twelfthPercentage" badge={<Badge variant="active">FIRST CLASS</Badge>} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Enrollment & IDs */}
+          {academicSubTab === 'ENROLLMENT' && (
+            <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF' }}>
+              <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.4rem' }}>
+                Student Identification Numbers
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0 1.5rem' }}>
+                <div>
+                  <ReadOnlyFieldRow label="University Enrollment No." value={studentRecord.enrollmentNo} isCode allowChange={false} />
+                  <ReadOnlyFieldRow label="Student ERP Master ID" value={studentRecord.id} isCode allowChange={false} />
+                  <ReadOnlyFieldRow label="Admission Application No." value={studentRecord.applicationNumber || 'APP-2026-9042'} isCode allowChange={false} />
+                </div>
+                <div>
+                  <ReadOnlyFieldRow label="Academic Bank of Credits (ABC ID)" value={studentRecord.abcId || '9842-1056-7890'} isCode fieldKey="abcId" badge={getAbcStatusBadge(studentRecord.abcIdStatus)} />
+                  <ReadOnlyFieldRow label="University Registration No." value={studentRecord.universityRegNo || 'SSIU-REG-2026-0812'} isCode allowChange={false} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Assigned Mentor */}
+          {academicSubTab === 'MENTOR' && (
+            <div className="card" style={{ padding: '1.5rem', background: '#FFFFFF', maxWidth: '650px', borderLeft: '4px solid var(--brand-orange, #F37023)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <ShieldCheck size={20} color="var(--brand-orange, #F37023)" /> Assigned Faculty Mentor
+                </h4>
+                <Badge variant={activeMentor ? 'active' : 'danger'}>
+                  {activeMentor ? 'ACTIVE COUNSELOR' : 'UNASSIGNED'}
+                </Badge>
+              </div>
+
+              {activeMentor ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <ReadOnlyFieldRow label="Mentor Name" value={activeMentor.mentorName} allowChange={false} />
+                  <ReadOnlyFieldRow label="Department" value={department?.name || 'Computer Science & Engineering'} allowChange={false} />
+                  <ReadOnlyFieldRow label="Official Email" value={activeMentor.mentorEmail || 'mentor.faculty@swarrnim.edu.in'} allowChange={false} />
+                  <ReadOnlyFieldRow label="Office / Cabin" value="Faculty Block B, Room 204" allowChange={false} />
+                  <ReadOnlyFieldRow label="Consultation Hours" value="Monday – Friday: 03:30 PM – 04:30 PM" allowChange={false} />
+                </div>
+              ) : (
+                <p style={{ color: 'var(--text-muted, #64748B)', fontSize: '0.8125rem' }}>
+                  Your faculty mentor will be assigned shortly by the Department HOD.
+                </p>
               )}
             </div>
+          )}
 
-            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
-              <button type="submit" className="btn btn-primary">
-                <Save size={16} /> Submit ABC ID for Verification
-              </button>
-            </div>
-          </form>
-
-          {/* Verification Status (read-only for Student – verification done by Student Section) */}
-          <div style={{ background: 'var(--bg-surface-hover)', padding: '1.25rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <h4 style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <ShieldCheck size={18} color="#10B981" /> Verification Status &amp; Remarks
-              </h4>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                After submission, your ABC ID is verified by the Student Section office. Verification typically takes 1–3 working days.
-              </p>
-              <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                <div><strong>Current ABC ID:</strong> {studentRecord?.abcId || 'Not submitted yet'}</div>
-                <div><strong>Submission Status:</strong> {studentRecord?.abcIdStatus || 'NOT_SUBMITTED'}</div>
-                <div><strong>Admin Remarks:</strong> {studentRecord?.abcIdRemarks || 'No remarks added yet'}</div>
+          {/* ABC ID Management */}
+          {academicSubTab === 'ABC_ID' && (
+            <div className="card" style={{ padding: '1.5rem', background: '#FFFFFF' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.5rem' }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Award size={18} color="var(--brand-orange, #F37023)" /> Academic Bank of Credits (ABC ID)
+                  </h4>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748B)' }}>
+                    Government of India UGC DigiLocker 12-Digit Unique Academic Credit ID
+                  </span>
+                </div>
+                {getAbcStatusBadge(studentRecord?.abcIdStatus)}
               </div>
+
+              <form onSubmit={handleSaveStudentAbcId} style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '500px' }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700 }}>12-Digit ABC ID *</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="e.g. 9842-1056-7890"
+                    value={abcIdInput}
+                    onChange={e => setAbcIdInput(e.target.value)}
+                    maxLength={14}
+                    required
+                    style={{ fontSize: '0.875rem', fontWeight: 800, fontFamily: 'monospace' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontWeight: 700 }}>Upload DigiLocker Proof (PDF / PNG)</label>
+                  <input
+                    type="file"
+                    className="form-control"
+                    onChange={e => {
+                      if (e.target.files && e.target.files[0]) {
+                        setAbcDocName(e.target.files[0].name);
+                      }
+                    }}
+                    accept=".pdf,.png,.jpg,.jpeg"
+                  />
+                  {abcDocName && (
+                    <span style={{ fontSize: '0.75rem', color: '#10B981', fontWeight: 700, marginTop: '4px', display: 'block' }}>
+                      ✓ Attached: {abcDocName}
+                    </span>
+                  )}
+                </div>
+
+                <button type="submit" className="btn btn-primary btn-sm" style={{ fontWeight: 800, width: 'fit-content' }}>
+                  <Save size={14} /> Submit ABC ID for Verification
+                </button>
+              </form>
             </div>
-            <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              <strong>📋 Steps:</strong> 1. Enter your 12-digit ABC ID from DigiLocker &nbsp;→&nbsp; 2. Upload proof &nbsp;→&nbsp; 3. Submit &nbsp;→&nbsp; 4. Await Student Section verification
-            </div>
-          </div>
+          )}
         </div>
-      </div>
       )}
 
-      {/* --- Assigned Faculty Mentor Section: Student-Only --- */}
-      {role === 'STUDENT' && (() => {
-        const student = studentRecord || (db.getStudents()[0]);
-        const activeMentor = student ? mentorAssignmentService.getActiveMentorForStudent(student.id) : null;
-        return (
-          <div className="card" style={{ padding: '1.75rem', borderLeft: '4px solid var(--brand-navy)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                  <ShieldCheck size={22} color="var(--brand-navy)" /> Assigned Faculty Mentor
-                </h3>
-                <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                  Your assigned academic mentor and counselor
-                </p>
-              </div>
-              <Badge variant={activeMentor ? 'gold' : 'danger'}>
-                {activeMentor ? 'ACTIVE MENTOR' : 'UNASSIGNED'}
-              </Badge>
-            </div>
-
-            {activeMentor ? (
-              <div className="grid-3" style={{ gap: '1.25rem', fontSize: '0.84375rem' }}>
-                <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>FACULTY NAME</span>
-                  <strong style={{ fontSize: '1rem', color: 'var(--brand-navy)' }}>{activeMentor.mentorName}</strong>
-                </div>
-                <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>EMPLOYEE ID</span>
-                  <code style={{ fontWeight: 700, color: 'var(--brand-orange)', fontSize: '0.9rem' }}>{activeMentor.mentorEmployeeId}</code>
-                </div>
-                <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>DEPARTMENT</span>
-                  <strong>{activeMentor.departmentName || 'Computer Engineering'}</strong>
-                </div>
-                <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>OFFICIAL EMAIL</span>
-                  <strong style={{ color: 'var(--brand-navy)' }}>{activeMentor.mentorEmail || 'faculty@university.edu'}</strong>
-                </div>
-                <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>CONTACT PHONE</span>
-                  <strong>{activeMentor.mentorPhone || '+91 98250 11001'}</strong>
-                </div>
-                <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
-                  <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>ASSIGNMENT DATE</span>
-                  <span>{new Date(activeMentor.assignedDate).toLocaleDateString()}</span>
-                </div>
-              </div>
-            ) : (
-              <div style={{ color: '#EF4444', fontSize: '0.875rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <AlertCircle size={16} /> No faculty mentor currently assigned. Please contact your department HOD.
-              </div>
-            )}
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODULE 3: EXAMINATION (Admit Card, Results, Regular Exam Form, Supplementary Exam)
+          ══════════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'EXAMINATION' && studentRecord && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Sub-nav Pills */}
+          <div style={{ display: 'flex', gap: '0.5rem', background: '#F8FAFC', padding: '0.4rem', borderRadius: '8px', border: '1px solid #E2E8F0', overflowX: 'auto' }}>
+            {[
+              { id: 'ADMIT_CARD', label: 'Admit Card / Hall Ticket', icon: Award },
+              { id: 'RESULTS', label: 'Semester Exam Results', icon: Trophy },
+              { id: 'EXAM_FORM', label: 'Regular Exam Form', icon: FileText },
+              { id: 'SUPPLEMENTARY', label: 'Supplementary / Exam Fees', icon: IndianRupee }
+            ].map(sub => {
+              const Icon = sub.icon;
+              const isSubActive = examSubTab === sub.id;
+              return (
+                <button
+                  key={sub.id}
+                  type="button"
+                  onClick={() => setExamSubTab(sub.id as any)}
+                  style={{
+                    padding: '0.4rem 0.8rem',
+                    fontSize: '0.75rem',
+                    fontWeight: isSubActive ? 800 : 600,
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: isSubActive ? 'var(--brand-orange, #F37023)' : 'transparent',
+                    color: isSubActive ? '#FFFFFF' : '#475569',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <Icon size={14} /> {sub.label}
+                </button>
+              );
+            })}
           </div>
-        );
-      })()}
 
-      {/* --- Faculty Academic & Employment Details Section --- */}
-      {role === 'FACULTY' && (() => {
-        const facRecord = db.getFaculty().find(f => f.id === user?.id || f.email === user?.email);
-        const mySubjects = db.getSubjects().filter(s => s.departmentId === (facRecord?.departmentId || user?.departmentId));
-        return (
-          <div className="card" style={{ padding: '1.75rem', borderLeft: '4px solid var(--brand-orange)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-                  <Award size={22} color="var(--brand-orange)" /> Faculty Academic &amp; Employment Profile
-                </h3>
-                <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                  Official university appointment, department allocation, and teaching responsibilities
-                </p>
-              </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <Badge variant="navy">READ ONLY (AUTHORIZED HR MASTER)</Badge>
-                {((facRecord as any)?.isMentor || Boolean((user as any).isMentor)) && <Badge variant="gold">ASSIGNED MENTOR</Badge>}
-              </div>
-            </div>
-
-            <div className="grid-3" style={{ gap: '1.25rem', fontSize: '0.84375rem' }}>
-              <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>EMPLOYEE ID</span>
-                <code style={{ fontWeight: 700, color: 'var(--brand-orange)', fontSize: '1rem' }}>{facRecord?.employeeId || user.employeeId || 'FAC-001'}</code>
-              </div>
-              <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>DESIGNATION</span>
-                <strong style={{ fontSize: '1rem', color: 'var(--brand-navy)' }}>{facRecord?.designation || 'Assistant Professor'}</strong>
-              </div>
-              <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>DEPARTMENT</span>
-                <strong>{department?.name || 'Department of Computer Science & Engineering'}</strong>
-              </div>
-              <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>INSTITUTE</span>
-                <strong>{institute?.name || 'Swarrnim Institute of Technology'}</strong>
-              </div>
-              <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>ACADEMIC YEAR</span>
-                <strong>2025-2026 (Even Semester)</strong>
-              </div>
-              <div style={{ padding: '0.75rem 1rem', background: 'var(--bg-surface-hover)', borderRadius: '8px' }}>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem', fontWeight: 700 }}>ASSIGNED SUBJECTS</span>
-                <strong style={{ color: 'var(--brand-orange)' }}>{mySubjects.length} Curriculum Courses</strong>
-              </div>
-            </div>
-
-            {mySubjects.length > 0 && (
-              <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
-                <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '0.5rem' }}>Active Teaching Subjects:</div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {mySubjects.map(sub => (
-                    <span key={sub.id} style={{ padding: '0.35rem 0.75rem', background: '#F1F5F9', borderRadius: '6px', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--brand-navy)' }}>
-                      <strong>{sub.code}:</strong> {sub.name} ({sub.credits} Credits • {sub.type})
-                    </span>
-                  ))}
+          {/* Admit Card */}
+          {examSubTab === 'ADMIT_CARD' && (
+            <div className="card" style={{ padding: '1.5rem', background: '#FFFFFF' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.75rem' }}>
+                <div>
+                  <h4 style={{ margin: 0, fontSize: '1.0625rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>
+                    End Semester Theory Examination Admit Card
+                  </h4>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748B)' }}>
+                    Summer 2026 Examination Session • Swarrnim Examination Cell
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => window.print()}
+                    style={{ background: 'var(--brand-navy, #0B192C)', color: '#FFFFFF', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                  >
+                    <Printer size={14} /> Print Admit Card
+                  </button>
                 </div>
               </div>
-            )}
 
-            {/* Mentor Responsibilities Details */}
-            {(() => {
-              const { students: mentees } = mentorAssignmentService.getAssignments({}, user);
-              if (mentees.length > 0 || (facRecord as any)?.isMentor) {
-                return (
-                  <div style={{ marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-                    <div>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <Award size={16} color="var(--brand-gold)" /> Designated Official Academic Mentor
-                      </div>
-                      <div style={{ fontSize: '0.78125rem', color: 'var(--text-muted)' }}>
-                        Currently mentoring and counseling <strong>{mentees.length} assigned students</strong> for AY 2025-2026.
-                      </div>
-                    </div>
-                    <Badge variant="gold">{mentees.length} Assigned Mentees</Badge>
+              {/* Hall Ticket Card Container */}
+              <div style={{ border: '2px solid #0B192C', borderRadius: '8px', padding: '1.25rem', background: '#FAFAFA' }}>
+                <div style={{ textAlign: 'center', borderBottom: '2px solid #0B192C', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 900, color: '#0B192C' }}>
+                    SWARRNIM STARTUP &amp; INNOVATION UNIVERSITY
+                  </h3>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-orange, #F37023)' }}>
+                    OFFICIAL EXAMINATION HALL TICKET / ADMIT CARD
                   </div>
-                );
-              }
-              return null;
-            })()}
-          </div>
-        );
-      })()}
+                  <div style={{ fontSize: '0.6875rem', color: '#64748B' }}>
+                    Summer 2026 Regular &amp; Remedial Examinations
+                  </div>
+                </div>
 
-      <div className="grid-2">
-        {/* Profile Info Form */}
-        <div className="card" style={{ padding: '1.75rem' }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <User size={20} color="var(--brand-orange)" /> Personal Details
-          </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: '1rem', marginBottom: '1rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem 1rem', fontSize: '0.8125rem' }}>
+                    <div><strong>Student Name:</strong> {studentRecord.name}</div>
+                    <div><strong>Enrollment No:</strong> <code style={{ color: 'var(--brand-orange, #F37023)', fontWeight: 800 }}>{studentRecord.enrollmentNo}</code></div>
+                    <div><strong>Institute:</strong> {institute?.name || 'SIT'}</div>
+                    <div><strong>Program:</strong> {program?.name || 'B.Tech CSE'}</div>
+                    <div><strong>Semester:</strong> {semester ? `Semester ${semester.number}` : 'Semester 4'}</div>
+                    <div><strong>Exam Center:</strong> Main Campus Block B, Hall 302</div>
+                  </div>
+                  <div style={{ width: '90px', height: '100px', border: '1px solid #CBD5E1', borderRadius: '4px', overflow: 'hidden' }}>
+                    <img src={studentRecord.photo || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} alt="Candidate" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </div>
+                </div>
 
-          <form onSubmit={handleUpdateInfo}>
-            <div className="form-group">
-              <label className="form-label">Full Name</label>
-              <input
-                type="text"
-                className="form-input"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                required
-              />
+                {/* Exam Timetable Table */}
+                <table className="table" style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse', marginBottom: '1rem' }}>
+                  <thead>
+                    <tr style={{ background: '#0B192C', color: '#FFFFFF' }}>
+                      <th style={{ padding: '6px 8px' }}>Subject Code</th>
+                      <th style={{ padding: '6px 8px' }}>Subject Title</th>
+                      <th style={{ padding: '6px 8px' }}>Date</th>
+                      <th style={{ padding: '6px 8px' }}>Time</th>
+                      <th style={{ padding: '6px 8px' }}>Invigilator Sign</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { code: 'CSE401', name: 'Design and Analysis of Algorithms', date: '12-May-2026', time: '10:30 AM – 01:00 PM' },
+                      { code: 'CSE402', name: 'Database Management Systems', date: '15-May-2026', time: '10:30 AM – 01:00 PM' },
+                      { code: 'CSE403', name: 'Computer Networks & Protocols', date: '18-May-2026', time: '10:30 AM – 01:00 PM' },
+                      { code: 'CSE404', name: 'Operating Systems & Architecture', date: '21-May-2026', time: '10:30 AM – 01:00 PM' }
+                    ].map((row, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid #E2E8F0', background: idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC' }}>
+                        <td style={{ padding: '6px 8px', fontWeight: 800 }}>{row.code}</td>
+                        <td style={{ padding: '6px 8px' }}>{row.name}</td>
+                        <td style={{ padding: '6px 8px' }}>{row.date}</td>
+                        <td style={{ padding: '6px 8px' }}>{row.time}</td>
+                        <td style={{ padding: '6px 8px', borderBottom: '1px dashed #94A3B8' }}></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div style={{ fontSize: '0.6875rem', color: '#64748B', lineHeight: 1.4 }}>
+                  <strong>Instructions to Candidates:</strong> Candidates must carry this Admit Card along with their University Digital ID Card. Electronic gadgets, smart watches, and unauthorized notes are strictly prohibited.
+                </div>
+              </div>
             </div>
+          )}
 
-            <div className="form-group">
-              <label className="form-label">Institutional Email (Read Only)</label>
-              <input
-                type="email"
-                className="form-input"
-                value={user.email}
-                disabled
-                style={{ backgroundColor: 'var(--bg-surface-hover)', cursor: 'not-allowed' }}
-              />
+          {/* Results */}
+          {examSubTab === 'RESULTS' && (
+            <div className="card" style={{ padding: '1.5rem', background: '#FFFFFF' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.5rem' }}>
+                <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>
+                  Semester-wise Examination Grade Report &amp; Transcript
+                </h4>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.8125rem', fontWeight: 800 }}>Cumulative CGPA: <strong style={{ color: '#047857' }}>8.42</strong></span>
+                  <Badge variant="active">ALL PASSED</Badge>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                {[
+                  { sem: 'Semester 1', sgpa: '8.20', credits: 22, result: 'PASS', date: 'Jan 2025' },
+                  { sem: 'Semester 2', sgpa: '8.55', credits: 24, result: 'PASS', date: 'Jun 2025' },
+                  { sem: 'Semester 3', sgpa: '8.65', credits: 24, result: 'PASS', date: 'Dec 2025' }
+                ].map((s, idx) => (
+                  <div key={idx} className="card" style={{ padding: '1rem', background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong style={{ color: 'var(--brand-navy, #0B192C)' }}>{s.sem}</strong>
+                      <Badge variant="active">{s.result}</Badge>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem' }}>
+                      <span style={{ fontSize: '0.8125rem', color: '#64748B' }}>SGPA: <strong style={{ color: 'var(--brand-navy, #0B192C)' }}>{s.sgpa}</strong></span>
+                      <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Credits: {s.credits}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
+          )}
 
-            <div className="form-group">
-              <label className="form-label">Phone Number</label>
-              <input
-                type="text"
-                className="form-input"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                placeholder="+91 98765 43210"
-              />
+          {/* Regular Exam Form */}
+          {examSubTab === 'EXAM_FORM' && (
+            <div className="card" style={{ padding: '1.5rem', background: '#FFFFFF', maxWidth: '600px' }}>
+              <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.4rem' }}>
+                Regular Semester Exam Form Submission Status
+              </h4>
+              <ReadOnlyFieldRow label="Exam Session" value="Summer 2026 Regular" allowChange={false} />
+              <ReadOnlyFieldRow label="Form Status" value="SUBMITTED & VERIFIED" badge={<Badge variant="active">VERIFIED</Badge>} allowChange={false} />
+              <ReadOnlyFieldRow label="Exam Fee Status" value="PAID (₹1,500 Included)" badge={<Badge variant="active">SETTLED</Badge>} allowChange={false} />
+              <ReadOnlyFieldRow label="HOD Approval" value="Approved on 15-Apr-2026" allowChange={false} />
+              <ReadOnlyFieldRow label="Hall Ticket Issuance" value="Generated & Available" allowChange={false} />
             </div>
+          )}
 
-            <button type="submit" className="btn btn-primary" style={{ marginTop: '0.75rem' }}>
-              <Save size={16} /> Save Personal Details
-            </button>
-          </form>
+          {/* Supplementary Exam */}
+          {examSubTab === 'SUPPLEMENTARY' && (
+            <div className="card" style={{ padding: '1.5rem', background: '#FFFFFF', maxWidth: '600px' }}>
+              <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '1rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.4rem' }}>
+                Supplementary Exam &amp; Remedial Backlog Fees
+              </h4>
+              <div style={{ padding: '1rem', background: '#ECFDF5', borderRadius: '6px', border: '1px solid #10B981', color: '#065F46', marginBottom: '1rem' }}>
+                <strong>No Active Backlogs:</strong> You do not have any pending remedial or supplementary backlog subjects.
+              </div>
+              <ReadOnlyFieldRow label="Current Backlog Count" value="0 Subjects" allowChange={false} />
+              <ReadOnlyFieldRow label="Supplementary Exam Fee" value="₹0 Due" allowChange={false} />
+            </div>
+          )}
         </div>
+      )}
 
-        {/* Change Password Form & Institutional Scope */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODULE 4: FEES & PAYMENTS
+          ══════════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'FEES' && studentRecord && (
+        <StudentFeeDashboard student={studentRecord} />
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODULE 5: OTHER PORTFOLIO (Notifications, Certificates, Achievements, Activities, Projects, Social, Health)
+          ══════════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'OTHER' && studentRecord && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Sub-nav Pills */}
+          <div style={{ display: 'flex', gap: '0.5rem', background: '#F8FAFC', padding: '0.4rem', borderRadius: '8px', border: '1px solid #E2E8F0', overflowX: 'auto' }}>
+            {[
+              { id: 'NOTIFICATIONS', label: 'Notifications', icon: Bell },
+              { id: 'CERTIFICATES', label: 'Certificates', icon: Award },
+              { id: 'ACHIEVEMENTS', label: 'Achievements', icon: Trophy },
+              { id: 'ACTIVITIES', label: 'Activities & Clubs', icon: Activity },
+              { id: 'PROJECTS', label: 'Projects & Experience', icon: Briefcase },
+              { id: 'SOCIAL', label: 'Social Profiles', icon: Globe },
+              { id: 'HEALTH', label: 'Health & Amenities', icon: Heart }
+            ].map(sub => {
+              const Icon = sub.icon;
+              const isSubActive = otherSubTab === sub.id;
+              return (
+                <button
+                  key={sub.id}
+                  type="button"
+                  onClick={() => setOtherSubTab(sub.id as any)}
+                  style={{
+                    padding: '0.4rem 0.8rem',
+                    fontSize: '0.75rem',
+                    fontWeight: isSubActive ? 800 : 600,
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: isSubActive ? 'var(--brand-navy, #0B192C)' : 'transparent',
+                    color: isSubActive ? '#FFFFFF' : '#475569',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  <Icon size={14} /> {sub.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Notifications */}
+          {otherSubTab === 'NOTIFICATIONS' && (
+            <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF' }}>
+              <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>
+                Official University Circulars &amp; Alerts
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {[
+                  { title: 'Summer 2026 Exam Hall Tickets Released', date: '2026-05-01', type: 'EXAM' },
+                  { title: 'Hackathon 2026 Team Registration Open', date: '2026-04-28', type: 'EVENT' },
+                  { title: 'Annual Cultural Fest "Swarrnim Spark" Announcement', date: '2026-04-20', type: 'CAMPUS' }
+                ].map((n, i) => (
+                  <div key={i} style={{ padding: '0.75rem 1rem', background: '#F8FAFC', borderRadius: '6px', border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <strong style={{ fontSize: '0.8125rem', color: 'var(--brand-navy, #0B192C)' }}>{n.title}</strong>
+                      <span style={{ display: 'block', fontSize: '0.6875rem', color: '#64748B' }}>Posted on {n.date}</span>
+                    </div>
+                    <Badge variant="navy">{n.type}</Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Certificates */}
+          {otherSubTab === 'CERTIFICATES' && (
+            <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF' }}>
+              <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>
+                Official Institutional Certificates
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
+                {[
+                  { name: 'Bonafide Student Certificate', status: 'AVAILABLE' },
+                  { name: 'Character Certificate', status: 'AVAILABLE' },
+                  { name: 'Fee Structure Certificate for Bank Loan', status: 'AVAILABLE' }
+                ].map((c, i) => (
+                  <div key={i} style={{ padding: '1rem', background: '#F8FAFC', borderRadius: '6px', border: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <strong style={{ fontSize: '0.8125rem', color: 'var(--brand-navy, #0B192C)' }}>{c.name}</strong>
+                      <span style={{ display: 'block', fontSize: '0.6875rem', color: '#10B981', fontWeight: 700 }}>Digitally Signed</span>
+                    </div>
+                    <button type="button" className="btn btn-secondary btn-xs" style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                      <Download size={12} /> Download
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Achievements */}
+          {otherSubTab === 'ACHIEVEMENTS' && (
+            <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF' }}>
+              <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>
+                Student Honors &amp; Achievements
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <ReadOnlyFieldRow label="Academic Distinction" value="Dean's List of Honor (Sem 2 & Sem 3)" allowChange={false} />
+                <ReadOnlyFieldRow label="Competition" value="1st Runner Up - SSIU Smart Gujarat Hackathon 2025" allowChange={false} />
+              </div>
+            </div>
+          )}
+
+          {/* Activities & Clubs */}
+          {otherSubTab === 'ACTIVITIES' && (
+            <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF' }}>
+              <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>
+                Clubs &amp; Extracurricular Activities
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <ReadOnlyFieldRow label="Student Club" value="SSIU Robotics & IoT Club (Core Member)" allowChange={false} />
+                <ReadOnlyFieldRow label="Social Service" value="National Service Scheme (NSS Volunteer)" allowChange={false} />
+                <ReadOnlyFieldRow label="Sports" value="University Table Tennis Team" allowChange={false} />
+              </div>
+            </div>
+          )}
+
+          {/* Projects */}
+          {otherSubTab === 'PROJECTS' && (
+            <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF' }}>
+              <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>
+                Academic Projects &amp; Research
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <ReadOnlyFieldRow label="Semester 4 Capstone" value="AI-Powered Student Attendance Management System" allowChange={false} />
+                <ReadOnlyFieldRow label="Industry Internship" value="Full Stack Intern at TechInnovate Solutions (Summer 2025)" allowChange={false} />
+              </div>
+            </div>
+          )}
+
+          {/* Social Profiles */}
+          {otherSubTab === 'SOCIAL' && (
+            <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF' }}>
+              <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>
+                Professional Links &amp; Profiles
+              </h4>
+              <ReadOnlyFieldRow label="LinkedIn Profile" value="https://linkedin.com/in/student-ssiu" allowChange={false} />
+              <ReadOnlyFieldRow label="GitHub Profile" value="https://github.com/student-ssiu" allowChange={false} />
+              <ReadOnlyFieldRow label="Professional Memberships" value="IEEE Student Member (ID: 9842104)" allowChange={false} />
+            </div>
+          )}
+
+          {/* Health & Amenities */}
+          {otherSubTab === 'HEALTH' && (
+            <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF', maxWidth: '600px' }}>
+              <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.875rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>
+                Health Information &amp; Campus Amenities
+              </h4>
+              <ReadOnlyFieldRow label="Blood Group" value={studentRecord.bloodGroup || 'B+'} fieldKey="bloodGroup" />
+              <ReadOnlyFieldRow label="Persons with Disability (PwD)" value={studentRecord.physicallyChallenged ? `Yes (${studentRecord.disabilityDetails})` : 'No (None)'} fieldKey="physicallyChallenged" />
+              <ReadOnlyFieldRow label="Campus Hostel Status" value={studentRecord.hostelRequired ? 'Hostel Resident (Block A, Room 204)' : 'Day Scholar'} fieldKey="hostelRequired" />
+              <ReadOnlyFieldRow label="University Bus Transport" value={studentRecord.transportRequired ? 'Enrolled (Bus Route 12 - Gandhinagar)' : 'Self Commute'} fieldKey="transportRequired" />
+              <ReadOnlyFieldRow label="Mother Tongue" value={studentRecord.motherTongue || 'Gujarati'} fieldKey="motherTongue" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          DATA CHANGE REQUESTS TRACKER TAB
+          ══════════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'DATA_CHANGE' && studentRecord && (
+        <StudentDataChangeTab student={studentRecord} />
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          SECURITY & CREDENTIALS TAB
+          ══════════════════════════════════════════════════════════════════════ */}
+      {activeTab === 'SECURITY' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
           {/* Institutional Scope Info */}
-          <div className="card" style={{ padding: '1.5rem', background: 'var(--bg-surface)' }}>
-            <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '0.875rem' }}>
+          <div className="card" style={{ padding: '1.5rem', background: '#FFFFFF' }}>
+            <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', marginBottom: '0.875rem' }}>
               Assigned Institutional Scope
             </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.84375rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', fontSize: '0.8125rem' }}>
               <div>
-                <span style={{ color: 'var(--text-muted)' }}>Assigned Institute:</span>{' '}
+                <span style={{ color: 'var(--text-muted, #64748B)' }}>Assigned Institute:</span>{' '}
                 <strong>{institute ? institute.name : 'All Institutes (Global)'}</strong>
               </div>
               <div>
-                <span style={{ color: 'var(--text-muted)' }}>Assigned Department:</span>{' '}
+                <span style={{ color: 'var(--text-muted, #64748B)' }}>Assigned Department:</span>{' '}
                 <strong>{department ? department.name : 'All Departments'}</strong>
               </div>
               {program && (
                 <div>
-                  <span style={{ color: 'var(--text-muted)' }}>Enrolled Program:</span>{' '}
+                  <span style={{ color: 'var(--text-muted, #64748B)' }}>Enrolled Program:</span>{' '}
                   <strong>{program.name} ({program.code})</strong>
+                </div>
+              )}
+              {studentRecord && (
+                <div>
+                  <span style={{ color: 'var(--text-muted, #64748B)' }}>ERP Username:</span>{' '}
+                  <code style={{ fontWeight: 800, color: 'var(--brand-orange, #F37023)' }}>{studentRecord.enrollmentNo || user.username}</code>
                 </div>
               )}
             </div>
           </div>
 
           {/* Change Password Form */}
-          <div className="card" style={{ padding: '1.75rem' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Lock size={20} color="var(--brand-navy-medium)" /> Security &amp; Credentials
+          <div className="card" style={{ padding: '1.5rem', background: '#FFFFFF' }}>
+            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Lock size={18} color="var(--brand-orange, #F37023)" /> Security &amp; Credentials
             </h3>
 
-            <form onSubmit={handleChangePassword}>
-              <div className="form-group">
-                <label className="form-label">New Password</label>
+            <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700 }}>New Password</label>
                 <input
                   type="password"
-                  className="form-input"
+                  className="form-control"
                   placeholder="At least 6 characters"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
+                  style={{ fontSize: '0.8125rem' }}
                 />
               </div>
 
-              <div className="form-group">
-                <label className="form-label">Confirm New Password</label>
+              <div>
+                <label style={{ fontSize: '0.75rem', fontWeight: 700 }}>Confirm New Password</label>
                 <input
                   type="password"
-                  className="form-input"
+                  className="form-control"
                   placeholder="Repeat new password"
                   value={confirmPassword}
                   onChange={e => setConfirmPassword(e.target.value)}
                   required
+                  style={{ fontSize: '0.8125rem' }}
                 />
               </div>
 
-              <button type="submit" className="btn btn-navy" style={{ marginTop: '0.75rem' }}>
-                <Lock size={16} /> Update Password
+              <button type="submit" className="btn btn-primary btn-sm" style={{ fontWeight: 800, width: 'fit-content' }}>
+                <Lock size={14} /> Update Security Password
               </button>
             </form>
           </div>
         </div>
-      </div>
-    </div>
-  )}
-
-      {/* Admin Reject ABC ID Modal */}
-      {isRejectingModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: '1rem' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '460px', padding: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '0.5rem' }}>
-              Reject Student ABC ID Submission
-            </h3>
-            <p style={{ fontSize: '0.84375rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              Specify rejection reason for {studentRecord?.name} ({studentRecord?.abcId})
-            </p>
-
-            <form onSubmit={handleAdminRejectAbcIdConfirm} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="form-group">
-                <label className="form-label">Rejection Reason / Correction Notes *</label>
-                <textarea
-                  className="form-input"
-                  rows={3}
-                  placeholder="e.g. DigiLocker card name mismatch or invalid 12-digit number."
-                  value={rejectReason}
-                  onChange={e => setRejectReason(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setIsRejectingModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-danger">Reject ABC ID</button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
+
+      {/* Student Data Change Request Modal */}
+      <StudentDataChangeRequestModal
+        isOpen={Boolean(selectedFieldForChange)}
+        onClose={() => setSelectedFieldForChange(null)}
+        student={studentRecord}
+        initialFieldKey={selectedFieldForChange || undefined}
+        onSuccess={() => {
+          setSelectedFieldForChange(null);
+          setActiveTab('DATA_CHANGE');
+        }}
+      />
     </div>
   );
 };

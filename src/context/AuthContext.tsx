@@ -28,7 +28,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (parsed && typeof parsed === 'object' && parsed.id) {
           const freshUser = db.getUsers().find(u => u.id === parsed.id || (parsed.username && u.username === parsed.username));
           if (freshUser) {
-            return { ...parsed, name: freshUser.name, designation: freshUser.designation };
+            if (freshUser.accountStatus === 'LOCKED' || freshUser.accountStatus === 'DISABLED' || freshUser.accountStatus === 'INACTIVE') {
+              localStorage.removeItem(AUTH_STORAGE_KEY);
+              return null;
+            }
+            return { ...freshUser };
           }
           return parsed;
         }
@@ -93,15 +97,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = (identifier: string, password?: string) => {
     const users = db.getUsers();
+    const students = db.getStudents();
     const cleanId = identifier.trim().toLowerCase();
 
-    // Match by username, email, or role keyword
+    // 1. Match by username, email, temporaryEnrollmentNumber, or finalEnrollmentNumber
     let foundUser = users.find(u => 
       (u.username && u.username.toLowerCase() === cleanId) ||
-      u.email.toLowerCase() === cleanId
+      (u.email && u.email.toLowerCase() === cleanId) ||
+      (u.temporaryEnrollmentNumber && u.temporaryEnrollmentNumber.toLowerCase() === cleanId) ||
+      (u.finalEnrollmentNumber && u.finalEnrollmentNumber.toLowerCase() === cleanId) ||
+      (u.enrollmentNo && u.enrollmentNo.toLowerCase() === cleanId)
     );
 
-    // Fallback role keyword match for demo accounts (e.g. "admin", "faculty", "student")
+    // 2. Fallback: Search via Student Master record
+    if (!foundUser) {
+      const studentMatch = students.find(s => 
+        (s.temporaryEnrollmentNumber && s.temporaryEnrollmentNumber.toLowerCase() === cleanId) ||
+        (s.finalEnrollmentNumber && s.finalEnrollmentNumber.toLowerCase() === cleanId) ||
+        (s.enrollmentNo && s.enrollmentNo.toLowerCase() === cleanId) ||
+        (s.id && s.id.toLowerCase() === cleanId)
+      );
+      if (studentMatch) {
+        foundUser = users.find(u => 
+          u.id === `user-${studentMatch.id}` || 
+          u.username === studentMatch.enrollmentNo || 
+          u.username === studentMatch.temporaryEnrollmentNumber ||
+          u.email.toLowerCase() === studentMatch.email.toLowerCase()
+        );
+      }
+    }
+
+    // 3. Fallback role keyword match for demo accounts (e.g. "admin", "faculty", "student")
     if (!foundUser) {
       if (cleanId === 'admin') {
         foundUser = users.find(u => u.role === 'SUPER_ADMIN') || users.find(u => u.role === 'UNIVERSITY_ADMIN');
@@ -132,20 +158,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (!foundUser) {
       securityAuditService.trackLoginFailure(identifier, 'Account not found or invalid identifier');
-      return { success: false, error: 'Invalid User ID or Email. Please enter a valid account ID.' };
+      return { success: false, error: 'Invalid User ID, Temporary Enrollment Number or Email. Please enter a valid account ID.' };
     }
 
-    if (password && foundUser.password && foundUser.password !== password) {
+    // 4. Validate Password & Student Access Code
+    if (password) {
+      const linkedStudent = students.find(s => 
+        (foundUser?.id && s.id === foundUser.id.replace('user-', '')) || 
+        s.enrollmentNo === foundUser?.username ||
+        s.temporaryEnrollmentNumber === foundUser?.temporaryEnrollmentNumber
+      );
+
+      const isDirectMatch = foundUser.password === password;
+      const isAccessCodeMatch = (foundUser.studentAccessCode && foundUser.studentAccessCode === password) ||
+                                (linkedStudent?.studentAccessCode && linkedStudent.studentAccessCode === password);
       const isDemoPassMatch = 
         password === 'Student@123' ||
         password === 'Faculty@123' ||
         password === 'Admin@123' ||
         password === 'Parent@123';
 
-      if (!isDemoPassMatch) {
-        securityAuditService.trackLoginFailure(identifier, 'Invalid password credentials');
-        return { success: false, error: 'Incorrect Password. Please check your User ID and Password.' };
+      if (!isDirectMatch && !isAccessCodeMatch && !isDemoPassMatch) {
+        securityAuditService.trackLoginFailure(identifier, 'Invalid password credentials or access code');
+        return { success: false, error: 'Incorrect Password or Student Access Code. Please check your credentials.' };
       }
+    }
+
+    // 5. Validate Account Status (Active vs Locked vs Disabled)
+    if (foundUser.accountStatus === 'LOCKED' || (foundUser as any).status === 'LOCKED') {
+      const lockMsg = foundUser.lockReason 
+        ? `Your account is LOCKED. Reason: ${foundUser.lockReason}. Please contact the Central ERP Coordinator.`
+        : 'Your account is LOCKED for security reasons. Please contact the Central ERP Coordinator.';
+      securityAuditService.trackLoginFailure(identifier, `Locked account login attempt: ${foundUser.username}`);
+      return { success: false, error: lockMsg };
+    }
+
+    if (foundUser.accountStatus === 'DISABLED' || foundUser.accountStatus === 'INACTIVE' || (foundUser.status === 'INACTIVE' && foundUser.accountStatus !== 'ACTIVE')) {
+      securityAuditService.trackLoginFailure(identifier, `Inactive/Disabled account login attempt: ${foundUser.username}`);
+      return { success: false, error: 'Your account has been DEACTIVATED/DISABLED. Please contact the Central ERP Coordinator or System Administrator.' };
     }
 
     setUser(foundUser);

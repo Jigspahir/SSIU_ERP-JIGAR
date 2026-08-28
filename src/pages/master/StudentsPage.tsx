@@ -9,15 +9,16 @@ import { Badge } from '../../components/common/Badge';
 import { StudentProfileModal } from '../../components/profile/StudentProfileModal';
 import { MentorAssignmentTab } from '../../components/mentor/MentorAssignmentTab';
 import { BulkDataManagerModal } from '../../components/bulk-import/BulkDataManagerModal';
-import { Eye, Users, UserCheck } from 'lucide-react';
+import { StudentOnboardingTab } from '../../components/admission/StudentOnboardingTab';
+import { Eye, Users, UserCheck, UserPlus } from 'lucide-react';
 
 interface StudentsPageProps {
-  initialTab?: 'DIRECTORY' | 'MENTOR_ASSIGNMENT';
+  initialTab?: 'DIRECTORY' | 'ONBOARDING' | 'MENTOR_ASSIGNMENT';
 }
 
 export const StudentsPage: React.FC<StudentsPageProps> = ({ initialTab = 'DIRECTORY' }) => {
   const { user, role, canMutate } = useAuth();
-  const [activeTab, setActiveTab] = useState<'DIRECTORY' | 'MENTOR_ASSIGNMENT'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'DIRECTORY' | 'ONBOARDING' | 'MENTOR_ASSIGNMENT'>(initialTab);
   const [students, setStudents] = useState<Student[]>(() => db.getStudents());
 
   // Filter Dropdowns State
@@ -128,7 +129,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ initialTab = 'DIRECT
     setEmail(item.email);
     setPhone(item.phone);
     setPhoto(item.photo || '');
-    setGender(item.gender);
+    setGender((item.gender as 'Male' | 'Female' | 'Other') || 'Male');
     setDateOfBirth(item.dateOfBirth || '');
     setBloodGroup(item.bloodGroup || 'O+');
     setAddress(item.address || '');
@@ -269,6 +270,13 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ initialTab = 'DIRECT
             <Users size={16} /> Student Directory
           </button>
           <button
+            className={`btn ${activeTab === 'ONBOARDING' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setActiveTab('ONBOARDING')}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 800 }}
+          >
+            <UserPlus size={16} /> Student Onboarding Desk
+          </button>
+          <button
             className={`btn ${activeTab === 'MENTOR_ASSIGNMENT' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setActiveTab('MENTOR_ASSIGNMENT')}
             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
@@ -278,7 +286,9 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({ initialTab = 'DIRECT
         </div>
       )}
 
-      {activeTab === 'MENTOR_ASSIGNMENT' ? (
+      {activeTab === 'ONBOARDING' ? (
+        <StudentOnboardingTab />
+      ) : activeTab === 'MENTOR_ASSIGNMENT' ? (
         <MentorAssignmentTab />
       ) : (
         <>

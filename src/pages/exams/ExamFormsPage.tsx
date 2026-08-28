@@ -26,6 +26,7 @@ export const ExamFormsPage: React.FC = () => {
   const [allForms, setAllForms] = useState<ExamForm[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [hallTickets, setHallTickets] = useState<HallTicket[]>([]);
 
@@ -73,6 +74,7 @@ export const ExamFormsPage: React.FC = () => {
     setExams(db.getExams(undefined, user));
     setStudents(db.getStudents());
     setPrograms(db.getPrograms());
+    setDepartments(db.getDepartments());
     setSemesters(db.getSemesters());
 
     if (isStudent) {
@@ -462,125 +464,142 @@ export const ExamFormsPage: React.FC = () => {
             </button>
           </div>
 
-          {/* Tab 1: Available Examinations */}
+          {/* Tab 1: Available Examinations (Official Table / Grid) */}
           {studentActiveTab === 'AVAILABLE' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {availableExams.length === 0 ? (
-                <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  <Clock size={36} style={{ margin: '0 auto 0.75rem auto', opacity: 0.5 }} />
-                  <h4 style={{ fontSize: '1.1rem', color: 'var(--brand-navy)', margin: '0 0 0.5rem 0' }}>
-                    No Active Examination Registration Windows
-                  </h4>
-                  <p style={{ fontSize: '0.875rem', maxWidth: '480px', margin: '0 auto' }}>
-                    There are currently no published examinations open for form submission matching your program and semester.
+            <div className="card" style={{ padding: '1.25rem', overflow: 'hidden', border: '1px solid var(--border-color)', background: '#FFFFFF', borderRadius: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0 }}>
+                    Eligible Examination Sessions &amp; Form Windows
+                  </h3>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                    Official examinations published by the Controller of Examinations for your Program, Department &amp; Semester.
                   </p>
                 </div>
-              ) : (
-                <div className="grid-2" style={{ gap: '1rem' }}>
-                  {availableExams.map(item => (
-                    <div key={item.id} className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid var(--border-color)' }}>
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--brand-orange)', fontSize: '0.85rem' }}>
-                            {item.examCode}
-                          </span>
-                          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                            <Badge variant={item.type === 'Regular' ? 'navy' : 'orange'}>
-                              {item.type}
-                            </Badge>
-                            {item.timePeriodStatus === 'OPEN' && <Badge variant="active">Open (Regular)</Badge>}
-                            {item.timePeriodStatus === 'OPEN_WITH_LATE_FEE' && <Badge variant="warning">Late Fee Period</Badge>}
-                            {item.timePeriodStatus === 'FORM_NOT_STARTED' && <Badge variant="navy">Opens {item.formStartDate}</Badge>}
-                            {item.timePeriodStatus === 'CLOSED' && <Badge variant="danger">Closed</Badge>}
-                          </div>
-                        </div>
-                        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--brand-navy)', margin: '0 0 0.5rem 0' }}>
-                          {item.name}
-                        </h3>
-                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                          <div><strong>Session:</strong> {item.session} ({item.academicYearCode}) — Semester {item.semesterNumber}</div>
-                          <div><strong>Regular Form Window:</strong> {item.formStartDate} to {item.formEndDate}</div>
-                          {item.lateFeeEndDate && <div><strong>Late Fee Deadline:</strong> {item.lateFeeEndDate}</div>}
-                          <div><strong>Examination Conduct Dates:</strong> {item.startDate} to {item.endDate}</div>
-                          <div style={{ marginTop: '0.25rem' }}>
-                            <strong>75% Attendance Gate:</strong>{' '}
-                            <span style={{ fontWeight: 700, color: item.shortageCount === 0 ? '#10B981' : '#D97706' }}>
-                              {item.eligibleSubjectsCount || 0} of {item.subjectsCount || 0} Papers Cleared
-                            </span>
-                            {item.shortageCount > 0 && (
-                              <span style={{ fontSize: '0.75rem', color: '#EF4444', marginLeft: '0.35rem' }}>
-                                ({item.shortageCount} shortage)
-                              </span>
-                            )}
-                          </div>
-                        </div>
+              </div>
 
-                        {/* Fee Pill */}
-                        <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#F8FAFC', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Payable Exam Fee:</div>
-                            <strong style={{ fontSize: '1.1rem', color: 'var(--brand-navy)' }}>₹{item.totalPayable.toLocaleString('en-IN')}</strong>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="table" style={{ width: '100%', fontSize: '0.84375rem', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#0F2C59', color: '#FFFFFF' }}>
+                      <th style={{ padding: '0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Examination</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Academic Year</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Semester</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Exam Session</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Form Start</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Form End</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Fee</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Status</th>
+                      <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 800 }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {availableExams.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                          <Clock size={32} style={{ margin: '0 auto 0.5rem auto', opacity: 0.5 }} />
+                          <div style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>No Active Examination Registration Windows</div>
+                          <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                            There are currently no published examinations open for form submission matching your program and semester.
                           </div>
-                          {item.isLate && (
-                            <Badge variant="warning">
-                              ⚠️ Late Fee Applied (+₹{item.applicableLateFee})
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Action Button */}
-                      <div style={{ marginTop: '1rem' }}>
-                        {item.isSubmitted ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <Badge variant="active">✓ Form Submitted ({item.existingFormNumber})</Badge>
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-sm"
-                              onClick={() => {
-                                const f = studentForms.find(sf => sf.id === item.existingFormId);
-                                if (f) setViewingFormDetails(f);
-                              }}
-                            >
-                              <Eye size={14} /> View
-                            </button>
-                          </div>
-                        ) : item.hasDraft ? (
-                          <button
-                            type="button"
-                            className="btn btn-warning btn-sm"
-                            onClick={() => {
-                              const draft = studentForms.find(sf => sf.id === item.existingFormId);
-                              handleOpenFormModal(item, draft);
-                            }}
-                            style={{ width: '100%', fontWeight: 700 }}
-                          >
-                            Continue Draft ({item.existingFormNumber})
-                          </button>
-                        ) : !item.isFillable ? (
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
-                            disabled
-                            style={{ width: '100%', opacity: 0.6, cursor: 'not-allowed' }}
-                          >
-                            {item.timePeriodStatus === 'FORM_NOT_STARTED' ? `Opens on ${item.formStartDate}` : 'Registration Window Closed'}
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-sm"
-                            onClick={() => handleOpenFormModal(item)}
-                            style={{ width: '100%', fontWeight: 800 }}
-                          >
-                            Fill Exam Form <ArrowRight size={15} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                        </td>
+                      </tr>
+                    ) : (
+                      availableExams.map((item, idx) => {
+                        const isEven = idx % 2 === 0;
+                        return (
+                          <tr key={item.id} style={{ background: isEven ? '#FFFFFF' : '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+                            <td style={{ padding: '0.75rem', borderRight: '1px solid #E2E8F0' }}>
+                              <div style={{ fontWeight: 800, color: '#0F2C59' }}>{item.name}</div>
+                              <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', marginTop: '2px' }}>
+                                <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#F37023', fontWeight: 700 }}>
+                                  {item.examCode}
+                                </span>
+                                <Badge variant={item.type === 'Regular' ? 'navy' : 'orange'}>
+                                  {item.type}
+                                </Badge>
+                              </div>
+                            </td>
+                            <td style={{ padding: '0.75rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 600 }}>
+                              {item.academicYearCode || '2026-27'}
+                            </td>
+                            <td style={{ padding: '0.75rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 700, color: '#0F2C59' }}>
+                              Semester {item.semesterNumber || 4}
+                            </td>
+                            <td style={{ padding: '0.75rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 600 }}>
+                              {item.session || 'Summer 2026'}
+                            </td>
+                            <td style={{ padding: '0.75rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontSize: '0.8125rem' }}>
+                              {item.formStartDate}
+                            </td>
+                            <td style={{ padding: '0.75rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontSize: '0.8125rem' }}>
+                              <div>{item.formEndDate}</div>
+                              {item.isLate && (
+                                <div style={{ fontSize: '0.7rem', color: '#D97706', fontWeight: 700 }}>Late Fee Active</div>
+                              )}
+                            </td>
+                            <td style={{ padding: '0.75rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 800, color: '#0F2C59' }}>
+                              ₹{item.totalPayable.toLocaleString('en-IN')}
+                            </td>
+                            <td style={{ padding: '0.75rem', textAlign: 'center', borderRight: '1px solid #E2E8F0' }}>
+                              <Badge variant={item.statusBadgeVariant || 'active'}>
+                                {item.displayStatus || 'Open'}
+                              </Badge>
+                            </td>
+                            <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                              {item.isSubmitted ? (
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                                  <button
+                                    type="button"
+                                    className="btn btn-ghost btn-sm"
+                                    onClick={() => {
+                                      const f = studentForms.find(sf => sf.id === item.existingFormId || sf.examId === item.id);
+                                      if (f) setViewingFormDetails(f);
+                                    }}
+                                    style={{ padding: '0.25rem 0.5rem', fontWeight: 700 }}
+                                  >
+                                    <Eye size={14} /> View Form
+                                  </button>
+                                </div>
+                              ) : item.hasDraft ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-warning btn-sm"
+                                  onClick={() => {
+                                    const draft = studentForms.find(sf => sf.id === item.existingFormId || sf.examId === item.id);
+                                    handleOpenFormModal(item, draft);
+                                  }}
+                                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.78125rem', fontWeight: 700 }}
+                                >
+                                  Continue Draft
+                                </button>
+                              ) : !item.isFillable ? (
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm"
+                                  disabled
+                                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', opacity: 0.6, cursor: 'not-allowed' }}
+                                >
+                                  {item.timePeriodStatus === 'FORM_NOT_STARTED' ? `Opens ${item.formStartDate}` : 'Closed'}
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-sm"
+                                  onClick={() => handleOpenFormModal(item)}
+                                  style={{ padding: '0.35rem 0.85rem', fontSize: '0.78125rem', fontWeight: 800, background: '#F37023', borderColor: '#F37023', color: '#FFFFFF' }}
+                                >
+                                  Apply / Fill Exam Form
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
@@ -887,13 +906,13 @@ export const ExamFormsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Verification Queue Table */}
-              <div className="card" style={{ padding: '1.5rem', overflow: 'hidden' }}>
+              {/* Verification Queue Table (Official 12-Column Table) */}
+              <div className="card" style={{ padding: '1.25rem', overflow: 'hidden', border: '1px solid var(--border-color)', background: '#FFFFFF', borderRadius: '8px' }}>
                 <div style={{ overflowX: 'auto' }}>
-                  <table className="table" style={{ fontSize: '0.875rem' }}>
+                  <table className="table" style={{ width: '100%', fontSize: '0.8125rem', borderCollapse: 'collapse' }}>
                     <thead>
-                      <tr style={{ background: 'var(--bg-surface-hover)' }}>
-                        <th style={{ width: '40px' }}>
+                      <tr style={{ background: '#0F2C59', color: '#FFFFFF' }}>
+                        <th style={{ width: '38px', padding: '0.625rem 0.5rem', textAlign: 'center', borderRight: '1px solid rgba(255,255,255,0.15)' }}>
                           <input
                             type="checkbox"
                             checked={filteredForms.length > 0 && selectedFormIds.length === filteredForms.length}
@@ -903,29 +922,39 @@ export const ExamFormsPage: React.FC = () => {
                             }}
                           />
                         </th>
-                        <th>Form Number</th>
-                        <th>Student Name &amp; Enrollment</th>
-                        <th>Examination</th>
-                        <th>Amount</th>
-                        <th>Payment</th>
-                        <th>Form Status</th>
-                        <th style={{ textAlign: 'right' }}>Actions</th>
+                        <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Application No.</th>
+                        <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Student Name</th>
+                        <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Student ID</th>
+                        <th style={{ padding: '0.625rem 0.75rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Enrollment No.</th>
+                        <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Department</th>
+                        <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Program</th>
+                        <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Semester</th>
+                        <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Examination</th>
+                        <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Fee Status</th>
+                        <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Application Status</th>
+                        <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Submission Date</th>
+                        <th style={{ padding: '0.625rem 0.75rem', textAlign: 'right', fontWeight: 800 }}>Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredForms.length === 0 ? (
                         <tr>
-                          <td colSpan={8} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                            No examination forms found matching the selected filter criteria.
+                          <td colSpan={13} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                            No examination applications found matching the selected filter criteria.
                           </td>
                         </tr>
                       ) : (
-                        filteredForms.map(form => {
+                        filteredForms.map((form, fIdx) => {
                           const examObj = exams.find(e => e.id === form.examId);
+                          const studentObj = students.find(s => s.id === form.studentId || s.enrollmentNo === form.enrollmentNo);
+                          const progObj = programs.find(p => p.id === (form.programId || studentObj?.programId || examObj?.programId));
+                          const deptObj = departments.find(d => d.id === (studentObj?.departmentId || progObj?.departmentId || examObj?.departmentId));
                           const isSelected = selectedFormIds.includes(form.id);
+                          const isEven = fIdx % 2 === 0;
+
                           return (
-                            <tr key={form.id} style={{ background: isSelected ? '#F0F9FF' : undefined }}>
-                              <td>
+                            <tr key={form.id} style={{ background: isSelected ? '#EFF6FF' : isEven ? '#FFFFFF' : '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+                              <td style={{ textAlign: 'center', padding: '0.5rem', borderRight: '1px solid #E2E8F0' }}>
                                 <input
                                   type="checkbox"
                                   checked={isSelected}
@@ -935,37 +964,56 @@ export const ExamFormsPage: React.FC = () => {
                                   }}
                                 />
                               </td>
-                              <td>
-                                <strong style={{ fontFamily: 'monospace', color: 'var(--brand-orange)' }}>
+                              <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0' }}>
+                                <strong style={{ fontFamily: 'monospace', color: '#F37023', fontSize: '0.8125rem' }}>
                                   {form.formNumber || form.id}
                                 </strong>
                               </td>
-                              <td>
-                                <div><strong>{form.studentName}</strong></div>
-                                <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{form.enrollmentNo}</div>
+                              <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0', fontWeight: 700, color: '#0F2C59' }}>
+                                {form.studentName || studentObj?.name || 'Student'}
                               </td>
-                              <td>{examObj?.name || 'Exam Session'}</td>
-                              <td>₹{(form.totalAmount ?? form.totalFee ?? 0).toLocaleString('en-IN')}</td>
-                              <td>
+                              <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontFamily: 'monospace', fontSize: '0.75rem', color: '#475569' }}>
+                                {form.studentId || studentObj?.id || 'N/A'}
+                              </td>
+                              <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontFamily: 'monospace', fontWeight: 700, color: '#0F2C59' }}>
+                                {form.enrollmentNo || studentObj?.enrollmentNo || 'N/A'}
+                              </td>
+                              <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0', fontSize: '0.78125rem' }}>
+                                {deptObj?.name || 'Computer Engineering'}
+                              </td>
+                              <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0', fontSize: '0.78125rem' }}>
+                                {progObj?.name || 'B.Tech CSE'}
+                              </td>
+                              <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 700, color: '#0F2C59' }}>
+                                Sem {form.semesterNumber || 4}
+                              </td>
+                              <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0' }}>
+                                <div style={{ fontWeight: 600, color: '#0F2C59' }}>{examObj?.name || 'Exam Session'}</div>
+                                <div style={{ fontSize: '0.71875rem', color: '#64748B', fontFamily: 'monospace' }}>{examObj?.examCode || examObj?.code}</div>
+                              </td>
+                              <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0' }}>
                                 <Badge variant={form.paymentStatus === 'PAID' || form.paymentStatus === 'COMPLETED' || form.paymentStatus === 'WAIVED' || form.paymentStatus === 'SUCCESS' ? 'active' : 'warning'}>
-                                  {form.paymentStatus}
+                                  {form.paymentStatus || 'PENDING'}
                                 </Badge>
                               </td>
-                              <td>
+                              <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0' }}>
                                 <Badge variant={form.status === 'VERIFIED' ? 'active' : form.status === 'SUBMITTED' ? 'navy' : form.status === 'UNDER_REVIEW' ? 'warning' : form.status === 'RETURNED' ? 'warning' : form.status === 'REJECTED' ? 'danger' : 'inactive'}>
-                                  {form.status}
+                                  {form.status === 'UNDER_REVIEW' ? 'UNDER VERIFICATION' : form.status}
                                 </Badge>
                               </td>
-                              <td style={{ textAlign: 'right' }}>
-                                <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+                              <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontSize: '0.75rem', color: '#64748B' }}>
+                                {form.submittedAt || form.appliedDate || form.createdAt || 'N/A'}
+                              </td>
+                              <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>
+                                <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center', justifyContent: 'flex-end' }}>
                                   <button
                                     type="button"
                                     className="btn btn-ghost btn-sm"
                                     title="Review & Verify"
                                     onClick={() => setViewingFormDetails(form)}
-                                    style={{ padding: '0.25rem 0.5rem' }}
+                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', fontWeight: 700 }}
                                   >
-                                    <Eye size={15} /> Review
+                                    <Eye size={14} /> Review
                                   </button>
                                   {form.status === 'VERIFIED' && (
                                     <button
@@ -973,9 +1021,9 @@ export const ExamFormsPage: React.FC = () => {
                                       className="btn btn-primary btn-sm"
                                       title="Generate Hall Ticket"
                                       onClick={() => handleGenerateHallTicket(form)}
-                                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', fontWeight: 700 }}
+                                      style={{ padding: '0.25rem 0.5rem', fontSize: '0.71875rem', fontWeight: 800, background: '#F37023', borderColor: '#F37023' }}
                                     >
-                                      <QrCode size={12} /> Hall Ticket
+                                      <QrCode size={12} /> Ticket
                                     </button>
                                   )}
                                 </div>
@@ -1417,34 +1465,111 @@ export const ExamFormsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─── STUDENT FILL EXAM FORM MODAL WITH 75% ATTENDANCE LOCK ─── */}
+      {/* ─── STUDENT FILL EXAM FORM MODAL (OFFICIAL UNIVERSITY ADMINISTRATIVE DOCUMENT) ─── */}
       {selectedExamForForm && (
-        <div className="modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1050, position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)' }}>
-          <div className="card" style={{ width: '96%', maxWidth: '780px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', background: '#FFFFFF', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-xl)', overflow: 'hidden', padding: 0 }}>
+        <div className="modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1050, position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)', padding: '1rem' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '840px', maxHeight: '92vh', display: 'flex', flexDirection: 'column', background: '#FFFFFF', borderRadius: '8px', border: '1px solid #CBD5E1', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.25)', overflow: 'hidden', padding: 0 }}>
             
             {/* Header */}
-            <div style={{ padding: '1.25rem 1.5rem', background: 'var(--brand-navy)', color: '#FFFFFF', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '1.25rem 1.75rem', background: '#0F2C59', color: '#FFFFFF', borderTop: '4px solid #F37023', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <div>
-                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.85 }}>
-                  {activeDraftForm ? 'Edit / Complete Draft Exam Form' : 'New Examination Form Enrollment'}
+                <span style={{ fontSize: '0.71875rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#F37023', fontWeight: 800 }}>
+                  {activeDraftForm ? 'Edit / Complete Draft Exam Application' : 'Student Examination Form Registration'}
                 </span>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: '#FFFFFF' }}>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '2px 0 0 0', color: '#FFFFFF' }}>
                   {selectedExamForForm.name || 'End Semester Examination'} ({selectedExamForForm.code || selectedExamForForm.examCode})
                 </h3>
               </div>
-              <button className="btn btn-ghost btn-sm" onClick={() => setSelectedExamForForm(null)} style={{ color: '#FFFFFF' }}>
-                <XCircle size={20} />
+              <button
+                type="button"
+                onClick={() => setSelectedExamForForm(null)}
+                style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', padding: '6px', display: 'flex', alignItems: 'center', borderRadius: '4px' }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#FFFFFF'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#94A3B8'; }}
+              >
+                <XCircle size={22} />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div style={{ padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.25rem', fontSize: '0.875rem' }}>
+            <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1.25rem', backgroundColor: '#F8FAFC' }}>
               
+              {/* SECTION 1: Student Profile & Academic Mapping */}
+              <div style={{ background: '#FFFFFF', borderRadius: '6px', border: '1px solid #CBD5E1', overflow: 'hidden' }}>
+                <div style={{ padding: '0.5rem 1rem', background: '#F1F5F9', borderBottom: '1px solid #CBD5E1', fontWeight: 800, fontSize: '0.8125rem', color: '#0F2C59', textTransform: 'uppercase' }}>
+                  1. Candidate Academic Profile
+                </div>
+                <div style={{ padding: '1rem', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', fontSize: '0.8125rem' }}>
+                  <div>
+                    <span style={{ color: '#64748B' }}>Student Name:</span>
+                    <div style={{ fontWeight: 800, color: '#0F2C59' }}>{currentStudent?.name || user?.name || 'Student Name'}</div>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B' }}>Student ID:</span>
+                    <div style={{ fontFamily: 'monospace', fontWeight: 700 }}>{currentStudent?.id || user?.id || 'stu-1'}</div>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B' }}>Enrollment Number:</span>
+                    <div style={{ fontFamily: 'monospace', fontWeight: 800, color: '#F37023' }}>{currentStudent?.enrollmentNo || user?.enrollmentNo || 'EN2024CSE001'}</div>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B' }}>Program:</span>
+                    <div style={{ fontWeight: 700 }}>{programs.find(p => p.id === (selectedExamForForm.programId || currentStudent?.programId))?.name || 'B.Tech CSE'}</div>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B' }}>Department:</span>
+                    <div style={{ fontWeight: 700 }}>{departments.find(d => d.id === (selectedExamForForm.departmentId || currentStudent?.departmentId))?.name || 'Computer Engineering'}</div>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B' }}>Semester:</span>
+                    <div style={{ fontWeight: 800, color: '#0F2C59' }}>Semester {selectedExamForForm.semesterNumber || (semesters.find(s => s.id === currentStudent?.semesterId)?.number) || (currentStudent as any)?.semesterNumber || 4}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: Examination Details & Dates */}
+              <div style={{ background: '#FFFFFF', borderRadius: '6px', border: '1px solid #CBD5E1', overflow: 'hidden' }}>
+                <div style={{ padding: '0.5rem 1rem', background: '#F1F5F9', borderBottom: '1px solid #CBD5E1', fontWeight: 800, fontSize: '0.8125rem', color: '#0F2C59', textTransform: 'uppercase' }}>
+                  2. Examination Details &amp; Important Dates
+                </div>
+                <div style={{ padding: '1rem', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', fontSize: '0.8125rem' }}>
+                  <div>
+                    <span style={{ color: '#64748B' }}>Examination:</span>
+                    <div style={{ fontWeight: 700 }}>{selectedExamForForm.name}</div>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B' }}>Session:</span>
+                    <div style={{ fontWeight: 700 }}>{selectedExamForForm.session || 'Summer 2026'} ({selectedExamForForm.academicYearCode || '2026-27'})</div>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B' }}>Examination Code:</span>
+                    <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#0F2C59' }}>{selectedExamForForm.examCode || selectedExamForForm.code}</div>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B' }}>Form Window:</span>
+                    <div style={{ fontWeight: 700, color: '#047857' }}>{selectedExamForForm.formStartDate} to {selectedExamForForm.formEndDate}</div>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B' }}>Late Fee Deadline:</span>
+                    <div style={{ fontWeight: 700, color: selectedExamForForm.lateFeeEndDate ? '#D97706' : '#64748B' }}>{selectedExamForForm.lateFeeEndDate || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B' }}>Exam Conduct Dates:</span>
+                    <div style={{ fontWeight: 700 }}>{selectedExamForForm.startDate} to {selectedExamForForm.endDate}</div>
+                  </div>
+                </div>
+                {selectedExamForForm.instructions && (
+                  <div style={{ padding: '0.5rem 1rem', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', fontSize: '0.75rem', color: '#475569' }}>
+                    <strong>General Instructions:</strong> {selectedExamForForm.instructions}
+                  </div>
+                )}
+              </div>
+
               {/* Fee Breakdown Alert */}
-              <div style={{ padding: '1rem', background: '#F8FAFC', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ padding: '0.875rem 1.25rem', background: '#FFFFFF', borderRadius: '6px', border: '1px solid #CBD5E1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Estimated Examination Fee:</div>
-                  <strong style={{ fontSize: '1.2rem', color: 'var(--brand-navy)' }}>₹{formFeeSummary.totalPayable.toLocaleString('en-IN')}</strong>
+                  <div style={{ fontSize: '0.75rem', color: '#64748B' }}>Total Examination Registration Fee:</div>
+                  <strong style={{ fontSize: '1.25rem', color: '#0F2C59' }}>₹{formFeeSummary.totalPayable.toLocaleString('en-IN')}</strong>
                 </div>
                 {formFeeSummary.isLate && (
                   <Badge variant="warning">
@@ -1453,43 +1578,44 @@ export const ExamFormsPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Subject Selection Table with Attendance 75% Rule */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0 }}>
-                    Select Course Papers &amp; Verify Mandatory 75% Attendance
-                  </h4>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              {/* SECTION 3: Subject Selection Table with Attendance 75% Rule */}
+              <div style={{ background: '#FFFFFF', borderRadius: '6px', border: '1px solid #CBD5E1', overflow: 'hidden' }}>
+                <div style={{ padding: '0.5rem 1rem', background: '#F1F5F9', borderBottom: '1px solid #CBD5E1', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontWeight: 800, fontSize: '0.8125rem', color: '#0F2C59', textTransform: 'uppercase' }}>
+                    3. Configured Examination Course Papers &amp; Attendance Gate
+                  </div>
+                  <span style={{ fontSize: '0.75rem', color: '#64748B' }}>
                     Statutory Rule: Minimum 75% Attendance Required
                   </span>
                 </div>
 
-                <div style={{ overflowX: 'auto', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-                  <table className="table" style={{ fontSize: '0.82rem', margin: 0 }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table" style={{ fontSize: '0.8125rem', margin: 0, width: '100%', borderCollapse: 'collapse' }}>
                     <thead>
-                      <tr style={{ background: 'var(--bg-surface-hover)' }}>
-                        <th style={{ width: '40px' }}>Select</th>
-                        <th>Subject Code</th>
-                        <th>Subject Name</th>
-                        <th>Attendance %</th>
-                        <th>75% Rule Status</th>
+                      <tr style={{ background: '#0F2C59', color: '#FFFFFF' }}>
+                        <th style={{ width: '40px', textAlign: 'center', padding: '0.5rem' }}>Select</th>
+                        <th style={{ padding: '0.5rem 0.75rem' }}>Subject Code</th>
+                        <th style={{ padding: '0.5rem 0.75rem' }}>Subject Name</th>
+                        <th style={{ padding: '0.5rem', textAlign: 'center' }}>Attendance %</th>
+                        <th style={{ padding: '0.5rem 0.75rem' }}>75% Gate Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {(selectedExamForForm.subjects && selectedExamForForm.subjects.length > 0
                         ? selectedExamForForm.subjects
                         : db.getSubjects().slice(0, 4)
-                      ).map((subj: any) => {
+                      ).map((subj: any, sIdx: number) => {
                         const sId = subj.subjectId || subj.id;
                         const sCode = subj.subjectCode || subj.code;
                         const sName = subj.subjectName || subj.name;
                         
                         const elig = attendanceApprovalService.checkSubjectExamEligibility(currentStudent?.id || user?.id || 'stu-1', sId);
                         const isSelected = selectedSubjectIds.includes(sId);
+                        const isEven = sIdx % 2 === 0;
 
                         return (
-                          <tr key={sId} style={{ background: !elig.isEligible ? '#FEF2F2' : undefined }}>
-                            <td>
+                          <tr key={sId} style={{ background: !elig.isEligible ? '#FEF2F2' : isEven ? '#FFFFFF' : '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+                            <td style={{ textAlign: 'center', padding: '0.4rem', borderRight: '1px solid #E2E8F0' }}>
                               <input
                                 type="checkbox"
                                 checked={isSelected && elig.isEligible}
@@ -1503,35 +1629,30 @@ export const ExamFormsPage: React.FC = () => {
                                 }}
                               />
                             </td>
-                            <td><code>{sCode}</code></td>
-                            <td style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{sName}</td>
-                            <td>
-                              <span style={{ fontWeight: 800, color: elig.percentage >= 75 ? '#10B981' : '#EF4444' }}>
-                                {elig.percentage}%
-                              </span>
+                            <td style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid #E2E8F0' }}>
+                              <strong style={{ fontFamily: 'monospace', color: '#0F2C59' }}>{sCode}</strong>
                             </td>
-                            <td>
+                            <td style={{ padding: '0.4rem 0.75rem', borderRight: '1px solid #E2E8F0', fontWeight: 600, color: '#334155' }}>
+                              {sName}
+                            </td>
+                            <td style={{ padding: '0.4rem', textAlign: 'center', borderRight: '1px solid #E2E8F0' }}>
+                              <strong style={{ color: elig.percentage >= 75 ? '#059669' : '#DC2626' }}>
+                                {elig.percentage}%
+                              </strong>
+                            </td>
+                            <td style={{ padding: '0.4rem 0.75rem' }}>
                               {elig.isEligible ? (
                                 <Badge variant={elig.status === 'CONDONED_APPROVAL' ? 'navy' : 'active'}>
                                   {elig.status === 'CONDONED_APPROVAL' ? '✓ Eligible Through Approval' : '✓ 75% Cleared'}
                                 </Badge>
                               ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                     <Badge variant="danger">Blocked (&lt; 75%)</Badge>
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#EF4444' }}>
-                                      Attendance requirement not fulfilled ({elig.percentage}% &lt; {elig.requiredPercentage}%)
+                                    <span style={{ fontSize: '0.71875rem', fontWeight: 600, color: '#DC2626' }}>
+                                      Attendance not met ({elig.percentage}% &lt; {elig.requiredPercentage}%)
                                     </span>
                                   </div>
-                                  {elig.applicationId ? (
-                                    <span style={{ fontSize: '0.75rem', color: '#D97706', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                      ⏳ Application in Review: {elig.applicationStatus}
-                                    </span>
-                                  ) : (
-                                    <span style={{ fontSize: '0.75rem', color: '#2563EB', fontWeight: 700 }}>
-                                      Submit Attendance Exemption application in Academic &rarr; Attendance Approval
-                                    </span>
-                                  )}
                                 </div>
                               )}
                             </td>
@@ -1544,48 +1665,53 @@ export const ExamFormsPage: React.FC = () => {
               </div>
 
               {/* Remarks */}
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label" style={{ fontWeight: 700 }}>Student Remarks (Optional)</label>
+              <div style={{ background: '#FFFFFF', padding: '1rem', borderRadius: '6px', border: '1px solid #CBD5E1' }}>
+                <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+                  Candidate Remarks (Optional)
+                </label>
                 <input
                   type="text"
-                  className="form-input"
-                  placeholder="e.g. Applying for regular examination semester 4..."
+                  className="input"
+                  placeholder="e.g. Applying for regular semester 4 examination session..."
                   value={formRemarks}
                   onChange={e => setFormRemarks(e.target.value)}
+                  style={{ width: '100%', height: '36px', borderRadius: '4px', border: '1px solid #CBD5E1', fontSize: '0.8125rem' }}
                 />
               </div>
 
               {/* Declaration */}
-              <div style={{ padding: '0.75rem', background: '#F8FAFC', borderRadius: 'var(--radius-sm)', border: '1px solid #E2E8F0' }}>
-                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem' }}>
+              <div style={{ padding: '0.875rem', background: '#FEF3C7', borderRadius: '6px', border: '1px solid #FDE68A' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.8125rem', color: '#92400E', fontWeight: 600 }}>
                   <input
                     type="checkbox"
                     checked={declarationAccepted}
                     onChange={e => setDeclarationAccepted(e.target.checked)}
-                    style={{ marginTop: '0.2rem' }}
+                    style={{ marginTop: '0.15rem' }}
                   />
                   <span>
-                    I hereby declare that all courses selected meet university attendance criteria or have approved condonations, and information submitted is true.
+                    I hereby declare that all course papers selected above meet university attendance requirements or have official sanctions, and information submitted is authentic.
                   </span>
                 </label>
               </div>
             </div>
 
             {/* Footer Buttons */}
-            <div style={{ padding: '1rem 1.5rem', background: 'var(--bg-surface-hover)', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '1rem 1.75rem', background: '#F8FAFC', borderTop: '1px solid #CBD5E1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
                 onClick={() => setSelectedExamForForm(null)}
+                style={{ padding: '0.45rem 0.875rem', fontSize: '0.8125rem', fontWeight: 600, background: '#FFFFFF', border: '1px solid #CBD5E1', color: '#64748B' }}
               >
                 Cancel
               </button>
 
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.625rem', alignItems: 'center' }}>
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
                   onClick={handleSaveDraft}
+                  style={{ padding: '0.45rem 0.875rem', fontSize: '0.8125rem', fontWeight: 700, background: '#FFFFFF', border: '1px solid #0F2C59', color: '#0F2C59' }}
                 >
                   <Save size={14} /> Save Draft
                 </button>
@@ -1594,7 +1720,7 @@ export const ExamFormsPage: React.FC = () => {
                   className="btn btn-primary btn-sm"
                   disabled={!declarationAccepted || selectedSubjectIds.length === 0}
                   onClick={handleFinalSubmit}
-                  style={{ fontWeight: 800 }}
+                  style={{ padding: '0.45rem 1.125rem', fontSize: '0.8125rem', fontWeight: 800, background: '#F37023', borderColor: '#F37023', color: '#FFFFFF' }}
                 >
                   <Send size={14} /> Submit Examination Form
                 </button>

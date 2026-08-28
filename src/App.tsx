@@ -60,6 +60,7 @@ import { StudentPTMView } from './components/ptm/StudentPTMView';
 // Fees & Finance Module Page
 import { FeesFinancePage } from './pages/finance/FeesFinancePage';
 import { HRManagementPage } from './pages/hr/HRManagementPage';
+import { UniversityHRMSPage } from './pages/hr/UniversityHRMSPage';
 
 // CRM & Admissions Module Page
 import { CRMPage } from './pages/crm/CRMPage';
@@ -77,6 +78,7 @@ import { LibraryWorkspacePage } from './pages/admin-offices/LibraryWorkspacePage
 import { TransportWorkspacePage } from './pages/admin-offices/TransportWorkspacePage';
 import { MaintenanceWorkspacePage } from './pages/admin-offices/MaintenanceWorkspacePage';
 import { AccountsWorkspacePage } from './pages/admin-offices/AccountsWorkspacePage';
+import { StudentAdminWorkspacePage } from './pages/admin-offices/StudentAdminWorkspacePage';
 
 // System Settings Module Page
 import { SystemSettingsPage } from './pages/settings/SystemSettingsPage';
@@ -86,6 +88,7 @@ import { NoteSheetVerificationPage } from './pages/public/NoteSheetVerificationP
 import { InwardOutwardRegisterPage } from './pages/admin-offices/InwardOutwardRegisterPage';
 import { WorkDiaryPage } from './pages/campus/WorkDiaryPage';
 import { InventoryAssetPage } from './pages/campus/InventoryAssetPage';
+import { UniversityAssetManagementPage } from './pages/assets/UniversityAssetManagementPage';
 import { BulkImportPage } from './pages/admin/BulkImportPage';
 
 // Examination Management Module Pages
@@ -108,34 +111,154 @@ import { ExamEdpDutyPage } from './pages/exams/ExamEdpDutyPage';
 import { ExamDayControlPage } from './pages/exams/ExamDayControlPage';
 
 import { WhatsNewModal } from './components/common/WhatsNewModal';
+import { AccessDeniedPage } from './components/common/AccessDeniedPage';
+import { NotFoundPage } from './components/common/NotFoundPage';
 import { db } from './services/db';
-import { isTabPermittedForRole } from './constants/navigationConfig';
+import { isTabPermittedForRole, ALL_NAV_ITEMS } from './constants/navigationConfig';
 
 import './styles/index.css';
 
+export const ROUTE_PATH_MAP: Record<string, string> = {
+  '': 'dashboard',
+  'dashboard': 'dashboard',
+  'settings': 'settings',
+  'inventory-assets': 'inventory-assets',
+  'inventory': 'inventory-assets',
+  'feedback': 'feedback',
+  'faculty/assets': 'faculty-assets',
+  'faculty-assets': 'faculty-assets',
+  'my-assets': 'faculty-assets',
+  'faculty/students/search': 'student-search',
+  'students/search': 'student-search',
+  'student-search': 'student-search',
+  'faculty/students/my-students': 'my-students',
+  'students/my-students': 'my-students',
+  'my-students': 'my-students',
+  'faculty/students/academic': 'student-academics',
+  'students/academic': 'student-academics',
+  'student-academics': 'student-academics',
+  'faculty/students/requests': 'student-requests',
+  'students/requests': 'student-requests',
+  'student-requests': 'student-requests',
+  'deputy-registrar/dashboard': 'dashboard',
+  'academic': 'subjects',
+  'subjects': 'subjects',
+  'attendance': 'attendance',
+  'attendance-history': 'attendance-history',
+  'subject-attendance': 'subject-attendance',
+  'attendance-reports': 'attendance-reports',
+  'attendance-import': 'attendance-import',
+  'attendance-templates': 'attendance-templates',
+  'attendance-applications': 'attendance-applications',
+  'materials': 'materials',
+  'study-material': 'study-material',
+  'assignments': 'assignments',
+  'timetable': 'timetable',
+  'quiz': 'quiz',
+  'session-plan': 'session-plan',
+  'calendar': 'calendar',
+  'examination': 'exam-dashboard',
+  'exam-dashboard': 'exam-dashboard',
+  'exam-duties': 'exam-duties',
+  'exam-eligibility': 'exam-eligibility',
+  'exam-forms': 'exam-forms',
+  'exam-fees': 'exam-fees',
+  'exam-fees-student': 'exam-fees-student',
+  'exam-backlog': 'exam-backlog',
+  'exam-reassessment': 'exam-reassessment',
+  'exam-hallticket': 'exam-hallticket',
+  'exam-results': 'exam-results',
+  'exam-marks': 'exam-marks',
+  'exam-marksheet': 'exam-marksheet',
+  'exam-centres': 'exam-centres',
+  'exam-seating': 'exam-seating',
+  'exam-day-control': 'exam-day-control',
+  'exams': 'exams',
+  'exam-schedule': 'exam-schedule',
+  'institutes': 'institutes',
+  'departments': 'departments',
+  'programs': 'programs',
+  'academic-years': 'academic-years',
+  'batches': 'batches',
+  'semesters': 'semesters',
+  'divisions': 'divisions',
+  'faculty': 'faculty',
+  'students': 'students',
+  'document-master': 'document-master',
+  'profile': 'profile',
+  'id-card': 'id-card',
+  'hr': 'hr',
+  'hrms': 'hr',
+  'university-hrms': 'hr',
+  'crm': 'crm',
+  'reports': 'reports',
+  'tickets': 'tickets',
+  'mentor': 'mentor',
+  'notices': 'notices',
+  'events': 'events',
+  'library': 'library',
+  'edp-duties': 'edp-duties',
+  'incubation': 'incubation',
+  'registrar': 'registrar',
+  'iqac': 'iqac',
+  'exam-cell': 'exam-cell',
+  'student-section': 'student-section',
+  'hostel-admin': 'hostel-admin',
+  'library-admin': 'library-admin',
+  'transport-admin': 'transport-admin',
+  'maintenance-admin': 'maintenance-admin',
+  'accounts-admin': 'accounts-admin',
+  'student-admin': 'student-admin',
+  'bulk-import': 'bulk-import',
+  'note-sheets': 'note-sheets',
+  'notesheet-verify': 'notesheet-verify',
+  'inward-outward': 'inward-outward',
+  'work-diary': 'work-diary',
+  'work-transfer': 'work-transfer',
+  'security-audit': 'security-audit',
+  'ptm-management': 'ptm-management',
+  'ptm-dashboard': 'ptm-dashboard',
+  'ptm-parent': 'ptm-parent',
+  'ptm-student': 'ptm-student',
+  'fees': 'fees',
+  'notifications': 'notifications'
+};
+
+export const TAB_TO_CANONICAL_PATH: Record<string, string> = {
+  'dashboard': '/dashboard',
+  'settings': '/settings',
+  'inventory-assets': '/inventory-assets',
+  'faculty-assets': '/faculty/assets',
+  'feedback': '/feedback',
+  'student-search': '/faculty/students/search',
+  'my-students': '/faculty/students/my-students',
+  'student-academics': '/faculty/students/academic',
+  'student-requests': '/faculty/students/requests'
+};
+
 const getInitialTabFromLocation = (): string => {
   if (typeof window === 'undefined') return 'dashboard';
-  const path = window.location.pathname.replace(/^\/+|\/+$/g, '');
   const searchParams = new URLSearchParams(window.location.search);
   const tabParam = searchParams.get('tab');
-  if (tabParam) return tabParam;
+  if (tabParam) {
+    return ROUTE_PATH_MAP[tabParam] || tabParam;
+  }
 
-  if (path === 'faculty/students/search' || path === 'students/search' || path === 'faculty/students/my-students' || path === 'students/my-students' || path === 'my-students' || path === 'student-search') {
-    return 'my-students';
-  }
-  if (path === 'faculty/students/academic' || path === 'students/academic' || path === 'student-academics') {
-    return 'student-academics';
-  }
-  if (path === 'faculty/students/requests' || path === 'students/requests' || path === 'student-requests') {
-    return 'student-requests';
-  }
-  if (path === 'deputy-registrar/dashboard' || path === 'dashboard' || path === '') {
+  const rawPath = window.location.pathname.replace(/^\/+|\/+$/g, '');
+  if (!rawPath || rawPath === 'dashboard') {
     return 'dashboard';
   }
-  if (path) {
-    return path;
+
+  if (ROUTE_PATH_MAP[rawPath] !== undefined) {
+    return ROUTE_PATH_MAP[rawPath];
   }
-  return 'dashboard';
+
+  // Check if rawPath exists directly in ALL_NAV_ITEMS
+  if (ALL_NAV_ITEMS[rawPath]) {
+    return rawPath;
+  }
+
+  return 'not-found';
 };
 
 const MainAppContent: React.FC = () => {
@@ -154,22 +277,10 @@ const MainAppContent: React.FC = () => {
     setActiveTabState(tab);
 
     if (pushHistory && typeof window !== 'undefined' && window.history) {
-      let targetUrl = '/';
-      if (tab === 'student-search') {
-        targetUrl = '/faculty/students/search';
-      } else if (tab === 'my-students') {
-        targetUrl = '/faculty/students/my-students';
-      } else if (tab === 'student-academics') {
-        targetUrl = '/faculty/students/academic';
-      } else if (tab === 'student-requests') {
-        targetUrl = '/faculty/students/requests';
-      } else if (tab !== 'dashboard') {
-        targetUrl = `?tab=${encodeURIComponent(tab)}`;
-      }
-
+      const canonicalPath = TAB_TO_CANONICAL_PATH[tab] || `/${tab}`;
       const currentPathAndQuery = window.location.pathname + window.location.search;
-      if (currentPathAndQuery !== targetUrl && window.location.search !== `?tab=${encodeURIComponent(tab)}`) {
-        window.history.pushState({ tab, params }, '', targetUrl);
+      if (currentPathAndQuery !== canonicalPath) {
+        window.history.pushState({ tab, params }, '', canonicalPath);
       }
     }
   };
@@ -202,10 +313,27 @@ const MainAppContent: React.FC = () => {
   };
 
   const renderActivePage = () => {
-    // Route guard check: fallback to dashboard if tab is unauthorized for active role
-    const currentTab = getIsTabAllowed(activeTab) ? activeTab : 'dashboard';
+    if (activeTab === 'not-found') {
+      return (
+        <NotFoundPage 
+          onNavigateHome={() => setActiveTab('dashboard')} 
+          requestedPath={typeof window !== 'undefined' ? window.location.pathname : ''} 
+        />
+      );
+    }
 
-    switch (currentTab) {
+    const isAllowed = getIsTabAllowed(activeTab);
+    if (!isAllowed) {
+      return (
+        <AccessDeniedPage 
+          onNavigateHome={() => setActiveTab('dashboard')} 
+          tabName={activeTab.replace(/-/g, ' ').toUpperCase()} 
+          userRole={role || 'GUEST'} 
+        />
+      );
+    }
+
+    switch (activeTab) {
       case 'dashboard':
         return <Dashboard setActiveTab={setActiveTab} />;
 
@@ -228,12 +356,20 @@ const MainAppContent: React.FC = () => {
       case 'attendance-reports':
       case 'faculty-attendance-reports':
         return <AttendancePage initialTab="REPORTS" />;
+      case 'attendance-import':
+      case 'faculty-attendance-import':
+        return <AttendancePage initialTab="IMPORT_STUDENTS" />;
+      case 'attendance-templates':
+      case 'faculty-attendance-templates':
+        return <AttendancePage initialTab="TEMPLATES" />;
       case 'attendance-applications':
       case 'faculty-attendance-apps':
         return <AttendancePage initialTab="APPLICATIONS" />;
       case 'materials':
+      case 'study-material':
       case 'academic-materials':
       case 'faculty-materials':
+      case 'mentor-study-material':
         return <UnitMaterialPage />;
       case 'assignments':
       case 'academic-assignments':
@@ -242,14 +378,15 @@ const MainAppContent: React.FC = () => {
       case 'timetable':
       case 'academic-timetable':
       case 'faculty-timetable':
-        return <TimetablePage />;
+        return <TimetablePage setActiveTab={setActiveTab} />;
       case 'quiz':
       case 'academic-quiz':
       case 'faculty-quiz':
         return <QuizPage />;
       case 'session-plan':
+      case 'mentor-session-plan':
       case 'faculty-session-plan':
-        return <SessionPlanPage />;
+        return <SessionPlanPage setActiveTab={setActiveTab} initialSubjectId={tabParams?.subjectId} />;
       case 'calendar':
       case 'faculty-calendar':
         return <AcademicCalendarPage />;
@@ -271,16 +408,17 @@ const MainAppContent: React.FC = () => {
         return <StudentExamFeesPage />;
       // Backlog / Re-Exam application page
       case 'exam-backlog':
-        return <BacklogReExamPage />;
+        return <BacklogReExamPage setActiveTab={setActiveTab} />;
       // Reassessment / Rechecking application page
       case 'exam-reassessment':
-        return <ReassessmentRecheckingPage />;
+        return <ReassessmentRecheckingPage setActiveTab={setActiveTab} />;
       // Admin/Controller exam fee configuration
       case 'exam-fees':
         return <ExamFeesPage />;
       case 'exam-hallticket':
         return <HallTicketPage />;
       case 'exam-results':
+      case 'result-management':
         return <ResultManagementPage />;
       case 'exams':
         return <ExamsListPage />;
@@ -290,6 +428,7 @@ const MainAppContent: React.FC = () => {
       case 'exam-marks':
         return <MarksManagementPage />;
       case 'exam-marksheet':
+      case 'marksheet':
         return <MarksheetPage />;
       case 'exam-centres':
         return <ExamCentresPage />;
@@ -391,12 +530,17 @@ const MainAppContent: React.FC = () => {
         return <HODWorkspacePage initialTab="AT_RISK" />;
       case 'hod-dept-faculty':
       case 'hod-faculty-list':
-      case 'hod-faculty-workload':
-      case 'hod-faculty-performance':
         return <HODWorkspacePage initialTab="FACULTY" />;
+      case 'hod-faculty-workload':
+        return <HODWorkspacePage initialTab="FACULTY_WORKLOAD" />;
+      case 'hod-faculty-performance':
+        return <HODWorkspacePage initialTab="FACULTY_PERFORMANCE" />;
       case 'hod-faculty-allocation':
       case 'hod-faculty-subject-allocation':
-        return <HODWorkspacePage initialTab="FACULTY" />;
+        return <HODWorkspacePage initialTab="FACULTY_ALLOCATION" />;
+      case 'hod-mentors':
+      case 'hod-mentor-assignment':
+        return <HODWorkspacePage initialTab="MENTORS" />;
       case 'hod-dept-programs':
         return <ProgramsPage />;
       case 'hod-dept-semesters':
@@ -406,9 +550,9 @@ const MainAppContent: React.FC = () => {
       case 'hod-academic-subjects':
         return <SubjectsPage />;
       case 'hod-timetable':
-        return <TimetablePage />;
+        return <TimetablePage setActiveTab={setActiveTab} />;
       case 'hod-session-plans':
-        return <SessionPlanPage />;
+        return <SessionPlanPage setActiveTab={setActiveTab} initialSubjectId={tabParams?.subjectId} />;
       case 'hod-materials':
         return <UnitMaterialPage />;
       case 'hod-assignments':
@@ -444,11 +588,15 @@ const MainAppContent: React.FC = () => {
       case 'hod-feedback-department':
         return <HODWorkspacePage initialTab="FEEDBACK" />;
       case 'hod-reports-academic':
+        return <HODWorkspacePage initialTab="REPORTS_ACADEMIC" />;
       case 'hod-reports-attendance':
+        return <HODWorkspacePage initialTab="REPORTS_ATTENDANCE" />;
       case 'hod-reports-student':
+        return <HODWorkspacePage initialTab="REPORTS_STUDENT" />;
       case 'hod-reports-faculty':
+        return <HODWorkspacePage initialTab="REPORTS_FACULTY" />;
       case 'hod-reports-department':
-        return <HODWorkspacePage initialTab="REPORTS" />;
+        return <HODWorkspacePage initialTab="REPORTS_DEPARTMENT" />;
 
       // ─── 3D. Principal / HOI Portal Routes ───
       case 'hoi-profile':
@@ -472,9 +620,9 @@ const MainAppContent: React.FC = () => {
       case 'hoi-faculty-allocation':
         return <HOIWorkspacePage initialTab="FACULTY" />;
       case 'hoi-timetable':
-        return <TimetablePage />;
+        return <TimetablePage setActiveTab={setActiveTab} />;
       case 'hoi-session-plans':
-        return <SessionPlanPage />;
+        return <SessionPlanPage setActiveTab={setActiveTab} initialSubjectId={tabParams?.subjectId} />;
       case 'hoi-calendar':
         return <AcademicCalendarPage />;
       case 'hoi-academic-performance':
@@ -611,6 +759,20 @@ const MainAppContent: React.FC = () => {
       case 'section-reports-requests':
       case 'section-reports-payments':
         return <StudentSectionWorkspacePage initialTab="REPORTS" />;
+
+      // ─── 5C. Student Administration & Onboarding Routes ───
+      case 'onboarding-applications':
+      case 'onboarding-doc-verification':
+      case 'onboarding-fee-verification':
+      case 'onboarding-student-creation':
+      case 'onboarding-enrollment':
+      case 'onboarding-mentor-assignment':
+      case 'onboarding-account-activation':
+      case 'onboarding-register':
+      case 'onboarding-reports':
+      case 'onboarding-pending-verification':
+      case 'onboarding-export-register':
+        return <StudentAdminWorkspacePage initialTab={activeTab} />;
 
       // ─── 5D. Registrar University Governance Routes ───
       case 'reg-profile':
@@ -847,7 +1009,12 @@ const MainAppContent: React.FC = () => {
 
       // ─── Campus & Other Support ───
       case 'hr':
-        return <HRManagementPage />;
+      case 'hrms':
+      case 'university-hrms':
+      case 'leave':
+      case 'payroll':
+      case 'recruitment':
+        return <UniversityHRMSPage />;
       case 'crm':
         return <CRMPage />;
       case 'reports':
@@ -858,9 +1025,10 @@ const MainAppContent: React.FC = () => {
       case 'feedback-give':
       case 'feedback-my':
       case 'feedback-suggestions':
-        return <FeedbackPage />;
+        return <FeedbackPage activeTab={activeTab} setActiveTab={setActiveTab} />;
       case 'tickets':
       case 'service-desk':
+      case 'support-tickets':
         return <SupportTicketsPage />;
       case 'mentor':
         return <MentorPage />;
@@ -883,8 +1051,11 @@ const MainAppContent: React.FC = () => {
       case 'library-admin':
         return <LibraryWorkspacePage />;
       case 'accounts-admin':
+      case 'accounts':
+      case 'fee-structure':
         return <AccountsWorkspacePage initialTab={tabParams?.subFilter} initialRecordId={tabParams?.recordId} />;
       case 'maintenance-admin':
+      case 'maintenance':
         return <MaintenanceWorkspacePage />;
       case 'institutes':
         return <InstitutesPage />;
@@ -900,14 +1071,14 @@ const MainAppContent: React.FC = () => {
         return <SemestersPage />;
       case 'divisions':
         return <DivisionsPage />;
-      case 'subjects':
-        return <SubjectsPage />;
       case 'faculty':
         return <FacultyPage />;
       case 'students':
         return <StudentsPage />;
       case 'student-search':
       case 'students-search':
+      case 'student-profile':
+      case 'students-profile':
         if (role === 'FACULTY' || role === 'MENTOR') {
           return <MentorPage initialTab="MY_STUDENTS" />;
         }
@@ -922,8 +1093,6 @@ const MainAppContent: React.FC = () => {
           <Dashboard setActiveTab={setActiveTab} />
         );
       case 'students-directory':
-      case 'reg-students-search':
-      case 'section-students-list':
         return role !== 'STUDENT' ? (
           <StudentDirectorySearchPage 
             initialRecordId={tabParams?.recordId}
@@ -938,8 +1107,6 @@ const MainAppContent: React.FC = () => {
         return <StudentsPage initialTab="MENTOR_ASSIGNMENT" />;
       case 'document-master':
         return <DocumentMasterPage initialRecordId={tabParams?.recordId} />;
-      case 'profile':
-        return <ProfilePage />;
       case 'security-audit':
         return <SecurityAuditCenterPage />;
       case 'bulk-import':
@@ -968,46 +1135,87 @@ const MainAppContent: React.FC = () => {
         return role !== 'STUDENT' ? <NoteSheetPage initialTab="DRAFTS" initialRecordId={tabParams?.recordId || tabParams?.notesheetId} initialAction={tabParams?.actionType} /> : <Dashboard setActiveTab={setActiveTab} />;
       case 'notesheet-closed':
         return role !== 'STUDENT' ? <NoteSheetPage initialTab="CLOSED" initialRecordId={tabParams?.recordId || tabParams?.notesheetId} initialAction={tabParams?.actionType} /> : <Dashboard setActiveTab={setActiveTab} />;
-      case 'notesheet-history':
-        return role !== 'STUDENT' ? <NoteSheetPage initialTab="REGISTER" initialRecordId={tabParams?.recordId || tabParams?.notesheetId} initialAction={tabParams?.actionType} /> : <Dashboard setActiveTab={setActiveTab} />;
       case 'notesheet-verify':
         return <NoteSheetPage initialTab="VERIFICATION" initialRecordId={tabParams?.recordId || tabParams?.notesheetId} initialAction={tabParams?.actionType} />;
+      case 'notesheet-testing-qa':
+      case 'qa-testing':
+      case 'testing-qa':
+        return role !== 'STUDENT' ? <NoteSheetPage initialTab="TESTING_QA" /> : <Dashboard setActiveTab={setActiveTab} />;
+      case 'notesheet-pending-testing':
+      case 'pending-testing':
+        return role !== 'STUDENT' ? <NoteSheetPage initialTab="PENDING_TESTING" /> : <Dashboard setActiveTab={setActiveTab} />;
       case 'inward-outward':
-        return role !== 'STUDENT' ? <InwardOutwardRegisterPage initialRecordId={tabParams?.recordId} /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <InwardOutwardRegisterPage initialRecordId={tabParams?.recordId} />;
       case 'work-diary':
-        return role !== 'STUDENT' ? <WorkDiaryPage initialRecordId={tabParams?.recordId} /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <WorkDiaryPage initialRecordId={tabParams?.recordId} />;
       case 'inventory-assets':
       case 'inventory-dashboard':
-        return role !== 'STUDENT' ? <InventoryAssetPage initialTab="DASHBOARD" /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <InventoryAssetPage initialTab="DASHBOARD" />;
+      case 'faculty-assets':
+      case 'my-assets':
+        return <InventoryAssetPage initialTab="ASSET_REGISTER" initialFacultySubTab="MY_ASSETS" />;
       case 'inventory-assets-register':
-        return role !== 'STUDENT' ? <InventoryAssetPage initialTab="ASSET_REGISTER" /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <InventoryAssetPage initialTab="ASSET_REGISTER" />;
       case 'inventory-stock':
-        return role !== 'STUDENT' ? <InventoryAssetPage initialTab="CONSUMABLES_STOCK" /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <InventoryAssetPage initialTab="CONSUMABLES_STOCK" />;
       case 'inventory-stationery':
-        return role !== 'STUDENT' ? <InventoryAssetPage initialTab="STATIONERY_REGISTER" /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <InventoryAssetPage initialTab="STATIONERY_REGISTER" />;
       case 'inventory-dept':
-        return role !== 'STUDENT' ? <InventoryAssetPage initialTab="DEPARTMENT_STORE" /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <InventoryAssetPage initialTab="DEPARTMENT_STORE" />;
       case 'inventory-assignments':
-        return role !== 'STUDENT' ? <InventoryAssetPage initialTab="ASSET_ASSIGNMENT" /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <InventoryAssetPage initialTab="ASSET_ASSIGNMENT" />;
       case 'inventory-transactions':
-        return role !== 'STUDENT' ? <InventoryAssetPage initialTab="STOCK_TRANSACTIONS" /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <InventoryAssetPage initialTab="STOCK_TRANSACTIONS" />;
       case 'inventory-maintenance':
-        return role !== 'STUDENT' ? <InventoryAssetPage initialTab="MAINTENANCE" /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <InventoryAssetPage initialTab="MAINTENANCE" />;
       case 'inventory-verification':
-        return role !== 'STUDENT' ? <InventoryAssetPage initialTab="PHYSICAL_VERIFICATION" /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <InventoryAssetPage initialTab="PHYSICAL_VERIFICATION" />;
       case 'inventory-transfers':
-        return role !== 'STUDENT' ? <InventoryAssetPage initialTab="TRANSFERS" /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <InventoryAssetPage initialTab="TRANSFERS" />;
       case 'inventory-disposal':
-        return role !== 'STUDENT' ? <InventoryAssetPage initialTab="DISPOSAL" /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <InventoryAssetPage initialTab="DISPOSAL" />;
       case 'inventory-files':
-        return role !== 'STUDENT' ? <InventoryAssetPage initialTab="PHYSICAL_FILES" /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <InventoryAssetPage initialTab="PHYSICAL_FILES" />;
       case 'inventory-import':
-        return role !== 'STUDENT' ? <InventoryAssetPage initialTab="EXCEL_IMPORT" /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <InventoryAssetPage initialTab="EXCEL_IMPORT" />;
       case 'inventory-reports':
-        return role !== 'STUDENT' ? <InventoryAssetPage initialTab="REPORTS" /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <InventoryAssetPage initialTab="REPORTS" />;
       case 'inventory-audit':
-        return role !== 'STUDENT' ? <InventoryAssetPage initialTab="AUDIT_LOG" /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <InventoryAssetPage initialTab="AUDIT_LOG" />;
       
+      // ─── University Resource Allocation & Central Asset Management Routes ───
+      case 'university-asset-management':
+      case 'resource-allocation':
+      case 'university-resource-allocation':
+        return <UniversityAssetManagementPage initialTab="DASHBOARD" />;
+      case 'asset-master-register':
+      case 'asset-register':
+        return <UniversityAssetManagementPage initialTab="ASSET_REGISTER" />;
+      case 'department-asset-allocation':
+      case 'dept-asset-allocation':
+        return <UniversityAssetManagementPage initialTab="DEPARTMENT_ALLOCATION" />;
+      case 'classroom-allocation':
+      case 'resource-classroom-allocation':
+        return <UniversityAssetManagementPage initialTab="CLASSROOM_ALLOCATION" />;
+      case 'lab-allocation':
+      case 'resource-lab-allocation':
+        return <UniversityAssetManagementPage initialTab="LAB_ALLOCATION" />;
+      case 'faculty-workload-allocation':
+      case 'faculty-resource-allocation':
+        return <UniversityAssetManagementPage initialTab="FACULTY_ALLOCATION" />;
+      case 'asset-transfers-returns':
+      case 'asset-transfers':
+        return <UniversityAssetManagementPage initialTab="TRANSFERS_RETURNS" />;
+      case 'asset-maintenance-warranty':
+      case 'asset-maintenance':
+        return <UniversityAssetManagementPage initialTab="MAINTENANCE_WARRANTY" />;
+      case 'asset-allocation-requests':
+      case 'asset-requests':
+        return <UniversityAssetManagementPage initialTab="ALLOCATION_REQUESTS" />;
+      case 'asset-reports':
+      case 'resource-reports':
+        return <UniversityAssetManagementPage initialTab="REPORTS_AUDIT" />;
+
       // ─── PTM Management Routes ───
       case 'ptm':
       case 'ptm-management':

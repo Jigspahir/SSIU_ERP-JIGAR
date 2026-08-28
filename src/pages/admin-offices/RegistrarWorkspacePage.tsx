@@ -23,6 +23,7 @@ import {
   InternationalStudentRecord, NoteSheet, StudentRequest, User, NoteSheetAction,
   DeputyRegistrarScopeMapping, DeputyRegistrarScopeAudit
 } from '../../types';
+import { StudentDataChangeTab } from '../../components/profile/StudentDataChangeTab';
 import * as XLSX from 'xlsx';
 
 export type RegistrarTabType = 
@@ -1610,7 +1611,7 @@ export const RegistrarWorkspacePage: React.FC<RegistrarWorkspacePageProps> = ({
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
             <div className="flex items-center gap-2 overflow-x-auto">
-              {['SEARCH', 'RECORDS', 'INTERNATIONAL', 'STATS'].map(view => (
+              {['SEARCH', 'RECORDS', 'DATA_CHANGES', 'INTERNATIONAL', 'STATS'].map(view => (
                 <button
                   key={view}
                   onClick={() => setSubFilter(view)}
@@ -1622,6 +1623,7 @@ export const RegistrarWorkspacePage: React.FC<RegistrarWorkspacePageProps> = ({
                 >
                   {view === 'SEARCH' && 'Student Search & Profile'}
                   {view === 'RECORDS' && 'Student Records Master'}
+                  {view === 'DATA_CHANGES' && 'Data Change Requests & Audits'}
                   {view === 'INTERNATIONAL' && `International Students (${internationalStudents.length})`}
                   {view === 'STATS' && 'Enrollment Statistics'}
                 </button>
@@ -1647,6 +1649,11 @@ export const RegistrarWorkspacePage: React.FC<RegistrarWorkspacePageProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Sub-view: Student Data Change Requests & Audits */}
+          {subFilter === 'DATA_CHANGES' && (
+            <StudentDataChangeTab isQueueMode={false} />
+          )}
 
           {/* Sub-view: International Students */}
           {subFilter === 'INTERNATIONAL' && (

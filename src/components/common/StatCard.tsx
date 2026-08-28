@@ -6,7 +6,8 @@ interface StatCardProps {
   title: string;
   value: string | number;
   subtitle?: string;
-  icon: LucideIcon;
+  description?: string;
+  icon: LucideIcon | React.ReactNode;
   colorScheme?: 'orange' | 'navy' | 'gold' | 'green' | 'blue';
   trend?: string;
   onClick?: () => void;
@@ -16,7 +17,8 @@ export const StatCard: React.FC<StatCardProps> = ({
   title,
   value,
   subtitle,
-  icon: Icon,
+  description,
+  icon,
   colorScheme = 'orange',
   trend,
   onClick
@@ -30,6 +32,16 @@ export const StatCard: React.FC<StatCardProps> = ({
   };
 
   const schemeStyles = schemeMap[colorScheme] || schemeMap.orange;
+  const subText = subtitle || description;
+
+  const renderIcon = () => {
+    if (!icon) return null;
+    if (React.isValidElement(icon)) {
+      return icon;
+    }
+    const IconComponent = icon as LucideIcon;
+    return <IconComponent size={19} strokeWidth={2} />;
+  };
 
   return (
     <div
@@ -86,20 +98,20 @@ export const StatCard: React.FC<StatCardProps> = ({
           <AnimatedNumber value={value} />
         </div>
 
-        {subtitle && (
+        {subText && (
           <div 
             style={{ 
               fontSize: '0.6875rem', 
               color: 'var(--text-muted, #64748B)', 
-              marginTop: '0.15rem',
+              marginTop: '0.15rem', 
               lineHeight: 1.2,
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis'
             }}
-            title={subtitle}
+            title={subText}
           >
-            {subtitle}
+            {subText}
           </div>
         )}
 
@@ -124,8 +136,9 @@ export const StatCard: React.FC<StatCardProps> = ({
           flexShrink: 0
         }}
       >
-        <Icon size={19} strokeWidth={2} />
+        {renderIcon()}
       </div>
     </div>
   );
 };
+

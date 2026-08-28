@@ -36,6 +36,8 @@ export type SuggestionCategory =
   | 'CLUBS'
   | 'LIBRARY'
   | 'SPORTS'
+  | 'LABORATORY'
+  | 'ADMINISTRATION'
   | 'CAFETERIA'
   | 'OTHER';
 
@@ -43,6 +45,7 @@ export type FeedbackStatus =
   | 'DRAFT'
   | 'SUBMITTED'
   | 'UNDER_REVIEW'
+  | 'REVIEWED'
   | 'ACKNOWLEDGED'
   | 'ACTION_REQUIRED'
   | 'RESOLVED'
@@ -53,6 +56,7 @@ export type SuggestionStatus =
   | 'ACKNOWLEDGED'
   | 'UNDER_REVIEW'
   | 'ASSIGNED'
+  | 'IN_PROGRESS'
   | 'ACTION_REQUIRED'
   | 'RESOLVED'
   | 'CLOSED'
@@ -67,8 +71,8 @@ export interface DetailedStudentFeedback {
   id: string;
   feedbackNo: string; // FDB/2026/000001
   studentId: string;
-  studentName?: string; // Hidden in UI when isAnonymous = true
-  studentEnrollmentNo?: string; // Hidden in UI when isAnonymous = true
+  studentName?: string; // Hidden in UI when isAnonymous = true or in faculty view
+  studentEnrollmentNo?: string;
   isAnonymous: boolean;
   
   category: FeedbackCategoryType;
@@ -100,9 +104,19 @@ export interface DetailedStudentFeedback {
   hoiId?: string;
   hoiName?: string;
 
-  // Criteria ratings (1-5)
+  // 5 Explicit Teaching Evaluation Ratings (1 to 5 Stars)
+  teachingClarity: number;
+  communication: number;
+  subjectKnowledge: number;
+  doubtResolution: number;
+  studentEngagement: number;
+
+  // Full Criteria map & Overall calculated rating
   ratings: Record<string, number>;
-  overallRating: number; // 1 to 5
+  overallRating: number; // 1 to 5 (average of metrics)
+  
+  positiveFeedback?: string;
+  improvementSuggestion?: string;
   comments?: string;
   suggestions?: string;
   attachmentUrls?: string[];
@@ -135,6 +149,7 @@ export interface StudentSuggestionItem {
   departmentName?: string;
   instituteId?: string;
 
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   status: SuggestionStatus;
   assignedDepartment?: string;
   assignedToUserId?: string;
@@ -145,6 +160,21 @@ export interface StudentSuggestionItem {
 
   createdAt: string;
   updatedAt: string;
+}
+
+export interface FeedbackAuditLogItem {
+  id: string;
+  feedbackId?: string;
+  feedbackNo?: string;
+  suggestionId?: string;
+  suggestionNo?: string;
+  user: string;
+  role: string;
+  action: 'FEEDBACK_SUBMITTED' | 'FEEDBACK_REVIEWED' | 'STATUS_CHANGED' | 'SUGGESTION_UPDATED' | 'FEEDBACK_EXPORTED' | 'FEEDBACK_PRINTED';
+  oldValue?: string;
+  newValue?: string;
+  details: string;
+  timestamp: string;
 }
 
 export interface FeedbackConfiguration {

@@ -17,6 +17,10 @@ import {
   Search, Filter, ExternalLink, Eye, TrendingUp, Home, Briefcase, Wrench, Inbox, ChevronRight, Download, RefreshCw, SlidersHorizontal, Activity
 } from 'lucide-react';
 import { StatusBadge, PriorityBadge } from '../../components/approval/ApprovalWorkflowBadge';
+import { StudentOnboardingTab } from '../../components/admission/StudentOnboardingTab';
+import { StudentAdminWorkspacePage } from '../admin-offices/StudentAdminWorkspacePage';
+import { TemporaryEnrollmentWelcomeModal } from '../../components/common/TemporaryEnrollmentWelcomeModal';
+import { StudentExcelDashboard } from '../../components/dashboard/StudentExcelDashboard';
 
 interface DashboardProps {
   setActiveTab: (tab: string, params?: any) => void;
@@ -25,6 +29,7 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
   const { user, role } = useAuth();
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [showTempWelcomeModal, setShowTempWelcomeModal] = useState(Boolean(user?.role === 'STUDENT' && (user?.isFirstLogin || user?.enrollmentStatus === 'TEMPORARY')));
 
   // Executive Vice President Workspaces State
   const [vpWorkspaceTab, setVpWorkspaceTab] = useState<'OVERVIEW' | 'GOVERNANCE' | 'STUDENTS' | 'FINANCE' | 'OPERATIONS' | 'AUDIT'>('OVERVIEW');
@@ -2247,252 +2252,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
     );
   };
 
-  // 9. Student Dashboard View
+  // 9. Student Dashboard View (Excel / University ERP Report Layout)
   const renderStudentDashboard = () => {
-    const studentId = user?.id || 'stu-1';
-    const students = db.getStudents();
-    const student = students.find(s => s.id === studentId || s.enrollmentNo === user?.enrollmentNo) || students[0];
-
-    const deptObj = departments.find(d => d.id === student.departmentId);
-    const progObj = programs.find(p => p.id === student.programId);
-    const semObj = semesters.find(s => s.id === student.semesterId);
-    const ayObj = academicYears.find(ay => ay.id === student.academicYearId) || currentAY;
-    const semNumber = semObj ? `Semester ${semObj.number}` : 'Semester 4';
-    const ayName = ayObj?.name || '2026-2027';
-
-    const stats = db.getStudentAttendanceStats(student.id);
-    const todayClasses = timetableEntries.filter(t => t.dayOfWeek === 'Monday' || t.divisionId === student.divisionId).slice(0, 4);
-    const studentAssignments = assignments.filter(a => a.status === 'ACTIVE');
-    const pendingAssignments = studentAssignments.filter(a => !(db.getAssignmentSubmissions() || []).some(sub => sub.assignmentId === a.id && sub.studentId === student.id));
-
-    const studentFee = studentFeeRecords.find(r => r.studentId === student.id || r.enrollmentNo === student.enrollmentNo) || studentFeeRecords[0];
-    const studentPayments = (db.getFeePaymentTransactions() || []).filter(t => t.studentId === student.id || t.enrollmentNo === student.enrollmentNo).slice(0, 4);
-
-    const examsList = db.getExams();
-    const upcomingExams = examsList.filter(e => e.status === 'SCHEDULED' || e.status === 'ONGOING').slice(0, 3);
-
-    const studentGeneralReqs = (db.getState().studentRequests || []).filter((r: any) => r.studentId === student.id || r.enrollmentNo === student.enrollmentNo);
-    const studentSectionReqs = (db.getState().studentSectionRequests || []).filter((r: any) => r.studentId === student.id || r.enrollmentNo === student.enrollmentNo);
-    const combinedRequests = [
-      ...studentGeneralReqs.map((r: any) => ({ id: r.id, reqNo: r.requestNo, title: r.category.replace(/_/g, ' '), date: r.createdAt, status: r.status, type: 'GENERAL' })),
-      ...studentSectionReqs.map((r: any) => ({ id: r.id, reqNo: r.requestNo, title: r.serviceName, date: r.createdAt, status: r.status, type: 'STUDENT_SECTION' }))
-    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 4);
-
-    const studentPendingReqs = combinedRequests.filter(r => r.status !== 'COMPLETED' && r.status !== 'REJECTED' && r.status !== 'CLOSED');
-    const myNotifs = userNotifications.slice(0, 4);
-
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
-        {/* 6 Summary Cards */}
-        <div className="grid-6">
-          <StatCard
-            title="Attendance %"
-            value={`${stats.percentage}%`}
-            subtitle={`${stats.presentClasses} / ${stats.totalClasses} Lectures`}
-            icon={ClipboardCheck}
-            colorScheme={stats.percentage >= 75 ? 'green' : 'orange'}
-            onClick={() => setActiveTab('attendance')}
-          />
-          <StatCard
-            title="Pending Fees"
-            value={`₹${(studentFee?.pendingAmount || 0).toLocaleString()}`}
-            subtitle={studentFee?.pendingAmount === 0 ? 'All Clear' : `Due: ${studentFee?.dueDate || 'Immediate'}`}
-            icon={IndianRupee}
-            colorScheme={studentFee?.pendingAmount === 0 ? 'green' : 'orange'}
-            onClick={() => setActiveTab('fees')}
-          />
-          <StatCard
-            title="Upcoming Exam"
-            value={`${upcomingExams.length} Active`}
-            subtitle={upcomingExams[0]?.name || 'End Sem Exam'}
-            icon={FileCheck}
-            colorScheme="navy"
-            onClick={() => setActiveTab('exam-forms')}
-          />
-          <StatCard
-            title="Pending Requests"
-            value={studentPendingReqs.length}
-            subtitle="In Progress / Review"
-            icon={CheckSquare}
-            colorScheme="gold"
-            onClick={() => setActiveTab('requests')}
-          />
-          <StatCard
-            title="Assignments Due"
-            value={pendingAssignments.length}
-            subtitle="Coursework to Submit"
-            icon={ClipboardList}
-            colorScheme="orange"
-            onClick={() => setActiveTab('assignments')}
-          />
-          <StatCard
-            title="Notifications"
-            value={myNotifs.length}
-            subtitle="Recent Alerts"
-            icon={Bell}
-            colorScheme="green"
-            onClick={() => setActiveTab('notifications')}
-          />
-        </div>
-
-        {/* 2-Column Section: Today's Classes & Upcoming Exams */}
-        <div className="grid-2">
-          {/* 1. Today's Classes */}
-          <div className="card" style={{ padding: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Clock size={20} color="var(--brand-orange)" /> Today's Scheduled Lectures
-              </h3>
-              <button className="btn btn-sm btn-secondary" onClick={() => setActiveTab('timetable')}>View Timetable</button>
-            </div>
-            {todayClasses.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No lectures scheduled for today.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {todayClasses.map(tt => {
-                  const subj = db.getSubjectById(tt.subjectId);
-                  const fac = db.getFaculty().find(f => f.id === tt.facultyId);
-                  return (
-                    <div key={tt.id} style={{ padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-surface-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>{subj?.name || 'Class Lecture'} ({subj?.code || 'CSE'})</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                          {tt.timeSlot} • Room: <strong>{tt.roomNo}</strong> • Faculty: {fac?.name || 'Assigned Professor'}
-                        </div>
-                      </div>
-                      <Badge variant="active">{subj?.type || 'THEORY'}</Badge>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* 2. Upcoming Exams */}
-          <div className="card" style={{ padding: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <FileCheck size={20} color="var(--brand-orange)" /> Upcoming University Examinations
-              </h3>
-              <button className="btn btn-sm btn-secondary" onClick={() => setActiveTab('exam-forms')}>Exam Forms</button>
-            </div>
-            {upcomingExams.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No examinations scheduled currently.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {upcomingExams.map(ex => (
-                  <div key={ex.id} style={{ padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-surface-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>{ex.name}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Starts: <strong>{ex.startDate}</strong> • Status: {ex.status}
-                      </div>
-                    </div>
-                    <Badge variant="gold">{ex.status}</Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 2-Column Section: Recent Fee Payments & Recent Requests */}
-        <div className="grid-2">
-          {/* 3. Recent Fee Payments */}
-          <div className="card" style={{ padding: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <IndianRupee size={20} color="var(--brand-orange)" /> Recent Fee Payments &amp; Receipts
-              </h3>
-              <button className="btn btn-sm btn-secondary" onClick={() => setActiveTab('fees')}>View All Receipts</button>
-            </div>
-            {studentPayments.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No payment transactions recorded.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {studentPayments.map(tx => (
-                  <div key={tx.id} style={{ padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-surface-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>
-                        Receipt: <code style={{ color: 'var(--brand-orange)' }}>{tx.receiptNo}</code>
-                      </div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Date: {tx.paymentDate} • Mode: {tx.paymentMode} • Ref: {tx.transactionId}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 800, color: '#10B981', fontSize: '1rem' }}>₹{tx.paidAmount.toLocaleString()}</div>
-                      <Badge variant="active">SUCCESS</Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* 4. Recent Requests */}
-          <div className="card" style={{ padding: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <CheckSquare size={20} color="var(--brand-orange)" /> Recent Service Requests &amp; Queries
-              </h3>
-              <button className="btn btn-sm btn-secondary" onClick={() => setActiveTab('requests')}>Track Requests</button>
-            </div>
-            {combinedRequests.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No service requests or queries logged.</p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {combinedRequests.map(req => (
-                  <div key={req.id} style={{ padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-surface-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>{req.title}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Req No: <code style={{ color: 'var(--brand-orange)' }}>{req.reqNo}</code> • Date: {new Date(req.date).toLocaleDateString()}
-                      </div>
-                    </div>
-                    <Badge variant={req.status === 'COMPLETED' || req.status === 'READY' ? 'active' : req.status === 'REJECTED' ? 'danger' : 'gold'}>
-                      {req.status.replace(/_/g, ' ')}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 5. Important Notifications */}
-        <div className="card" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Bell size={20} color="var(--brand-orange)" /> Important University Notifications &amp; Alerts
-            </h3>
-            <button className="btn btn-sm btn-secondary" onClick={() => setActiveTab('notifications')}>All Notifications</button>
-          </div>
-          {myNotifs.length === 0 ? (
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>No unread notifications.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {myNotifs.map(n => (
-                <div key={n.id} style={{ padding: '0.85rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', background: 'var(--bg-surface-hover)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                      <Badge variant="navy">{n.module}</Badge>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{n.timestamp || (n.createdAt ? new Date(n.createdAt).toLocaleDateString() : 'Recent')}</span>
-                    </div>
-                    <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--brand-navy)' }}>{n.title}</h4>
-                    <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>{n.message}</p>
-                  </div>
-                  {n.linkTab && (
-                    <button className="btn btn-sm btn-secondary" onClick={() => setActiveTab(n.linkTab || 'dashboard')}>
-                      View Details
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      <StudentExcelDashboard
+        user={user}
+        setActiveTab={setActiveTab}
+        departments={departments}
+        programs={programs}
+        semesters={semesters}
+        academicYears={academicYears}
+        batches={batches}
+        divisions={divisions}
+        facultyList={facultyList}
+        timetableEntries={timetableEntries}
+        assignments={assignments}
+        studentFeeRecords={studentFeeRecords}
+        userNotifications={userNotifications}
+        currentAY={currentAY}
+      />
     );
   };
 
@@ -2779,7 +2557,268 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
     );
   };
 
+  const renderERPCoordinatorDashboard = () => {
+    const allUsers = db.getUsers();
+    const activeUsers = allUsers.filter(u => u.accountStatus === 'ACTIVE' || (!u.accountStatus && u.status === 'ACTIVE'));
+    const lockedUsers = allUsers.filter(u => u.accountStatus === 'LOCKED');
+    const customOverrideUsers = allUsers.filter(u => u.customPermissions && Object.keys(u.customPermissions).length > 0);
+    const auditLogs = db.getAuditLogs();
+    const recentAudit = auditLogs.slice(0, 8);
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        {/* Banner */}
+        <div style={{
+          backgroundColor: '#001F3F',
+          borderRadius: 'var(--radius-lg)',
+          padding: '1.5rem',
+          color: '#FFFFFF',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '1rem',
+          boxShadow: '0 4px 20px rgba(0, 31, 63, 0.25)'
+        }}>
+          <div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', padding: '0.2rem 0.6rem', borderRadius: '9999px', backgroundColor: 'rgba(243, 112, 35, 0.2)', color: '#FF9F43', fontSize: '0.6875rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '0.5rem' }}>
+              <ShieldCheck size={13} />
+              <span>CENTRAL IDENTITY &amp; ACCESS GOVERNANCE HUB</span>
+            </div>
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 0.35rem 0', color: '#FFFFFF' }}>
+              University Access Control &amp; Identity Administration
+            </h3>
+            <p style={{ margin: 0, fontSize: '0.84375rem', color: 'rgba(255,255,255,0.7)', maxWidth: '650px' }}>
+              Configure role permission templates, manage individual user access, enforce data boundary scopes, and inspect security audit events.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className="btn btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--brand-orange)', color: '#FFFFFF', border: 'none', padding: '0.55rem 1rem', fontWeight: 700, borderRadius: '6px' }}
+            >
+              <Users2 size={15} />
+              <span>User Accounts</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className="btn btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'rgba(255,255,255,0.12)', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.2)', padding: '0.55rem 1rem', fontWeight: 700, borderRadius: '6px' }}
+            >
+              <SlidersHorizontal size={15} />
+              <span>Role Permissions</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 6 Key Governance KPI Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+          <StatCard
+            title="Total University Users"
+            value={allUsers.length}
+            icon={Users2}
+            colorScheme="navy"
+            subtitle="Across all 19 roles"
+            onClick={() => setActiveTab('settings')}
+          />
+          <StatCard
+            title="Active Accounts"
+            value={activeUsers.length}
+            icon={UserCheck}
+            colorScheme="green"
+            subtitle={`${((activeUsers.length / (allUsers.length || 1)) * 100).toFixed(0)}% enabled`}
+            onClick={() => setActiveTab('settings')}
+          />
+          <StatCard
+            title="Locked Accounts"
+            value={lockedUsers.length}
+            icon={AlertTriangle}
+            colorScheme={lockedUsers.length > 0 ? "orange" : "green"}
+            subtitle={lockedUsers.length > 0 ? "Requires administrative review" : "No security lockouts"}
+            onClick={() => setActiveTab('settings')}
+          />
+          <StatCard
+            title="Role Templates"
+            value={19}
+            icon={SlidersHorizontal}
+            colorScheme="gold"
+            subtitle="Configurable action matrix"
+            onClick={() => setActiveTab('settings')}
+          />
+          <StatCard
+            title="Custom Overrides"
+            value={customOverrideUsers.length}
+            icon={Activity}
+            colorScheme="blue"
+            subtitle="Granular permissions"
+            onClick={() => setActiveTab('settings')}
+          />
+          <StatCard
+            title="Security Audit Logs"
+            value={auditLogs.length}
+            icon={ShieldCheck}
+            colorScheme="navy"
+            subtitle="Immutable access history"
+            onClick={() => setActiveTab('settings')}
+          />
+        </div>
+
+        {/* Quick Access Modules Hub */}
+        <div className="card" style={{ padding: '1.25rem' }}>
+          <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--brand-navy)', margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Layers size={18} style={{ color: 'var(--brand-orange)' }} />
+            <span>Central Management &amp; Oversight Portals</span>
+          </h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+            <div
+              onClick={() => setActiveTab('settings')}
+              style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: 'var(--bg-card)' }}
+              className="hover:border-orange-500 hover:shadow-md"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
+                <div style={{ padding: '0.4rem', backgroundColor: 'rgba(15,44,89,0.08)', borderRadius: '6px', color: 'var(--brand-navy)' }}>
+                  <Settings size={18} />
+                </div>
+                <div style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--brand-navy)' }}>User Account Governance</div>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.78125rem', color: 'var(--text-muted)' }}>
+                Create, lock, unlock users, reset passwords, and assign 13-action matrix permissions.
+              </p>
+            </div>
+
+            <div
+              onClick={() => setActiveTab('inventory-assets')}
+              style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: 'var(--bg-card)' }}
+              className="hover:border-orange-500 hover:shadow-md"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
+                <div style={{ padding: '0.4rem', backgroundColor: 'rgba(243,112,35,0.08)', borderRadius: '6px', color: 'var(--brand-orange)' }}>
+                  <Briefcase size={18} />
+                </div>
+                <div style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--brand-navy)' }}>Inventory &amp; Asset Oversight</div>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.78125rem', color: 'var(--text-muted)' }}>
+                Audit institutional fixed assets, consumables stock, custody transfers, and store movements.
+              </p>
+            </div>
+
+            <div
+              onClick={() => setActiveTab('feedback')}
+              style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: 'var(--bg-card)' }}
+              className="hover:border-orange-500 hover:shadow-md"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
+                <div style={{ padding: '0.4rem', backgroundColor: 'rgba(16,185,129,0.08)', borderRadius: '6px', color: '#10B981' }}>
+                  <MessageSquare size={18} />
+                </div>
+                <div style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--brand-navy)' }}>Student Feedback Portal</div>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.78125rem', color: 'var(--text-muted)' }}>
+                Review department-wide student feedback, mentor counseling metrics, and suggestions.
+              </p>
+            </div>
+
+            <div
+              onClick={() => setActiveTab('reports')}
+              style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', cursor: 'pointer', transition: 'all 0.2s', backgroundColor: 'var(--bg-card)' }}
+              className="hover:border-orange-500 hover:shadow-md"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.4rem' }}>
+                <div style={{ padding: '0.4rem', backgroundColor: 'rgba(124,58,237,0.08)', borderRadius: '6px', color: '#7C3AED' }}>
+                  <BarChart3 size={18} />
+                </div>
+                <div style={{ fontWeight: 800, fontSize: '0.9375rem', color: 'var(--brand-navy)' }}>Reports &amp; Analytics</div>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.78125rem', color: 'var(--text-muted)' }}>
+                Export university-wide rosters, audit registers, and statutory compliance data.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Security Audit Events Feed */}
+        <div className="card" style={{ padding: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div>
+              <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <ShieldCheck size={18} style={{ color: 'var(--brand-navy)' }} />
+                <span>Recent Security &amp; Access Audit Events</span>
+              </h4>
+              <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Live chronological log of user logins, role changes, locks, and permission updates.
+              </p>
+            </div>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className="btn btn-secondary"
+              style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', fontWeight: 700 }}
+            >
+              View Full Audit Register →
+            </button>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table className="w-full text-xs text-left">
+              <thead style={{ backgroundColor: '#001F3F', color: '#FFFFFF', fontWeight: 700 }}>
+                <tr>
+                  <th style={{ padding: '0.6rem 0.75rem' }}>Timestamp</th>
+                  <th style={{ padding: '0.6rem 0.75rem' }}>Action</th>
+                  <th style={{ padding: '0.6rem 0.75rem' }}>Actor</th>
+                  <th style={{ padding: '0.6rem 0.75rem' }}>Module</th>
+                  <th style={{ padding: '0.6rem 0.75rem' }}>Event Details</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                {recentAudit.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No audit events recorded yet.
+                    </td>
+                  </tr>
+                ) : (
+                  recentAudit.map(log => (
+                    <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td style={{ padding: '0.55rem 0.75rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+                        {new Date(log.timestamp).toLocaleString('en-IN')}
+                      </td>
+                      <td style={{ padding: '0.55rem 0.75rem', fontWeight: 700 }}>
+                        <span style={{
+                          padding: '0.15rem 0.45rem',
+                          borderRadius: '4px',
+                          backgroundColor: log.action.includes('LOCK') ? 'rgba(239,68,68,0.12)' : (log.action.includes('UNLOCK') || log.action.includes('ACTIVE') ? 'rgba(16,185,129,0.12)' : 'rgba(15,44,89,0.08)'),
+                          color: log.action.includes('LOCK') ? '#DC2626' : (log.action.includes('UNLOCK') || log.action.includes('ACTIVE') ? '#059669' : 'var(--brand-navy)')
+                        }}>
+                          {log.action}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.55rem 0.75rem', fontWeight: 600, color: 'var(--brand-navy)' }}>
+                        {log.userName || 'System'}
+                      </td>
+                      <td style={{ padding: '0.55rem 0.75rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>
+                        {log.module || log.entity || 'AUTH'}
+                      </td>
+                      <td style={{ padding: '0.55rem 0.75rem', color: 'var(--text-main)' }}>
+                        {log.details}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderStudentAdminDashboard = () => {
+    return <StudentAdminWorkspacePage initialTab="DASHBOARD" />;
+  };
+
   const renderCurrentView = () => {
+    if (role === 'ERP_COORDINATOR') return renderERPCoordinatorDashboard();
     if (role === 'VICE_PRESIDENT') return renderVicePresidentDashboard();
     if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') return renderAdminDashboard();
     if (role === 'PRINCIPAL') return renderPrincipalDashboard();
@@ -2791,6 +2830,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
     if (role === 'HOSTEL_ADMIN') return renderHostelAdminDashboard();
     if (role === 'HOD') return renderHODDashboard();
     if (role === 'MENTOR') return renderMentorDashboard();
+    if (role === 'STUDENT_ADMIN') return renderStudentAdminDashboard();
     if (role === 'FACULTY') return renderFacultyDashboard();
     return renderStudentDashboard();
   };
@@ -2815,6 +2855,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
       HOD: 'Head of Department',
       FACULTY: 'Teaching Faculty',
       MENTOR: 'Faculty Mentor',
+      STUDENT_ADMIN: 'Student Administration / Onboarding Officer',
       STUDENT: 'Student Scholar',
       IQAC: 'IQAC Director',
       EXAM_CELL: 'Controller of Examinations',

@@ -5,7 +5,7 @@
 import { db } from './db';
 import { mentorAssignmentService } from './mentorAssignmentService';
 import { 
-  Student, StudentDocument, DocumentVerificationRecord, 
+  Student, StudentStatus, StudentDocument, DocumentVerificationRecord, 
   User, UserRole, StudentAcademicHistoryRecord, Institute, Department, Program, Semester, Batch, Division
 } from '../types';
 
@@ -29,7 +29,7 @@ export interface StudentIdentitySummary {
   batchName?: string;
   academicYearName?: string;
   studentType: 'DOMESTIC' | 'INTERNATIONAL';
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'GRADUATED';
+  status: StudentStatus | 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'GRADUATED';
   abcId?: string;
   abcIdStatus?: string;
 }
@@ -251,6 +251,8 @@ export class StudentProfileAccessService {
       if (cleanQuery) {
         const nameMatch = student.name?.toLowerCase().includes(cleanQuery);
         const enrollMatch = student.enrollmentNo?.toLowerCase().includes(cleanQuery);
+        const tempMatch = student.temporaryEnrollmentNumber?.toLowerCase().includes(cleanQuery);
+        const finalMatch = student.finalEnrollmentNumber?.toLowerCase().includes(cleanQuery);
         const idMatch = student.id?.toLowerCase().includes(cleanQuery);
         const emailMatch = student.email?.toLowerCase().includes(cleanQuery);
         const phoneMatch = student.phone?.includes(cleanQuery);
@@ -262,7 +264,7 @@ export class StudentProfileAccessService {
         const dept = departments.find(d => d.id === student.departmentId);
         const deptMatch = dept?.name?.toLowerCase().includes(cleanQuery) || dept?.code?.toLowerCase().includes(cleanQuery);
 
-        if (!nameMatch && !enrollMatch && !idMatch && !emailMatch && !phoneMatch && !abcMatch && !progMatch && !deptMatch) {
+        if (!nameMatch && !enrollMatch && !tempMatch && !finalMatch && !idMatch && !emailMatch && !phoneMatch && !abcMatch && !progMatch && !deptMatch) {
           return false;
         }
       }

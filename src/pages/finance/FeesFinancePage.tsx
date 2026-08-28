@@ -4,7 +4,8 @@ import { db } from '../../services/db';
 import { Badge } from '../../components/common/Badge';
 import { StatCard } from '../../components/common/StatCard';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
-import { FeeReceiptModal } from '../../components/finance/FeeReceiptModal';
+import { feeReceiptPdfService } from '../../services/feeReceiptPdfService';
+import { fromFeePaymentTransaction } from '../../components/receipt/receiptTypes';
 import { DashboardReportModal } from '../../components/reports/DashboardReportModal';
 import { FeeHeadManagementTab } from '../../components/finance/FeeHeadManagementTab';
 import { FeeStructureManagementTab } from '../../components/finance/FeeStructureManagementTab';
@@ -15,6 +16,7 @@ import { FeeInvoiceViewModal } from '../../components/finance/FeeInvoiceViewModa
 import { OnlinePaymentModal } from '../../components/finance/OnlinePaymentModal';
 import { FeeQueryModal } from '../../components/finance/FeeQueryModal';
 import { FeeQueryResolveModal } from '../../components/finance/FeeQueryResolveModal';
+import { ExcelTableContainer, ExcelTable, ExcelTh, ExcelTd } from '../../components/common/ExcelTable';
 import { feeQueryService } from '../../services/feeQueryService';
 import { FeeQuery } from '../../types/feeQuery';
 import { 
@@ -187,7 +189,7 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
     }, `Updated fee balance for ${selectedRecordForPayment.studentName}`);
 
     setIsRecordPaymentModalOpen(false);
-    setSelectedTransactionForReceipt(newTx);
+    feeReceiptPdfService.openInNewTab(fromFeePaymentTransaction(newTx, selectedRecordForPayment));
   };
 
   // Handlers for Student Online Payment
@@ -252,7 +254,7 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
 
       setTimeout(() => {
         setIsOnlinePaymentModalOpen(false);
-        setSelectedTransactionForReceipt(newTx);
+        feeReceiptPdfService.openInNewTab(fromFeePaymentTransaction(newTx, selectedRecordForPayment));
       }, 1500);
     }, 2000);
   };
@@ -496,136 +498,212 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
 
             {/* Fee-Wise Breakdown Table as Required by Section 1 */}
             <div className="card" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <FileText size={18} color="var(--brand-orange)" /> Itemized Semester Fee Heads &amp; Breakdown
-                </h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <FileText size={18} color="var(--brand-orange)" /> Itemized Semester Fee Heads &amp; Breakdown
+                  </h3>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>
+                    Official fee schedule per academic component with concession credits, late charges, and real-time ledger settlement
+                  </p>
+                </div>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                   Academic Year: <strong>2026-27</strong> • Semester: <strong>Semester 4</strong>
                 </span>
               </div>
 
-              <div className="table-responsive">
-                <table className="table" style={{ fontSize: '0.85rem' }}>
+              <ExcelTableContainer minWidth="1100px">
+                <ExcelTable>
                   <thead>
                     <tr>
-                      <th>Fee Head</th>
-                      <th>Academic Year</th>
-                      <th>Semester</th>
-                      <th style={{ textAlign: 'right' }}>Original Amount</th>
-                      <th style={{ textAlign: 'right' }}>Concession</th>
-                      <th style={{ textAlign: 'right' }}>Late Fee</th>
-                      <th style={{ textAlign: 'right' }}>Total Payable</th>
-                      <th style={{ textAlign: 'right' }}>Paid Amount</th>
-                      <th style={{ textAlign: 'right' }}>Pending Amount</th>
-                      <th>Due Date</th>
-                      <th>Status</th>
+                      <ExcelTh align="left" style={{ minWidth: '180px' }}>Fee Head</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '100px' }}>Academic Year</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '90px' }}>Semester</ExcelTh>
+                      <ExcelTh align="right" style={{ minWidth: '110px' }}>Original Amount</ExcelTh>
+                      <ExcelTh align="right" style={{ minWidth: '95px' }}>Concession</ExcelTh>
+                      <ExcelTh align="right" style={{ minWidth: '90px' }}>Late Fee</ExcelTh>
+                      <ExcelTh align="right" style={{ minWidth: '105px' }}>Total Fee</ExcelTh>
+                      <ExcelTh align="right" style={{ minWidth: '115px' }}>Payable Amount</ExcelTh>
+                      <ExcelTh align="right" style={{ minWidth: '105px' }}>Paid Amount</ExcelTh>
+                      <ExcelTh align="right" style={{ minWidth: '115px' }}>Pending Amount</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '100px' }}>Due Date</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '100px' }}>Status</ExcelTh>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td><strong>Tuition Fee</strong></td>
-                      <td>2026-27</td>
-                      <td>Sem 4</td>
-                      <td style={{ textAlign: 'right' }}>₹{studentFee?.tuitionFee.toLocaleString()}</td>
-                      <td style={{ textAlign: 'right', color: '#10B981' }}>-₹0</td>
-                      <td style={{ textAlign: 'right', color: lateFee > 0 ? '#EF4444' : 'inherit' }}>+₹{lateFee > 0 ? Math.round(lateFee * 0.6) : 0}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{(studentFee?.tuitionFee || 0) + (lateFee > 0 ? Math.round(lateFee * 0.6) : 0)}</td>
-                      <td style={{ textAlign: 'right', color: '#10B981', fontWeight: 600 }}>₹{Math.min(studentFee?.paidAmount || 0, studentFee?.tuitionFee || 0).toLocaleString()}</td>
-                      <td style={{ textAlign: 'right', color: 'var(--brand-orange)', fontWeight: 700 }}>₹{Math.max(0, (studentFee?.tuitionFee || 0) - (studentFee?.paidAmount || 0))}</td>
-                      <td>{studentFee?.dueDate}</td>
-                      <td><Badge variant={studentFee?.paidAmount && studentFee.paidAmount >= (studentFee?.tuitionFee || 0) ? 'success' : 'gold'}>{studentFee?.paidAmount && studentFee.paidAmount >= (studentFee?.tuitionFee || 0) ? 'PAID' : 'PARTIALLY_PAID'}</Badge></td>
+                      <ExcelTd align="left" bold color="var(--brand-navy)">Tuition Fee</ExcelTd>
+                      <ExcelTd align="center">2026-27</ExcelTd>
+                      <ExcelTd align="center">Semester 4</ExcelTd>
+                      <ExcelTd align="right">₹{(studentFee?.tuitionFee || 0).toLocaleString('en-IN')}</ExcelTd>
+                      <ExcelTd align="right" color="#10B981">-₹0</ExcelTd>
+                      <ExcelTd align="right" color={lateFee > 0 ? '#EF4444' : 'inherit'}>
+                        {lateFee > 0 ? `+₹${Math.round(lateFee * 0.6).toLocaleString('en-IN')}` : '₹0'}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold>
+                        ₹{((studentFee?.tuitionFee || 0) + (lateFee > 0 ? Math.round(lateFee * 0.6) : 0)).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold color="#8B5CF6">
+                        ₹{(Math.max(0, (studentFee?.tuitionFee || 0) - (studentFee?.paidAmount || 0)) + (lateFee > 0 ? Math.round(lateFee * 0.6) : 0)).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold color="#10B981">
+                        ₹{Math.min(studentFee?.paidAmount || 0, studentFee?.tuitionFee || 0).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold color="var(--brand-orange)">
+                        ₹{Math.max(0, (studentFee?.tuitionFee || 0) - (studentFee?.paidAmount || 0)).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="center">{studentFee?.dueDate || '2026-09-15'}</ExcelTd>
+                      <ExcelTd align="center">
+                        <Badge variant={studentFee?.paidAmount && studentFee.paidAmount >= (studentFee?.tuitionFee || 0) ? 'success' : lateFee > 0 ? 'danger' : 'gold'}>
+                          {studentFee?.paidAmount && studentFee.paidAmount >= (studentFee?.tuitionFee || 0) ? 'PAID' : lateFee > 0 ? 'OVERDUE' : 'PARTIALLY_PAID'}
+                        </Badge>
+                      </ExcelTd>
                     </tr>
                     <tr>
-                      <td><strong>Lab &amp; Computing Infrastructure Fee</strong></td>
-                      <td>2026-27</td>
-                      <td>Sem 4</td>
-                      <td style={{ textAlign: 'right' }}>₹{studentFee?.labFee.toLocaleString()}</td>
-                      <td style={{ textAlign: 'right', color: '#10B981' }}>-₹0</td>
-                      <td style={{ textAlign: 'right', color: lateFee > 0 ? '#EF4444' : 'inherit' }}>+₹{lateFee > 0 ? Math.round(lateFee * 0.2) : 0}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{(studentFee?.labFee || 0) + (lateFee > 0 ? Math.round(lateFee * 0.2) : 0)}</td>
-                      <td style={{ textAlign: 'right', color: '#10B981', fontWeight: 600 }}>₹{studentFee?.status === 'PAID' ? studentFee.labFee : 0}</td>
-                      <td style={{ textAlign: 'right', color: 'var(--brand-orange)', fontWeight: 700 }}>₹{studentFee?.status === 'PAID' ? 0 : studentFee?.labFee}</td>
-                      <td>{studentFee?.dueDate}</td>
-                      <td><Badge variant={studentFee?.status === 'PAID' ? 'success' : 'gold'}>{studentFee?.status === 'PAID' ? 'PAID' : 'PENDING'}</Badge></td>
+                      <ExcelTd align="left" bold color="var(--brand-navy)">Lab &amp; Computing Infrastructure Fee</ExcelTd>
+                      <ExcelTd align="center">2026-27</ExcelTd>
+                      <ExcelTd align="center">Semester 4</ExcelTd>
+                      <ExcelTd align="right">₹{(studentFee?.labFee || 0).toLocaleString('en-IN')}</ExcelTd>
+                      <ExcelTd align="right" color="#10B981">-₹0</ExcelTd>
+                      <ExcelTd align="right" color={lateFee > 0 ? '#EF4444' : 'inherit'}>
+                        {lateFee > 0 ? `+₹${Math.round(lateFee * 0.2).toLocaleString('en-IN')}` : '₹0'}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold>
+                        ₹{((studentFee?.labFee || 0) + (lateFee > 0 ? Math.round(lateFee * 0.2) : 0)).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold color="#8B5CF6">
+                        ₹{(studentFee?.status === 'PAID' ? 0 : (studentFee?.labFee || 0) + (lateFee > 0 ? Math.round(lateFee * 0.2) : 0)).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold color="#10B981">
+                        ₹{(studentFee?.status === 'PAID' ? (studentFee?.labFee || 0) : 0).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold color="var(--brand-orange)">
+                        ₹{(studentFee?.status === 'PAID' ? 0 : (studentFee?.labFee || 0)).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="center">{studentFee?.dueDate || '2026-09-15'}</ExcelTd>
+                      <ExcelTd align="center">
+                        <Badge variant={studentFee?.status === 'PAID' ? 'success' : lateFee > 0 ? 'danger' : 'gold'}>
+                          {studentFee?.status === 'PAID' ? 'PAID' : lateFee > 0 ? 'OVERDUE' : 'PENDING'}
+                        </Badge>
+                      </ExcelTd>
                     </tr>
                     <tr>
-                      <td><strong>Campus Development Fee</strong></td>
-                      <td>2026-27</td>
-                      <td>Sem 4</td>
-                      <td style={{ textAlign: 'right' }}>₹{studentFee?.developmentFee.toLocaleString()}</td>
-                      <td style={{ textAlign: 'right', color: '#10B981' }}>-₹0</td>
-                      <td style={{ textAlign: 'right', color: lateFee > 0 ? '#EF4444' : 'inherit' }}>+₹{lateFee > 0 ? Math.round(lateFee * 0.2) : 0}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{(studentFee?.developmentFee || 0) + (lateFee > 0 ? Math.round(lateFee * 0.2) : 0)}</td>
-                      <td style={{ textAlign: 'right', color: '#10B981', fontWeight: 600 }}>₹{studentFee?.status === 'PAID' ? studentFee.developmentFee : 0}</td>
-                      <td style={{ textAlign: 'right', color: 'var(--brand-orange)', fontWeight: 700 }}>₹{studentFee?.status === 'PAID' ? 0 : studentFee?.developmentFee}</td>
-                      <td>{studentFee?.dueDate}</td>
-                      <td><Badge variant={studentFee?.status === 'PAID' ? 'success' : 'gold'}>{studentFee?.status === 'PAID' ? 'PAID' : 'PENDING'}</Badge></td>
+                      <ExcelTd align="left" bold color="var(--brand-navy)">Campus Development Fee</ExcelTd>
+                      <ExcelTd align="center">2026-27</ExcelTd>
+                      <ExcelTd align="center">Semester 4</ExcelTd>
+                      <ExcelTd align="right">₹{(studentFee?.developmentFee || 0).toLocaleString('en-IN')}</ExcelTd>
+                      <ExcelTd align="right" color="#10B981">-₹0</ExcelTd>
+                      <ExcelTd align="right" color={lateFee > 0 ? '#EF4444' : 'inherit'}>
+                        {lateFee > 0 ? `+₹${Math.round(lateFee * 0.2).toLocaleString('en-IN')}` : '₹0'}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold>
+                        ₹{((studentFee?.developmentFee || 0) + (lateFee > 0 ? Math.round(lateFee * 0.2) : 0)).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold color="#8B5CF6">
+                        ₹{(studentFee?.status === 'PAID' ? 0 : (studentFee?.developmentFee || 0) + (lateFee > 0 ? Math.round(lateFee * 0.2) : 0)).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold color="#10B981">
+                        ₹{(studentFee?.status === 'PAID' ? (studentFee?.developmentFee || 0) : 0).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold color="var(--brand-orange)">
+                        ₹{(studentFee?.status === 'PAID' ? 0 : (studentFee?.developmentFee || 0)).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="center">{studentFee?.dueDate || '2026-09-15'}</ExcelTd>
+                      <ExcelTd align="center">
+                        <Badge variant={studentFee?.status === 'PAID' ? 'success' : lateFee > 0 ? 'danger' : 'gold'}>
+                          {studentFee?.status === 'PAID' ? 'PAID' : lateFee > 0 ? 'OVERDUE' : 'PENDING'}
+                        </Badge>
+                      </ExcelTd>
                     </tr>
                     {studentFee?.hostelFee && studentFee.hostelFee > 0 ? (
                       <tr>
-                        <td><strong>Hostel &amp; Dining Fee</strong></td>
-                        <td>2026-27</td>
-                        <td>Sem 4</td>
-                        <td style={{ textAlign: 'right' }}>₹{studentFee.hostelFee.toLocaleString()}</td>
-                        <td style={{ textAlign: 'right', color: '#10B981' }}>-₹0</td>
-                        <td style={{ textAlign: 'right' }}>+₹0</td>
-                        <td style={{ textAlign: 'right', fontWeight: 700 }}>₹{studentFee.hostelFee.toLocaleString()}</td>
-                        <td style={{ textAlign: 'right', color: '#10B981', fontWeight: 600 }}>₹{studentFee.hostelFee.toLocaleString()}</td>
-                        <td style={{ textAlign: 'right', color: 'var(--brand-orange)', fontWeight: 700 }}>₹0</td>
-                        <td>{studentFee.dueDate}</td>
-                        <td><Badge variant="success">PAID</Badge></td>
+                        <ExcelTd align="left" bold color="var(--brand-navy)">Hostel &amp; Dining Fee</ExcelTd>
+                        <ExcelTd align="center">2026-27</ExcelTd>
+                        <ExcelTd align="center">Semester 4</ExcelTd>
+                        <ExcelTd align="right">₹{studentFee.hostelFee.toLocaleString('en-IN')}</ExcelTd>
+                        <ExcelTd align="right" color="#10B981">-₹0</ExcelTd>
+                        <ExcelTd align="right">₹0</ExcelTd>
+                        <ExcelTd align="right" bold>₹{studentFee.hostelFee.toLocaleString('en-IN')}</ExcelTd>
+                        <ExcelTd align="right" bold color="#8B5CF6">₹0</ExcelTd>
+                        <ExcelTd align="right" bold color="#10B981">₹{studentFee.hostelFee.toLocaleString('en-IN')}</ExcelTd>
+                        <ExcelTd align="right" bold color="var(--brand-orange)">₹0</ExcelTd>
+                        <ExcelTd align="center">{studentFee.dueDate || '2026-09-15'}</ExcelTd>
+                        <ExcelTd align="center"><Badge variant="success">PAID</Badge></ExcelTd>
                       </tr>
                     ) : null}
                   </tbody>
                   <tfoot>
-                    <tr style={{ backgroundColor: '#F8FAFC', fontWeight: 800, borderTop: '2px solid var(--border-color)' }}>
-                      <td colSpan={3}>TOTAL SUMMARY DEMAND</td>
-                      <td style={{ textAlign: 'right' }}>₹{studentFee?.totalAmount.toLocaleString()}</td>
-                      <td style={{ textAlign: 'right', color: '#10B981' }}>-₹0</td>
-                      <td style={{ textAlign: 'right', color: lateFee > 0 ? '#EF4444' : 'inherit' }}>+₹{lateFee.toLocaleString()}</td>
-                      <td style={{ textAlign: 'right', color: '#8B5CF6' }}>₹{(studentFee ? studentFee.totalAmount + lateFee : 0).toLocaleString()}</td>
-                      <td style={{ textAlign: 'right', color: '#10B981' }}>₹{studentFee?.paidAmount.toLocaleString()}</td>
-                      <td style={{ textAlign: 'right', color: 'var(--brand-orange)' }}>₹{(studentFee ? studentFee.pendingAmount + lateFee : 0).toLocaleString()}</td>
-                      <td>{studentFee?.dueDate}</td>
-                      <td>{getStatusBadge(studentFee?.status || 'PENDING')}</td>
+                    <tr>
+                      <ExcelTd align="left" bold style={{ color: 'var(--brand-navy)' }}>TOTAL SUMMARY DEMAND</ExcelTd>
+                      <ExcelTd align="center" bold>2026-27</ExcelTd>
+                      <ExcelTd align="center" bold>Semester 4</ExcelTd>
+                      <ExcelTd align="right" bold>₹{(studentFee?.totalAmount || 0).toLocaleString('en-IN')}</ExcelTd>
+                      <ExcelTd align="right" bold color="#10B981">-₹0</ExcelTd>
+                      <ExcelTd align="right" bold color={lateFee > 0 ? '#EF4444' : 'inherit'}>
+                        {lateFee > 0 ? `+₹${lateFee.toLocaleString('en-IN')}` : '₹0'}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold style={{ color: '#8B5CF6' }}>
+                        ₹{((studentFee ? studentFee.totalAmount + lateFee : 0)).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold style={{ color: '#8B5CF6' }}>
+                        ₹{((studentFee ? studentFee.pendingAmount + lateFee : 0)).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold color="#10B981">
+                        ₹{(studentFee?.paidAmount || 0).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold color="var(--brand-orange)">
+                        ₹{(studentFee?.pendingAmount || 0).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="center" bold>{studentFee?.dueDate || '2026-09-15'}</ExcelTd>
+                      <ExcelTd align="center">
+                        <Badge variant={studentFee?.status === 'PAID' ? 'success' : lateFee > 0 ? 'danger' : studentFee?.paidAmount && studentFee.paidAmount > 0 ? 'gold' : 'gold'}>
+                          {studentFee?.status === 'PAID' ? 'PAID' : lateFee > 0 ? 'OVERDUE' : studentFee?.paidAmount && studentFee.paidAmount > 0 ? 'PARTIALLY_PAID' : 'PENDING'}
+                        </Badge>
+                      </ExcelTd>
                     </tr>
                   </tfoot>
-                </table>
-              </div>
+                </ExcelTable>
+              </ExcelTableContainer>
             </div>
 
             {/* Official Fee Invoices & Demand Notices */}
             <div className="card" style={{ padding: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <FileText size={18} color="var(--brand-orange)" /> My Official Fee Invoices &amp; Demand Notices
-              </h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <FileText size={18} color="var(--brand-orange)" /> My Official Fee Invoices &amp; Demand Notices
+                  </h3>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>
+                    Official digital tax invoices and fee demand statements generated by the Finance Directorate
+                  </p>
+                </div>
+              </div>
 
-              <div className="table-responsive">
-                <table className="table" style={{ fontSize: '0.825rem' }}>
+              <ExcelTableContainer minWidth="820px">
+                <ExcelTable>
                   <thead>
-                    <tr style={{ background: '#f8fafc' }}>
-                      <th style={{ padding: '0.75rem' }}>Invoice Number</th>
-                      <th style={{ padding: '0.75rem' }}>Invoice Date</th>
-                      <th style={{ padding: '0.75rem' }}>Due Date</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'right' }}>Invoiced Amount</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'center' }}>Status</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'center' }}>Action</th>
+                    <tr>
+                      <ExcelTh align="left" style={{ minWidth: '160px' }}>Invoice Number</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '120px' }}>Invoice Date</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '120px' }}>Due Date</ExcelTh>
+                      <ExcelTh align="right" style={{ minWidth: '140px' }}>Invoiced Amount</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '120px' }}>Status</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '160px' }}>Action</ExcelTh>
                     </tr>
                   </thead>
                   <tbody>
                     {db.getFeeInvoicesByStudentId(studentId).length === 0 ? (
                       <tr>
-                        <td colSpan={6} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                        <ExcelTd colSpan={6} align="center" style={{ padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
                           No official fee demand notices issued for your account yet.
-                        </td>
+                        </ExcelTd>
                       </tr>
                     ) : (
                       db.getFeeInvoicesByStudentId(studentId).map(inv => {
                         const lateFeeInfo = db.getInvoiceLateFeeInfo(inv.id);
                         return (
                           <tr key={inv.id} style={{ background: lateFeeInfo.isOverdue ? '#fff9f9' : undefined }}>
-                            <td style={{ padding: '0.75rem', fontFamily: 'monospace', fontWeight: 800, color: '#1e40af' }}>
+                            <ExcelTd align="left" mono color="#1E40AF">
                               {inv.invoiceNumber}
                               {lateFeeInfo.isOverdue && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem' }}>
@@ -633,22 +711,24 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
                                   <span style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 600 }}>{lateFeeInfo.overdueDays} days overdue</span>
                                 </div>
                               )}
-                            </td>
-                            <td style={{ padding: '0.75rem' }}>{inv.invoiceDate}</td>
-                            <td style={{ padding: '0.75rem', fontWeight: 700, color: lateFeeInfo.isOverdue ? '#ef4444' : '#b91c1c' }}>{inv.dueDate}</td>
-                            <td style={{ padding: '0.75rem', textAlign: 'right', fontFamily: 'monospace', fontWeight: 800 }}>
+                            </ExcelTd>
+                            <ExcelTd align="center">{inv.invoiceDate}</ExcelTd>
+                            <ExcelTd align="center" bold color={lateFeeInfo.isOverdue ? '#ef4444' : '#b91c1c'}>
+                              {inv.dueDate}
+                            </ExcelTd>
+                            <ExcelTd align="right" bold>
                               ₹{Number(inv.totalAmount).toLocaleString('en-IN')}
                               {lateFeeInfo.lateFeeAmount > 0 && (
-                                <div style={{ fontSize: '0.7rem', color: '#ef4444', marginTop: '0.2rem' }}>+₹{lateFeeInfo.lateFeeAmount.toLocaleString()} late fee</div>
+                                <div style={{ fontSize: '0.7rem', color: '#ef4444', marginTop: '0.2rem' }}>+₹{lateFeeInfo.lateFeeAmount.toLocaleString('en-IN')} late fee</div>
                               )}
-                            </td>
-                            <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                            </ExcelTd>
+                            <ExcelTd align="center">
                               <Badge variant={inv.status === 'ISSUED' ? 'success' : inv.status === 'CANCELLED' ? 'danger' : inv.status === 'OVERDUE' ? 'danger' : 'gold'}>
                                 {inv.status}
                               </Badge>
-                            </td>
-                            <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                              <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center' }}>
+                            </ExcelTd>
+                            <ExcelTd align="center">
+                              <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center', justifyContent: 'center' }}>
                                 <button
                                   className="btn btn-secondary btn-sm"
                                   onClick={() => setViewingStudentInvoice(inv)}
@@ -664,14 +744,14 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
                                   </button>
                                 )}
                               </div>
-                            </td>
+                            </ExcelTd>
                           </tr>
                         );
                       })
                     )}
                   </tbody>
-                </table>
-              </div>
+                </ExcelTable>
+              </ExcelTableContainer>
             </div>
           </div>
         )}
@@ -682,58 +762,79 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
         {studentTab === 'PAYMENT_HISTORY' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             <div className="card" style={{ padding: '1.5rem' }}>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '1.25rem' }}>
-                Complete Payment Transaction History &amp; Official Receipts
-              </h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', margin: 0 }}>
+                    Complete Payment Transaction History &amp; Official Receipts
+                  </h3>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>
+                    Audit-verified ledger of all tuition, examination, hostel, and service fee transactions with downloadable university receipts
+                  </p>
+                </div>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Total Settlements: <strong>{studentTxs.length}</strong>
+                </span>
+              </div>
 
-              <div className="table-responsive">
-                <table className="table">
+              <ExcelTableContainer minWidth="940px">
+                <ExcelTable>
                   <thead>
                     <tr>
-                      <th>Receipt No</th>
-                      <th>Payment Date</th>
-                      <th>Type</th>
-                      <th>Payment Mode</th>
-                      <th>Gateway Ref</th>
-                      <th>Amount Paid</th>
-                      <th>Status</th>
-                      <th>Receipt Action</th>
+                      <ExcelTh align="left" style={{ minWidth: '170px' }}>Receipt No</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '110px' }}>Payment Date</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '100px' }}>Type</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '130px' }}>Payment Mode</ExcelTh>
+                      <ExcelTh align="left" style={{ minWidth: '160px' }}>Gateway Ref</ExcelTh>
+                      <ExcelTh align="right" style={{ minWidth: '120px' }}>Amount Paid</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '100px' }}>Status</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '130px' }}>Receipt Action</ExcelTh>
                     </tr>
                   </thead>
                   <tbody>
                     {studentTxs.length === 0 ? (
                       <tr>
-                        <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                        <ExcelTd colSpan={8} align="center" style={{ padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
                           No payment transactions recorded for your account yet.
-                        </td>
+                        </ExcelTd>
                       </tr>
                     ) : (
                       studentTxs.map(tx => (
                         <tr key={tx.id}>
-                          <td><code style={{ fontWeight: 700, color: 'var(--brand-orange)' }}>{tx.receiptNo}</code></td>
-                          <td>{tx.paymentDate}</td>
-                          <td><Badge variant="navy">{tx.feeType || 'TUITION'}</Badge></td>
-                          <td><Badge variant="orange">{tx.paymentMode}</Badge></td>
-                          <td><code>{tx.transactionId}</code></td>
-                          <td style={{ fontWeight: 800, color: tx.status === 'REFUNDED' ? '#EF4444' : '#10B981' }}>
-                            ₹{tx.paidAmount.toLocaleString()}
-                          </td>
-                          <td>
-                            <Badge variant={tx.status === 'SUCCESS' || !tx.status ? 'active' : tx.status === 'REFUNDED' ? 'inactive' : 'danger'}>
+                          <ExcelTd align="left" mono color="#1E40AF">
+                            {tx.receiptNo}
+                          </ExcelTd>
+                          <ExcelTd align="center">{tx.paymentDate}</ExcelTd>
+                          <ExcelTd align="center">
+                            <Badge variant="navy">{tx.feeType || 'TUITION'}</Badge>
+                          </ExcelTd>
+                          <ExcelTd align="center">
+                            <Badge variant="orange">{tx.paymentMode}</Badge>
+                          </ExcelTd>
+                          <ExcelTd align="left" mono style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                            {tx.transactionId}
+                          </ExcelTd>
+                          <ExcelTd align="right" bold color={tx.status === 'REFUNDED' ? '#EF4444' : '#10B981'}>
+                            ₹{tx.paidAmount.toLocaleString('en-IN')}
+                          </ExcelTd>
+                          <ExcelTd align="center">
+                            <Badge variant={tx.status === 'SUCCESS' || !tx.status ? 'success' : tx.status === 'REFUNDED' ? 'danger' : 'gold'}>
                               {tx.status || 'SUCCESS'}
                             </Badge>
-                          </td>
-                          <td>
-                            <button className="btn btn-sm btn-secondary" onClick={() => setSelectedTransactionForReceipt(tx)}>
-                              <FileText size={14} /> View Receipt
+                          </ExcelTd>
+                          <ExcelTd align="center">
+                            <button
+                              className="btn btn-sm btn-secondary"
+                              onClick={() => feeReceiptPdfService.openInNewTab(fromFeePaymentTransaction(tx))}
+                            >
+                              <FileText size={13} /> Receipt PDF
                             </button>
-                          </td>
+                          </ExcelTd>
                         </tr>
                       ))
                     )}
                   </tbody>
-                </table>
-              </div>
+                </ExcelTable>
+              </ExcelTableContainer>
             </div>
 
             {/* Failed Payment History (Student View) */}
@@ -742,35 +843,35 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
               if (failedTxs.length === 0) return null;
               return (
                 <div className="card" style={{ padding: '1.5rem', border: '1.5px solid #fecaca' }}>
-                  <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#b91c1c', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: '#b91c1c', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <XCircle size={18} color="#ef4444" /> Failed Payment Attempts
                   </h3>
-                  <div style={{ background: '#fff9f9', border: '1px solid #fecaca', borderRadius: '8px', padding: '0.85rem 1rem', marginBottom: '1rem', fontSize: '0.8125rem', lineHeight: 1.6 }}>
+                  <div style={{ background: '#fff9f9', border: '1px solid #fecaca', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.8125rem', lineHeight: 1.6 }}>
                     <strong>Note:</strong> These payments were <strong>not processed</strong>. Your fee account balance and invoice status are unchanged. You can safely retry payment.
                   </div>
-                  <div className="table-responsive">
-                    <table className="table" style={{ fontSize: '0.8125rem' }}>
+                  <ExcelTableContainer minWidth="750px">
+                    <ExcelTable>
                       <thead>
                         <tr>
-                          <th>Transaction No.</th>
-                          <th>Date</th>
-                          <th>Amount</th>
-                          <th>Failure Reason</th>
-                          <th>Action</th>
+                          <ExcelTh align="left" style={{ minWidth: '160px' }}>Transaction No.</ExcelTh>
+                          <ExcelTh align="center" style={{ minWidth: '110px' }}>Date</ExcelTh>
+                          <ExcelTh align="right" style={{ minWidth: '120px' }}>Amount</ExcelTh>
+                          <ExcelTh align="left" style={{ minWidth: '220px' }}>Failure Reason</ExcelTh>
+                          <ExcelTh align="center" style={{ minWidth: '140px' }}>Action</ExcelTh>
                         </tr>
                       </thead>
                       <tbody>
                         {failedTxs.map(tx => (
                           <tr key={tx.id}>
-                            <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>{tx.transactionNo}</td>
-                            <td>{tx.paymentDate}</td>
-                            <td style={{ fontWeight: 800, color: '#ef4444' }}>₹{Number(tx.paidAmount).toLocaleString('en-IN')}</td>
-                            <td>
-                              <div style={{ color: '#92400e', background: '#fef3c7', padding: '0.2rem 0.6rem', borderRadius: '4px', display: 'inline-block', fontSize: '0.75rem' }}>
+                            <ExcelTd align="left" mono>{tx.transactionNo}</ExcelTd>
+                            <ExcelTd align="center">{tx.paymentDate}</ExcelTd>
+                            <ExcelTd align="right" bold color="#ef4444">₹{Number(tx.paidAmount).toLocaleString('en-IN')}</ExcelTd>
+                            <ExcelTd align="left">
+                              <div style={{ color: '#92400e', background: '#fef3c7', padding: '0.2rem 0.6rem', borderRadius: '4px', display: 'inline-block', fontSize: '0.75rem', fontWeight: 600 }}>
                                 {db.getFriendlyFailureReason(tx.failureReason)}
                               </div>
-                            </td>
-                            <td>
+                            </ExcelTd>
+                            <ExcelTd align="center">
                               <button
                                 className="btn btn-primary btn-sm"
                                 onClick={() => {
@@ -780,12 +881,12 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
                               >
                                 <RefreshCw size={13} /> Retry Payment
                               </button>
-                            </td>
+                            </ExcelTd>
                           </tr>
                         ))}
                       </tbody>
-                    </table>
-                  </div>
+                    </ExcelTable>
+                  </ExcelTableContainer>
                 </div>
               );
             })()}
@@ -819,58 +920,66 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
                 <p style={{ fontSize: '0.85rem' }}>If you have any discrepancy regarding fee amounts, late fees, or online payments, click Submit New Fee Query.</p>
               </div>
             ) : (
-              <div className="table-responsive">
-                <table className="table" style={{ fontSize: '0.85rem' }}>
+              <ExcelTableContainer minWidth="900px">
+                <ExcelTable>
                   <thead>
                     <tr>
-                      <th>Query ID</th>
-                      <th>Category</th>
-                      <th>Subject</th>
-                      <th>Priority</th>
-                      <th>Date</th>
-                      <th>Status</th>
-                      <th>Accounts Resolution</th>
+                      <ExcelTh align="left" style={{ minWidth: '120px' }}>Query ID</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '130px' }}>Category</ExcelTh>
+                      <ExcelTh align="left" style={{ minWidth: '260px' }}>Subject</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '95px' }}>Priority</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '105px' }}>Date</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '120px' }}>Status</ExcelTh>
+                      <ExcelTh align="left" style={{ minWidth: '220px' }}>Accounts Resolution</ExcelTh>
                     </tr>
                   </thead>
                   <tbody>
                     {studentQueries.map(q => (
                       <tr key={q.id}>
-                        <td style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{q.queryNo}</td>
-                        <td><Badge variant="navy">{q.category.replace(/_/g, ' ')}</Badge></td>
-                        <td>
-                          <strong>{q.subject}</strong>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <ExcelTd align="left" mono color="var(--brand-navy)">
+                          {q.queryNo}
+                        </ExcelTd>
+                        <ExcelTd align="center">
+                          <Badge variant="navy">{q.category.replace(/_/g, ' ')}</Badge>
+                        </ExcelTd>
+                        <ExcelTd align="left">
+                          <strong style={{ color: '#0F172A', display: 'block', marginBottom: '0.15rem' }}>{q.subject}</strong>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4, whiteSpace: 'normal' }}>
                             {q.description}
                           </div>
-                        </td>
-                        <td>
+                        </ExcelTd>
+                        <ExcelTd align="center">
                           <Badge variant={q.priority === 'URGENT' ? 'danger' : q.priority === 'HIGH' ? 'warning' : 'navy'}>
                             {q.priority}
                           </Badge>
-                        </td>
-                        <td>{new Date(q.createdAt).toLocaleDateString()}</td>
-                        <td>
+                        </ExcelTd>
+                        <ExcelTd align="center">{new Date(q.createdAt).toLocaleDateString()}</ExcelTd>
+                        <ExcelTd align="center">
                           <Badge variant={q.status === 'RESOLVED' ? 'success' : q.status === 'UNDER_REVIEW' ? 'active' : q.status === 'REJECTED' ? 'danger' : 'gold'}>
                             {q.status.replace(/_/g, ' ')}
                           </Badge>
-                        </td>
-                        <td>
+                        </ExcelTd>
+                        <ExcelTd align="left">
                           {q.resolutionSummary ? (
-                            <div style={{ fontSize: '0.8rem', color: 'var(--brand-green)', fontWeight: 600 }}>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--brand-green)', fontWeight: 600, whiteSpace: 'normal', lineHeight: 1.4 }}>
                               {q.resolutionSummary}
                               {q.assignedAccountsHandlerName && (
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>By: {q.assignedAccountsHandlerName}</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                                  By: {q.assignedAccountsHandlerName}
+                                </div>
                               )}
                             </div>
                           ) : (
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Assigned to Accounts Directorate</span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                              Assigned to Accounts Directorate
+                            </span>
                           )}
-                        </td>
+                        </ExcelTd>
                       </tr>
                     ))}
                   </tbody>
-                </table>
-              </div>
+                </ExcelTable>
+              </ExcelTableContainer>
             )}
           </div>
         )}
@@ -993,13 +1102,7 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
           </div>
         )}
 
-        {/* Fee Receipt Modal */}
-        <FeeReceiptModal
-          isOpen={!!selectedTransactionForReceipt}
-          onClose={() => setSelectedTransactionForReceipt(null)}
-          transaction={selectedTransactionForReceipt}
-          feeRecord={studentFee}
-        />
+
 
         {/* Student Fee Query Modal */}
         {isFeeQueryModalOpen && (
@@ -1288,8 +1391,8 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.4rem' }}>
-                        <button className="btn btn-primary btn-sm" onClick={() => setSelectedTransactionForReceipt(tx)}>
-                          <FileText size={14} /> Receipt
+                        <button className="btn btn-primary btn-sm" onClick={() => feeReceiptPdfService.openInNewTab(fromFeePaymentTransaction(tx))}>
+                          <FileText size={14} /> Receipt PDF
                         </button>
                         {tx.status !== 'REFUNDED' && (
                           <button className="btn btn-secondary btn-sm" style={{ color: '#EF4444' }} onClick={() => setRefundingTx(tx)}>
@@ -1796,12 +1899,7 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
         message={`Are you sure you want to refund ₹${refundingTx?.paidAmount.toLocaleString()} for transaction ${refundingTx?.receiptNo}? This will re-add the amount to the student's pending fee balance.`}
       />
 
-      {/* Fee Receipt Modal */}
-      <FeeReceiptModal
-        isOpen={!!selectedTransactionForReceipt}
-        onClose={() => setSelectedTransactionForReceipt(null)}
-        transaction={selectedTransactionForReceipt}
-      />
+
 
       {/* Dashboard Report Modal */}
       <DashboardReportModal

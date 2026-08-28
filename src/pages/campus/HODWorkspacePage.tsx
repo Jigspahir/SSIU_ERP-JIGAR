@@ -18,6 +18,22 @@ import {
   BarChart3, MessageSquare, Calendar, ChevronRight, Filter, ExternalLink
 } from 'lucide-react';
 import { AttendanceApplication, Student, Faculty, Subject, Program, Semester } from '../../types';
+import { studentDataChangeRequestService } from '../../services/studentDataChangeRequestService';
+import { StudentDataChangeTab } from '../../components/profile/StudentDataChangeTab';
+import { MentorAssignmentTab } from '../../components/mentor/MentorAssignmentTab';
+import { MenteeExamEligibilityManager } from '../../components/mentor/MenteeExamEligibilityManager';
+import { DepartmentStudentRosterGrid } from '../../components/hod/DepartmentStudentRosterGrid';
+import { DepartmentCommandCenter } from '../../components/hod/DepartmentCommandCenter';
+import { DepartmentFacultyDirectory } from '../../components/hod/DepartmentFacultyDirectory';
+import { DepartmentFacultyWorkloadGrid } from '../../components/hod/DepartmentFacultyWorkloadGrid';
+import { DepartmentSubjectAllocationGrid } from '../../components/hod/DepartmentSubjectAllocationGrid';
+import { DepartmentFacultyPerformanceGrid } from '../../components/hod/DepartmentFacultyPerformanceGrid';
+import { DepartmentAttendanceRegister } from '../../components/hod/DepartmentAttendanceRegister';
+import { AcademicReports } from '../../components/hod/reports/AcademicReports';
+import { AttendanceReports } from '../../components/hod/reports/AttendanceReports';
+import { StudentReports } from '../../components/hod/reports/StudentReports';
+import { FacultyReports } from '../../components/hod/reports/FacultyReports';
+import { DepartmentReports } from '../../components/hod/reports/DepartmentReports';
 import * as XLSX from 'xlsx';
 
 export type HODTabType = 
@@ -28,6 +44,9 @@ export type HODTabType =
   | 'FACULTY'
   | 'FACULTY_WORKLOAD'
   | 'FACULTY_ALLOCATION'
+  | 'FACULTY_PERFORMANCE'
+  | 'MENTORS'
+  | 'MENTOR_MANAGEMENT'
   | 'SUBJECTS'
   | 'ATTENDANCE'
   | 'ATTENDANCE_SHORTAGE'
@@ -35,9 +54,15 @@ export type HODTabType =
   | 'EXAMINATION'
   | 'EXAM_ELIGIBILITY'
   | 'DOCUMENTS'
+  | 'DATA_CHANGE_APPROVALS'
   | 'REQUESTS'
   | 'FEEDBACK'
-  | 'REPORTS';
+  | 'REPORTS'
+  | 'REPORTS_ACADEMIC'
+  | 'REPORTS_ATTENDANCE'
+  | 'REPORTS_STUDENT'
+  | 'REPORTS_FACULTY'
+  | 'REPORTS_DEPARTMENT';
 
 export interface HODWorkspacePageProps {
   initialTab?: HODTabType;
@@ -156,6 +181,11 @@ export const HODWorkspacePage: React.FC<HODWorkspacePageProps> = ({ initialTab =
     const all = db.getState().studentRequests || [];
     return all.filter(r => r.departmentId === department?.id || (r as any).currentOffice === 'HOD_ACADEMIC' || role === 'SUPER_ADMIN');
   }, [department, role, refreshKey]);
+
+  // 6. Pending Student Data Changes for Final HOD Approval
+  const pendingHODDataChangesCount = useMemo(() => {
+    return studentDataChangeRequestService.getScopedRequests(user, role, { status: 'HOD_PENDING', departmentId: department?.id }).length;
+  }, [user, role, department, refreshKey]);
 
   const pendingRequests = useMemo(() => {
     return deptRequests.filter(r => r.status === 'SUBMITTED' || r.status === 'WORK_IN_PROGRESS' || r.status === 'WITH_HOD' || r.status === 'FORWARDED_TO_HOD');
@@ -373,6 +403,12 @@ export const HODWorkspacePage: React.FC<HODWorkspacePageProps> = ({ initialTab =
           <UserCheck size={14} /> Faculty &amp; Workload ({deptFaculty.length})
         </button>
         <button 
+          className={`btn btn-sm ${activeTab === 'MENTORS' || activeTab === 'MENTOR_MANAGEMENT' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('MENTORS')}
+        >
+          <Users size={14} /> Mentor Assignment
+        </button>
+        <button 
           className={`btn btn-sm ${activeTab === 'ATTENDANCE' || activeTab === 'ATTENDANCE_SHORTAGE' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveTab('ATTENDANCE')}
         >
@@ -391,6 +427,12 @@ export const HODWorkspacePage: React.FC<HODWorkspacePageProps> = ({ initialTab =
           <Award size={14} /> Exam Eligibility
         </button>
         <button 
+          className={`btn btn-sm ${activeTab === 'DATA_CHANGE_APPROVALS' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('DATA_CHANGE_APPROVALS')}
+        >
+          <ShieldCheck size={14} /> Data Change Approvals ({pendingHODDataChangesCount})
+        </button>
+        <button 
           className={`btn btn-sm ${activeTab === 'REQUESTS' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveTab('REQUESTS')}
         >
@@ -403,230 +445,54 @@ export const HODWorkspacePage: React.FC<HODWorkspacePageProps> = ({ initialTab =
           <BarChart3 size={14} /> Department Feedback
         </button>
         <button 
-          className={`btn btn-sm ${activeTab === 'REPORTS' ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => setActiveTab('REPORTS')}
+          className={`btn btn-sm ${
+            activeTab === 'REPORTS' || 
+            activeTab === 'REPORTS_ACADEMIC' || 
+            activeTab === 'REPORTS_ATTENDANCE' || 
+            activeTab === 'REPORTS_STUDENT' || 
+            activeTab === 'REPORTS_FACULTY' || 
+            activeTab === 'REPORTS_DEPARTMENT' 
+              ? 'btn-primary' 
+              : 'btn-secondary'
+          }`}
+          onClick={() => setActiveTab('REPORTS_ACADEMIC')}
         >
           <FileSpreadsheet size={14} /> Reports &amp; Analytics
         </button>
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          TAB 1: Department Overview
+          TAB 1: Department Overview (Department Command Center)
           ───────────────────────────────────────────────────────────── */}
       {activeTab === 'OVERVIEW' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div className="card" style={{ padding: '1.5rem', background: 'linear-gradient(135deg, var(--brand-navy) 0%, #1e3a8a 100%)', color: '#FFFFFF' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-              <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 800, letterSpacing: '0.5px', color: 'var(--brand-gold)', textTransform: 'uppercase' }}>Department Master Profile</span>
-                <h3 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#FFFFFF', marginTop: '0.25rem' }}>{department?.name}</h3>
-                <p style={{ fontSize: '0.85rem', color: '#CBD5E1', marginTop: '0.25rem' }}>
-                  Code: <code>{department?.code || 'CSE'}</code> • Head of Department: <strong>{user?.name || 'Dr. HOD'}</strong> • Academic Year: <strong>2025-2026</strong>
-                </p>
-              </div>
-              <Badge variant="gold">OFFICIAL DEPT WORKSPACE</Badge>
-            </div>
-          </div>
-
-          <div className="grid-3" style={{ gap: '1.25rem' }}>
-            <div className="card" style={{ padding: '1.25rem' }}>
-              <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <BookOpen size={16} color="var(--brand-orange)" /> Active Degree Programs ({deptPrograms.length})
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {deptPrograms.map(p => (
-                  <div key={p.id} style={{ padding: '0.6rem 0.75rem', backgroundColor: 'var(--bg-surface-hover)', borderRadius: '6px', fontSize: '0.8125rem' }}>
-                    <strong>{p.name}</strong> ({p.code})
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Duration: {p.durationYears || 4} Years • {p.totalSemesters || 8} Semesters</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="card" style={{ padding: '1.25rem' }}>
-              <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <UserCheck size={16} color="#10B981" /> Faculty Team Strength ({deptFaculty.length})
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {deptFaculty.slice(0, 4).map(f => (
-                  <div key={f.id} style={{ padding: '0.6rem 0.75rem', backgroundColor: 'var(--bg-surface-hover)', borderRadius: '6px', fontSize: '0.8125rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <strong>{f.name}</strong>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{f.designation}</div>
-                    </div>
-                    <Badge variant="active">{f.status}</Badge>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="card" style={{ padding: '1.25rem' }}>
-              <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Clock size={16} color="var(--brand-gold)" /> Academic Health Indicators
-              </h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', fontSize: '0.8125rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Department Attendance Average:</span>
-                  <strong style={{ color: '#10B981' }}>82.4%</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Syllabus Topics Covered:</span>
-                  <strong>88.5% Completed</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Students with &lt;75% Attendance:</span>
-                  <strong style={{ color: shortageStudents.length > 0 ? '#EF4444' : '#10B981' }}>{shortageStudents.length} Students</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Condonation Approval Queue:</span>
-                  <strong style={{ color: pendingHODAttendanceApps.length > 0 ? '#F59E0B' : '#10B981' }}>{pendingHODAttendanceApps.length} Pending</strong>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <DepartmentCommandCenter
+          onNavigateTab={setActiveTab}
+          onRefresh={() => setRefreshKey(k => k + 1)}
+        />
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          TAB 2: Student Roster
+          TAB 2: Student Roster (Excel-Style Data Grid)
           ───────────────────────────────────────────────────────────── */}
       {activeTab === 'STUDENTS' && (
-        <div className="card" style={{ padding: '1.25rem' }}>
+        <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF', borderRadius: '8px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <div>
               <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0 }}>
-                Department Students ({filteredStudents.length})
+                Department Students Roster
               </h3>
-              <div style={{ display: 'flex', gap: '0.35rem' }}>
-                <button 
-                  className={`btn btn-sm ${statusFilter === 'ALL' ? 'btn-navy' : 'btn-outline'}`}
-                  onClick={() => setStatusFilter('ALL')}
-                  style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
-                >
-                  All ({deptStudents.length})
-                </button>
-                <button 
-                  className={`btn btn-sm ${statusFilter === 'SHORTAGE' ? 'btn-danger' : 'btn-outline'}`}
-                  onClick={() => setStatusFilter('SHORTAGE')}
-                  style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem' }}
-                >
-                  Shortage ({shortageStudents.length})
-                </button>
-                <button 
-                  className={`btn btn-sm ${statusFilter === 'RISK' ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => setStatusFilter('RISK')}
-                  style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', backgroundColor: statusFilter === 'RISK' ? '#F59E0B' : undefined }}
-                >
-                  At Risk ({atRiskStudents.length})
-                </button>
-              </div>
-            </div>
-
-            <div style={{ position: 'relative', width: '260px' }}>
-              <input 
-                className="form-control" 
-                placeholder="Search name or enrollment..." 
-                value={searchQuery} 
-                onChange={e => setSearchQuery(e.target.value)} 
-                style={{ paddingLeft: '2rem' }}
-              />
-              <Search size={15} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
+                Centralized academic register with live attendance, document verification, academic risk standing, and examination admittance status.
+              </p>
             </div>
           </div>
 
-          <div className="table-responsive">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Student Name &amp; Enrollment</th>
-                  <th>Program &amp; Sem</th>
-                  <th>Section</th>
-                  <th>Attendance %</th>
-                  <th>Academic Status</th>
-                  <th>Document Vault</th>
-                  <th>Exam Eligibility</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredStudents.map(({ student, stats, hasShortage, hasMissingDocs }) => {
-                  const prog = db.getProgramById(student.programId);
-                  const sem = db.getSemesterById(student.semesterId);
-
-                  return (
-                    <tr key={student.id}>
-                      <td>
-                        <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>{student.name}</div>
-                        <code style={{ fontSize: '0.75rem', color: 'var(--brand-orange)' }}>{student.enrollmentNo}</code>
-                      </td>
-                      <td>
-                        <strong>{prog?.code || 'B.Tech'}</strong>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Sem {sem?.number || 4}</div>
-                      </td>
-                      <td>
-                        <Badge variant="navy">{student.divisionId || 'Div A'}</Badge>
-                      </td>
-                      {/* Attendance % */}
-                      <td>
-                        {stats.percentage >= 75 ? (
-                          <Badge variant="active">{stats.percentage}%</Badge>
-                        ) : stats.percentage >= 60 ? (
-                          <Badge variant="warning">{stats.percentage}%</Badge>
-                        ) : (
-                          <Badge variant="danger">{stats.percentage}%</Badge>
-                        )}
-                      </td>
-
-                      {/* Academic Status */}
-                      <td>
-                        {stats.percentage >= 75 ? (
-                          <Badge variant="active">GOOD STANDING</Badge>
-                        ) : stats.percentage >= 60 ? (
-                          <Badge variant="warning">ACADEMIC RISK</Badge>
-                        ) : (
-                          <Badge variant="danger">CRITICAL RISK</Badge>
-                        )}
-                      </td>
-
-                      {/* Document Status */}
-                      <td>
-                        <Badge variant={!hasMissingDocs ? 'active' : 'danger'}>
-                          {!hasMissingDocs ? 'ALL VERIFIED' : 'PENDING'}
-                        </Badge>
-                      </td>
-
-                      {/* Exam Status */}
-                      <td>
-                        <Badge variant={stats.percentage >= 75 ? 'active' : stats.percentage >= 60 ? 'warning' : 'danger'}>
-                          {stats.percentage >= 75 ? 'ELIGIBLE' : stats.percentage >= 60 ? 'PROVISIONAL' : 'SHORTAGE'}
-                        </Badge>
-                      </td>
-
-                      {/* Actions with status dot */}
-                      <td style={{ textAlign: 'right', paddingRight: '1rem' }}>
-                        <StudentRowActionMenu 
-                          student={student}
-                          statusLevel={
-                            (stats.percentage < 60 || hasMissingDocs) 
-                              ? 'critical' 
-                              : stats.percentage < 75 
-                              ? 'warning' 
-                              : 'good'
-                          }
-                          onViewProfile={() => setSelectedStudentForProfile(student)}
-                          onViewAcademic={() => setSelectedStudentForProfile(student)}
-                          onViewAttendance={() => setSelectedStudentForProfile(student)}
-                          onViewDocuments={() => setSelectedStudentForProfile(student)}
-                          onViewExamination={() => setSelectedStudentForProfile(student)}
-                          onViewRequests={() => setSelectedStudentForProfile(student)}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <DepartmentStudentRosterGrid
+            departmentId={department?.id || targetDepartmentId}
+            departmentName={department?.name || 'Computer Science & Engineering'}
+            onSelectStudentForProfile={(student) => setSelectedStudentForProfile(student)}
+            onExportExcel={() => exportDepartmentReportXLSX('STUDENTS')}
+          />
         </div>
       )}
 
@@ -710,139 +576,110 @@ export const HODWorkspacePage: React.FC<HODWorkspacePageProps> = ({ initialTab =
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          TAB 4: Faculty & Workload Matrix
+          FACULTY SUB-MODULES (4 DISTINCT DEDICATED ERP PAGES)
           ───────────────────────────────────────────────────────────── */}
-      {activeTab === 'FACULTY' && (
-        <div className="card" style={{ padding: '1.25rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <div>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
-                Department Faculty Roster &amp; Teaching Workload ({deptFaculty.length})
-              </h3>
-              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                Official faculty profiles, designation, assigned teaching courses, and weekly load distribution.
-              </p>
-            </div>
-            <button className="btn btn-primary btn-sm" onClick={() => setIsAllocModalOpen(true)}>
-              <Plus size={14} /> Allocate Course Subject
+      {(activeTab === 'FACULTY' || activeTab === 'FACULTY_WORKLOAD' || activeTab === 'FACULTY_ALLOCATION' || activeTab === 'FACULTY_PERFORMANCE') && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%' }}>
+          
+          {/* Sub-Navigation Switcher for 4 Dedicated Faculty Pages */}
+          <div style={{ 
+            display: 'flex', 
+            gap: '0.4rem', 
+            background: '#FFFFFF', 
+            padding: '0.5rem 0.75rem', 
+            borderRadius: '8px', 
+            border: '1px solid #E2E8F0',
+            flexWrap: 'wrap'
+          }}>
+            <button
+              type="button"
+              className={`btn btn-sm ${activeTab === 'FACULTY' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setActiveTab('FACULTY')}
+              style={{ fontSize: '0.75rem', fontWeight: 700 }}
+            >
+              1. Faculty Directory (HR Profiles)
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${activeTab === 'FACULTY_WORKLOAD' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setActiveTab('FACULTY_WORKLOAD')}
+              style={{ fontSize: '0.75rem', fontWeight: 700 }}
+            >
+              2. Teaching Workload (Load Balancing)
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${activeTab === 'FACULTY_ALLOCATION' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setActiveTab('FACULTY_ALLOCATION')}
+              style={{ fontSize: '0.75rem', fontWeight: 700 }}
+            >
+              3. Subject Allocation (Course Coverage)
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${activeTab === 'FACULTY_PERFORMANCE' ? 'btn-primary' : 'btn-outline'}`}
+              onClick={() => setActiveTab('FACULTY_PERFORMANCE')}
+              style={{ fontSize: '0.75rem', fontWeight: 700 }}
+            >
+              4. Faculty Performance &amp; Reviews
             </button>
           </div>
 
-          <div className="table-responsive">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Faculty Name &amp; Employee ID</th>
-                  <th>Designation</th>
-                  <th>Assigned Courses</th>
-                  <th>Weekly Theory Load</th>
-                  <th>Weekly Lab Load</th>
-                  <th>Total Hours</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deptFaculty.map(f => {
-                  const assignedSubs = deptSubjects.filter(s => s.assignedFacultyId === f.id);
-                  const thHours = assignedSubs.reduce((sum, s) => sum + (s.theoryHoursPerWeek || 3), 0);
-                  const labHours = assignedSubs.reduce((sum, s) => sum + (s.labHoursPerWeek || 2), 0);
+          {/* PAGE 1: Faculty Master Directory / HR Profile View */}
+          {activeTab === 'FACULTY' && (
+            <DepartmentFacultyDirectory
+              onRefreshParent={() => setRefreshKey(k => k + 1)}
+              onNavigateToWorkload={() => setActiveTab('FACULTY_WORKLOAD')}
+            />
+          )}
 
-                  return (
-                    <tr key={f.id}>
-                      <td>
-                        <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>{f.name}</div>
-                        <code style={{ fontSize: '0.75rem', color: 'var(--brand-orange)' }}>{f.employeeId}</code>
-                      </td>
-                      <td><strong>{f.designation}</strong></td>
-                      <td>
-                        {assignedSubs.length > 0 ? (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                            {assignedSubs.map(s => (
-                              <Badge key={s.id} variant="navy">{s.code}</Badge>
-                            ))}
-                          </div>
-                        ) : (
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>None</span>
-                        )}
-                      </td>
-                      <td><strong>{thHours} Hrs</strong></td>
-                      <td><strong>{labHours} Hrs</strong></td>
-                      <td>
-                        <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
-                          {thHours + labHours} Hrs/Wk
-                        </span>
-                      </td>
-                      <td>
-                        <Badge variant={f.status === 'ACTIVE' ? 'active' : 'inactive'}>{f.status}</Badge>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          {/* PAGE 2: Faculty Teaching Workload Matrix */}
+          {activeTab === 'FACULTY_WORKLOAD' && (
+            <DepartmentFacultyWorkloadGrid
+              onRefreshParent={() => setRefreshKey(k => k + 1)}
+            />
+          )}
+
+          {/* PAGE 3: Subject-Centric Course Allocation */}
+          {activeTab === 'FACULTY_ALLOCATION' && (
+            <DepartmentSubjectAllocationGrid
+              onRefreshParent={() => setRefreshKey(k => k + 1)}
+              onNavigateToWorkload={() => setActiveTab('FACULTY_WORKLOAD')}
+            />
+          )}
+
+          {/* PAGE 4: Faculty Performance Evaluation & Reviews */}
+          {activeTab === 'FACULTY_PERFORMANCE' && (
+            <DepartmentFacultyPerformanceGrid
+              onRefreshParent={() => setRefreshKey(k => k + 1)}
+              onNavigateToWorkload={() => setActiveTab('FACULTY_WORKLOAD')}
+            />
+          )}
+
         </div>
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          TAB 5: Department Attendance Overview
+          TAB 4B: Department Mentor Assignment Management
           ───────────────────────────────────────────────────────────── */}
-      {activeTab === 'ATTENDANCE' && (
-        <div className="card" style={{ padding: '1.25rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-            <div>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
-                Department-Wide Subject Attendance Register
-              </h3>
-              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                Centralized student attendance metrics, sessions conducted, and condonation requirements.
-              </p>
-            </div>
-            <button className="btn btn-sm btn-primary" onClick={() => setActiveTab('ATTENDANCE_APPROVALS')}>
-              Open Approvals Queue ({pendingHODAttendanceApps.length}) →
-            </button>
-          </div>
-
-          <div className="table-responsive">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Student Candidate</th>
-                  <th>Total Classes</th>
-                  <th>Present</th>
-                  <th>Absent</th>
-                  <th>Attendance %</th>
-                  <th>Minimum Required</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deptAttendanceData.map(({ student, stats, hasShortage }) => (
-                  <tr key={student.id}>
-                    <td>
-                      <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>{student.name}</div>
-                      <code style={{ fontSize: '0.75rem', color: 'var(--brand-orange)' }}>{student.enrollmentNo}</code>
-                    </td>
-                    <td><strong>{stats.totalClasses} Classes</strong></td>
-                    <td><span style={{ color: '#10B981', fontWeight: 700 }}>{stats.presentClasses}</span></td>
-                    <td><span style={{ color: '#EF4444', fontWeight: 700 }}>{stats.absentClasses}</span></td>
-                    <td>
-                      <span style={{ fontSize: '1rem', fontWeight: 800, color: !hasShortage ? '#10B981' : '#EF4444' }}>
-                        {stats.percentage}%
-                      </span>
-                    </td>
-                    <td><strong>75%</strong></td>
-                    <td>
-                      <Badge variant={!hasShortage ? 'active' : 'danger'}>
-                        {!hasShortage ? 'ELIGIBLE' : `SHORTAGE (${75 - stats.percentage}%)`}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {(activeTab === 'MENTORS' || activeTab === 'MENTOR_MANAGEMENT') && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <MentorAssignmentTab 
+            initialDeptFilter={user?.departmentId} 
+            initialInstFilter={user?.instituteId} 
+          />
         </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          TAB 5: Department-Wide Subject Attendance Register (Excel-Style Data Register)
+          ───────────────────────────────────────────────────────────── */}
+      {(activeTab === 'ATTENDANCE' || activeTab === 'ATTENDANCE_SHORTAGE') && (
+        <DepartmentAttendanceRegister
+          onNavigateToApprovals={() => setActiveTab('ATTENDANCE_APPROVALS')}
+          onRefreshParent={() => setRefreshKey(k => k + 1)}
+          initialStatusFilter={activeTab === 'ATTENDANCE_SHORTAGE' ? 'SHORTAGE' : 'ALL'}
+        />
       )}
 
       {/* ─────────────────────────────────────────────────────────────
@@ -922,59 +759,19 @@ export const HODWorkspacePage: React.FC<HODWorkspacePageProps> = ({ initialTab =
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          TAB 7: Exam Eligibility Register
+          TAB 7: Exam Eligibility Register (Excel-Style Register)
           ───────────────────────────────────────────────────────────── */}
-      {activeTab === 'EXAMINATION' && (
-        <div className="card" style={{ padding: '1.25rem' }}>
-          <div style={{ marginBottom: '1rem' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
-              Department Semester Exam Eligibility Register
-            </h3>
-            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-              Candidate admittance status based on attendance thresholds and completed condonation approvals.
-            </p>
-          </div>
+      {(activeTab === 'EXAMINATION' || activeTab === 'EXAM_ELIGIBILITY') && (
+        <MenteeExamEligibilityManager
+          onNavigateToCondonations={() => setActiveTab('ATTENDANCE_APPROVALS')}
+        />
+      )}
 
-          <div className="table-responsive">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Student Candidate</th>
-                  <th>Attendance %</th>
-                  <th>Subject Faculty</th>
-                  <th>Mentor Endorsement</th>
-                  <th>HOD Status</th>
-                  <th>HOI / Principal Approval</th>
-                  <th>Final Examination Admittance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {deptAttendanceData.map(({ student, stats, hasShortage }) => (
-                  <tr key={student.id}>
-                    <td>
-                      <strong>{student.name}</strong>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{student.enrollmentNo}</div>
-                    </td>
-                    <td>
-                      <Badge variant={!hasShortage ? 'active' : 'danger'}>
-                        {stats.percentage}%
-                      </Badge>
-                    </td>
-                    <td><Badge variant="active">CLEARED</Badge></td>
-                    <td><Badge variant={!hasShortage ? 'active' : 'gold'}>{!hasShortage ? 'CLEARED' : 'CONDONED'}</Badge></td>
-                    <td><Badge variant={!hasShortage ? 'active' : 'navy'}>{!hasShortage ? 'APPROVED' : 'IN REVIEW'}</Badge></td>
-                    <td><Badge variant={!hasShortage ? 'active' : 'navy'}>{!hasShortage ? 'APPROVED' : 'PENDING'}</Badge></td>
-                    <td>
-                      <Badge variant={!hasShortage ? 'active' : 'danger'}>
-                        {!hasShortage ? 'ELIGIBLE' : 'PROVISIONAL'}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {/* ─────────────────────────────────────────────────────────────
+          TAB: Student Data Change Approvals (HOD Final Review & Master Mutation)
+          ───────────────────────────────────────────────────────────── */}
+      {activeTab === 'DATA_CHANGE_APPROVALS' && (
+        <StudentDataChangeTab isQueueMode={true} initialStatusFilter="HOD_PENDING" />
       )}
 
       {/* ─────────────────────────────────────────────────────────────
@@ -1064,43 +861,26 @@ export const HODWorkspacePage: React.FC<HODWorkspacePageProps> = ({ initialTab =
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          TAB 10: Department Reports & Analytics
+          TAB 10: Department Reports & Analytics (5 Distinct Dedicated Sub-Modules)
           ───────────────────────────────────────────────────────────── */}
-      {activeTab === 'REPORTS' && (
-        <div className="card" style={{ padding: '1.5rem' }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '0.5rem' }}>
-            Department Official Reports Generator (.xlsx)
-          </h3>
-          <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-            Generate and download standard department records for academic audits, accreditation, and institutional review.
-          </p>
+      {(activeTab === 'REPORTS' || activeTab === 'REPORTS_ACADEMIC') && (
+        <AcademicReports onTabChange={(tab) => setActiveTab(`REPORTS_${tab}` as HODTabType)} />
+      )}
 
-          <div className="grid-3" style={{ gap: '1.25rem' }}>
-            <div style={{ padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>Students Roster &amp; Academic Status</div>
-              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Full department roster with program, semester, section, and standing.</p>
-              <button className="btn btn-secondary btn-sm" onClick={() => exportDepartmentReportXLSX('STUDENTS')}>
-                <Download size={14} /> Download (.xlsx)
-              </button>
-            </div>
+      {activeTab === 'REPORTS_ATTENDANCE' && (
+        <AttendanceReports onTabChange={(tab) => setActiveTab(`REPORTS_${tab}` as HODTabType)} />
+      )}
 
-            <div style={{ padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>Attendance &amp; Shortage Audit</div>
-              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Detailed attendance percentages, shortage counts, and eligibility.</p>
-              <button className="btn btn-secondary btn-sm" onClick={() => exportDepartmentReportXLSX('ATTENDANCE')}>
-                <Download size={14} /> Download (.xlsx)
-              </button>
-            </div>
+      {activeTab === 'REPORTS_STUDENT' && (
+        <StudentReports onTabChange={(tab) => setActiveTab(`REPORTS_${tab}` as HODTabType)} />
+      )}
 
-            <div style={{ padding: '1.25rem', borderRadius: '8px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>Faculty Workload &amp; Allocations</div>
-              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Teaching allocations, weekly theory hours, and lab distribution.</p>
-              <button className="btn btn-secondary btn-sm" onClick={() => exportDepartmentReportXLSX('FACULTY')}>
-                <Download size={14} /> Download (.xlsx)
-              </button>
-            </div>
-          </div>
-        </div>
+      {activeTab === 'REPORTS_FACULTY' && (
+        <FacultyReports onTabChange={(tab) => setActiveTab(`REPORTS_${tab}` as HODTabType)} />
+      )}
+
+      {activeTab === 'REPORTS_DEPARTMENT' && (
+        <DepartmentReports onTabChange={(tab) => setActiveTab(`REPORTS_${tab}` as HODTabType)} />
       )}
 
       {/* Subject Allocation Modal */}

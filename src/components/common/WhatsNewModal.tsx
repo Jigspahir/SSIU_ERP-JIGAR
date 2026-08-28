@@ -5,6 +5,7 @@ import { db } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
 import { Badge } from './Badge';
 import { notificationService } from '../../services/notificationService';
+import { useModalScrollLock } from '../../utils/modalScrollLock';
 
 interface WhatsNewModalProps {
   notifications: ERPNotification[];
@@ -15,6 +16,8 @@ interface WhatsNewModalProps {
 export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({ notifications, onClose, onNavigateTab }) => {
   const { user, role } = useAuth();
   const [unreadList, setUnreadList] = useState<ERPNotification[]>(notifications);
+
+  useModalScrollLock(unreadList.length > 0, onClose);
 
   const getModuleBadge = (module: NotificationModule) => {
     switch (module) {
@@ -48,30 +51,24 @@ export const WhatsNewModal: React.FC<WhatsNewModalProps> = ({ notifications, onC
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(7, 19, 37, 0.7)',
-        backdropFilter: 'blur(4px)',
-        zIndex: 999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '1rem'
-      }}
+      className="modal-overlay"
+      onClick={onClose}
+      role="presentation"
     >
       <div
-        className="card"
+        className="modal-container"
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="What's New Notifications"
         style={{
           width: '100%',
           maxWidth: '620px',
-          maxHeight: '85vh',
           display: 'flex',
           flexDirection: 'column',
           boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
           border: '1px solid rgba(243, 112, 35, 0.3)',
-          overflow: 'hidden',
-          animation: 'fadeIn 0.25s ease-out'
+          overflow: 'hidden'
         }}
       >
         {/* Header Banner */}

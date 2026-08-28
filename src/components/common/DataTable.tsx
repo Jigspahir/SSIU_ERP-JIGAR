@@ -1,13 +1,14 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Download, Printer, Plus, ChevronLeft, ChevronRight, Edit3, Trash2, Eye, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, UploadCloud } from 'lucide-react';
+import { Search, Printer, Plus, ChevronLeft, ChevronRight, Edit3, Trash2, Eye, ArrowUp, ArrowDown, ArrowUpDown, FileSpreadsheet, UploadCloud } from 'lucide-react';
 import { Badge } from './Badge';
 
 export interface Column<T> {
   key: string;
   header: string;
-  accessor?: (item: T) => React.ReactNode;
+  accessor?: (item: T, index?: number) => React.ReactNode;
   sortable?: boolean;
   width?: string;
+  align?: 'left' | 'center' | 'right';
 }
 
 interface DataTableProps<T extends { id: string }> {
@@ -271,16 +272,23 @@ export function DataTable<T extends { id: string }>({
                   <th
                     key={col.key}
                     style={{
-                      padding: '0.875rem 1.25rem',
-                      fontWeight: 700,
-                      color: isSorted ? 'var(--brand-orange)' : 'var(--brand-navy-medium)',
+                      padding: '0.75rem 1rem',
+                      fontWeight: 800,
+                      color: isSorted ? 'var(--brand-orange)' : 'var(--brand-navy)',
                       width: col.width,
                       cursor: col.sortable ? 'pointer' : 'default',
-                      userSelect: 'none'
+                      userSelect: 'none',
+                      borderRight: '1px solid var(--border-light, #E2E8F0)',
+                      fontSize: '0.8125rem'
                     }}
                     onClick={() => col.sortable && handleSort(col.key)}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '6px',
+                      justifyContent: col.align === 'center' ? 'center' : col.align === 'right' ? 'flex-end' : 'flex-start'
+                    }}>
                       <span>{col.header}</span>
                       {col.sortable && (
                         isSorted ? (
@@ -331,9 +339,17 @@ export function DataTable<T extends { id: string }>({
                   className="table-row-hover"
                 >
                   {columns.map(col => (
-                    <td key={col.key} style={{ padding: '0.875rem 1.25rem', verticalAlign: 'middle' }}>
+                    <td 
+                      key={col.key} 
+                      style={{ 
+                        padding: '0.75rem 1rem', 
+                        verticalAlign: 'middle',
+                        textAlign: col.align || 'left',
+                        borderRight: '1px solid var(--border-light, #F1F5F9)'
+                      }}
+                    >
                       {col.accessor ? (
-                        col.accessor(item)
+                        col.accessor(item, (currentPage - 1) * pageSize + idx)
                       ) : col.key === 'status' ? (
                         <Badge variant={(item as any).status === 'ACTIVE' ? 'active' : 'inactive'}>
                           {(item as any).status}
@@ -415,6 +431,7 @@ export function DataTable<T extends { id: string }>({
               value={pageSize}
               onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
             >
+              <option value={5}>5</option>
               <option value={8}>8</option>
               <option value={15}>15</option>
               <option value={25}>25</option>

@@ -27,21 +27,33 @@ export interface NotesheetImportResult {
 }
 
 export const NOTESHEET_TYPES_LIST = [
-  'Administrative',
   'Academic',
-  'Financial',
-  'Purchase',
-  'HR',
-  'Student Matter',
   'Examination',
+  'Student Affairs',
+  'Faculty & Staff',
+  'Department Administration',
+  'Attendance',
+  'Admission',
+  'Scholarship',
+  'Student Support',
+  'Research & Innovation',
+  'Training & Placement',
+  'Event / Activity',
+  'Discipline & Student Conduct',
+  'Academic Infrastructure',
+  'IT / Digital Services',
+  'Library',
   'Hostel',
-  'Infrastructure',
-  'IT / Technical',
-  'Maintenance',
-  'Event',
+  'Transport',
+  'Sports',
+  'Purchase',
+  'Administration',
   'Legal / Compliance',
-  'Other'
-];
+  'University Committee',
+  'General / Other'
+] as const;
+
+export type UniversityNoteSheetType = typeof NOTESHEET_TYPES_LIST[number];
 
 export class NotesheetImportService {
   /**

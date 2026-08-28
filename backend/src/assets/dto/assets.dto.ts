@@ -280,3 +280,274 @@ export class CreateDisposalDto {
   @IsString()
   remarks?: string;
 }
+
+export class ReceiveStockDto {
+  @ApiProperty({ example: 'Dell Latitude 3420' })
+  @IsNotEmpty()
+  @IsString()
+  name: string;
+
+  @ApiProperty({ example: 'AST-IT-000456' })
+  @IsNotEmpty()
+  @IsString()
+  assetTag: string;
+
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  categoryId: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  serialNo?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  manufacturer?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  modelNo?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  purchaseDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  purchasePrice?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  vendor?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  invoiceRef?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  poNo?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  location?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+}
+
+export class IssueStockDto {
+  @ApiProperty({ description: 'Asset ID to issue' })
+  @IsNotEmpty()
+  @IsString()
+  assetId: string;
+
+  @ApiProperty({ description: 'Target user ID' })
+  @IsNotEmpty()
+  @IsString()
+  issueToUserId: string;
+
+  @ApiProperty({ example: 'HOI' })
+  @IsNotEmpty()
+  @IsString()
+  recipientRole: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  location?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+}
+
+export class CreateTransferRequestDto {
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  assetId: string;
+
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  toUserId: string;
+
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  reason: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+}
+
+export class ReviewTransferRequestDto {
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsBoolean()
+  approved: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+}
+
+export class CreateReturnRequestDto {
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  assetId: string;
+
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  returnReason: string;
+
+  @ApiProperty({ example: 'GOOD' })
+  @IsNotEmpty()
+  @IsString()
+  conditionAtReturn: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+}
+
+export class ReviewReturnRequestDto {
+  @ApiProperty({ example: 'GOOD' })
+  @IsNotEmpty()
+  @IsString()
+  conditionAtReturn: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+}
+
+export class CreateReplacementRequestDto {
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  assetId: string;
+
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  reason: string;
+
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  problemDescription: string;
+
+  @ApiProperty({ example: 'POOR' })
+  @IsNotEmpty()
+  @IsString()
+  currentCondition: string;
+
+  @ApiPropertyOptional({ example: 'HIGH' })
+  @IsOptional()
+  @IsString()
+  priority?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+}
+
+export class CreateIssueReportDto {
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  assetId: string;
+
+  @ApiProperty({ example: 'TECHNICAL_PROBLEM' })
+  @IsNotEmpty()
+  @IsString()
+  issueType: string;
+
+  @ApiProperty({ example: 'HIGH' })
+  @IsNotEmpty()
+  @IsString()
+  severity: string;
+
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  description: string;
+}
+
+export class CreateVerificationDto {
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  assetId: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  foundLocation?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  actualCustodian?: string;
+
+  @ApiProperty({ example: 'GOOD' })
+  @IsNotEmpty()
+  @IsString()
+  physicalCondition: string;
+
+  @ApiProperty({ example: 'VERIFIED' })
+  @IsNotEmpty()
+  @IsString()
+  verificationStatus: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+}
+
+export class ArchiveAssetDto {
+  @ApiProperty()
+  @IsNotEmpty()
+  @IsString()
+  reason: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  approvedBy?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+}
+

@@ -13,8 +13,14 @@ import {
   ApprovalRequest,
   Student,
   NoteSheet,
+  StudentGatePass,
 } from '../../types';
 import { Badge } from '../../components/common/Badge';
+import { studentGatePassService } from '../../services/studentGatePassService';
+import { StudentGatePassModal } from '../../components/hostel/StudentGatePassModal';
+import { WardenGatePassReviewModal } from '../../components/hostel/WardenGatePassReviewModal';
+import { SecurityGatePassScannerModal } from '../../components/hostel/SecurityGatePassScannerModal';
+import { GatePassAuditModal } from '../../components/hostel/GatePassAuditModal';
 import {
   Building,
   Home,
@@ -127,6 +133,13 @@ export const HostelWorkspacePage: React.FC<HostelWorkspacePageProps> = ({ initia
   const [selectedTicket, setSelectedTicket] = useState<HostelMaintenanceRequestItem | null>(null);
   const [selectedVisitor, setSelectedVisitor] = useState<HostelVisitorEntry | null>(null);
   const [selectedAllotment, setSelectedAllotment] = useState<HostelAllotmentDetail | null>(null);
+
+  // Student Gate Pass States
+  const [selectedGatePassForDoc, setSelectedGatePassForDoc] = useState<StudentGatePass | null>(null);
+  const [selectedGatePassForReview, setSelectedGatePassForReview] = useState<{ pass: StudentGatePass; action: 'APPROVE' | 'REJECT' } | null>(null);
+  const [selectedGatePassForAudit, setSelectedGatePassForAudit] = useState<StudentGatePass | null>(null);
+  const [showSecurityScannerModal, setShowSecurityScannerModal] = useState(false);
+  const [gatePassRefreshKey, setGatePassRefreshKey] = useState(0);
 
   // Forms
   const [hostelForm, setHostelForm] = useState({
@@ -1296,48 +1309,78 @@ export const HostelWorkspacePage: React.FC<HostelWorkspacePageProps> = ({ initia
         </div>
       )}
 
-      {/* TAB CONTENT: 7. LEAVE/OUTPASS */}
+      {/* TAB CONTENT: 7. LEAVE/OUTPASS & STUDENT GATE PASSES */}
       {activeTab === 'OUTPASS' && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-white">Student Leave & Outpass Requests</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-800/40 p-4 rounded-xl border border-slate-800">
+            <div>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <ShieldCheck size={20} className="text-amber-400" />
+                Student Gate Pass &amp; Campus Outpass Requests
+              </h3>
+              <p className="text-xs text-slate-400">Chief Warden clearance &amp; Main Gate security authorization ledger</p>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowSecurityScannerModal(true)}
+                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-amber-600/20 transition-all"
+              >
+                <ShieldCheck size={15} /> Campus Gate Security Checkpoint
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto rounded-2xl border border-slate-700/60 bg-slate-800/40 shadow-xl">
             <table className="w-full text-left text-sm text-slate-300">
               <thead className="bg-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700">
                 <tr>
-                  <th className="px-4 py-3.5">Outpass No</th>
-                  <th className="px-4 py-3.5">Student</th>
-                  <th className="px-4 py-3.5">Hostel & Room</th>
-                  <th className="px-4 py-3.5">From Date</th>
-                  <th className="px-4 py-3.5">To Date</th>
-                  <th className="px-4 py-3.5">Purpose & Destination</th>
-                  <th className="px-4 py-3.5">Guardian Phone</th>
+                  <th className="px-4 py-3.5">Gate Pass No</th>
+                  <th className="px-4 py-3.5">Student Name</th>
+                  <th className="px-4 py-3.5">Hostel &amp; Room</th>
+                  <th className="px-4 py-3.5">Outing Date</th>
+                  <th className="px-4 py-3.5">Schedule</th>
+                  <th className="px-4 py-3.5">Purpose &amp; Destination</th>
+                  <th className="px-4 py-3.5">Guardian Contact</th>
                   <th className="px-4 py-3.5">Status</th>
-                  <th className="px-4 py-3.5 text-right">Actions</th>
+                  <th className="px-4 py-3.5 text-right">Warden Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {outpassRequests.map((out) => (
+                {studentGatePassService.getGatePasses().map((out) => (
                   <tr key={out.id} className="hover:bg-slate-800/60 transition-all">
-                    <td className="px-4 py-3 font-mono text-xs text-indigo-300 font-bold">{out.outpassNo}</td>
-                    <td className="px-4 py-3 font-semibold text-white">{out.studentName}</td>
-                    <td className="px-4 py-3 text-slate-300">
-                      {out.hostelName} (Room {out.roomNo})
-                    </td>
-                    <td className="px-4 py-3 text-slate-300">{out.fromDate}</td>
-                    <td className="px-4 py-3 text-slate-300">{out.toDate}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-indigo-300 font-bold">{out.gatePassNo}</td>
                     <td className="px-4 py-3">
-                      <p className="text-slate-200">{out.purpose}</p>
+                      <div className="font-semibold text-white">{out.studentName}</div>
+                      <div className="text-xs font-mono text-slate-400">{out.enrollmentNo}</div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-300">
+                      {out.hostelName} (Room {out.roomNo}, {out.bedNo})
+                    </td>
+                    <td className="px-4 py-3 text-slate-300 font-semibold">{out.outingDate}</td>
+                    <td className="px-4 py-3 text-xs text-slate-300">
+                      <div>Out: <strong className="text-emerald-400">{out.expectedOutTime}</strong></div>
+                      <div>Return: <strong className="text-rose-400">{out.expectedReturnTime}</strong></div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <p className="text-slate-200 font-medium">{out.purpose}</p>
                       <p className="text-xs text-slate-400">📍 {out.destination}</p>
                     </td>
-                    <td className="px-4 py-3 text-slate-400">{out.guardianContact}</td>
+                    <td className="px-4 py-3 text-slate-300 text-xs">
+                      <div>{out.parentGuardianName}</div>
+                      <div className="text-slate-400">{out.parentGuardianMobile}</div>
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
-                          out.status === 'APPROVED'
+                          out.status === 'APPROVED' || out.status === 'ACTIVE'
                             ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : out.status === 'OUT'
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                            : out.status === 'RETURNED'
+                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                            : out.status === 'REJECTED'
+                            ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                             : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                         }`}
                       >
@@ -1345,19 +1388,40 @@ export const HostelWorkspacePage: React.FC<HostelWorkspacePageProps> = ({ initia
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {out.status === 'PENDING' && (
+                      <div className="inline-flex items-center gap-1.5 justify-end">
                         <button
-                          onClick={() => {
-                            setOutpassRequests((prev) =>
-                              prev.map((o) => (o.id === out.id ? { ...o, status: 'APPROVED' } : o))
-                            );
-                            showToast('success', `Outpass ${out.outpassNo} approved by Warden.`);
-                          }}
-                          className="text-xs text-emerald-400 hover:text-emerald-300 font-medium px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg transition-all"
+                          onClick={() => setSelectedGatePassForDoc(out)}
+                          className="text-xs text-indigo-400 hover:text-indigo-300 font-medium px-2 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 rounded-lg transition-all"
+                          title="View Official Gate Pass & QR Code"
                         >
-                          Approve Outpass
+                          View Pass
                         </button>
-                      )}
+
+                        {out.status === 'PENDING' && (
+                          <>
+                            <button
+                              onClick={() => setSelectedGatePassForReview({ pass: out, action: 'APPROVE' })}
+                              className="text-xs text-emerald-400 hover:text-emerald-300 font-medium px-2 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg transition-all"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => setSelectedGatePassForReview({ pass: out, action: 'REJECT' })}
+                              className="text-xs text-rose-400 hover:text-rose-300 font-medium px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 rounded-lg transition-all"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+
+                        <button
+                          onClick={() => setSelectedGatePassForAudit(out)}
+                          className="text-xs text-slate-400 hover:text-slate-300 px-1.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-lg"
+                          title="View Audit Trail"
+                        >
+                          History
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -2687,6 +2751,82 @@ export const HostelWorkspacePage: React.FC<HostelWorkspacePageProps> = ({ initia
           </div>
         </div>
       )}
+
+      {/* ── MODAL: OFFICIAL STUDENT GATE PASS DOCUMENT VIEW ── */}
+      {selectedGatePassForDoc && (
+        <StudentGatePassModal
+          isOpen={Boolean(selectedGatePassForDoc)}
+          onClose={() => setSelectedGatePassForDoc(null)}
+          gatePass={selectedGatePassForDoc}
+          canApprove={true}
+          onApprove={(id) => {
+            setSelectedGatePassForReview({ pass: selectedGatePassForDoc, action: 'APPROVE' });
+            setSelectedGatePassForDoc(null);
+          }}
+          onReject={(id) => {
+            setSelectedGatePassForReview({ pass: selectedGatePassForDoc, action: 'REJECT' });
+            setSelectedGatePassForDoc(null);
+          }}
+          canRecordGate={true}
+          onMarkOut={(id) => {
+            try {
+              const updated = studentGatePassService.recordGatePassOut(id, user);
+              setSelectedGatePassForDoc(updated);
+              setGatePassRefreshKey(prev => prev + 1);
+              showToast('success', `Student OUT recorded at Gate.`);
+            } catch (err: any) {
+              showToast('error', err.message);
+            }
+          }}
+          onMarkIn={(id) => {
+            try {
+              const updated = studentGatePassService.recordGatePassIn(id, user);
+              setSelectedGatePassForDoc(updated);
+              setGatePassRefreshKey(prev => prev + 1);
+              showToast('success', `Student RETURN (IN) recorded at Gate.`);
+            } catch (err: any) {
+              showToast('error', err.message);
+            }
+          }}
+        />
+      )}
+
+      {/* ── MODAL: WARDEN APPROVAL / REJECTION ── */}
+      {selectedGatePassForReview && (
+        <WardenGatePassReviewModal
+          isOpen={Boolean(selectedGatePassForReview)}
+          onClose={() => setSelectedGatePassForReview(null)}
+          gatePass={selectedGatePassForReview.pass}
+          action={selectedGatePassForReview.action}
+          user={user}
+          onSuccess={(updatedPass) => {
+            setGatePassRefreshKey(prev => prev + 1);
+            showToast('success', `Gate Pass ${updatedPass.gatePassNo} has been marked as ${updatedPass.status}.`);
+          }}
+        />
+      )}
+
+      {/* ── MODAL: MAIN GATE SECURITY SCANNER & CHECKPOINT ── */}
+      {showSecurityScannerModal && (
+        <SecurityGatePassScannerModal
+          isOpen={showSecurityScannerModal}
+          onClose={() => setShowSecurityScannerModal(false)}
+          user={user}
+          onUpdated={(updated) => {
+            setGatePassRefreshKey(prev => prev + 1);
+          }}
+        />
+      )}
+
+      {/* ── MODAL: GATE PASS AUDIT TRAIL ── */}
+      {selectedGatePassForAudit && (
+        <GatePassAuditModal
+          isOpen={Boolean(selectedGatePassForAudit)}
+          onClose={() => setSelectedGatePassForAudit(null)}
+          gatePass={selectedGatePassForAudit}
+        />
+      )}
+
     </div>
   );
 };

@@ -14,6 +14,8 @@ import {
   Program,
   Semester,
 } from '../../types';
+import { feeReceiptPdfService } from '../../services/feeReceiptPdfService';
+import { fromFeePaymentTransaction } from '../../components/receipt/receiptTypes';
 import { Badge } from '../../components/common/Badge';
 import {
   IndianRupee,
@@ -876,10 +878,10 @@ export const AccountsWorkspacePage: React.FC<AccountsWorkspacePageProps> = ({ in
                     <td className="px-4 py-3 text-slate-400 text-xs">{p.paymentDate}</td>
                     <td className="px-4 py-3 text-right">
                       <button
-                        onClick={() => setViewingReceipt(p)}
+                        onClick={() => feeReceiptPdfService.openInNewTab(fromFeePaymentTransaction(p))}
                         className="px-3 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold rounded-lg transition-all cursor-pointer"
                       >
-                        Print / Download
+                        PDF Receipt
                       </button>
                     </td>
                   </tr>

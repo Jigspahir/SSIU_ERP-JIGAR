@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { feeQueryService } from '../../services/feeQueryService';
 import { FeeQueryCategory } from '../../types/feeQuery';
 import { HelpCircle, AlertCircle, Send, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { DragDropUpload } from '../common/form';
 
 interface FeeQueryModalProps {
   isOpen: boolean;
@@ -190,17 +191,17 @@ export const FeeQueryModal: React.FC<FeeQueryModalProps> = ({
           </div>
         </div>
 
-        {/* Attachment Link */}
-        <div>
-          <label className="form-label" style={{ fontWeight: 600 }}>Supporting Evidence / Receipt URL</label>
-          <input
-            type="url"
-            className="form-input"
-            placeholder="https://... (Bank statement snapshot or scholarship letter)"
-            value={attachmentUrl}
-            onChange={e => setAttachmentUrl(e.target.value)}
-          />
-        </div>
+        {/* Supporting Evidence Upload with Drag & Drop and N/A */}
+        <DragDropUpload
+          label="Supporting Evidence / Payment Proof"
+          value={attachmentUrl}
+          onFileUrlChange={(url) => setAttachmentUrl(url)}
+          allowNotApplicable={true}
+          requirement="OPTIONAL"
+          notApplicableLabel="Supporting proof not applicable"
+          helperText="Upload bank debit screenshot, challan or sanction order (PDF, PNG, JPG up to 5MB)."
+          maxSizeMB={5}
+        />
 
         {/* Actions */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
