@@ -51,6 +51,7 @@ export const HOIWorkspacePage: React.FC<HOIWorkspacePageProps> = ({ initialTab =
 
   const [selectedStudentForProfile, setSelectedStudentForProfile] = useState<Student | null>(null);
   const [selectedStudentInitialTab, setSelectedStudentInitialTab] = useState<StudentProfileTabType>('OVERVIEW');
+  const [approvalsFilterMode, setApprovalsFilterMode] = useState<'ALL' | 'PENDING_MY_ACTION' | 'IN_PROGRESS' | 'APPROVED' | 'REJECTED'>('ALL');
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [isHODModalOpen, setIsHODModalOpen] = useState(false);
@@ -187,6 +188,28 @@ export const HOIWorkspacePage: React.FC<HOIWorkspacePageProps> = ({ initialTab =
     const allApps = db.getAttendanceApplications();
     return allApps.filter(a => a.instituteId === institute?.id || role === 'SUPER_ADMIN');
   }, [institute, role, refreshKey]);
+
+  const filteredApprovalsData = useMemo(() => {
+    if (approvalsFilterMode === 'PENDING_MY_ACTION') {
+      return pendingHOIAttendanceApps;
+    }
+    if (approvalsFilterMode === 'IN_PROGRESS') {
+      return allInstituteAttendanceApps.filter(a =>
+        a.status === 'SUBMITTED_TO_FACULTY' ||
+        a.status === 'FACULTY_APPROVED' ||
+        a.status === 'SUBMITTED_TO_MENTOR' ||
+        a.status === 'MENTOR_APPROVED' ||
+        a.status === 'SUBMITTED_TO_HOD'
+      );
+    }
+    if (approvalsFilterMode === 'APPROVED') {
+      return allInstituteAttendanceApps.filter(a => a.status === 'FINAL_APPROVED' || a.status === 'HOI_APPROVED');
+    }
+    if (approvalsFilterMode === 'REJECTED') {
+      return allInstituteAttendanceApps.filter(a => a.status === 'REJECTED' || a.status === 'HOI_REJECTED' || a.status === 'FACULTY_REJECTED' || a.status === 'HOD_REJECTED');
+    }
+    return allInstituteAttendanceApps;
+  }, [approvalsFilterMode, pendingHOIAttendanceApps, allInstituteAttendanceApps]);
 
   const instRequests = useMemo(() => {
     const all = db.getState().studentRequests || [];
@@ -1046,24 +1069,59 @@ export const HOIWorkspacePage: React.FC<HOIWorkspacePageProps> = ({ initialTab =
       key: 'endorsements',
       header: 'Approval Chain (4-Tier)',
       width: '240px',
-      render: item => (
-        <div style={{ fontSize: '0.72rem', lineHeight: 1.3 }}>
-          <div>1. Faculty: <span style={{ color: '#10B981', fontWeight: 700 }}>✓ Approved</span></div>
-          <div>2. Mentor: <span style={{ color: '#10B981', fontWeight: 700 }}>✓ Endorsed</span></div>
-          <div>3. HOD: <span style={{ color: 'var(--brand-navy, #0B192C)', fontWeight: 800 }}>✓ Recommended</span></div>
-        </div>
-      )
+      render: item => {
+        const isFacultyDone = ['FACULTY_APPROVED', 'SUBMITTED_TO_MENTOR', 'MENTOR_APPROVED', 'SUBMITTED_TO_HOD', 'HOD_APPROVED', 'WITH_HOI', 'FINAL_APPROVED', 'HOI_APPROVED'].includes(item.status);
+        const isMentorDone = ['MENTOR_APPROVED', 'SUBMITTED_TO_HOD', 'HOD_APPROVED', 'WITH_HOI', 'FINAL_APPROVED', 'HOI_APPROVED'].includes(item.status);
+        const isHODDone = ['HOD_APPROVED', 'WITH_HOI', 'FINAL_APPROVED', 'HOI_APPROVED'].includes(item.status);
+        const isHOIDone = ['FINAL_APPROVED', 'HOI_APPROVED'].includes(item.status);
+
+        return (
+          <div style={{ fontSize: '0.72rem', lineHeight: 1.35 }}>
+            <div>
+              <span style={{ color: isFacultyDone ? '#10B981' : item.status === 'SUBMITTED_TO_FACULTY' ? '#F59E0B' : '#94A3B8', fontWeight: 700 }}>
+                1. Faculty: {isFacultyDone ? '✓ Approved' : item.status === 'SUBMITTED_TO_FACULTY' ? '⏳ Under Review' : '○ Pending'}
+              </span>
+            </div>
+            <div>
+              <span style={{ color: isMentorDone ? '#10B981' : item.status === 'SUBMITTED_TO_MENTOR' ? '#F59E0B' : '#94A3B8', fontWeight: 700 }}>
+                2. Mentor: {isMentorDone ? '✓ Endorsed' : item.status === 'SUBMITTED_TO_MENTOR' ? '⏳ Under Review' : '○ Not Reached'}
+              </span>
+            </div>
+            <div>
+              <span style={{ color: isHODDone ? '#10B981' : item.status === 'SUBMITTED_TO_HOD' ? '#F59E0B' : '#94A3B8', fontWeight: 700 }}>
+                3. HOD: {isHODDone ? '✓ Recommended' : item.status === 'SUBMITTED_TO_HOD' ? '⏳ Under Review' : '○ Not Reached'}
+              </span>
+            </div>
+            <div>
+              <span style={{ color: isHOIDone ? '#10B981' : (item.status === 'HOD_APPROVED' || item.status === 'WITH_HOI') ? '#D97706' : '#94A3B8', fontWeight: 800 }}>
+                4. HOI / Principal: {isHOIDone ? '✓ Approved' : (item.status === 'HOD_APPROVED' || item.status === 'WITH_HOI') ? '⚡ Action Required' : '○ Not Reached'}
+              </span>
+            </div>
+          </div>
+        );
+      }
     },
     {
       key: 'status',
-      header: 'Final HOI Status',
-      width: '150px',
+      header: 'Workflow Stage / Status',
+      width: '185px',
       align: 'center',
-      render: item => (
-        <Badge variant={item.status === 'FINAL_APPROVED' ? 'active' : item.status === 'HOI_REJECTED' ? 'danger' : 'warning'}>
-          {item.status}
-        </Badge>
-      )
+      render: item => {
+        const isActionableForHOI = item.status === 'HOD_APPROVED' || item.status === 'WITH_HOI' || item.status === 'SUBMITTED_TO_PRINCIPAL';
+        const isApproved = item.status === 'FINAL_APPROVED' || item.status === 'HOI_APPROVED';
+        const isRejected = item.status.includes('REJECT');
+
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+            <Badge variant={isApproved ? 'active' : isRejected ? 'danger' : isActionableForHOI ? 'gold' : 'warning'}>
+              {item.status}
+            </Badge>
+            <span style={{ fontSize: '0.68rem', color: isActionableForHOI ? '#D97706' : '#64748B', fontWeight: isActionableForHOI ? 800 : 500 }}>
+              {isActionableForHOI ? '⚡ Awaiting HOI Decision' : isApproved ? 'Exam Hall Ticket Cleared' : isRejected ? 'Application Rejected' : `Current: ${item.currentHandlerRole || 'Tier Review'}`}
+            </span>
+          </div>
+        );
+      }
     },
     {
       key: 'submittedDate',
@@ -1073,23 +1131,26 @@ export const HOIWorkspacePage: React.FC<HOIWorkspacePageProps> = ({ initialTab =
     },
     {
       key: 'actions',
-      header: 'Final Decision',
+      header: 'Action / Review',
       width: '160px',
       align: 'right',
       sortable: false,
-      render: item => (
-        <button
-          type="button"
-          className="btn btn-primary btn-xs"
-          onClick={() => {
-            setReviewApp(item);
-            setReviewRemarks('');
-            setReviewDecision('APPROVE');
-          }}
-        >
-          Review &amp; Approve
-        </button>
-      )
+      render: item => {
+        const isActionableForHOI = item.status === 'HOD_APPROVED' || item.status === 'WITH_HOI' || item.status === 'SUBMITTED_TO_PRINCIPAL';
+        return (
+          <button
+            type="button"
+            className={`btn ${isActionableForHOI ? 'btn-primary' : 'btn-secondary'} btn-xs`}
+            onClick={() => {
+              setReviewApp(item);
+              setReviewRemarks('');
+              setReviewDecision('APPROVE');
+            }}
+          >
+            {isActionableForHOI ? 'Review & Decision' : 'Inspect Workflow'}
+          </button>
+        );
+      }
     }
   ];
 
@@ -1495,7 +1556,17 @@ export const HOIWorkspacePage: React.FC<HOIWorkspacePageProps> = ({ initialTab =
         <StatCard title="Departments" value={instDepartments.length} subtitle={`${instPrograms.length} Degree Programs`} icon={Building2} colorScheme="navy" onClick={() => setActiveTab('DEPARTMENTS')} />
         <StatCard title="Enrolled Students" value={instStudents.length} subtitle="Active Headcount" icon={Users} colorScheme="orange" onClick={() => setActiveTab('STUDENTS')} />
         <StatCard title="Faculty Strength" value={instFaculty.length} subtitle="Professors & Lecturers" icon={UserCheck} colorScheme="green" onClick={() => setActiveTab('FACULTY')} />
-        <StatCard title="Pending Approvals" value={pendingHOIAttendanceApps.length} subtitle="Awaiting Final Decision" icon={CheckSquare} colorScheme={pendingHOIAttendanceApps.length > 0 ? 'gold' : 'green'} onClick={() => setActiveTab('ATTENDANCE_APPROVALS')} />
+        <StatCard
+          title="Pending Approvals"
+          value={pendingHOIAttendanceApps.length}
+          subtitle="Awaiting Final Decision"
+          icon={CheckSquare}
+          colorScheme={pendingHOIAttendanceApps.length > 0 ? 'gold' : 'green'}
+          onClick={() => {
+            setActiveTab('ATTENDANCE_APPROVALS');
+            setApprovalsFilterMode('PENDING_MY_ACTION');
+          }}
+        />
       </div>
 
       <div style={{ display: 'flex', gap: '0.4rem', borderBottom: '2px solid var(--border-color, #E2E8F0)', paddingBottom: '0.5rem', flexWrap: 'wrap' }}>
@@ -1571,13 +1642,13 @@ export const HOIWorkspacePage: React.FC<HOIWorkspacePageProps> = ({ initialTab =
 
       {activeTab === 'FACULTY' && (
         <ExcelDataTable
-          data={facultyWorkloadData}
+          data={instFaculty}
           columns={facultyWorkloadColumns}
-          title={`Institute Faculty Roster & Workload Register (${facultyWorkloadData.length})`}
-          subtitle="Comprehensive faculty profiles, assigned theory/lab course hours, and total weekly workload distribution."
+          title={`Institute Faculty & Academic Workload Register (${instFaculty.length})`}
+          subtitle="Professor credentials, designated departmental affiliations, assigned course workloads, and active mentorship rosters."
           storageKey="hoi_faculty"
-          searchPlaceholder="Search faculty name, employee ID, or department..."
-          searchFields={['name', 'employeeId', 'departmentName', 'designation']}
+          searchPlaceholder="Search faculty by name, employee code, or department..."
+          searchFields={['name', 'employeeCode', 'departmentName', 'designation']}
           exportFilename={`HOI_Faculty_Workload_${institute?.code || 'INST'}`}
           onRefresh={handleRefreshData}
         />
@@ -1599,16 +1670,67 @@ export const HOIWorkspacePage: React.FC<HOIWorkspacePageProps> = ({ initialTab =
 
       {activeTab === 'ATTENDANCE_APPROVALS' && (
         <ExcelDataTable
-          data={pendingHOIAttendanceApps.length > 0 ? pendingHOIAttendanceApps : allInstituteAttendanceApps}
+          data={filteredApprovalsData}
           columns={finalApprovalsColumns}
-          title={`Final 4-Tier Attendance Condonation Approvals Queue (${pendingHOIAttendanceApps.length} Pending)`}
-          subtitle="Mandatory sequence: Student → Faculty → Mentor → HOD → Principal / HOI (Final Approval & Exam Hall Ticket Release)."
+          title={`Institute Attendance Condonation Approvals (${filteredApprovalsData.length} Shown / ${pendingHOIAttendanceApps.length} Actionable for Final HOI Decision)`}
+          subtitle="Mandatory sequence: Student → Faculty → Mentor → HOD → Principal / HOI (Final Decision & Exam Hall Ticket Release)."
           storageKey="hoi_apps"
           searchPlaceholder="Search approvals by application no, student, or department..."
           searchFields={['applicationNo', 'studentName', 'enrollmentNo', 'departmentName']}
           exportFilename={`HOI_Approvals_${institute?.code || 'INST'}`}
-          emptyMessage="No Applications Currently Awaiting Final HOI Approval"
-          emptyDescription="All attendance condonation requests have been processed or are currently with Department HODs/Mentors."
+          emptyMessage={
+            approvalsFilterMode === 'PENDING_MY_ACTION'
+              ? 'No Applications Currently Awaiting Final HOI Approval'
+              : 'No Attendance Condonation Records Found'
+          }
+          emptyDescription={
+            approvalsFilterMode === 'PENDING_MY_ACTION'
+              ? 'All attendance condonation requests have been processed or are currently in progress at Department / Faculty tiers.'
+              : 'There are no attendance condonation applications matching the selected filter criteria.'
+          }
+          toolbarExtra={
+            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              <button
+                type="button"
+                className={`btn btn-xs ${approvalsFilterMode === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setApprovalsFilterMode('ALL')}
+              >
+                All Institute Applications ({allInstituteAttendanceApps.length})
+              </button>
+              <button
+                type="button"
+                className={`btn btn-xs ${approvalsFilterMode === 'PENDING_MY_ACTION' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setApprovalsFilterMode('PENDING_MY_ACTION')}
+                style={{
+                  borderColor: pendingHOIAttendanceApps.length > 0 ? '#F59E0B' : undefined,
+                  fontWeight: pendingHOIAttendanceApps.length > 0 ? 800 : undefined
+                }}
+              >
+                ⚡ Actionable for Me ({pendingHOIAttendanceApps.length})
+              </button>
+              <button
+                type="button"
+                className={`btn btn-xs ${approvalsFilterMode === 'IN_PROGRESS' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setApprovalsFilterMode('IN_PROGRESS')}
+              >
+                In Progress ({allInstituteAttendanceApps.filter(a => ['SUBMITTED_TO_FACULTY', 'FACULTY_APPROVED', 'SUBMITTED_TO_MENTOR', 'MENTOR_APPROVED', 'SUBMITTED_TO_HOD'].includes(a.status)).length})
+              </button>
+              <button
+                type="button"
+                className={`btn btn-xs ${approvalsFilterMode === 'APPROVED' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setApprovalsFilterMode('APPROVED')}
+              >
+                Cleared ({allInstituteAttendanceApps.filter(a => a.status === 'FINAL_APPROVED' || a.status === 'HOI_APPROVED').length})
+              </button>
+              <button
+                type="button"
+                className={`btn btn-xs ${approvalsFilterMode === 'REJECTED' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setApprovalsFilterMode('REJECTED')}
+              >
+                Rejected ({allInstituteAttendanceApps.filter(a => a.status.includes('REJECT')).length})
+              </button>
+            </div>
+          }
           onRefresh={handleRefreshData}
         />
       )}
