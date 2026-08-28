@@ -1723,6 +1723,141 @@ export class CentralInventoryManagementService {
       window.URL.revokeObjectURL(url);
     }
   }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // CANONICAL DISCRETE BUSINESS TRANSACTION QUERIES (NO DATA DUPLICATION)
+  // ═════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Get Asset Transfers strictly matching business transfer requests.
+   */
+  public getAssetTransfers(scope?: { departmentId?: string; instituteId?: string; userId?: string }): AssetTransferRequestRecord[] {
+    const st = db.getState() as any;
+    let list: AssetTransferRequestRecord[] = st.assetTransferRequests || [];
+
+    if (scope?.userId) {
+      list = list.filter(t => t.fromUserId === scope.userId || t.toUserId === scope.userId);
+    }
+    if (scope?.departmentId && scope.departmentId !== 'ALL') {
+      list = list.filter(t => t.departmentId === scope.departmentId);
+    }
+    if (scope?.instituteId && scope.instituteId !== 'ALL') {
+      list = list.filter(t => (t as any).instituteId === scope.instituteId);
+    }
+    return list;
+  }
+
+  /**
+   * Get Asset Returns strictly matching return requests and inwards.
+   */
+  public getAssetReturns(scope?: { departmentId?: string; instituteId?: string; userId?: string }): AssetReturnRequestRecord[] {
+    const st = db.getState() as any;
+    let list: AssetReturnRequestRecord[] = st.assetReturnRequests || [];
+
+    if (scope?.userId) {
+      list = list.filter(r => r.requestedByUserId === scope.userId);
+    }
+    if (scope?.departmentId && scope.departmentId !== 'ALL') {
+      list = list.filter(r => r.departmentId === scope.departmentId);
+    }
+    if (scope?.instituteId && scope.instituteId !== 'ALL') {
+      list = list.filter(r => (r as any).instituteId === scope.instituteId);
+    }
+    return list;
+  }
+
+  /**
+   * Get Asset Replacements strictly matching RMA / hardware replacement requests.
+   */
+  public getAssetReplacements(scope?: { departmentId?: string; instituteId?: string; userId?: string }): AssetReplacementRequestRecord[] {
+    const st = db.getState() as any;
+    let list: AssetReplacementRequestRecord[] = st.assetReplacementRequests || [];
+
+    if (scope?.userId) {
+      list = list.filter(r => r.requestedByUserId === scope.userId);
+    }
+    if (scope?.departmentId && scope.departmentId !== 'ALL') {
+      list = list.filter(r => r.departmentId === scope.departmentId);
+    }
+    if (scope?.instituteId && scope.instituteId !== 'ALL') {
+      list = list.filter(r => (r as any).instituteId === scope.instituteId);
+    }
+    return list;
+  }
+
+  /**
+   * Get Asset Issues strictly matching reported defects and damage tickets.
+   */
+  public getAssetIssues(scope?: { departmentId?: string; instituteId?: string; userId?: string }): AssetIssueReportRecord[] {
+    const st = db.getState() as any;
+    let list: AssetIssueReportRecord[] = st.assetIssueReports || [];
+
+    if (scope?.userId) {
+      list = list.filter(i => i.reportedByUserId === scope.userId);
+    }
+    if (scope?.departmentId && scope.departmentId !== 'ALL') {
+      list = list.filter(i => i.departmentId === scope.departmentId);
+    }
+    if (scope?.instituteId && scope.instituteId !== 'ALL') {
+      list = list.filter(i => (i as any).instituteId === scope.instituteId);
+    }
+    return list;
+  }
+
+  /**
+   * Get Maintenance Records strictly matching service and repair events.
+   */
+  public getAssetMaintenanceRecords(scope?: { departmentId?: string; instituteId?: string }): AssetMaintenanceRecord[] {
+    const st = db.getState() as any;
+    let list: AssetMaintenanceRecord[] = st.assetMaintenanceLogs || st.assetMaintenanceRecords || [];
+
+    if (scope?.departmentId && scope.departmentId !== 'ALL') {
+      list = list.filter(m => (m as any).departmentId === scope.departmentId);
+    }
+    return list;
+  }
+
+  /**
+   * Get Physical Verification Records strictly matching audit scans.
+   */
+  public getAssetVerifications(scope?: { departmentId?: string; instituteId?: string }): PhysicalVerificationRecord[] {
+    const st = db.getState() as any;
+    let list: PhysicalVerificationRecord[] = st.physicalVerifications || [];
+
+    if (scope?.departmentId && scope.departmentId !== 'ALL') {
+      list = list.filter(v => (v as any).departmentId === scope.departmentId);
+    }
+    return list;
+  }
+
+  /**
+   * Get Asset Requisitions strictly matching faculty / department new requirements.
+   */
+  public getAssetRequisitions(scope?: { departmentId?: string; instituteId?: string; userId?: string }): AssetRequestRecord[] {
+    const st = db.getState() as any;
+    let list: AssetRequestRecord[] = st.assetRequisitions || [];
+
+    if (scope?.userId) {
+      list = list.filter(r => r.requestedByUserId === scope.userId);
+    }
+    if (scope?.departmentId && scope.departmentId !== 'ALL') {
+      list = list.filter(r => r.departmentId === scope.departmentId);
+    }
+    if (scope?.instituteId && scope.instituteId !== 'ALL') {
+      list = list.filter(r => r.instituteId === scope.instituteId);
+    }
+    return list;
+  }
+
+  /**
+   * Get Department Fixed Assets strictly for register & inventory custody views.
+   */
+  public getDepartmentAssets(scope?: { departmentId?: string; instituteId?: string }): FixedAsset[] {
+    return db.getFixedAssets(undefined, {
+      departmentId: scope?.departmentId && scope.departmentId !== 'ALL' ? scope.departmentId : undefined,
+      instituteId: scope?.instituteId && scope.instituteId !== 'ALL' ? scope.instituteId : undefined
+    });
+  }
 }
 
 export const inventoryManagementService = new CentralInventoryManagementService();

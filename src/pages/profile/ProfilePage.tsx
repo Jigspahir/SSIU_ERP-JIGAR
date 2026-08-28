@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Badge } from '../../components/common/Badge';
 import { 
-  User, ShieldCheck, Mail, Phone, Lock, Save, CheckCircle2, 
+  User as UserIcon, ShieldCheck, Mail, Phone, Lock, Save, CheckCircle2, 
   Award, FileText, Check, XCircle, Upload, AlertCircle, RefreshCw, 
   FolderCheck, IndianRupee, GraduationCap, MapPin, Users, HeartHandshake,
   Calendar, BookOpen, Clock, FileCheck, Layers, Sparkles, Printer,
@@ -11,18 +11,21 @@ import {
 } from 'lucide-react';
 import { db } from '../../services/db';
 import { mentorAssignmentService } from '../../services/mentorAssignmentService';
-import { Student } from '../../types';
+import { Student, User, UserRole } from '../../types';
 import { StudentDocumentsSection } from '../../components/profile/StudentDocumentsSection';
 import { StudentDataChangeTab } from '../../components/profile/StudentDataChangeTab';
 import { StudentDataChangeRequestModal } from '../../components/profile/StudentDataChangeRequestModal';
 import { StudentFeeDashboard } from '../../components/finance/StudentFeeDashboard';
+import { StaffProfileView } from '../../components/profile/StaffProfileView';
 
-export const ProfilePage: React.FC = () => {
-  const { user, role, updateProfile } = useAuth();
-  
+const StudentProfileView: React.FC<{ user: User; role: UserRole; updateProfile: (u: Partial<User>) => void }> = ({
+  user,
+  role,
+  updateProfile
+}) => {
   // Student Portal 5-Module Navigation Tabs + Data Change + Security
   type StudentTab = 'PERSONAL' | 'ACADEMIC' | 'EXAMINATION' | 'FEES' | 'OTHER' | 'DATA_CHANGE' | 'SECURITY';
-  const [activeTab, setActiveTab] = useState<StudentTab>(role === 'STUDENT' ? 'PERSONAL' : 'SECURITY');
+  const [activeTab, setActiveTab] = useState<StudentTab>('PERSONAL');
   
   // Sub-tabs for each primary section
   const [personalSubTab, setPersonalSubTab] = useState<'INFO' | 'PARENTS' | 'ADDRESS' | 'EMERGENCY' | 'DOCUMENTS'>('INFO');
@@ -286,7 +289,7 @@ export const ProfilePage: React.FC = () => {
         {role === 'STUDENT' ? (
           <>
             {[
-              { id: 'PERSONAL', label: '1. Personal Profile', icon: User },
+              { id: 'PERSONAL', label: '1. Personal Profile', icon: UserIcon },
               { id: 'ACADEMIC', label: '2. Academic Profile', icon: GraduationCap },
               { id: 'EXAMINATION', label: '3. Examination', icon: FileCheck },
               { id: 'FEES', label: '4. Fees & Payments', icon: IndianRupee },
@@ -352,7 +355,7 @@ export const ProfilePage: React.FC = () => {
           {/* Sub-nav Pills */}
           <div style={{ display: 'flex', gap: '0.5rem', background: '#F8FAFC', padding: '0.4rem', borderRadius: '8px', border: '1px solid #E2E8F0', overflowX: 'auto' }}>
             {[
-              { id: 'INFO', label: 'Personal Information', icon: User },
+              { id: 'INFO', label: 'Personal Information', icon: UserIcon },
               { id: 'PARENTS', label: 'Parent / Guardian', icon: Users },
               { id: 'ADDRESS', label: 'Address Details', icon: MapPin },
               { id: 'EMERGENCY', label: 'Emergency Contact', icon: HeartHandshake },
@@ -391,7 +394,7 @@ export const ProfilePage: React.FC = () => {
             <div className="card" style={{ padding: '1.25rem', background: '#FFFFFF' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.5rem' }}>
                 <h4 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <User size={16} color="var(--brand-orange, #F37023)" /> Basic Student &amp; Identity Details (Read Only Master)
+                  <UserIcon size={16} color="var(--brand-orange, #F37023)" /> Basic Student &amp; Identity Details (Read Only Master)
                 </h4>
                 <Badge variant="navy">Official Master Record</Badge>
               </div>
@@ -1166,3 +1169,30 @@ export const ProfilePage: React.FC = () => {
     </div>
   );
 };
+
+export const ProfilePage: React.FC = () => {
+  const { user, role, activeRole, updateProfile } = useAuth();
+
+  if (!user) return null;
+
+  const currentRole = (activeRole || role || 'FACULTY') as UserRole;
+
+  if (currentRole !== 'STUDENT') {
+    return (
+      <StaffProfileView
+        user={user}
+        role={currentRole}
+        onUpdateProfile={updateProfile}
+      />
+    );
+  }
+
+  return (
+    <StudentProfileView
+      user={user}
+      role={currentRole}
+      updateProfile={updateProfile}
+    />
+  );
+};
+

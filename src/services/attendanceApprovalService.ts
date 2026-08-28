@@ -443,6 +443,7 @@ class CentralAttendanceApprovalService {
     app.currentHandlerRole = nextHandlerRole;
     app.currentHandlerId = nextHandlerId;
     app.currentHandlerName = nextHandlerName;
+    if (!app.timeline) app.timeline = [];
     app.timeline.push(timelineItem);
     app.updatedAt = now;
 
@@ -552,6 +553,7 @@ class CentralAttendanceApprovalService {
     app.currentHandlerRole = nextHandlerRole;
     app.currentHandlerId = nextHandlerId;
     app.currentHandlerName = nextHandlerName;
+    if (!app.timeline) app.timeline = [];
     app.timeline.push(timelineItem);
     app.updatedAt = now;
 
@@ -663,6 +665,7 @@ class CentralAttendanceApprovalService {
     app.currentHandlerRole = nextHandlerRole;
     app.currentHandlerId = nextHandlerId;
     app.currentHandlerName = nextHandlerName;
+    if (!app.timeline) app.timeline = [];
     app.timeline.push(timelineItem);
     app.updatedAt = now;
 
@@ -707,6 +710,8 @@ class CentralAttendanceApprovalService {
       nextHandlerRole = 'COMPLETED';
       nextHandlerId = '';
       nextHandlerName = 'None';
+      app.hoiStatus = 'FINAL_APPROVED';
+      app.examEligibilityStatus = 'EXAM_ELIGIBLE';
       app.hoiRemarks = params.remarks;
       app.finalEligibilityGranted = true;
       app.eligibilityType = 'ATTENDANCE_APPROVAL';
@@ -787,6 +792,7 @@ class CentralAttendanceApprovalService {
     app.currentHandlerRole = nextHandlerRole;
     app.currentHandlerId = nextHandlerId;
     app.currentHandlerName = nextHandlerName;
+    if (!app.timeline) app.timeline = [];
     app.timeline.push(timelineItem);
     app.updatedAt = now;
 

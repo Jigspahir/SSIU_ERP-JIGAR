@@ -2514,8 +2514,8 @@ export const InventoryAssetPage: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* HOD Sub-Tabs */}
-      {isHOD && (
+      {/* Management & Authority Sub-Tabs */}
+      {!isFacultyOrStaff && (
         <div className="flex border-b border-slate-200 bg-white rounded-t-xl px-4 pt-2 gap-2 overflow-x-auto shadow-sm">
           <button
             onClick={() => setHodTab('DEPT_REGISTER')}
@@ -2524,7 +2524,7 @@ export const InventoryAssetPage: React.FC<Props> = ({
             }`}
           >
             <Boxes className="w-4 h-4" />
-            Department Assets ({hodData.totalAssetsCount})
+            {isHOD ? 'Department Assets' : 'Asset Register'} ({departmentAssets.length})
           </button>
           <button
             onClick={() => setHodTab('ASSET_REQUISITIONS')}
@@ -2533,12 +2533,7 @@ export const InventoryAssetPage: React.FC<Props> = ({
             }`}
           >
             <Plus className="w-4 h-4 text-amber-500" />
-            Asset Requisitions ({hodData.allDepartmentRequisitions.length})
-            {hodData.pendingAssetRequisitions.length > 0 && (
-              <span className="px-1.5 py-0.5 text-[10px] bg-amber-500 text-white rounded-full font-bold">
-                {hodData.pendingAssetRequisitions.length}
-              </span>
-            )}
+            Asset Requisitions ({departmentRequisitions.length})
           </button>
           <button
             onClick={() => setHodTab('TRANSFER_APPROVALS')}
@@ -2547,12 +2542,7 @@ export const InventoryAssetPage: React.FC<Props> = ({
             }`}
           >
             <ArrowRightLeft className="w-4 h-4" />
-            Transfers ({hodData.allDepartmentTransfers.length})
-            {hodData.pendingTransferRequests.length > 0 && (
-              <span className="px-1.5 py-0.5 text-[10px] bg-amber-500 text-white rounded-full font-bold">
-                {hodData.pendingTransferRequests.length}
-              </span>
-            )}
+            Transfers ({departmentTransfers.length})
           </button>
           <button
             onClick={() => setHodTab('RETURN_INSPECTIONS')}
@@ -2561,12 +2551,7 @@ export const InventoryAssetPage: React.FC<Props> = ({
             }`}
           >
             <Package className="w-4 h-4" />
-            Returns ({hodData.allDepartmentReturns.length})
-            {hodData.pendingReturnRequests.length > 0 && (
-              <span className="px-1.5 py-0.5 text-[10px] bg-amber-500 text-white rounded-full font-bold">
-                {hodData.pendingReturnRequests.length}
-              </span>
-            )}
+            Returns ({departmentReturns.length})
           </button>
           <button
             onClick={() => setHodTab('REPLACEMENT_REVIEWS')}
@@ -2575,7 +2560,7 @@ export const InventoryAssetPage: React.FC<Props> = ({
             }`}
           >
             <RotateCcw className="w-4 h-4" />
-            Replacements ({hodData.pendingReplacementRequests.length})
+            Replacements ({departmentReplacements.length})
           </button>
           <button
             onClick={() => setHodTab('ISSUE_REPORTS')}
@@ -2584,12 +2569,7 @@ export const InventoryAssetPage: React.FC<Props> = ({
             }`}
           >
             <AlertOctagon className="w-4 h-4" />
-            Issues ({hodData.allDepartmentIssues.length})
-            {hodData.activeIssueReports.length > 0 && (
-              <span className="px-1.5 py-0.5 text-[10px] bg-amber-500 text-white rounded-full font-bold">
-                {hodData.activeIssueReports.length}
-              </span>
-            )}
+            Issues ({departmentIssues.length})
           </button>
         </div>
       )}
@@ -2600,41 +2580,35 @@ export const InventoryAssetPage: React.FC<Props> = ({
         <div className="flex flex-col md:flex-row justify-between gap-4 items-start md:items-center border-b pb-4">
           <div>
             <h3 className="text-base font-bold text-navy-900">
-              {isHOD ? (
-                hodTab === 'DEPT_REGISTER' ? 'Department Assets Register' :
+              {hodTab === 'DEPT_REGISTER' ? 'Department Assets Register' :
                 hodTab === 'ASSET_REQUISITIONS' ? 'Faculty & Staff Asset Requisitions' :
                 hodTab === 'TRANSFER_APPROVALS' ? 'Custody Transfer Requests' :
                 hodTab === 'RETURN_INSPECTIONS' ? 'Asset Return & Inward Inspections' :
                 hodTab === 'REPLACEMENT_REVIEWS' ? 'Asset Replacement & RMA Requests' :
-                'Maintenance & Hardware Issues'
-              ) : 'University Fixed Asset Master Register'}
+                'Reported Hardware & Asset Issues'}
             </h3>
-            <span className="text-xs text-slate-500">
-              {isHOD ? (
-                hodTab === 'DEPT_REGISTER' ? 'Official fixed asset master register for your department' :
+            <p className="text-xs text-slate-500">
+              {hodTab === 'DEPT_REGISTER' ? 'Official fixed asset master register for your department' :
                 hodTab === 'ASSET_REQUISITIONS' ? 'Review faculty requirements and assign available store assets' :
                 hodTab === 'TRANSFER_APPROVALS' ? 'Review inter-faculty and lab-to-lab equipment transfer requests' :
                 hodTab === 'RETURN_INSPECTIONS' ? 'Inspect returning assets and check condition before store intake' :
                 hodTab === 'REPLACEMENT_REVIEWS' ? 'Review defective hardware replacement requests and escalate to HOI' :
-                'Manage technical problems, maintenance tickets, and hardware repairs'
-              ) : 'Comprehensive register of all institutional physical and capital equipment'}
-            </span>
+                'Track broken, malfunctioning or damaged departmental equipment'}
+            </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-            <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64">
+              <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
               <input
                 type="text"
                 placeholder={
-                  isHOD ? (
-                    hodTab === 'DEPT_REGISTER' ? 'Search assets by tag, name, serial...' :
-                    hodTab === 'ASSET_REQUISITIONS' ? 'Search requisitions by ID, faculty...' :
-                    hodTab === 'TRANSFER_APPROVALS' ? 'Search transfers by ID, tag, faculty...' :
-                    hodTab === 'RETURN_INSPECTIONS' ? 'Search returns by ID, tag, returner...' :
-                    hodTab === 'REPLACEMENT_REVIEWS' ? 'Search replacements by ID, tag, defect...' :
-                    'Search issues by ID, tag, description...'
-                  ) : 'Search assets by tag, name, serial...'
+                  hodTab === 'DEPT_REGISTER' ? 'Search assets by tag, name, serial...' :
+                  hodTab === 'ASSET_REQUISITIONS' ? 'Search requisitions by ID, faculty...' :
+                  hodTab === 'TRANSFER_APPROVALS' ? 'Search transfers by ID, tag, faculty...' :
+                  hodTab === 'RETURN_INSPECTIONS' ? 'Search returns by ID, tag, returner...' :
+                  hodTab === 'REPLACEMENT_REVIEWS' ? 'Search replacements by ID, tag, defect...' :
+                  'Search issues by ID, tag, description...'
                 }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -2651,7 +2625,7 @@ export const InventoryAssetPage: React.FC<Props> = ({
         </div>
 
         {/* 1. TAB: DEPARTMENT ASSETS REGISTER */}
-        {(!isHOD || hodTab === 'DEPT_REGISTER') && (
+        {hodTab === 'DEPT_REGISTER' && (
           <div className="overflow-x-auto border border-slate-200 rounded-lg">
             <table className="w-full text-left text-xs border-collapse">
               <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
@@ -2716,7 +2690,7 @@ export const InventoryAssetPage: React.FC<Props> = ({
         )}
 
         {/* 2. TAB: ASSET REQUISITIONS */}
-        {isHOD && hodTab === 'ASSET_REQUISITIONS' && (
+        {hodTab === 'ASSET_REQUISITIONS' && (
           <div className="overflow-x-auto border border-slate-200 rounded-lg">
             <table className="w-full text-left text-xs border-collapse">
               <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
@@ -2843,7 +2817,7 @@ export const InventoryAssetPage: React.FC<Props> = ({
         )}
 
         {/* 3. TAB: TRANSFERS */}
-        {isHOD && hodTab === 'TRANSFER_APPROVALS' && (
+        {hodTab === 'TRANSFER_APPROVALS' && (
           <div className="overflow-x-auto border border-slate-200 rounded-lg">
             <table className="w-full text-left text-xs border-collapse">
               <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
@@ -2929,7 +2903,7 @@ export const InventoryAssetPage: React.FC<Props> = ({
         )}
 
         {/* 4. TAB: RETURNS */}
-        {isHOD && hodTab === 'RETURN_INSPECTIONS' && (
+        {hodTab === 'RETURN_INSPECTIONS' && (
           <div className="overflow-x-auto border border-slate-200 rounded-lg">
             <table className="w-full text-left text-xs border-collapse">
               <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
@@ -3016,7 +2990,7 @@ export const InventoryAssetPage: React.FC<Props> = ({
         )}
 
         {/* 5. TAB: REPLACEMENTS */}
-        {isHOD && hodTab === 'REPLACEMENT_REVIEWS' && (
+        {hodTab === 'REPLACEMENT_REVIEWS' && (
           <div className="overflow-x-auto border border-slate-200 rounded-lg">
             <table className="w-full text-left text-xs border-collapse">
               <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
@@ -3097,7 +3071,7 @@ export const InventoryAssetPage: React.FC<Props> = ({
         )}
 
         {/* 6. TAB: ISSUES */}
-        {isHOD && hodTab === 'ISSUE_REPORTS' && (
+        {hodTab === 'ISSUE_REPORTS' && (
           <div className="overflow-x-auto border border-slate-200 rounded-lg">
             <table className="w-full text-left text-xs border-collapse">
               <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">

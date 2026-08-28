@@ -109,6 +109,7 @@ export interface User {
   signatureStatus?: 'ACTIVE' | 'INACTIVE' | 'PENDING';
   signatureVersion?: number;
   signatureUpdatedAt?: string;
+  reportingToUserId?: string;
   createdAt: string;
   updatedAt?: string;
 }

@@ -45,6 +45,7 @@ export interface ExcelDataTableProps<T extends { id: string | number }> {
   keyField?: keyof T;
   title?: string;
   subtitle?: string;
+  storageKey?: string;
   searchPlaceholder?: string;
   searchFields?: (keyof T | string)[];
   filters?: ExcelFilterOption[];
@@ -60,6 +61,9 @@ export interface ExcelDataTableProps<T extends { id: string | number }> {
   pageSizeOptions?: number[];
   defaultPageSize?: number;
   isLoading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+  lastUpdated?: string | Date;
   onRefresh?: () => void;
   toolbarExtra?: React.ReactNode;
   emptyMessage?: string;
@@ -73,6 +77,7 @@ export function ExcelDataTable<T extends { id: string | number }>({
   keyField = 'id' as keyof T,
   title,
   subtitle,
+  storageKey,
   searchPlaceholder = 'Search records...',
   searchFields,
   filters = [],
@@ -85,15 +90,35 @@ export function ExcelDataTable<T extends { id: string | number }>({
   exportFilename = 'ERP_Register_Export',
   exportTitle,
   exportMetadata,
-  pageSizeOptions = [25, 50, 100, 200],
+  pageSizeOptions = [10, 25, 50, 100, 200],
   defaultPageSize = 25,
   isLoading = false,
+  error = null,
+  onRetry,
+  lastUpdated,
   onRefresh,
   toolbarExtra,
   emptyMessage = 'No records found',
   emptyDescription = 'Try adjusting your search query or active filters to find what you are looking for.',
   rowHighlightPredicate
 }: ExcelDataTableProps<T>) {
+  // ─── Density Control State ──────────────────────────────────────────────
+  const [density, setDensity] = useState<'COMPACT' | 'COMFORTABLE'>(() => {
+    if (storageKey) {
+      const saved = localStorage.getItem(`sscit_grid_density_${storageKey}`);
+      if (saved === 'COMPACT' || saved === 'COMFORTABLE') return saved;
+    }
+    return 'COMPACT';
+  });
+
+  const toggleDensity = () => {
+    const next = density === 'COMPACT' ? 'COMFORTABLE' : 'COMPACT';
+    setDensity(next);
+    if (storageKey) {
+      localStorage.setItem(`sscit_grid_density_${storageKey}`, next);
+    }
+  };
+
   // ─── Search & Pagination State ────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -108,8 +133,41 @@ export function ExcelDataTable<T extends { id: string | number }>({
 
   // ─── Column Visibility ────────────────────────────────────────────────────
   const [visibleColumnKeys, setVisibleColumnKeys] = useState<Set<string>>(() => {
+    if (storageKey) {
+      try {
+        const saved = localStorage.getItem(`sscit_grid_cols_${storageKey}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return new Set(parsed);
+          }
+        }
+      } catch (e) {}
+    }
     return new Set(columns.filter(c => c.defaultVisible !== false).map(c => c.key));
   });
+
+  const handleToggleColumn = (key: string) => {
+    const newSet = new Set(visibleColumnKeys);
+    if (newSet.has(key)) {
+      if (newSet.size > 1) newSet.delete(key);
+    } else {
+      newSet.add(key);
+    }
+    setVisibleColumnKeys(newSet);
+    if (storageKey) {
+      localStorage.setItem(`sscit_grid_cols_${storageKey}`, JSON.stringify(Array.from(newSet)));
+    }
+  };
+
+  const handleResetColumns = () => {
+    const defaultSet = new Set(columns.filter(c => c.defaultVisible !== false).map(c => c.key));
+    setVisibleColumnKeys(defaultSet);
+    if (storageKey) {
+      localStorage.removeItem(`sscit_grid_cols_${storageKey}`);
+    }
+  };
+
   const [isColumnPickerOpen, setIsColumnPickerOpen] = useState(false);
   const columnPickerRef = useRef<HTMLDivElement>(null);
 
@@ -456,7 +514,17 @@ export function ExcelDataTable<T extends { id: string | number }>({
 
           {/* Right Group: Excel Spreadsheet Utilities */}
           <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            
+            {/* Density Toggle */}
+            <button
+              type="button"
+              onClick={toggleDensity}
+              className="btn btn-secondary btn-sm"
+              style={{ height: '32px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}
+              title={`Toggle Row Density (Current: ${density})`}
+            >
+              <Layers size={13} /> {density === 'COMPACT' ? 'Compact' : 'Comfortable'}
+            </button>
+
             {/* Refresh */}
             {onRefresh && (
               <button
@@ -479,7 +547,7 @@ export function ExcelDataTable<T extends { id: string | number }>({
                 style={{ height: '32px', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}
                 title="Customize Visible Columns"
               >
-                <SlidersHorizontal size={13} /> Columns
+                <SlidersHorizontal size={13} /> Columns ({activeColumns.length}/{columns.length})
               </button>
 
               {isColumnPickerOpen && (
@@ -491,14 +559,21 @@ export function ExcelDataTable<T extends { id: string | number }>({
                   border: '1px solid #CBD5E1', 
                   borderRadius: '6px', 
                   padding: '0.65rem', 
-                  width: '230px', 
+                  width: '240px', 
                   zIndex: 20, 
                   boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
                   maxHeight: '320px',
                   overflowY: 'auto'
                 }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '0.4rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.3rem' }}>
-                    TOGGLE COLUMNS
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '0.4rem', borderBottom: '1px solid #E2E8F0', paddingBottom: '0.3rem' }}>
+                    <span>TOGGLE COLUMNS</span>
+                    <button
+                      type="button"
+                      onClick={handleResetColumns}
+                      style={{ background: 'none', border: 'none', color: 'var(--brand-orange, #F37023)', fontSize: '0.6875rem', cursor: 'pointer', fontWeight: 700, padding: 0 }}
+                    >
+                      Reset
+                    </button>
                   </div>
                   {columns.map(col => (
                     <label 
@@ -508,7 +583,7 @@ export function ExcelDataTable<T extends { id: string | number }>({
                         alignItems: 'center', 
                         gap: '0.4rem', 
                         fontSize: '0.75rem', 
-                        padding: '2px 0', 
+                        padding: '3px 0', 
                         cursor: 'pointer',
                         color: '#334155'
                       }}
@@ -516,15 +591,7 @@ export function ExcelDataTable<T extends { id: string | number }>({
                       <input
                         type="checkbox"
                         checked={visibleColumnKeys.has(col.key)}
-                        onChange={() => {
-                          const newSet = new Set(visibleColumnKeys);
-                          if (newSet.has(col.key)) {
-                            if (newSet.size > 1) newSet.delete(col.key);
-                          } else {
-                            newSet.add(col.key);
-                          }
-                          setVisibleColumnKeys(newSet);
-                        }}
+                        onChange={() => handleToggleColumn(col.key)}
                       />
                       <span>{col.header}</span>
                     </label>
@@ -566,9 +633,28 @@ export function ExcelDataTable<T extends { id: string | number }>({
               <Printer size={13} />
             </button>
 
+            {/* Last updated timestamp */}
+            {lastUpdated && (
+              <span style={{ fontSize: '0.6875rem', color: '#94A3B8', marginLeft: '0.25rem', whiteSpace: 'nowrap' }}>
+                Updated: {typeof lastUpdated === 'string' ? lastUpdated : lastUpdated.toLocaleTimeString()}
+              </span>
+            )}
+
           </div>
 
         </div>
+
+        {/* Error message banner */}
+        {error && (
+          <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.85rem', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '6px', color: '#991B1B', fontSize: '0.78125rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>{error}</span>
+            {onRetry && (
+              <button type="button" onClick={onRetry} className="btn btn-xs btn-outline" style={{ fontSize: '0.6875rem' }}>
+                Retry
+              </button>
+            )}
+          </div>
+        )}
 
         {/* ═══ BULK SELECTION ACTIONS BAR ═══ */}
         {enableSelection && selectedIds.size > 0 && (
@@ -763,7 +849,11 @@ export function ExcelDataTable<T extends { id: string | number }>({
                     >
                       {/* Checkbox */}
                       {enableSelection && (
-                        <td style={{ padding: '0.5rem 0.4rem', textAlign: 'center', borderRight: '1px solid #E2E8F0' }}>
+                        <td style={{ 
+                          padding: density === 'COMPACT' ? '0.35rem 0.4rem' : '0.65rem 0.5rem', 
+                          textAlign: 'center', 
+                          borderRight: '1px solid #E2E8F0' 
+                        }}>
                           <input
                             type="checkbox"
                             checked={isSelected}
@@ -784,7 +874,9 @@ export function ExcelDataTable<T extends { id: string | number }>({
                           <td
                             key={col.key}
                             style={{
-                              padding: '0.5rem 0.65rem',
+                              padding: density === 'COMPACT' ? '0.35rem 0.55rem' : '0.65rem 0.75rem',
+                              fontSize: density === 'COMPACT' ? '0.78125rem' : '0.8125rem',
+                              lineHeight: 1.35,
                               textAlign: col.align || 'left',
                               borderRight: '1px solid #E2E8F0',
                               verticalAlign: 'middle',

@@ -1282,60 +1282,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
         </div>
-
-        {/* Sidebar Footer User Info */}
-        <div
-          style={{
-            padding: collapsed ? '1rem 0' : '1rem 1.25rem',
-            borderTop: '1px solid rgba(255,255,255,0.08)',
-            backgroundColor: 'rgba(0,0,0,0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            gap: '0.75rem',
-            width: '100%',
-            boxSizing: 'border-box'
-          }}
-        >
-          <div className="collapsed-nav-item-wrapper" style={{ width: collapsed ? 'auto' : undefined }}>
-            <div
-              style={{
-                width: '40px',
-                height: '40px',
-                minWidth: '40px',
-                minHeight: '40px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--brand-orange)',
-                color: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 800,
-                fontSize: '0.875rem',
-                border: '2px solid rgba(255,255,255,0.15)',
-                cursor: 'pointer'
-              }}
-            >
-              {user?.name?.charAt(0) || 'U'}
-            </div>
-            {collapsed && (
-              <span className="collapsed-nav-tooltip">
-                {user?.name || 'User'} ({role})
-              </span>
-            )}
-          </div>
-
-          {!collapsed && (
-            <div style={{ flex: 1, overflow: 'hidden' }}>
-              <div style={{ fontSize: '0.875rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {user?.name || 'User'}
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--brand-gold)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {role}
-              </div>
-            </div>
-          )}
-        </div>
       </aside>
     </>
   );

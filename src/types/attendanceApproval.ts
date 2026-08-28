@@ -134,6 +134,13 @@ export interface AttendanceApplication {
   currentHandlerName: string;
   
   status: AttendanceApprovalStatus;
+  facultyStatus?: string;
+  mentorStatus?: string;
+  hodStatus?: string;
+  hoiStatus?: string;
+  examEligibilityStatus?: string;
+  medicalCondonationApplied?: boolean;
+  medicalDocs?: any[];
   finalEligibilityGranted: boolean;
   eligibilityType?: AttendanceEligibilityType;
   
