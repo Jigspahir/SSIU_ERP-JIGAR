@@ -161,8 +161,8 @@ class CentralApprovalWorkflowEngine {
   public canUserActOnRequest(req: ApprovalRequest, user?: User | null, role?: UserRole | null): boolean {
     if (!user || !role || role === 'STUDENT') return false;
 
-    // Super Admin & University Admin can act on any active request
-    if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') {
+    // Super Admin, University Admin & Registrar can act on any active request under university governance
+    if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'REGISTRAR') {
       return req.status === 'PENDING' || req.status === 'UNDER_REVIEW' || req.status === 'FORWARDED' || req.status === 'SUBMITTED' || req.status === 'RETURNED';
     }
 

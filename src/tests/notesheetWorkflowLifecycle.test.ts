@@ -245,19 +245,15 @@ export async function runNotesheetWorkflowLifecycleTests(): Promise<void> {
   const mvtVP = noteFinal.movements.find(m => m.fromUserRole === 'VICE_PRESIDENT' || m.fromUserId === vpUser.id || m.fromUser.includes('VICE_PRESIDENT'));
   assert(Boolean(mvtVP && mvtVP.action === 'APPROVE'), '7.6 Vice President step recorded as APPROVE in movement history');
 
-  // ─── SUMMARY ───────────────────────────────────────────────────────────────
-  console.log('\n========================================================================');
-  console.log(`WORKFLOW LIFECYCLE TEST RESULTS: ${totalPassed} PASSED, ${totalFailed} FAILED out of ${totalTests} tests`);
   console.log('========================================================================\n');
-
-  if (totalFailed > 0 && typeof process !== 'undefined' && process.exit) {
-    process.exit(1);
-  }
 }
 
-if (typeof window === 'undefined' && typeof process !== 'undefined') {
-  runNotesheetWorkflowLifecycleTests().catch(err => {
-    console.error('Fatal test execution error:', err);
-    process.exit(1);
+import { describe, it, expect } from 'vitest';
+
+describe('Notesheet Multi-Stage Approval & Forward Workflow Lifecycle', () => {
+  it('executes the full 35-assertion workflow lifecycle cleanly', async () => {
+    await runNotesheetWorkflowLifecycleTests();
+    expect(totalFailed).toBe(0);
+    expect(totalPassed).toBeGreaterThanOrEqual(35);
   });
-}
+});

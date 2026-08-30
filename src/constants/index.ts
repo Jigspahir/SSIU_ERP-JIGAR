@@ -18,6 +18,7 @@ export const PAGE_SIZE_OPTIONS = [8, 15, 25, 50, 100] as const;
 // ─── Demo Account Credentials ─────────────────────────────────────────────────
 export const DEMO_ACCOUNTS = {
   admin: { identifier: 'admin', password: 'Admin@123', displayName: 'Demo Admin', email: 'demo.admin@university.edu' },
+  registrar: { identifier: 'registrar', password: 'Admin@123', displayName: 'Demo Registrar 1', email: 'demo.registrar1@ssiu-demo.ac.in' },
   studentadmin: { identifier: 'studentadmin', password: 'Admin@123', displayName: 'Onboarding Officer', email: 'onboarding.officer@swarrnim.edu.in' },
   deputyregistrar: { identifier: 'deputyregistrar', password: 'Admin@123', displayName: 'Demo Deputy Registrar 1', email: 'demo.deputyregistrar1@ssiu-demo.ac.in' },
   faculty: { identifier: 'faculty', password: 'Faculty@123', displayName: 'Prof. Demo Faculty', email: 'demo.faculty@university.edu' },

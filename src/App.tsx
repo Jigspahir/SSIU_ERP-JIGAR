@@ -19,6 +19,10 @@ import { DocumentMasterPage } from './pages/master/DocumentMasterPage';
 import { ProfilePage } from './pages/profile/ProfilePage';
 import { DigitalIdCardPage } from './pages/profile/DigitalIdCardPage';
 
+// Modular ERP Extension Plugins Registry
+import './modules';
+import { getPlugin } from './modules/moduleRegistry';
+
 // Academic Module Pages
 import { AttendancePage } from './pages/academic/AttendancePage';
 import { TimetablePage } from './pages/academic/TimetablePage';
@@ -331,6 +335,13 @@ const MainAppContent: React.FC = () => {
           userRole={role || 'GUEST'} 
         />
       );
+    }
+
+    // ─── Modular ERP Plugin Extension Dispatcher ───
+    const pluginManifest = getPlugin(activeTab);
+    if (pluginManifest) {
+      const PluginComponent = pluginManifest.component;
+      return <PluginComponent />;
     }
 
     switch (activeTab) {
@@ -795,6 +806,14 @@ const MainAppContent: React.FC = () => {
         return <RegistrarWorkspacePage initialTab="ACADEMICS" initialSubFilter="CALENDAR" />;
       case 'reg-academic-overview':
         return <RegistrarWorkspacePage initialTab="ACADEMICS" initialSubFilter="OVERVIEW" />;
+      case 'reg-attendance-overview':
+      case 'reg-attendance-inst':
+      case 'reg-attendance-dept':
+      case 'reg-attendance-shortage':
+      case 'reg-attendance-approvals':
+      case 'reg-attendance-reports':
+      case 'reg-attendance-trends':
+        return <RegistrarWorkspacePage initialTab="ATTENDANCE" initialSubFilter="OVERVIEW" />;
       case 'reg-students-overview':
       case 'reg-students-search':
         return <RegistrarWorkspacePage initialTab="STUDENTS" initialSubFilter="SEARCH" />;

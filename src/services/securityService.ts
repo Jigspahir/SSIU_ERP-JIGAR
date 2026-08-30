@@ -334,8 +334,8 @@ export const isUserAuthorizedForApprovalRequest = (
 ): boolean => {
   if (!user || !role) return false;
 
-  // Executive leadership has full executive oversight
-  if (['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRESIDENT', 'VICE_PRESIDENT', 'PROVOST'].includes(role)) {
+  // Executive leadership & Registrar office have full university-level oversight
+  if (['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRESIDENT', 'VICE_PRESIDENT', 'PROVOST', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'ASSISTANT_REGISTRAR'].includes(role)) {
     return true;
   }
 

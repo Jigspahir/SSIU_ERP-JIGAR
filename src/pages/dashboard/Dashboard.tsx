@@ -21,13 +21,14 @@ import { StudentOnboardingTab } from '../../components/admission/StudentOnboardi
 import { StudentAdminWorkspacePage } from '../admin-offices/StudentAdminWorkspacePage';
 import { TemporaryEnrollmentWelcomeModal } from '../../components/common/TemporaryEnrollmentWelcomeModal';
 import { StudentExcelDashboard } from '../../components/dashboard/StudentExcelDashboard';
+import { registrarOfficeService } from '../../services/registrarOfficeService';
 
 interface DashboardProps {
   setActiveTab: (tab: string, params?: any) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
-  const { user, role } = useAuth();
+  const { user, role, registrarViewContext, setRegistrarViewContext } = useAuth();
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [showTempWelcomeModal, setShowTempWelcomeModal] = useState(Boolean(user?.role === 'STUDENT' && (user?.isFirstLogin || user?.enrollmentStatus === 'TEMPORARY')));
 
@@ -1698,105 +1699,407 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
     );
   };
 
-  // 2. Registrar Office Dashboard
+  // 2. Registrar Dual Control Dashboard (University Academic + Registrar Office Administration)
   const renderRegistrarDashboard = () => {
+    // ─── A. Academic Datasets ───
     const allInstitutes = db.getInstitutes();
     const allDepartments = db.getDepartments();
     const allPrograms = db.getPrograms();
     const allStudents = db.getStudents();
     const allFaculty = db.getFaculty();
     const academicYears = db.getAcademicYears();
-    const currentAY = academicYears.find(ay => ay.isCurrent) || academicYears[0] || { name: '2025-2026' };
+    const currentAY = academicYears.find(ay => ay.isCurrent) || academicYears[0] || { name: '2026–27' };
     const pendingStatutory = ((db.getState() as any).statutoryApprovals || []).filter((a: any) => a.status === 'PENDING');
     const pendingReqs = (db.getState().studentRequests || []).filter((r: any) => r.currentOffice === 'REGISTRAR');
     
-    // Attendance Shortage Calculation
+    // Attendance Shortage Calculation (<75% threshold)
     const shortageCount = allStudents.filter(s => {
       const stats = db.getStudentAttendanceStats(s.id);
       return stats.percentage < 75;
     }).length;
 
+    // ─── B. Registrar Office Administration Datasets ───
+    const officeKPIs = registrarOfficeService.getOfficeDashboardKPIs();
+    const officeSections = registrarOfficeService.getSections();
+    const officeStaff = registrarOfficeService.getStaffList();
+    const officeWork = registrarOfficeService.getWorkItems();
+
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
-        {/* 12 Key Governance Statistics */}
-        <div className="grid-4">
-          <StatCard title="Total Institutes" value={allInstitutes.length} subtitle="Constituent Colleges" icon={Building2} colorScheme="navy" onClick={() => setActiveTab('reg-uni-institutes')} />
-          <StatCard title="Total Departments" value={allDepartments.length} subtitle="Academic Divisions" icon={Layers} colorScheme="navy" onClick={() => setActiveTab('reg-uni-departments')} />
-          <StatCard title="Degree Programs" value={allPrograms.length} subtitle="Approved Curriculums" icon={BookOpen} colorScheme="green" onClick={() => setActiveTab('reg-academic-programs')} />
-          <StatCard title="University Students" value={allStudents.length} subtitle="Enrolled Scholars" icon={GraduationCap} colorScheme="orange" onClick={() => setActiveTab('reg-students-overview')} />
-        </div>
-
-        <div className="grid-4">
-          <StatCard title="Total Faculty Strength" value={allFaculty.length} subtitle="Teaching Scholars" icon={UserCheck} colorScheme="navy" onClick={() => setActiveTab('reg-faculty-overview')} />
-          <StatCard title="Active Academic Year" value={currentAY.name} subtitle="Current Session" icon={Calendar} colorScheme="green" onClick={() => setActiveTab('reg-academic-year')} />
-          <StatCard title="Pending Approvals" value={pendingStatutory.length} subtitle="Statutory Decisions" icon={CheckSquare} colorScheme={pendingStatutory.length > 0 ? 'gold' : 'green'} onClick={() => setActiveTab('reg-approvals-pending')} />
-          <StatCard title="Escalated Requests" value={pendingReqs.length} subtitle="Secretariat Petitions" icon={MessageSquare} colorScheme="orange" onClick={() => setActiveTab('reg-requests-escalated')} />
-        </div>
-
-        <div className="grid-4">
-          <StatCard title="Attendance Shortage" value={shortageCount} subtitle="Students Below 75%" icon={Clock} colorScheme={shortageCount > 0 ? 'gold' : 'green'} onClick={() => setActiveTab('reg-attendance-shortage')} />
-          <StatCard title="Exam Form Status" value="98.4%" subtitle="Verified &amp; Cleared" icon={Award} colorScheme="green" onClick={() => setActiveTab('reg-exam-forms')} />
-          <StatCard title="Result Status" value="Active" subtitle="Even Sem Tabulation" icon={FileSpreadsheet} colorScheme="navy" onClick={() => setActiveTab('reg-exam-results')} />
-          <StatCard title="Audit Alerts" value="0 Critical" subtitle="Security Ledger Clean" icon={ShieldCheck} colorScheme="green" onClick={() => setActiveTab('reg-audit-logs')} />
-        </div>
-
-        {/* Institute-wise Comparison Table */}
-        <div className="card" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <div>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)' }}>Constituent Institutes Governance &amp; Enrollment Matrix</h3>
-              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Comparative institutional overview across all constituent entities.</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        
+        {/* ─── DUAL CONTROL EXECUTIVE BANNER ─── */}
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 rounded-2xl border border-indigo-500/20 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+                Dual Control Architecture
+              </span>
+              <span className="text-xs text-slate-400">•</span>
+              <span className="text-xs text-slate-300 font-medium">Apex University Governance</span>
             </div>
-            <button className="btn btn-secondary btn-sm" onClick={() => setActiveTab('reg-uni-overview')}>View Full University Overview</button>
+            <h2 className="text-xl md:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+              <span>Registrar Academic &amp; Secretariat Command Center</span>
+            </h2>
+            <p className="text-xs md:text-sm text-indigo-200/80 mt-1 max-w-2xl">
+              Unified governance console integrating <strong>University-Wide Academic Operations</strong> (12 Constituent Colleges) and the <strong>Autonomous Office of the Registrar</strong> (Secretariat &amp; Statutory Wings).
+            </p>
           </div>
-
-          <div style={{ overflowX: 'auto' }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Institute Name &amp; Code</th>
-                  <th>Head of Institute (HOI)</th>
-                  <th>Departments</th>
-                  <th>Students</th>
-                  <th>Faculty</th>
-                  <th>Avg Attendance</th>
-                  <th>Status</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allInstitutes.map(inst => {
-                  const instDepts = allDepartments.filter(d => d.instituteId === inst.id);
-                  const instStudents = allStudents.filter(s => s.instituteId === inst.id || instDepts.some(d => d.id === s.departmentId));
-                  const instFaculty = allFaculty.filter(f => f.instituteId === inst.id || instDepts.some(d => d.id === f.departmentId));
-
-                  return (
-                    <tr key={inst.id}>
-                      <td>
-                        <strong>{inst.name}</strong>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--brand-orange)' }}>Code: <code>{inst.code}</code></div>
-                      </td>
-                      <td>
-                        <strong>{inst.principalName || 'Dr. Principal'}</strong>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>HOI / Dean</div>
-                      </td>
-                      <td><strong>{instDepts.length}</strong></td>
-                      <td><strong>{instStudents.length}</strong></td>
-                      <td><strong>{instFaculty.length}</strong></td>
-                      <td><Badge variant="active">88.5%</Badge></td>
-                      <td><Badge variant={inst.status === 'INACTIVE' ? 'inactive' : 'active'}>{inst.status || 'ACTIVE'}</Badge></td>
-                      <td>
-                        <button className="btn btn-primary btn-sm" onClick={() => setActiveTab('reg-uni-institutes')}>
-                          Inspect
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <button 
+              onClick={() => setRegistrarViewContext('ACADEMIC')}
+              className={`flex-1 md:flex-initial px-4 py-2 text-xs font-bold rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer ${
+                registrarViewContext === 'ACADEMIC' 
+                  ? 'bg-blue-600 text-white ring-2 ring-blue-400 font-black' 
+                  : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700'
+              }`}
+            >
+              <span>🎓</span>
+              <span>ACADEMIC VIEW</span>
+            </button>
+            <button 
+              onClick={() => setRegistrarViewContext('NON_ACADEMIC')}
+              className={`flex-1 md:flex-initial px-4 py-2 text-xs font-bold rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer ${
+                registrarViewContext === 'NON_ACADEMIC' 
+                  ? 'bg-amber-600 text-white ring-2 ring-amber-400 font-black' 
+                  : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700'
+              }`}
+            >
+              <span>🏢</span>
+              <span>NON-ACADEMIC VIEW</span>
+            </button>
           </div>
         </div>
+
+        {/* ─── SECTION 1: WHAT NEEDS MY ATTENTION? (DUAL ACTIONABLE MATTERS) ─── */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+                What Needs My Attention?
+              </h3>
+            </div>
+            <span className="text-xs text-slate-500 font-medium">Live priority queues</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 1. Academic Decisions */}
+            <div 
+              onClick={() => setActiveTab('reg-approvals-pending')}
+              className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:border-amber-400 transition cursor-pointer flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                  ACADEMIC
+                </span>
+                <CheckSquare className="w-4 h-4 text-blue-600" />
+              </div>
+              <div>
+                <h4 className="text-2xl font-black text-slate-900 dark:text-white">{pendingStatutory.length}</h4>
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5">Statutory Decisions</p>
+                <p className="text-[11px] text-slate-500 mt-1">Pending BoS &amp; Academic Council sign-offs</p>
+              </div>
+            </div>
+
+            {/* 2. Office Overdue Tasks */}
+            <div 
+              onClick={() => setActiveTab('reg-faculty-staff')}
+              className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:border-rose-400 transition cursor-pointer flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                  REGISTRAR OFFICE
+                </span>
+                <AlertTriangle className="w-4 h-4 text-rose-600" />
+              </div>
+              <div>
+                <h4 className="text-2xl font-black text-rose-600 dark:text-rose-400">{officeKPIs.overdueWork}</h4>
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5">Overdue Matters</p>
+                <p className="text-[11px] text-slate-500 mt-1">Files exceeding statutory due dates</p>
+              </div>
+            </div>
+
+            {/* 3. Academic Shortage Alert */}
+            <div 
+              onClick={() => setActiveTab('reg-academic-overview')}
+              className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:border-amber-400 transition cursor-pointer flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                  ACADEMIC
+                </span>
+                <Clock className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <h4 className="text-2xl font-black text-amber-600 dark:text-amber-400">{shortageCount}</h4>
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5">Attendance Shortfall</p>
+                <p className="text-[11px] text-slate-500 mt-1">Students below 75% examination threshold</p>
+              </div>
+            </div>
+
+            {/* 4. Escalated Office Matters */}
+            <div 
+              onClick={() => setActiveTab('reg-faculty-staff')}
+              className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:border-indigo-400 transition cursor-pointer flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                  REGISTRAR OFFICE
+                </span>
+                <Briefcase className="w-4 h-4 text-indigo-600" />
+              </div>
+              <div>
+                <h4 className="text-2xl font-black text-indigo-600 dark:text-indigo-400">{officeKPIs.inProgressWork + officeKPIs.pendingWork}</h4>
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-0.5">Active Office Matters</p>
+                <p className="text-[11px] text-slate-500 mt-1">Under Deputy &amp; Asst Registrar scrutiny</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── SECTION 2: UNIVERSITY ACADEMIC GOVERNANCE ─── */}
+        <div className={`space-y-4 pt-2 p-4 rounded-2xl transition-all ${
+          registrarViewContext === 'ACADEMIC' 
+            ? 'bg-blue-50/40 dark:bg-blue-950/20 border-2 border-blue-400/40' 
+            : 'border border-transparent'
+        }`}>
+          <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
+            <div className="flex items-center gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Control Area 1</span>
+                  {registrarViewContext === 'ACADEMIC' && (
+                    <span className="px-2 py-0.5 text-[9px] font-extrabold uppercase rounded-full bg-blue-600 text-white animate-pulse">Active Focus</span>
+                  )}
+                </div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white">University Academic Operations &amp; Colleges</h3>
+              </div>
+            </div>
+            <button 
+              onClick={() => setActiveTab('reg-uni-overview')}
+              className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+            >
+              <span>Explore Academic Tree</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Academic KPIs Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard title="Constituent Institutes" value={allInstitutes.length} subtitle="12 Colleges &amp; Faculties" icon={Building2} colorScheme="navy" onClick={() => setActiveTab('reg-uni-institutes')} />
+            <StatCard title="Academic Departments" value={allDepartments.length} subtitle="Divisions &amp; Centers" icon={Layers} colorScheme="navy" onClick={() => setActiveTab('reg-uni-departments')} />
+            <StatCard title="Degree Programs" value={allPrograms.length} subtitle="Approved Curriculums" icon={BookOpen} colorScheme="green" onClick={() => setActiveTab('reg-academic-programs')} />
+            <StatCard title="Enrolled Students" value={allStudents.length} subtitle="Scholars on Roll" icon={GraduationCap} colorScheme="orange" onClick={() => setActiveTab('reg-students-overview')} />
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard title="Faculty Strength" value={allFaculty.length} subtitle="Appointed Professors" icon={UserCheck} colorScheme="navy" onClick={() => setActiveTab('reg-faculty-overview')} />
+            <StatCard title="Active Academic Year" value={currentAY.name} subtitle="Current Session" icon={Calendar} colorScheme="green" onClick={() => setActiveTab('reg-academic-year')} />
+            <StatCard title="Exam Form Status" value="98.4%" subtitle="Eligibility Cleared" icon={Award} colorScheme="green" onClick={() => setActiveTab('reg-exam-forms')} />
+            <StatCard title="Average Attendance" value="88.2%" subtitle="University-wide Health" icon={Activity} colorScheme="green" onClick={() => setActiveTab('reg-academic-overview')} />
+          </div>
+
+          {/* Constituent Institutes Comparative Matrix */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900 dark:text-white">Constituent Institutes Governance &amp; Enrollment Matrix</h4>
+                <p className="text-xs text-slate-500 mt-0.5">Live drilldown into faculties, deans, student strength, and faculty strength.</p>
+              </div>
+              <button 
+                onClick={() => setActiveTab('reg-uni-institutes')}
+                className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 text-xs font-semibold rounded-lg transition"
+              >
+                View Full Institutes Directory →
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 font-semibold">
+                    <th className="p-3">Institute &amp; Code</th>
+                    <th className="p-3">Head of Institute (HOI)</th>
+                    <th className="p-3 text-center">Departments</th>
+                    <th className="p-3 text-center">Students</th>
+                    <th className="p-3 text-center">Faculty</th>
+                    <th className="p-3 text-center">Avg Attendance</th>
+                    <th className="p-3 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {allInstitutes.map(inst => {
+                    const instDepts = allDepartments.filter(d => d.instituteId === inst.id);
+                    const instStudents = allStudents.filter(s => s.instituteId === inst.id || instDepts.some(d => d.id === s.departmentId));
+                    const instFaculty = allFaculty.filter(f => f.instituteId === inst.id || instDepts.some(d => d.id === f.departmentId));
+
+                    return (
+                      <tr key={inst.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition">
+                        <td className="p-3">
+                          <div className="font-bold text-slate-900 dark:text-white">{inst.name}</div>
+                          <div className="text-[11px] text-blue-600 dark:text-blue-400 font-mono">Code: {inst.code}</div>
+                        </td>
+                        <td className="p-3">
+                          <div className="font-medium text-slate-800 dark:text-slate-200">{inst.principalName || 'Dr. Dean / Principal'}</div>
+                          <div className="text-[11px] text-slate-500">Institute Leadership</div>
+                        </td>
+                        <td className="p-3 text-center font-bold">{instDepts.length}</td>
+                        <td className="p-3 text-center font-bold text-orange-600 dark:text-orange-400">{instStudents.length}</td>
+                        <td className="p-3 text-center font-bold text-indigo-600 dark:text-indigo-400">{instFaculty.length}</td>
+                        <td className="p-3 text-center">
+                          <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            88.5%
+                          </span>
+                        </td>
+                        <td className="p-3 text-center">
+                          <button 
+                            onClick={() => setActiveTab('reg-uni-institutes')}
+                            className="px-2.5 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 rounded text-xs font-semibold transition"
+                          >
+                            Drill Down →
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── SECTION 3: REGISTRAR OFFICE ADMINISTRATION ─── */}
+        <div className={`space-y-4 pt-2 p-4 rounded-2xl transition-all ${
+          registrarViewContext === 'NON_ACADEMIC' 
+            ? 'bg-amber-50/40 dark:bg-amber-950/20 border-2 border-amber-400/40' 
+            : 'border border-transparent'
+        }`}>
+          <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Control Area 2</span>
+                {registrarViewContext === 'NON_ACADEMIC' && (
+                  <span className="px-2 py-0.5 text-[9px] font-extrabold uppercase rounded-full bg-amber-600 text-white animate-pulse">Active Focus</span>
+                )}
+              </div>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white">Registrar Office &amp; Administrative Secretariat</h3>
+            </div>
+            <button 
+              onClick={() => setActiveTab('reg-faculty-staff')}
+              className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+            >
+              <span>Manage Secretariat Hierarchy</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Office Administration KPIs */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard title="Secretariat Staff" value={officeKPIs.totalStaff} subtitle="10 Active Officers" icon={Users2} colorScheme="navy" onClick={() => setActiveTab('reg-faculty-staff')} />
+            <StatCard title="Deputy Registrars" value={officeKPIs.deputyRegistrars} subtitle="Academics &amp; Evaluation" icon={ShieldCheck} colorScheme="navy" onClick={() => setActiveTab('reg-faculty-staff')} />
+            <StatCard title="Assistant Registrars" value={officeKPIs.assistantRegistrars} subtitle="Records &amp; Establishment" icon={ShieldCheck} colorScheme="green" onClick={() => setActiveTab('reg-faculty-staff')} />
+            <StatCard title="Section Officers" value={officeKPIs.sectionOfficers} subtitle="Branch In-charges" icon={Briefcase} colorScheme="orange" onClick={() => setActiveTab('reg-faculty-staff')} />
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard title="Active Sections" value={officeKPIs.activeSections} subtitle="Statutory Branches" icon={Layers} colorScheme="navy" onClick={() => setActiveTab('reg-faculty-staff')} />
+            <StatCard title="Active Matters" value={officeKPIs.inProgressWork + officeKPIs.pendingWork} subtitle="Tasks In Transit" icon={FileText} colorScheme="green" onClick={() => setActiveTab('reg-faculty-staff')} />
+            <StatCard title="Overdue Files" value={officeKPIs.overdueWork} subtitle="Statutory Target Breached" icon={AlertTriangle} colorScheme={officeKPIs.overdueWork > 0 ? 'orange' : 'green'} onClick={() => setActiveTab('reg-faculty-staff')} />
+            <StatCard title="Completed Matters" value={officeKPIs.completedWork} subtitle="Resolved &amp; Gazetted" icon={CheckCircle2} colorScheme="green" onClick={() => setActiveTab('reg-faculty-staff')} />
+          </div>
+
+          {/* 7 Statutory Office Sections Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {officeSections.slice(0, 6).map(sec => {
+              const secStaff = officeStaff.filter(s => s.sectionId === sec.id);
+              const secWork = officeWork.filter(w => w.sectionId === sec.id && w.status !== 'COMPLETED');
+
+              return (
+                <div 
+                  key={sec.id}
+                  onClick={() => setActiveTab('reg-faculty-staff')}
+                  className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:border-indigo-400 transition cursor-pointer flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 uppercase">{sec.sectionCode}</span>
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                        {secStaff.length} Officers
+                      </span>
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">{sec.sectionName}</h4>
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">{sec.description}</p>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Active Matters: <strong className="text-slate-900 dark:text-white">{secWork.length}</strong></span>
+                    <span className="text-indigo-600 font-semibold flex items-center gap-0.5">Control →</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ─── SECTION 4: EXECUTIVE DUAL QUICK CONTROLS ─── */}
+        <div className="bg-slate-50 dark:bg-slate-800/40 p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Executive 1-Click Launchers</h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            <button 
+              onClick={() => setActiveTab('reg-uni-institutes')}
+              className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-400 text-left transition shadow-xs"
+            >
+              <Building2 className="w-4 h-4 text-blue-600 mb-1" />
+              <div className="text-xs font-bold text-slate-900 dark:text-white">Colleges</div>
+              <div className="text-[10px] text-slate-500">12 Constituent Units</div>
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('reg-uni-departments')}
+              className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-400 text-left transition shadow-xs"
+            >
+              <Layers className="w-4 h-4 text-blue-600 mb-1" />
+              <div className="text-xs font-bold text-slate-900 dark:text-white">Departments</div>
+              <div className="text-[10px] text-slate-500">Academic Divisions</div>
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('reg-faculty-overview')}
+              className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-400 text-left transition shadow-xs"
+            >
+              <UserCheck className="w-4 h-4 text-blue-600 mb-1" />
+              <div className="text-xs font-bold text-slate-900 dark:text-white">Faculty &amp; Staff</div>
+              <div className="text-[10px] text-slate-500">Workforce &amp; Portfolios</div>
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('reg-approvals-pending')}
+              className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-400 text-left transition shadow-xs"
+            >
+              <CheckSquare className="w-4 h-4 text-blue-600 mb-1" />
+              <div className="text-xs font-bold text-slate-900 dark:text-white">Academic Approvals</div>
+              <div className="text-[10px] text-slate-500">Statutory Sign-offs</div>
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('reg-faculty-staff')}
+              className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-indigo-400 text-left transition shadow-xs"
+            >
+              <ShieldCheck className="w-4 h-4 text-indigo-600 mb-1" />
+              <div className="text-xs font-bold text-slate-900 dark:text-white">My Secretariat</div>
+              <div className="text-[10px] text-slate-500">Office Roster &amp; Tasks</div>
+            </button>
+
+            <button 
+              onClick={() => setActiveTab('reg-audit-logs')}
+              className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-indigo-400 text-left transition shadow-xs"
+            >
+              <Clock className="w-4 h-4 text-indigo-600 mb-1" />
+              <div className="text-xs font-bold text-slate-900 dark:text-white">Audit Ledger</div>
+              <div className="text-[10px] text-slate-500">Immutable Records</div>
+            </button>
+          </div>
+        </div>
+
       </div>
     );
   };
@@ -2880,6 +3183,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
           </h2>
           <div style={{ fontSize: '0.84375rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 700, color: 'var(--brand-orange)' }}>{getRoleDisplayName(role)}</span>
+            {role === 'REGISTRAR' && (
+              <span className="px-2 py-0.5 text-xs font-semibold rounded bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                Dual Control • University Academic + Registrar Office
+              </span>
+            )}
             <span>•</span>
             <span>Academic Year: <strong>2026–27</strong></span>
           </div>

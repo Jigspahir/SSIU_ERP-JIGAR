@@ -6427,36 +6427,64 @@ export interface InternationalStudentRecord {
 }
 
 // ─── DEPUTY REGISTRAR INSTITUTIONAL & DEPARTMENTAL SCOPE MAPPING ───────────
+export type DeputyRegistrarScopeLevel = 
+  | 'UNIVERSITY'
+  | 'INSTITUTE'
+  | 'DEPARTMENT'
+  | 'MULTI_INSTITUTE'
+  | 'MULTI_DEPARTMENT';
+
+export type DeputyRegistrarScopeStatus = 
+  | 'ACTIVE' 
+  | 'SUSPENDED' 
+  | 'REVOKED' 
+  | 'INACTIVE';
+
 export interface DeputyRegistrarScopeMapping {
   id: string;
   userId: string;
   userName?: string;
+  employeeId?: string;
+  userEmail?: string;
+  designation?: string;
   instituteId: string;
   instituteCode?: string;
   instituteName?: string;
   departmentIds: string[];
   departmentNames?: string[];
+  scopeLevel?: DeputyRegistrarScopeLevel;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+  reason?: string;
   assignedByUserId: string;
   assignedByName?: string;
   assignedByRole?: string;
   assignedBy?: string;
   assignedAt?: string;
+  revokedByUserId?: string;
+  revokedByName?: string;
+  revokedAt?: string;
+  revokeReason?: string;
   isUniversalInstituteScope?: boolean;
-  userEmail?: string;
-  status: 'ACTIVE' | 'INACTIVE';
+  status: DeputyRegistrarScopeStatus;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface DeputyRegistrarScopeAudit {
   id: string;
+  scopeId?: string;
   userId: string;
   userName: string;
+  employeeId?: string;
   instituteId: string;
   instituteName?: string;
   departmentId?: string;
   departmentName?: string;
-  action: 'ASSIGNED' | 'REMOVED' | 'UPDATED';
+  oldScope?: string;
+  newScope?: string;
+  action: 'ASSIGNED' | 'REMOVED' | 'UPDATED' | 'TRANSFERRED' | 'REVOKED' | 'SUSPENDED' | 'REACTIVATED';
+  reason?: string;
   assignedByUserId: string;
   assignedByName: string;
   assignedByRole: string;
@@ -6935,3 +6963,265 @@ export interface ManualTestRecord {
 
 export * from './studentDataChangeRequest';
 export * from './studentMapping';
+export * from './registrarOffice';
+
+// ==============================================================================
+// SSIU ERP — RELATIONAL FOUNDATION & MASTER DATA MODELS (PHASE 1)
+// ==============================================================================
+
+export interface UserOrganizationScope {
+  id: string;
+  userId: string;
+  organizationType: 'UNIVERSITY' | 'INSTITUTE' | 'DEPARTMENT' | 'PROGRAM';
+  organizationId: string;
+  roleId: UserRole | string;
+  isActive: boolean;
+  validFrom: string;
+  validTo?: string;
+  assignedByUserId?: string;
+  createdAt: string;
+}
+
+export interface MentorAssignmentRecord {
+  id: string;
+  mentorId: string;
+  mentorName?: string;
+  studentId: string;
+  studentName?: string;
+  programId: string;
+  departmentId: string;
+  instituteId: string;
+  academicYearId: string;
+  semesterId?: string;
+  startDate: string;
+  endDate?: string;
+  status: 'ACTIVE' | 'COMPLETED' | 'TRANSFERRED';
+  assignedByUserId: string;
+  createdAt: string;
+}
+
+export interface HODAssignmentRecord {
+  id: string;
+  hodId: string;
+  hodName: string;
+  departmentId: string;
+  departmentName: string;
+  instituteId: string;
+  instituteName: string;
+  startDate: string;
+  endDate?: string;
+  status: 'ACTIVE' | 'COMPLETED' | 'RELIEVED';
+  appointedByUserId: string;
+  createdAt: string;
+}
+
+export interface HOIAssignmentRecord {
+  id: string;
+  hoiId: string;
+  hoiName: string;
+  instituteId: string;
+  instituteName: string;
+  startDate: string;
+  endDate?: string;
+  status: 'ACTIVE' | 'COMPLETED' | 'RELIEVED';
+  appointedByUserId: string;
+  createdAt: string;
+}
+
+export interface FacultySubjectAllocationRecord {
+  id: string;
+  facultyId: string;
+  facultyName: string;
+  subjectId: string;
+  subjectName: string;
+  subjectCode: string;
+  programId: string;
+  departmentId: string;
+  instituteId: string;
+  semesterId: string;
+  academicYearId: string;
+  divisionId?: string;
+  workloadHoursPerWeek: number;
+  status: 'ACTIVE' | 'COMPLETED';
+  createdAt: string;
+}
+
+export interface FacultyWorkloadRecord {
+  id: string;
+  facultyId: string;
+  subjectId: string;
+  programId: string;
+  departmentId: string;
+  instituteId: string;
+  semesterId: string;
+  academicYearId: string;
+  hours: number;
+  workloadType: 'THEORY' | 'PRACTICAL' | 'TUTORIAL' | 'LAB' | 'ADMINISTRATIVE';
+  status: 'ACTIVE' | 'ARCHIVED';
+  createdAt: string;
+}
+
+export interface AssetBusinessTransferRecord {
+  id: string;
+  assetId: string;
+  assetTag: string;
+  assetName: string;
+  fromDepartmentId: string;
+  fromDepartmentName: string;
+  toDepartmentId: string;
+  toDepartmentName: string;
+  fromUserId?: string;
+  toUserId?: string;
+  transferredByUserId: string;
+  transferDate: string;
+  remarks: string;
+  status: 'PENDING' | 'APPROVED' | 'COMPLETED' | 'REJECTED';
+  createdAt: string;
+}
+
+export interface AssetBusinessIssueRecord {
+  id: string;
+  assetId: string;
+  assetTag: string;
+  assetName: string;
+  issuedToUserId: string;
+  issuedToUserName: string;
+  issuedToRole: string;
+  issuedByUserId: string;
+  departmentId: string;
+  issueDate: string;
+  expectedReturnDate?: string;
+  status: 'ISSUED' | 'RETURNED' | 'OVERDUE';
+  createdAt: string;
+}
+
+export interface AssetBusinessReturnRecord {
+  id: string;
+  assetId: string;
+  assetTag: string;
+  issueId?: string;
+  returnedByUserId: string;
+  returnedByUserName: string;
+  receivedByUserId: string;
+  returnDate: string;
+  assetCondition: 'EXCELLENT' | 'GOOD' | 'DAMAGED' | 'SCRAP';
+  status: 'COMPLETED';
+  remarks?: string;
+  createdAt: string;
+}
+
+export interface AssetBusinessReplacementRecord {
+  id: string;
+  oldAssetId: string;
+  newAssetId: string;
+  reason: string;
+  requestedByUserId: string;
+  approvedByUserId?: string;
+  status: 'REQUESTED' | 'APPROVED' | 'COMPLETED' | 'REJECTED';
+  createdAt: string;
+}
+
+export interface AssetBusinessMaintenanceRecord {
+  id: string;
+  assetId: string;
+  vendorName: string;
+  issueDescription: string;
+  estimatedCost: number;
+  actualCost?: number;
+  status: 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  serviceDate: string;
+  completionDate?: string;
+  createdAt: string;
+}
+
+export interface AssetBusinessRequisitionRecord {
+  id: string;
+  requisitionNumber: string;
+  requesterUserId: string;
+  requesterName: string;
+  departmentId: string;
+  instituteId: string;
+  itemName: string;
+  quantity: number;
+  estimatedBudget: number;
+  purpose: string;
+  status: 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'FULFILLED';
+  approvalId?: string;
+  createdAt: string;
+}
+
+export interface UniversalDocumentRecord {
+  id: string;
+  entityType: 'STUDENT' | 'FACULTY' | 'STAFF' | 'NOTESHEET' | 'REQUEST' | 'EXAMINATION' | 'APPROVAL' | 'ASSET';
+  entityId: string;
+  documentCategory: string;
+  fileName: string;
+  fileUrl: string;
+  fileSize?: number;
+  uploadedByUserId: string;
+  uploadedByName: string;
+  verifiedByUserId?: string;
+  verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  version: number;
+  createdAt: string;
+}
+
+export interface UserAuthorizationContext {
+  userId: string;
+  userName: string;
+  email: string;
+  activeRole: UserRole | string;
+  assignedRoles: Array<UserRole | string>;
+  permissions: string[];
+  universityId?: string;
+  instituteId?: string;
+  instituteIds?: string[];
+  departmentId?: string;
+  departmentIds?: string[];
+  programIds?: string[];
+  assignedStudentIds?: string[];
+  delegationIds?: string[];
+}
+
+export interface ReportingRelationshipRecord {
+  id: string;
+  managerUserId: string;
+  managerName?: string;
+  managerRole?: string;
+  employeeUserId: string;
+  employeeName?: string;
+  employeeRole?: string;
+  relationshipType: 'DIRECT_REPORTS_TO' | 'DELEGATED_TO' | 'COMMITTEE_CHAIR' | 'DEPUTY_ASSIGNED';
+  organizationId?: string;
+  departmentId?: string;
+  startDate: string;
+  endDate?: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  createdByUserId: string;
+  createdAt: string;
+}
+
+export interface DelegationRecord {
+  id: string;
+  delegatorUserId: string;
+  delegatorName: string;
+  delegatorRole: UserRole | string;
+  delegateUserId: string;
+  delegateName: string;
+  delegateRole: UserRole | string;
+  permissionScope: string[];
+  entityScope?: {
+    instituteId?: string;
+    departmentId?: string;
+    programId?: string;
+  };
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: 'ACTIVE' | 'EXPIRED' | 'REVOKED';
+  createdAt: string;
+  revokedAt?: string;
+  revokedByUserId?: string;
+}
+
+

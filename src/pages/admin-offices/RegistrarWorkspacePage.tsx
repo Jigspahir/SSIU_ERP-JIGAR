@@ -24,12 +24,27 @@ import {
   DeputyRegistrarScopeMapping, DeputyRegistrarScopeAudit
 } from '../../types';
 import { StudentDataChangeTab } from '../../components/profile/StudentDataChangeTab';
+import { ExcelDataTable, ExcelColumn } from '../../components/common/ExcelDataTable';
+import { StaffProfileDossierModal } from '../../components/profile/StaffProfileDossierModal';
+import { DepartmentCompleteManagementView } from '../../components/campus/DepartmentCompleteManagementView';
+import { InstituteCompleteManagementView } from '../../components/campus/InstituteCompleteManagementView';
+import { RegistrarFacultyStaffControlView } from '../../components/campus/RegistrarFacultyStaffControlView';
+import { RegistrarOfficeOrganizationView } from '../../components/campus/RegistrarOfficeOrganizationView';
+import { RegistrarExamGovernanceView } from '../../components/academic/RegistrarExamGovernanceView';
+import { RegistrarAcademicRequestsGovernanceView } from '../../components/academic/RegistrarAcademicRequestsGovernanceView';
+import { RegistrarAcademicReportsView } from '../../components/academic/RegistrarAcademicReportsView';
+import { RegistrarDeputyScopeManagementView } from '../../components/campus/RegistrarDeputyScopeManagementView';
+import { RegistrarAcademicAdministrationView } from '../../components/academic/RegistrarAcademicAdministrationView';
+import { RegistrarAttendanceGovernanceView } from '../../components/academic/RegistrarAttendanceGovernanceView';
+import { NoteSheetPage } from './NoteSheetPage';
 import * as XLSX from 'xlsx';
 
 export type RegistrarTabType = 
   | 'DASHBOARD'
+  | 'MY_OFFICE'
   | 'UNIVERSITY'
   | 'ACADEMICS'
+  | 'ATTENDANCE'
   | 'STUDENTS'
   | 'FACULTY'
   | 'NOTESHEETS'
@@ -82,6 +97,10 @@ export const RegistrarWorkspacePage: React.FC<RegistrarWorkspacePageProps> = ({
 
   // Modals & Drawers
   const [selectedStudentForProfile, setSelectedStudentForProfile] = useState<Student | null>(null);
+  const [selectedFacultyForProfile, setSelectedFacultyForProfile] = useState<Faculty | null>(null);
+  const [selectedInstituteForDrilldown, setSelectedInstituteForDrilldown] = useState<Institute | null>(null);
+  const [selectedDepartmentForDrilldown, setSelectedDepartmentForDrilldown] = useState<Department | null>(null);
+  const [departmentDrilldownTab, setDepartmentDrilldownTab] = useState<string>('OVERVIEW');
   
   // Scope Assignment Modal State
   const [isScopeModalOpen, setIsScopeModalOpen] = useState(false);
@@ -245,8 +264,8 @@ export const RegistrarWorkspacePage: React.FC<RegistrarWorkspacePageProps> = ({
     const totalStud = students.length;
     const totalFac = faculty.length;
     
-    // Notesheets pending with registrar
-    const pendingNotesheets = noteSheets.filter(n => n.status === 'UNDER_REVIEW' || n.status === 'SUBMITTED' || n.status === 'PENDING_APPROVAL').length;
+    // Notesheets pending with registrar (derived strictly from central Single Source of Truth)
+    const pendingNotesheets = db.getPendingWithMeNotesheets(user, role).length;
     const pendingApprovalsCount = statutoryApprovals.filter(a => a.status === 'PENDING').length;
     const escalatedRequestsCount = allRequests.filter(r => r.status === 'SUBMITTED' || (r as any).escalated).length + sectionRequests.filter(r => r.status === 'UNDER_REVIEW' || r.status === 'PROCESSING').length;
     const pendingDocsCount = allDocs.filter(d => (d as any).verificationStatus === 'PENDING_VERIFICATION' || (d as any).status === 'PENDING').length;
@@ -278,6 +297,180 @@ export const RegistrarWorkspacePage: React.FC<RegistrarWorkspacePageProps> = ({
       pendingActions: committeeActionItems.filter(a => a.status === 'PENDING' || a.status === 'IN_PROGRESS').length
     };
   }, [institutes, departments, programs, students, faculty, noteSheets, statutoryApprovals, allRequests, sectionRequests, allDocs, exams, officialCorrespondence, fileMovements, committees, committeeActionItems]);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // UNIVERSITY ALL DEPARTMENTS DIRECTORY DATA & COLUMNS
+  // ──────────────────────────────────────────────────────────────────────────
+  const departmentDirectoryData = useMemo(() => {
+    return departments.map((dept, idx) => {
+      const inst = institutes.find(i => i.id === dept.instituteId) || allInstitutes.find(i => i.id === dept.instituteId);
+      const dProgs = programs.filter(p => p.departmentId === dept.id);
+      const dStudents = students.filter(s => s.departmentId === dept.id);
+      const dFaculty = faculty.filter(f => f.departmentId === dept.id);
+      const dSections = dProgs.length * 2;
+      
+      const dAttendanceShortages = dStudents.filter(s => {
+        const stats = db.getStudentAttendanceStats(s.id);
+        const avg = stats ? stats.percentage : 85;
+        return avg < 75;
+      }).length;
+
+      const dAcademicRisks = dStudents.filter(s => {
+        const sem = s.academicHistory?.[s.academicHistory.length - 1];
+        return (sem && ((sem as any).gpa < 5.0 || ((sem as any).backlogs && (sem as any).backlogs > 0)));
+      }).length;
+
+      const dPendingApprovals = statutoryApprovals.filter(a => a.departmentId === dept.id && a.status === 'PENDING').length;
+      const dPendingRequests = allRequests.filter(r => r.departmentId === dept.id && (r.status === 'SUBMITTED' || r.status === 'FORWARDED_TO_DEPARTMENT')).length;
+      const dHOD = faculty.find(f => f.departmentId === dept.id && (f.designation?.toLowerCase().includes('hod') || f.email?.includes('hod'))) || faculty.find(f => f.departmentId === dept.id);
+
+      return {
+        id: dept.id,
+        index: idx + 1,
+        department: dept,
+        name: dept.name,
+        code: dept.code,
+        instituteId: dept.instituteId,
+        instituteCode: inst?.code || 'INST',
+        instituteName: inst?.name || 'Constituent Institute',
+        hodName: dHOD?.name || (dept as any).hodName || 'Prof. Appointed HOD',
+        hodEmail: dHOD?.email || (dept as any).hodEmail || 'hod@swarrnim.edu.in',
+        programsCount: dProgs.length,
+        studentsCount: dStudents.length,
+        facultyCount: dFaculty.length,
+        sectionsCount: dSections,
+        activeAY: currentAY.name,
+        attendanceRiskCount: dAttendanceShortages,
+        academicRiskCount: dAcademicRisks,
+        pendingApprovalsCount: dPendingApprovals,
+        pendingRequestsCount: dPendingRequests,
+        examStatus: 'SCHEDULED',
+        status: (dept as any).status || 'ACTIVE'
+      };
+    });
+  }, [departments, institutes, allInstitutes, programs, students, faculty, statutoryApprovals, allRequests, currentAY]);
+
+  const departmentDirectoryColumns: ExcelColumn<any>[] = [
+    {
+      key: 'code',
+      header: 'Dept Code',
+      width: '120px',
+      render: item => <code style={{ fontWeight: 800, color: 'var(--brand-orange, #F37023)' }}>{item.code}</code>
+    },
+    {
+      key: 'name',
+      header: 'Department Name',
+      width: '230px',
+      render: item => (
+        <div>
+          <strong style={{ color: 'var(--brand-navy, #0B192C)' }}>{item.name}</strong>
+          <div style={{ fontSize: '0.72rem', color: '#64748B' }}>{item.instituteName} ({item.instituteCode})</div>
+        </div>
+      )
+    },
+    {
+      key: 'hodName',
+      header: 'Head of Department (HOD)',
+      width: '180px',
+      render: item => (
+        <div>
+          <div style={{ fontWeight: 600 }}>{item.hodName}</div>
+          <div style={{ fontSize: '0.72rem', color: '#64748B' }}>{item.hodEmail}</div>
+        </div>
+      )
+    },
+    {
+      key: 'programsCount',
+      header: 'Programs',
+      width: '95px',
+      align: 'center',
+      render: item => <Badge variant="navy">{item.programsCount} Degree</Badge>
+    },
+    {
+      key: 'studentsCount',
+      header: 'Students',
+      width: '95px',
+      align: 'center',
+      render: item => <span style={{ fontWeight: 700, color: '#10B981' }}>{item.studentsCount}</span>
+    },
+    {
+      key: 'facultyCount',
+      header: 'Faculty',
+      width: '90px',
+      align: 'center',
+      render: item => <span style={{ fontWeight: 700, color: '#6366F1' }}>{item.facultyCount}</span>
+    },
+    {
+      key: 'attendanceRiskCount',
+      header: 'Attendance Risk',
+      width: '120px',
+      align: 'center',
+      render: item => (
+        <Badge variant={item.attendanceRiskCount > 0 ? 'warning' : 'active'}>
+          {item.attendanceRiskCount > 0 ? `${item.attendanceRiskCount} Shortage` : 'Normal (≥75%)'}
+        </Badge>
+      )
+    },
+    {
+      key: 'academicRiskCount',
+      header: 'Academic Risk',
+      width: '110px',
+      align: 'center',
+      render: item => (
+        <Badge variant={item.academicRiskCount > 0 ? 'danger' : 'active'}>
+          {item.academicRiskCount > 0 ? `${item.academicRiskCount} At-Risk` : 'Clear'}
+        </Badge>
+      )
+    },
+    {
+      key: 'pendingApprovalsCount',
+      header: 'Approvals',
+      width: '95px',
+      align: 'center',
+      render: item => (
+        <Badge variant={item.pendingApprovalsCount > 0 ? 'gold' : 'inactive'}>
+          {item.pendingApprovalsCount}
+        </Badge>
+      )
+    },
+    {
+      key: 'pendingRequestsCount',
+      header: 'Requests',
+      width: '95px',
+      align: 'center',
+      render: item => (
+        <Badge variant={item.pendingRequestsCount > 0 ? 'warning' : 'inactive'}>
+          {item.pendingRequestsCount}
+        </Badge>
+      )
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      width: '95px',
+      align: 'center',
+      render: item => <Badge variant="active">{item.status}</Badge>
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      width: '180px',
+      align: 'right',
+      sortable: false,
+      render: item => (
+        <button
+          type="button"
+          className="btn btn-primary btn-xs"
+          onClick={() => {
+            setSelectedDepartmentForDrilldown(item.department);
+            setDepartmentDrilldownTab('OVERVIEW');
+          }}
+        >
+          Open Management View →
+        </button>
+      )
+    }
+  ];
 
   // ──────────────────────────────────────────────────────────────────────────
   // EXPORT UTILITY: XLSX ONLY (NO CSV)
@@ -588,32 +781,56 @@ export const RegistrarWorkspacePage: React.FC<RegistrarWorkspacePageProps> = ({
 
         {/* Global KPI Ribbon */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mt-6 pt-6 border-t border-slate-700/60">
-          <div className="bg-white/5 rounded-xl p-3 border border-white/5">
+          <div 
+            onClick={() => setActiveTab('UNIVERSITY')}
+            className="bg-white/5 hover:bg-white/10 transition cursor-pointer rounded-xl p-3 border border-white/5"
+            title="View Constituent Institutes"
+          >
             <span className="text-xs text-slate-400 font-medium">Institutes</span>
             <div className="text-xl font-bold text-white mt-0.5">{kpiStats.totalInst}</div>
             <span className="text-[11px] text-blue-300">Constituent Units</span>
           </div>
-          <div className="bg-white/5 rounded-xl p-3 border border-white/5">
+          <div 
+            onClick={() => setActiveTab('STUDENTS')}
+            className="bg-white/5 hover:bg-white/10 transition cursor-pointer rounded-xl p-3 border border-white/5"
+            title="View Student Administration"
+          >
             <span className="text-xs text-slate-400 font-medium">Enrolled Students</span>
             <div className="text-xl font-bold text-white mt-0.5">{kpiStats.totalStud}</div>
             <span className="text-[11px] text-emerald-300">All Semesters</span>
           </div>
-          <div className="bg-white/5 rounded-xl p-3 border border-white/5">
-            <span className="text-xs text-slate-400 font-medium">Faculty Strength</span>
+          <div 
+            onClick={() => setActiveTab('FACULTY')}
+            className="bg-white/5 hover:bg-white/10 transition cursor-pointer rounded-xl p-3 border border-white/5"
+            title="View Complete Faculty & Staff Control Center"
+          >
+            <span className="text-xs text-slate-400 font-medium">Faculty & Staff</span>
             <div className="text-xl font-bold text-white mt-0.5">{kpiStats.totalFac}</div>
-            <span className="text-[11px] text-indigo-300">Teaching Roster</span>
+            <span className="text-[11px] text-indigo-300">Academic Workforce</span>
           </div>
-          <div className="bg-white/5 rounded-xl p-3 border border-white/5">
+          <div 
+            onClick={() => setActiveTab('APPROVALS')}
+            className="bg-white/5 hover:bg-white/10 transition cursor-pointer rounded-xl p-3 border border-white/5"
+            title="View Pending Approvals"
+          >
             <span className="text-xs text-slate-400 font-medium">Pending Approvals</span>
             <div className="text-xl font-bold text-amber-400 mt-0.5">{kpiStats.pendingApprovalsCount}</div>
             <span className="text-[11px] text-amber-300">Statutory / Programs</span>
           </div>
-          <div className="bg-white/5 rounded-xl p-3 border border-white/5">
+          <div 
+            onClick={() => setActiveTab('NOTESHEETS')}
+            className="bg-white/5 hover:bg-white/10 transition cursor-pointer rounded-xl p-3 border border-white/5"
+            title="View Notesheet Queue"
+          >
             <span className="text-xs text-slate-400 font-medium">Pending Notesheets</span>
             <div className="text-xl font-bold text-rose-400 mt-0.5">{kpiStats.pendingNotesheets}</div>
             <span className="text-[11px] text-rose-300">Workflow Concurrence</span>
           </div>
-          <div className="bg-white/5 rounded-xl p-3 border border-white/5">
+          <div 
+            onClick={() => setActiveTab('COMMITTEES')}
+            className="bg-white/5 hover:bg-white/10 transition cursor-pointer rounded-xl p-3 border border-white/5"
+            title="View Active Committees"
+          >
             <span className="text-xs text-slate-400 font-medium">Active Committees</span>
             <div className="text-xl font-bold text-cyan-300 mt-0.5">{kpiStats.totalCommittees}</div>
             <span className="text-[11px] text-cyan-200">{kpiStats.pendingActions} Action Items</span>
@@ -639,606 +856,548 @@ export const RegistrarWorkspacePage: React.FC<RegistrarWorkspacePageProps> = ({
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* 1. DASHBOARD VIEW */}
       {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* 1. DASHBOARD VIEW */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
       {(activeTab === 'DASHBOARD') && (
-        <div className="space-y-6">
-          {/* Top Quick Actions Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Official Correspondence</p>
-                <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{kpiStats.totalCorrespondence}</h3>
-                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">UGC, AICTE & Govt Letters</p>
+        selectedDepartmentForDrilldown ? (
+          <DepartmentCompleteManagementView
+            department={selectedDepartmentForDrilldown}
+            onBack={() => setSelectedDepartmentForDrilldown(null)}
+          />
+        ) : selectedInstituteForDrilldown ? (
+          <InstituteCompleteManagementView
+            institute={selectedInstituteForDrilldown}
+            onBack={() => setSelectedInstituteForDrilldown(null)}
+            onSelectDepartment={(dept) => setSelectedDepartmentForDrilldown(dept)}
+          />
+        ) : (
+          <div className="space-y-6">
+            {/* Top Quick Actions Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Registrar Secretariat</p>
+                  <h3 className="text-2xl font-bold text-indigo-950 dark:text-white mt-1">My Office</h3>
+                  <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1">Staff Hierarchy & Tasks</p>
+                </div>
+                <button 
+                  onClick={() => setActiveTab('MY_OFFICE')}
+                  className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-100 transition"
+                  title="Open Registrar Office Organization & Staff Control"
+                >
+                  <Building2 className="w-5 h-5" />
+                </button>
               </div>
-              <button 
-                onClick={() => { setActiveTab('CORRESPONDENCE'); setIsCorrModalOpen(true); }}
-                className="p-3 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl hover:bg-blue-100 transition"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
+
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Official Correspondence</p>
+                  <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{kpiStats.totalCorrespondence}</h3>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">UGC, AICTE & Govt Letters</p>
+                </div>
+                <button 
+                  onClick={() => { setActiveTab('CORRESPONDENCE'); setIsCorrModalOpen(true); }}
+                  className="p-3 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-xl hover:bg-blue-100 transition"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active File Movements</p>
+                  <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{kpiStats.activeFilesCount}</h3>
+                  <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1">In Transit / Scrutiny</p>
+                </div>
+                <button 
+                  onClick={() => { setActiveTab('FILES'); setIsFileMovementModalOpen(true); }}
+                  className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-100 transition"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Statutory Approvals</p>
+                  <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{kpiStats.pendingApprovalsCount}</h3>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">Requires Registrar Sign-off</p>
+                </div>
+                <button 
+                  onClick={() => setActiveTab('APPROVALS')}
+                  className="p-3 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-xl hover:bg-amber-100 transition"
+                >
+                  <CheckSquare className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending Notesheets</p>
+                  <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{kpiStats.pendingNotesheets}</h3>
+                  <p className="text-xs text-rose-600 dark:text-rose-400 mt-1">Institute Concurrence Queue</p>
+                </div>
+                <button 
+                  onClick={() => setActiveTab('NOTESHEETS')}
+                  className="p-3 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-xl hover:bg-rose-100 transition"
+                >
+                  <FileSignature className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active File Movements</p>
-                <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{kpiStats.activeFilesCount}</h3>
-                <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-1">In Transit / Scrutiny</p>
+            {/* What Needs My Attention? Action Center */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-500" />
+                    What Needs My Attention?
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Live action items categorized by priority requiring Registrar review, sign-off or concurrence</p>
+                </div>
+                <Badge variant="warning" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                  {kpiStats.pendingNotesheets + kpiStats.pendingApprovalsCount + kpiStats.pendingActions} Action Items
+                </Badge>
               </div>
-              <button 
-                onClick={() => { setActiveTab('FILES'); setIsFileMovementModalOpen(true); }}
-                className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl hover:bg-indigo-100 transition"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Critical Priority Card */}
+                <div className="p-4 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-950/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-rose-700 dark:text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                      Critical
+                    </span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300">
+                      {db.getPendingWithMeNotesheets(user, role).length} Items
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {db.getPendingWithMeNotesheets(user, role).slice(0, 2).map(n => (
+                      <button
+                        key={n.id}
+                        onClick={() => { setSelectedNotesheet(n); }}
+                        className="w-full text-left p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-rose-100 dark:border-rose-900/40 hover:border-rose-400 dark:hover:border-rose-600 transition shadow-sm group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-mono font-bold text-blue-600 dark:text-blue-400">{n.noteSheetNumber}</span>
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-600 transition" />
+                        </div>
+                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1 line-clamp-1">{n.subject}</p>
+                        <span className="text-[10px] text-slate-500">{n.estimatedCost ? `₹${n.estimatedCost.toLocaleString('en-IN')}` : 'Non-financial'} • Pending Concurrence</span>
+                      </button>
+                    ))}
+                    {db.getPendingWithMeNotesheets(user, role).length === 0 && (
+                      <p className="text-xs text-slate-400 italic py-2">No critical notesheets pending</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* High Priority Card */}
+                <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                      High
+                    </span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+                      {statutoryApprovals.filter(a => a.status === 'PENDING').length} Approvals
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {statutoryApprovals.filter(a => a.status === 'PENDING').slice(0, 2).map(a => (
+                      <button
+                        key={a.id}
+                        onClick={() => { setSelectedApproval(a); }}
+                        className="w-full text-left p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-amber-100 dark:border-amber-900/40 hover:border-amber-400 dark:hover:border-amber-600 transition shadow-sm group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-mono font-bold text-amber-600 dark:text-amber-400">{a.requestNo}</span>
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-600 transition" />
+                        </div>
+                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1 line-clamp-1">{a.title}</p>
+                        <span className="text-[10px] text-slate-500">{a.applicantEntity} • Statutory Sign-off</span>
+                      </button>
+                    ))}
+                    {statutoryApprovals.filter(a => a.status === 'PENDING').length === 0 && (
+                      <p className="text-xs text-slate-400 italic py-2">No pending statutory requests</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Medium Priority Card */}
+                <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                      Medium
+                    </span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
+                      {committeeActionItems.filter(i => i.status === 'PENDING' || i.status === 'IN_PROGRESS').length} Actions
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {committeeActionItems.filter(i => i.status === 'PENDING' || i.status === 'IN_PROGRESS').slice(0, 2).map(i => (
+                      <button
+                        key={i.id}
+                        onClick={() => { setSelectedActionItem(i); }}
+                        className="w-full text-left p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-blue-100 dark:border-blue-900/40 hover:border-blue-400 dark:hover:border-blue-600 transition shadow-sm group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-mono font-bold text-blue-600 dark:text-blue-400">{i.itemNumber}</span>
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition" />
+                        </div>
+                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1 line-clamp-1">{i.description}</p>
+                        <span className="text-[10px] text-slate-500">Due: {i.deadline} • {i.committeeName}</span>
+                      </button>
+                    ))}
+                    {committeeActionItems.filter(i => i.status === 'PENDING' || i.status === 'IN_PROGRESS').length === 0 && (
+                      <p className="text-xs text-slate-400 italic py-2">All committee actions resolved</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Normal Priority Card */}
+                <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                      Routine
+                    </span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                      {officialCorrespondence.length} Records
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {officialCorrespondence.slice(0, 2).map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => { setActiveTab('CORRESPONDENCE'); }}
+                        className="w-full text-left p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 hover:border-slate-400 dark:hover:border-slate-600 transition shadow-sm group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-mono font-bold text-indigo-600 dark:text-indigo-400">{c.referenceNumber}</span>
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 transition" />
+                        </div>
+                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1 line-clamp-1">{c.subject}</p>
+                        <span className="text-[10px] text-slate-500">{c.correspondenceType} • {c.senderOrRecipient}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Statutory Approvals</p>
-                <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{kpiStats.pendingApprovalsCount}</h3>
-                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">Requires Registrar Sign-off</p>
+            {/* MY UNIVERSITY — CONSTITUENT INSTITUTES DIRECTORY */}
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Building2 className="w-5 h-5 text-blue-600" />
+                    MY UNIVERSITY — INSTITUTES DIRECTORY ({institutes.length})
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Central Academic Master governance across all constituent SSIU institutions</p>
+                </div>
+                <button
+                  onClick={() => exportToExcel(institutes.map(i => {
+                    const instStudents = students.filter(s => s.instituteId === i.id);
+                    const instFaculty = faculty.filter(f => f.instituteId === i.id);
+                    const instProgs = programs.filter(p => p.instituteId === i.id);
+                    const instDepts = departments.filter(d => d.instituteId === i.id);
+                    return {
+                      'Institute Code': i.code,
+                      'Institute Name': i.name,
+                      'Dean / HOI': (i as any).deanName || 'Dr. Principal',
+                      'Total Departments': instDepts.length,
+                      'Total Programs': instProgs.length,
+                      'Total Students': instStudents.length,
+                      'Total Faculty': instFaculty.length,
+                      'FSR Ratio': `1:${Math.round(instStudents.length / Math.max(1, instFaculty.length))}`
+                    };
+                  }), 'SSIU_Constituent_Institutes_Roster')}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold flex items-center gap-1.5 hover:bg-emerald-100 transition"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Export Institute Roster (.xlsx)
+                </button>
               </div>
-              <button 
-                onClick={() => setActiveTab('APPROVALS')}
-                className="p-3 bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded-xl hover:bg-amber-100 transition"
-              >
-                <CheckSquare className="w-5 h-5" />
-              </button>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 font-semibold border-b border-slate-100 dark:border-slate-800">
+                    <tr>
+                      <th className="py-3 px-4">Institute</th>
+                      <th className="py-3 px-4">Code</th>
+                      <th className="py-3 px-4">Head of Institute (HOI)</th>
+                      <th className="py-3 px-4 text-center">Depts</th>
+                      <th className="py-3 px-4 text-center">Programs</th>
+                      <th className="py-3 px-4 text-center">Students</th>
+                      <th className="py-3 px-4 text-center">Faculty</th>
+                      <th className="py-3 px-4 text-center">Status</th>
+                      <th className="py-3 px-4 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {institutes.map(inst => {
+                      const instStudents = students.filter(s => s.instituteId === inst.id);
+                      const instFaculty = faculty.filter(f => f.instituteId === inst.id);
+                      const instProgs = programs.filter(p => p.instituteId === inst.id);
+                      const instDepts = departments.filter(d => d.instituteId === inst.id);
+                      return (
+                        <tr key={inst.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
+                          <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white">
+                            <div className="flex items-center gap-2">
+                              <Building2 className="w-4 h-4 text-blue-600" />
+                              {inst.name}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 font-mono font-bold text-blue-600 dark:text-blue-400">{inst.code}</td>
+                          <td className="py-3 px-4 text-slate-600 dark:text-slate-300">{(inst as any).deanName || 'Dr. Principal / Director'}</td>
+                          <td className="py-3 px-4 text-center font-bold text-slate-700 dark:text-slate-200">{instDepts.length}</td>
+                          <td className="py-3 px-4 text-center font-bold text-slate-700 dark:text-slate-200">{instProgs.length}</td>
+                          <td className="py-3 px-4 text-center font-bold text-emerald-600 dark:text-emerald-400">{instStudents.length}</td>
+                          <td className="py-3 px-4 text-center font-bold text-indigo-600 dark:text-indigo-400">{instFaculty.length}</td>
+                          <td className="py-3 px-4 text-center">
+                            <Badge variant="active">Active</Badge>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              onClick={() => setSelectedInstituteForDrilldown(inst)}
+                              className="px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs shadow-sm transition"
+                            >
+                              VIEW INSTITUTE →
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending Notesheets</p>
-                <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{kpiStats.pendingNotesheets}</h3>
-                <p className="text-xs text-rose-600 dark:text-rose-400 mt-1">Institute Concurrence Queue</p>
-              </div>
-              <button 
-                onClick={() => setActiveTab('NOTESHEETS')}
-                className="p-3 bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-xl hover:bg-rose-100 transition"
-              >
-                <FileSignature className="w-5 h-5" />
-              </button>
-            </div>
+            {/* ALL UNIVERSITY DEPARTMENTS DIRECTORY (EXCEL DATA TABLE) */}
+            <ExcelDataTable
+              data={departmentDirectoryData}
+              columns={departmentDirectoryColumns}
+              title={`All University Departments & Academic Divisions (${departments.length})`}
+              subtitle="Comprehensive department directory across constituent institutes with live headcount, workload, and risk metrics. Click 'Open Management View →' to open the complete 16-tab department dossier."
+              storageKey="reg_dash_all_depts"
+              searchPlaceholder="Search departments by code, name, HOD, or institute..."
+              searchFields={['name', 'code', 'instituteName', 'hodName']}
+              exportFilename="University_All_Departments_Roster"
+              onRefresh={triggerRefresh}
+            />
           </div>
-
-          {/* What Needs My Attention? Action Center */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-amber-500" />
-                  What Needs My Attention?
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">Live action items categorized by priority requiring Registrar review, sign-off or concurrence</p>
-              </div>
-              <Badge variant="warning" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
-                {kpiStats.pendingNotesheets + kpiStats.pendingApprovalsCount + kpiStats.pendingActions} Action Items
-              </Badge>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Critical Priority Card */}
-              <div className="p-4 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-950/20 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-rose-700 dark:text-rose-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
-                    Critical
-                  </span>
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300">
-                    {noteSheets.filter(n => n.currentOffice === 'REGISTRAR' || n.status === 'SUBMITTED' || n.status === 'UNDER_REVIEW').length} Items
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {noteSheets.filter(n => n.currentOffice === 'REGISTRAR' || n.status === 'SUBMITTED' || n.status === 'UNDER_REVIEW').slice(0, 2).map(n => (
-                    <button
-                      key={n.id}
-                      onClick={() => { setSelectedNotesheet(n); }}
-                      className="w-full text-left p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-rose-100 dark:border-rose-900/40 hover:border-rose-400 dark:hover:border-rose-600 transition shadow-sm group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-mono font-bold text-blue-600 dark:text-blue-400">{n.noteSheetNumber}</span>
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-rose-600 transition" />
-                      </div>
-                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1 line-clamp-1">{n.subject}</p>
-                      <span className="text-[10px] text-slate-500">{n.estimatedCost ? `₹${n.estimatedCost.toLocaleString('en-IN')}` : 'Non-financial'} • Pending Concurrence</span>
-                    </button>
-                  ))}
-                  {noteSheets.filter(n => n.currentOffice === 'REGISTRAR' || n.status === 'SUBMITTED' || n.status === 'UNDER_REVIEW').length === 0 && (
-                    <p className="text-xs text-slate-400 italic py-2">No critical notesheets pending</p>
-                  )}
-                </div>
-              </div>
-
-              {/* High Priority Card */}
-              <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                    High
-                  </span>
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
-                    {statutoryApprovals.filter(a => a.status === 'PENDING').length} Approvals
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {statutoryApprovals.filter(a => a.status === 'PENDING').slice(0, 2).map(a => (
-                    <button
-                      key={a.id}
-                      onClick={() => { setSelectedApproval(a); }}
-                      className="w-full text-left p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-amber-100 dark:border-amber-900/40 hover:border-amber-400 dark:hover:border-amber-600 transition shadow-sm group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-mono font-bold text-amber-600 dark:text-amber-400">{a.requestNo}</span>
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-600 transition" />
-                      </div>
-                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1 line-clamp-1">{a.title}</p>
-                      <span className="text-[10px] text-slate-500">{a.applicantEntity} • Statutory Sign-off</span>
-                    </button>
-                  ))}
-                  {statutoryApprovals.filter(a => a.status === 'PENDING').length === 0 && (
-                    <p className="text-xs text-slate-400 italic py-2">No pending statutory requests</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Medium Priority Card */}
-              <div className="p-4 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                    Medium
-                  </span>
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300">
-                    {committeeActionItems.filter(i => i.status === 'PENDING' || i.status === 'IN_PROGRESS').length} Actions
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {committeeActionItems.filter(i => i.status === 'PENDING' || i.status === 'IN_PROGRESS').slice(0, 2).map(i => (
-                    <button
-                      key={i.id}
-                      onClick={() => { setSelectedActionItem(i); }}
-                      className="w-full text-left p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-blue-100 dark:border-blue-900/40 hover:border-blue-400 dark:hover:border-blue-600 transition shadow-sm group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-mono font-bold text-blue-600 dark:text-blue-400">{i.itemNumber}</span>
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition" />
-                      </div>
-                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1 line-clamp-1">{i.description}</p>
-                      <span className="text-[10px] text-slate-500">Due: {i.deadline} • {i.committeeName}</span>
-                    </button>
-                  ))}
-                  {committeeActionItems.filter(i => i.status === 'PENDING' || i.status === 'IN_PROGRESS').length === 0 && (
-                    <p className="text-xs text-slate-400 italic py-2">All committee actions resolved</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Normal Priority Card */}
-              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/20 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-slate-400"></span>
-                    Routine
-                  </span>
-                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                    {officialCorrespondence.length} Records
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {officialCorrespondence.slice(0, 2).map(c => (
-                    <button
-                      key={c.id}
-                      onClick={() => { setActiveTab('CORRESPONDENCE'); }}
-                      className="w-full text-left p-2.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 hover:border-slate-400 dark:hover:border-slate-600 transition shadow-sm group"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-mono font-bold text-indigo-600 dark:text-indigo-400">{c.referenceNumber}</span>
-                        <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-600 transition" />
-                      </div>
-                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 mt-1 line-clamp-1">{c.subject}</p>
-                      <span className="text-[10px] text-slate-500">{c.correspondenceType} • {c.senderOrRecipient}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Institute Comparative Overview Table */}
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">Constituent Institute Master Roster</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Central Academic Master governance across all 12 SSIU institutions</p>
-              </div>
-              <button
-                onClick={() => exportToExcel(institutes.map(i => {
-                  const instStudents = students.filter(s => s.instituteId === i.id);
-                  const instFaculty = faculty.filter(f => f.instituteId === i.id);
-                  const instProgs = programs.filter(p => p.instituteId === i.id);
-                  return {
-                    'Institute Code': i.code,
-                    'Institute Name': i.name,
-                    'Dean / HOI': (i as any).deanName || 'Dr. Principal',
-                    'Total Programs': instProgs.length,
-                    'Total Students': instStudents.length,
-                    'Total Faculty': instFaculty.length,
-                    'FSR Ratio': `1:${Math.round(instStudents.length / Math.max(1, instFaculty.length))}`
-                  };
-                }), 'SSIU_Constituent_Institutes_Roster')}
-                className="px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold flex items-center gap-1.5 hover:bg-emerald-100 transition"
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-                Export Institute Roster (.xlsx)
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 font-semibold border-b border-slate-100 dark:border-slate-800">
-                  <tr>
-                    <th className="py-3 px-4">Institute</th>
-                    <th className="py-3 px-4">Code</th>
-                    <th className="py-3 px-4">Head of Institute (HOI)</th>
-                    <th className="py-3 px-4 text-center">Programs</th>
-                    <th className="py-3 px-4 text-center">Students</th>
-                    <th className="py-3 px-4 text-center">Faculty</th>
-                    <th className="py-3 px-4 text-center">Est. FSR</th>
-                    <th className="py-3 px-4 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {institutes.map(inst => {
-                    const instStudents = students.filter(s => s.instituteId === inst.id);
-                    const instFaculty = faculty.filter(f => f.instituteId === inst.id);
-                    const instProgs = programs.filter(p => p.instituteId === inst.id);
-                    const fsr = Math.round(instStudents.length / Math.max(1, instFaculty.length));
-                    return (
-                      <tr key={inst.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
-                        <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white">
-                          <div className="flex items-center gap-2">
-                            <Building2 className="w-4 h-4 text-blue-600" />
-                            {inst.name}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 font-mono font-bold text-blue-600 dark:text-blue-400">{inst.code}</td>
-                        <td className="py-3 px-4 text-slate-600 dark:text-slate-300">{(inst as any).deanName || 'Dr. Principal / Director'}</td>
-                        <td className="py-3 px-4 text-center font-bold text-slate-700 dark:text-slate-200">{instProgs.length}</td>
-                        <td className="py-3 px-4 text-center font-bold text-emerald-600 dark:text-emerald-400">{instStudents.length}</td>
-                        <td className="py-3 px-4 text-center font-bold text-indigo-600 dark:text-indigo-400">{instFaculty.length}</td>
-                        <td className="py-3 px-4 text-center">
-                          <span className={`px-2 py-0.5 rounded-full font-semibold text-[11px] ${
-                            fsr <= 20 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                          }`}>
-                            1:{fsr}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <button
-                            onClick={() => {
-                              setSelectedInstFilter(inst.id);
-                              setActiveTab('STUDENTS');
-                            }}
-                            className="px-2.5 py-1 rounded bg-slate-100 hover:bg-blue-600 hover:text-white dark:bg-slate-800 dark:hover:bg-blue-600 text-slate-700 dark:text-slate-300 font-medium transition"
-                          >
-                            View Roster
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        )
       )}
 
       {/* ─────────────────────────────────────────────────────────────────── */}
       {/* 2. UNIVERSITY ADMINISTRATION */}
       {/* ─────────────────────────────────────────────────────────────────── */}
       {(activeTab === 'UNIVERSITY') && (
-        <div className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-            <div className="flex items-center gap-2 overflow-x-auto">
-              {['OVERVIEW', 'INSTITUTES', 'DEPARTMENTS', 'PROGRAMS', 'STRUCTURE', 'DELEGATED_SCOPES'].map(tab => (
-                <button
-                  key={tab}
-                  onClick={() => setSubFilter(tab)}
-                  className={`px-4 py-2 rounded-lg text-xs font-bold transition whitespace-nowrap ${
-                    subFilter === tab 
-                      ? 'bg-blue-600 text-white shadow-sm' 
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
-                  }`}
-                >
-                  {tab === 'OVERVIEW' && 'University Overview'}
-                  {tab === 'INSTITUTES' && 'Institute Overview'}
-                  {tab === 'DEPARTMENTS' && 'Department Overview'}
-                  {tab === 'PROGRAMS' && 'Program Overview'}
-                  {tab === 'STRUCTURE' && 'Organization Structure'}
-                  {tab === 'DELEGATED_SCOPES' && 'Deputy Registrar Scopes'}
-                </button>
-              ))}
+        selectedDepartmentForDrilldown ? (
+          <DepartmentCompleteManagementView
+            department={selectedDepartmentForDrilldown}
+            onBack={() => setSelectedDepartmentForDrilldown(null)}
+          />
+        ) : selectedInstituteForDrilldown ? (
+          <InstituteCompleteManagementView
+            institute={selectedInstituteForDrilldown}
+            onBack={() => setSelectedInstituteForDrilldown(null)}
+            onSelectDepartment={(dept) => setSelectedDepartmentForDrilldown(dept)}
+          />
+        ) : (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2 overflow-x-auto">
+                {['OVERVIEW', 'INSTITUTES', 'DEPARTMENTS', 'PROGRAMS', 'STRUCTURE', 'DELEGATED_SCOPES'].map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setSubFilter(tab)}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition whitespace-nowrap ${
+                      subFilter === tab 
+                        ? 'bg-blue-600 text-white shadow-sm' 
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200'
+                    }`}
+                  >
+                    {tab === 'OVERVIEW' && 'University Overview'}
+                    {tab === 'INSTITUTES' && 'Institute Overview'}
+                    {tab === 'DEPARTMENTS' && 'Department Overview'}
+                    {tab === 'PROGRAMS' && 'Program Overview'}
+                    {tab === 'STRUCTURE' && 'Organization Structure'}
+                    {tab === 'DELEGATED_SCOPES' && 'Deputy Registrar Scopes'}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => exportToExcel(institutes, 'University_Administration_Report')}
+                className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm"
+              >
+                <Download className="w-4 h-4" />
+                Export Excel (.xlsx)
+              </button>
             </div>
 
-            <button
-              onClick={() => exportToExcel(institutes, 'University_Administration_Report')}
-              className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm"
-            >
-              <Download className="w-4 h-4" />
-              Export Excel (.xlsx)
-            </button>
-          </div>
-
-          {/* Sub-view: Structure */}
-          {subFilter === 'STRUCTURE' && (
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-2">Statutory Organization Structure</h3>
-              <p className="text-xs text-slate-500 mb-6">Apex University Governance Hierarchy pursuant to the Swarrnim University Act</p>
-              
-              <div className="space-y-4 max-w-2xl mx-auto">
-                <div className="p-4 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-xl text-center">
-                  <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Apex Authority</span>
-                  <h4 className="text-base font-extrabold text-slate-900 dark:text-white">Honorable Chancellor & Board of Governors (BOG)</h4>
-                  <p className="text-xs text-slate-500 mt-1">Trustees, State Government Nominees & Eminent Academicians</p>
-                </div>
+            {/* Sub-view: Structure */}
+            {subFilter === 'STRUCTURE' && (
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white mb-2">Statutory Organization Structure</h3>
+                <p className="text-xs text-slate-500 mb-6">Apex University Governance Hierarchy pursuant to the Swarrnim University Act</p>
                 
-                <div className="flex justify-center"><ArrowRight className="w-5 h-5 text-slate-400 rotate-90" /></div>
-
-                <div className="p-4 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl text-center">
-                  <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Chief Executive & Academic Officer</span>
-                  <h4 className="text-base font-extrabold text-slate-900 dark:text-white">Provost / Vice-Chancellor</h4>
-                  <p className="text-xs text-slate-500 mt-1">Chairperson - Academic Council & Executive Committee</p>
-                </div>
-
-                <div className="flex justify-center"><ArrowRight className="w-5 h-5 text-slate-400 rotate-90" /></div>
-
-                <div className="p-4 bg-slate-900 text-white rounded-xl text-center shadow-lg border border-blue-500">
-                  <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">Chief Administrative & Statutory Custodian</span>
-                  <h4 className="text-lg font-extrabold text-white">Office of the Registrar</h4>
-                  <p className="text-xs text-slate-300 mt-1">Secretary - BOG & Academic Council | Legal & Compliance Apex</p>
-                </div>
-
-                <div className="flex justify-center"><ArrowRight className="w-5 h-5 text-slate-400 rotate-90" /></div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-center">
-                    <h5 className="font-bold text-xs text-slate-900 dark:text-white">12 Deans & Heads of Institutes (HOIs)</h5>
-                    <p className="text-[11px] text-slate-500 mt-0.5">Faculty of Tech, Design, Health, Ayurveda, Pharma, Management</p>
+                <div className="space-y-4 max-w-2xl mx-auto">
+                  <div className="p-4 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-xl text-center">
+                    <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">Apex Authority</span>
+                    <h4 className="text-base font-extrabold text-slate-900 dark:text-white">Honorable Chancellor & Board of Governors (BOG)</h4>
+                    <p className="text-xs text-slate-500 mt-1">Trustees, State Government Nominees & Eminent Academicians</p>
                   </div>
-                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-center">
-                    <h5 className="font-bold text-xs text-slate-900 dark:text-white">Statutory University Cells</h5>
-                    <p className="text-[11px] text-slate-500 mt-0.5">Controller of Exams, Finance Officer, IQAC, Student Welfare</p>
+                  
+                  <div className="flex justify-center"><ArrowRight className="w-5 h-5 text-slate-400 rotate-90" /></div>
+
+                  <div className="p-4 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl text-center">
+                    <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Chief Executive & Academic Officer</span>
+                    <h4 className="text-base font-extrabold text-slate-900 dark:text-white">Provost / Vice-Chancellor</h4>
+                    <p className="text-xs text-slate-500 mt-1">Chairperson - Academic Council & Executive Committee</p>
+                  </div>
+
+                  <div className="flex justify-center"><ArrowRight className="w-5 h-5 text-slate-400 rotate-90" /></div>
+
+                  <div className="p-4 bg-slate-900 text-white rounded-xl text-center shadow-lg border border-blue-500">
+                    <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">Chief Administrative & Statutory Custodian</span>
+                    <h4 className="text-lg font-extrabold text-white">Office of the Registrar</h4>
+                    <p className="text-xs text-slate-300 mt-1">Secretary - BOG & Academic Council | Legal & Compliance Apex</p>
+                  </div>
+
+                  <div className="flex justify-center"><ArrowRight className="w-5 h-5 text-slate-400 rotate-90" /></div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-center">
+                      <h5 className="font-bold text-xs text-slate-900 dark:text-white">12 Deans & Heads of Institutes (HOIs)</h5>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Faculty of Tech, Design, Health, Ayurveda, Pharma, Management</p>
+                    </div>
+                    <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-center">
+                      <h5 className="font-bold text-xs text-slate-900 dark:text-white">Statutory University Cells</h5>
+                      <p className="text-[11px] text-slate-500 mt-0.5">Controller of Exams, Finance Officer, IQAC, Student Welfare</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Sub-view: Delegated Scopes */}
-          {subFilter === 'DELEGATED_SCOPES' && (
-            <div className="space-y-6">
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <ShieldCheck className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                      Deputy Registrar Jurisdictional Scope Delegation
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Configure multi-institute and multi-departmental jurisdictional delegations under Registrar Office.
-                    </p>
-                  </div>
-                  {role !== 'DEPUTY_REGISTRAR' ? (
-                    <button
-                      onClick={() => {
-                        setScopeTargetUserId(allDeputyRegistrars[0]?.id || '');
-                        setScopeTargetInstId(allInstitutes[0]?.id || '');
-                        setScopeSelectedDeptIds([]);
-                        setIsScopeModalOpen(true);
-                      }}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Assign New Scope
-                    </button>
-                  ) : (
-                    <Badge variant="warning" className="text-xs">
-                      Read-Only: Self-Assignment Prohibited
-                    </Badge>
-                  )}
-                </div>
+            {/* Sub-view: Delegated Scopes */}
+            {subFilter === 'DELEGATED_SCOPES' && (
+              <RegistrarDeputyScopeManagementView />
+            )}
 
-                {/* Scope Table */}
-                <div className="overflow-x-auto">
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Deputy Registrar</th>
-                        <th>Assigned Institute</th>
-                        <th>Assigned Department(s)</th>
-                        <th>Assigned By</th>
-                        <th>Last Modified</th>
-                        <th>Status</th>
-                        {role !== 'DEPUTY_REGISTRAR' && <th>Actions</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allDeputyRegistrarScopes.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="text-center py-8 text-slate-400 text-xs">
-                            No jurisdictional scopes configured. Click "Assign New Scope" to delegate oversight.
-                          </td>
-                        </tr>
-                      ) : (
-                        allDeputyRegistrarScopes.map(s => {
-                          const userObj = allDeputyRegistrars.find(u => u.id === s.userId) || db.getUsers().find(u => u.id === s.userId);
-                          const inst = allInstitutes.find(i => i.id === s.instituteId);
-                          const instDepts = allDepartments.filter(d => s.departmentIds.includes(d.id));
+            {/* Sub-view: DEPARTMENTS (ExcelDataTable) */}
+            {subFilter === 'DEPARTMENTS' && (
+              <ExcelDataTable
+                data={departmentDirectoryData}
+                columns={departmentDirectoryColumns}
+                title={`All University Departments & Academic Divisions (${departments.length})`}
+                subtitle="Complete department roster across all constituent institutes. Click 'Open Management View →' to open full 16-tab dossier."
+                storageKey="reg_univ_all_depts"
+                searchPlaceholder="Search departments by code, name, or institute..."
+                searchFields={['name', 'code', 'instituteName', 'hodName']}
+                exportFilename="University_Departments_Directory"
+                onRefresh={triggerRefresh}
+              />
+            )}
 
-                          return (
-                            <tr key={s.id}>
-                              <td>
-                                <div className="font-bold text-slate-900 dark:text-white text-xs">{s.userName || userObj?.name || 'Deputy Registrar'}</div>
-                                <div className="text-[11px] text-slate-400">{userObj?.email || s.userId}</div>
-                              </td>
-                              <td>
-                                <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs">{inst?.name || s.instituteName || s.instituteId}</div>
-                                <Badge variant="navy" className="text-[10px] mt-0.5">{inst?.code || s.instituteCode || 'INST'}</Badge>
-                              </td>
-                              <td>
-                                <div className="flex flex-wrap gap-1 max-w-md">
-                                  {instDepts.length > 0 ? (
-                                    instDepts.map(d => (
-                                      <span
-                                        key={d.id}
-                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
-                                      >
-                                        {d.name}
-                                        {role !== 'DEPUTY_REGISTRAR' && (
-                                          <button
-                                            onClick={() => handleRemoveDepartmentFromScope(s.id, d.id)}
-                                            className="text-rose-500 hover:text-rose-700 ml-0.5"
-                                            title={`Remove ${d.name} from scope`}
-                                          >
-                                            ×
-                                          </button>
-                                        )}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    <Badge variant="success">All Departments in Institute</Badge>
-                                  )}
-                                </div>
-                              </td>
-                              <td>
-                                <div className="text-xs font-medium text-slate-700 dark:text-slate-300">{s.assignedByName || 'Registrar'}</div>
-                                <div className="text-[10px] text-slate-400">{s.assignedByRole || 'REGISTRAR'}</div>
-                              </td>
-                              <td>
-                                <div className="text-xs text-slate-500">{new Date(s.updatedAt || s.createdAt).toLocaleDateString()}</div>
-                              </td>
-                              <td>
-                                <Badge variant={s.status === 'ACTIVE' ? 'active' : 'inactive'}>{s.status}</Badge>
-                              </td>
-                              {role !== 'DEPUTY_REGISTRAR' && (
-                                <td>
-                                  <div className="flex items-center gap-1.5">
-                                    <button
-                                      onClick={() => handleRevokeScope(s.id)}
-                                      className="px-2 py-1 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-300 rounded text-xs font-semibold transition"
-                                      title="Revoke full scope assignment"
-                                    >
-                                      Revoke
-                                    </button>
-                                  </div>
-                                </td>
-                              )}
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Scope Audit Trail */}
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-                  <History className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                  Scope Delegation Audit Log
-                </h4>
-                <div className="overflow-x-auto">
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Date & Time</th>
-                        <th>Action</th>
-                        <th>Deputy Registrar</th>
-                        <th>Target Scope</th>
-                        <th>Assigned By</th>
-                        <th>Details</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {scopeAuditLogs.map(log => (
-                        <tr key={log.id}>
-                          <td className="text-xs text-slate-500 whitespace-nowrap">
-                            {new Date(log.timestamp).toLocaleString()}
-                          </td>
-                          <td>
-                            <Badge
-                              variant={
-                                log.action === 'ASSIGNED'
-                                  ? 'success'
-                                  : log.action === 'UPDATED'
-                                  ? 'warning'
-                                  : 'inactive'
-                              }
-                            >
-                              {log.action}
-                            </Badge>
-                          </td>
-                          <td className="font-semibold text-xs text-slate-800 dark:text-slate-200">
-                            {log.userName}
-                          </td>
-                          <td className="text-xs text-slate-600 dark:text-slate-300">
-                            <strong>{log.instituteName || log.instituteId}</strong>
-                            {log.departmentName && <div className="text-[11px] text-slate-400">{log.departmentName}</div>}
-                          </td>
-                          <td className="text-xs text-slate-700 dark:text-slate-300">
-                            {log.assignedByName} ({log.assignedByRole})
-                          </td>
-                          <td className="text-xs text-slate-500">
-                            {log.details || 'Scope modification'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Sub-view: Overview / Institutes / Depts / Progs */}
-          {subFilter !== 'STRUCTURE' && subFilter !== 'DELEGATED_SCOPES' && (
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-slate-900 dark:text-white text-base">
-                  {subFilter === 'DEPARTMENTS' ? `Departments (${departments.length})` : subFilter === 'PROGRAMS' ? `Approved Programs (${programs.length})` : `Constituent Institutes (${institutes.length})`}
-                </h3>
-                <div className="flex items-center gap-2">
+            {/* Sub-view: INSTITUTES */}
+            {subFilter === 'INSTITUTES' && (
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                    Constituent Institutes Directory ({institutes.length})
+                  </h3>
                   <input
                     type="text"
-                    placeholder="Search master record..."
+                    placeholder="Search institutes..."
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-100"
                   />
                 </div>
-              </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {institutes
+                    .filter(inst => searchQuery ? (inst.name.toLowerCase().includes(searchQuery.toLowerCase()) || inst.code.toLowerCase().includes(searchQuery.toLowerCase())) : true)
+                    .map(inst => {
+                      const instStudents = students.filter(s => s.instituteId === inst.id);
+                      const instFaculty = faculty.filter(f => f.instituteId === inst.id);
+                      const instProgs = programs.filter(p => p.instituteId === inst.id);
+                      const instDepts = departments.filter(d => d.instituteId === inst.id);
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {(subFilter === 'PROGRAMS' ? programs : subFilter === 'DEPARTMENTS' ? departments : institutes)
-                  .filter((item: any) => searchQuery ? (item.name?.toLowerCase().includes(searchQuery.toLowerCase()) || item.code?.toLowerCase().includes(searchQuery.toLowerCase())) : true)
-                  .map((item: any) => (
-                    <div key={item.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 hover:border-blue-400 transition">
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono font-bold text-blue-600 dark:text-blue-400 text-xs">{item.code}</span>
-                        <Badge variant="navy" className="text-[10px]">{item.degreeLevel || item.type || 'ACTIVE'}</Badge>
-                      </div>
-                      <h4 className="font-bold text-sm text-slate-900 dark:text-white mt-1.5">{item.name}</h4>
-                      <p className="text-xs text-slate-500 mt-1">{item.description || (item as any).deanName || item.hodName || 'SSIU Constituent Unit'}</p>
-                      {item.intakeCapacity && (
-                        <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-2">Sanctioned Intake: {item.intakeCapacity} Seats</p>
-                      )}
-                    </div>
-                  ))}
+                      return (
+                        <div key={inst.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 hover:border-blue-400 transition flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono font-bold text-blue-600 dark:text-blue-400 text-xs">{inst.code}</span>
+                              <Badge variant="navy">Constituent Unit</Badge>
+                            </div>
+                            <h4 className="font-bold text-sm text-slate-900 dark:text-white mt-2">{inst.name}</h4>
+                            <p className="text-xs text-slate-500 mt-1">Dean: {(inst as any).deanName || 'Dr. Principal / Director'}</p>
+                            <div className="flex gap-2 mt-3 text-xs">
+                              <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold">{instDepts.length} Depts</span>
+                              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-semibold">{instStudents.length} Students</span>
+                              <span className="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 font-semibold">{instFaculty.length} Faculty</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setSelectedInstituteForDrilldown(inst)}
+                            className="mt-4 w-full py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs transition text-center shadow-sm"
+                          >
+                            VIEW INSTITUTE →
+                          </button>
+                        </div>
+                      );
+                    })}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+
+            {/* Sub-view: Overview / Programs */}
+            {subFilter !== 'STRUCTURE' && subFilter !== 'DELEGATED_SCOPES' && subFilter !== 'DEPARTMENTS' && subFilter !== 'INSTITUTES' && (
+              <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                    {subFilter === 'PROGRAMS' ? `Approved Programs (${programs.length})` : `University Overview (${institutes.length} Institutes)`}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Search master record..."
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-100"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {(subFilter === 'PROGRAMS' ? programs : institutes)
+                    .filter((item: any) => searchQuery ? (item.name?.toLowerCase().includes(searchQuery.toLowerCase()) || item.code?.toLowerCase().includes(searchQuery.toLowerCase())) : true)
+                    .map((item: any) => (
+                      <div key={item.id} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 hover:border-blue-400 transition">
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-bold text-blue-600 dark:text-blue-400 text-xs">{item.code}</span>
+                          <Badge variant="navy" className="text-[10px]">{item.degreeLevel || item.type || 'ACTIVE'}</Badge>
+                        </div>
+                        <h4 className="font-bold text-sm text-slate-900 dark:text-white mt-1.5">{item.name}</h4>
+                        <p className="text-xs text-slate-500 mt-1">{item.description || (item as any).deanName || item.hodName || 'SSIU Constituent Unit'}</p>
+                        {item.intakeCapacity && (
+                          <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-2">Sanctioned Intake: {item.intakeCapacity} Seats</p>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )
       )}
 
       {/* ─────────────────────────────────────────────────────────────────── */}
@@ -1605,6 +1764,24 @@ export const RegistrarWorkspacePage: React.FC<RegistrarWorkspacePageProps> = ({
       )}
 
       {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* 6.5 FACULTY & STAFF MANAGEMENT & ACADEMIC WORKFORCE CONTROL */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {((activeTab === 'FACULTY') || ((activeTab as string) === 'FACULTY_STAFF')) && (
+        <RegistrarFacultyStaffControlView
+          onBackToDashboard={() => setActiveTab('DASHBOARD')}
+        />
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* 6.6 REGISTRAR OFFICE ORGANIZATION & STAFF CONTROL */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {((activeTab === 'MY_OFFICE') || ((activeTab as string) === 'REGISTRAR_OFFICE')) && (
+        <RegistrarOfficeOrganizationView
+          onBackToMainDashboard={() => setActiveTab('DASHBOARD')}
+        />
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
       {/* 7. STUDENT ADMINISTRATION & INTERNATIONAL STUDENTS */}
       {/* ─────────────────────────────────────────────────────────────────── */}
       {(activeTab === 'STUDENTS') && (
@@ -1776,70 +1953,7 @@ export const RegistrarWorkspacePage: React.FC<RegistrarWorkspacePageProps> = ({
       {/* 8. NOTESHEETS WORKFLOW INTEGRATION */}
       {/* ─────────────────────────────────────────────────────────────────── */}
       {(activeTab === 'NOTESHEETS') && (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Institute-wise Notesheet Governance</h3>
-              <p className="text-xs text-slate-500">Format: {`{InstituteCode}-NOTESHEET-{MMYY}-{001}`} (e.g. SIT-NOTESHEET-0826-001)</p>
-            </div>
-            <button
-              onClick={() => exportToExcel(noteSheets, 'SSIU_Notesheet_Register')}
-              className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-semibold rounded-lg hover:bg-emerald-700 flex items-center gap-1.5"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              Export Notesheets (.xlsx)
-            </button>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 font-semibold border-b border-slate-100 dark:border-slate-800">
-                  <tr>
-                    <th className="py-3 px-4">Notesheet #</th>
-                    <th className="py-3 px-4">Subject</th>
-                    <th className="py-3 px-4">Branch / Institute</th>
-                    <th className="py-3 px-4">Initiated By</th>
-                    <th className="py-3 px-4">Date</th>
-                    <th className="py-3 px-4">Amount</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {noteSheets.map(note => (
-                    <tr key={note.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
-                      <td className="py-3 px-4 font-mono font-bold text-blue-600 dark:text-blue-400">{note.noteSheetNumber || (note as any).number || note.id}</td>
-                      <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white max-w-xs">{note.subject}</td>
-                      <td className="py-3 px-4 text-slate-600 dark:text-slate-400">{note.branch || 'ACADEMIC'}</td>
-                      <td className="py-3 px-4 text-slate-700 dark:text-slate-300 font-medium">{note.creatorName || (note as any).authorName || 'Initiator'}</td>
-                      <td className="py-3 px-4 text-slate-500">{note.date || (note as any).createdAt?.slice(0, 10)}</td>
-                      <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
-                        {note.estimatedCost ? `₹${note.estimatedCost.toLocaleString('en-IN')}` : '-'}
-                      </td>
-                      <td className="py-3 px-4">
-                        <Badge variant={note.status === 'APPROVED' ? 'success' : note.status === 'REJECTED' ? 'danger' : 'warning'}>
-                          {note.status}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => {
-                            setSelectedNotesheet(note);
-                            setNotesheetRemarks('');
-                          }}
-                          className="px-2.5 py-1 rounded bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 font-medium transition"
-                        >
-                          Concurrence
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <NoteSheetPage initialTab="DASHBOARD" />
       )}
 
       {/* ─────────────────────────────────────────────────────────────────── */}
@@ -1943,9 +2057,44 @@ export const RegistrarWorkspacePage: React.FC<RegistrarWorkspacePageProps> = ({
       )}
 
       {/* ─────────────────────────────────────────────────────────────────── */}
-      {/* OTHER TABS FALLBACK HANDLER (EXAMINATION, INVENTORY, REPORTS, NOTICES, ETC.) */}
+      {/* TAB: EXAMINATION GOVERNANCE CENTER */}
       {/* ─────────────────────────────────────────────────────────────────── */}
-      {!['DASHBOARD', 'UNIVERSITY', 'CORRESPONDENCE', 'FILES', 'COMMITTEES', 'APPROVALS', 'STUDENTS', 'NOTESHEETS', 'EXCEL_CENTER', 'AUDIT_LOGS'].includes(activeTab) && (
+      {activeTab === 'EXAMINATION' && (
+        <RegistrarExamGovernanceView />
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* TAB: ACADEMIC REQUESTS GOVERNANCE CENTER */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {activeTab === 'REQUESTS' && (
+        <RegistrarAcademicRequestsGovernanceView />
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* TAB: ACADEMIC ADMINISTRATION */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {activeTab === 'ACADEMICS' && (
+        <RegistrarAcademicAdministrationView />
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* TAB: ATTENDANCE GOVERNANCE CENTER */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {activeTab === 'ATTENDANCE' && (
+        <RegistrarAttendanceGovernanceView />
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* TAB: ACADEMIC REPORTS & ANALYTICS GOVERNANCE CENTER */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {activeTab === 'REPORTS' && (
+        <RegistrarAcademicReportsView />
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* OTHER TABS FALLBACK HANDLER (INVENTORY, NOTICES, ETC.) */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {!['DASHBOARD', 'UNIVERSITY', 'CORRESPONDENCE', 'FILES', 'COMMITTEES', 'APPROVALS', 'STUDENTS', 'NOTESHEETS', 'EXCEL_CENTER', 'AUDIT_LOGS', 'EXAMINATION', 'REQUESTS', 'REPORTS', 'ACADEMICS', 'ATTENDANCE'].includes(activeTab) && (
         <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm text-center space-y-4">
           <div className="p-4 bg-blue-50 text-blue-600 rounded-full w-fit mx-auto">
             <Landmark className="w-8 h-8" />
@@ -2501,6 +2650,17 @@ export const RegistrarWorkspacePage: React.FC<RegistrarWorkspacePageProps> = ({
           isOpen={Boolean(selectedStudentForProfile)}
           onClose={() => setSelectedStudentForProfile(null)}
           student={selectedStudentForProfile}
+        />
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {/* MODAL: FACULTY STAFF DOSSIER */}
+      {/* ─────────────────────────────────────────────────────────────────── */}
+      {selectedFacultyForProfile && (
+        <StaffProfileDossierModal
+          isOpen={Boolean(selectedFacultyForProfile)}
+          faculty={selectedFacultyForProfile}
+          onClose={() => setSelectedFacultyForProfile(null)}
         />
       )}
     </div>

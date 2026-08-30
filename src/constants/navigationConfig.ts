@@ -6,7 +6,8 @@ import {
   Grid, Activity, ShieldAlert, ShieldCheck, Users2, FileSpreadsheet, UploadCloud, User,
   RotateCcw, RefreshCw, LogOut, Boxes, Package, Layers, Archive,
   Mail, Send, Inbox, Briefcase, History, UserPlus, FileStack, KeyRound, Users, CheckCircle2,
-  FileSignature, Landmark, FileBox, FileQuestion, DollarSign, FileDown, Search, ArrowLeftRight
+  FileSignature, Landmark, FileBox, FileQuestion, DollarSign, FileDown, Search, ArrowLeftRight,
+  AlertTriangle
 } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -679,6 +680,103 @@ export const ALL_NAV_ITEMS: Record<string, NavItemConfig> = {
     icon: User,
     allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN', 'ACCOUNTS_ADMIN'],
     category: 'System'
+  },
+
+  // ─── STAGE 1: MODULAR ENTERPRISE EXTENSIONS ───
+  'org-governance': {
+    id: 'org-governance',
+    label: 'Organization Governance',
+    icon: Landmark,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR', 'PRINCIPAL', 'HOD'],
+    category: 'Administration'
+  },
+  'rbac-matrix': {
+    id: 'rbac-matrix',
+    label: 'Roles & Permissions (RBAC)',
+    icon: ShieldCheck,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR'],
+    category: 'Administration'
+  },
+  'db-health': {
+    id: 'db-health',
+    label: 'Database Architecture & Health',
+    icon: Landmark,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN'],
+    category: 'System'
+  },
+
+  // ─── STAGE 2: STUDENT & STAFF MANAGEMENT HUBS ───
+  'students-hub': {
+    id: 'students-hub',
+    label: 'Student Management Hub',
+    icon: Users,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR', 'PRINCIPAL', 'HOD', 'STUDENT_SECTION'],
+    category: 'Administration'
+  },
+  'staff-hub': {
+    id: 'staff-hub',
+    label: 'Staff & Faculty Hub',
+    icon: Briefcase,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR', 'PRINCIPAL', 'HOD'],
+    category: 'Administration'
+  },
+
+  // ─── STAGE 3: HR, ATTENDANCE, FEES & FINANCE HUBS ───
+  'hr-hub': {
+    id: 'hr-hub',
+    label: 'HR Management Hub',
+    icon: Briefcase,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR', 'PRINCIPAL', 'HOD'],
+    category: 'Administration'
+  },
+  'attendance-hub': {
+    id: 'attendance-hub',
+    label: 'Attendance Intelligence Hub',
+    icon: UserCheck,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR', 'PRINCIPAL', 'HOD', 'FACULTY'],
+    category: 'Academic'
+  },
+  'fees-hub': {
+    id: 'fees-hub',
+    label: 'Fee Operations Hub',
+    icon: IndianRupee,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR', 'ACCOUNTS_ADMIN', 'PRINCIPAL', 'HOD'],
+    category: 'Finance & Admin'
+  },
+  'finance-hub': {
+    id: 'finance-hub',
+    label: 'Institutional Finance Hub',
+    icon: Landmark,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR', 'ACCOUNTS_ADMIN', 'PRINCIPAL', 'HOD'],
+    category: 'Finance & Admin'
+  },
+  'timetable-generator': {
+    id: 'timetable-generator',
+    label: 'Timetable Generator',
+    icon: Clock,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR', 'PRINCIPAL', 'HOD', 'FACULTY'],
+    category: 'Academic'
+  },
+  'examination-hub': {
+    id: 'examination-hub',
+    label: 'Examination & Results Engine',
+    icon: Award,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR', 'EXAM_CELL', 'PRINCIPAL', 'HOD', 'FACULTY'],
+    category: 'Examinations'
+  },
+  'lms-hub': {
+    id: 'lms-hub',
+    label: 'LMS & Course Hub',
+    icon: BookOpen,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'],
+    category: 'Academic'
+  },
+  'dms-hub': {
+    id: 'dms-hub',
+    label: 'Document Management (DMS & OCR)',
+    icon: FileText,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR', 'PRINCIPAL', 'HOD', 'FACULTY'],
+    category: 'Administration'
   }
 };
 
@@ -694,6 +792,7 @@ export interface StudentNavGroup {
   label: string;
   icon: any;
   defaultTab: string;
+  category?: string;
   children?: StudentNavSubItem[];
 }
 
@@ -1634,247 +1733,197 @@ export const STUDENT_ADMIN_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
  * FINAL REGISTRAR / REGISTRAR OFFICE SIDEBAR STRUCTURE (21 Complete Sections)
  */
 export const REGISTRAR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
+  // ─── QUICK ACCESS ───
   {
     id: 'dashboard',
     label: 'Dashboard',
     icon: LayoutDashboard,
-    defaultTab: 'dashboard'
-  },
-  {
-    id: 'university-group',
-    label: 'University Administration',
-    icon: Building2,
-    defaultTab: 'reg-uni-overview',
-    children: [
-      { id: 'reg-uni-overview', label: 'University Overview', targetTab: 'reg-uni-overview' },
-      { id: 'reg-uni-institutes', label: 'Institute Overview', targetTab: 'reg-uni-institutes' },
-      { id: 'reg-uni-departments', label: 'Department Overview', targetTab: 'reg-uni-departments' },
-      { id: 'reg-uni-programs', label: 'Program Overview', targetTab: 'reg-uni-programs' },
-      { id: 'reg-uni-structure', label: 'Organization Structure', targetTab: 'reg-uni-structure' }
-    ]
-  },
-  {
-    id: 'academic-group',
-    label: 'Academic Administration',
-    icon: BookOpen,
-    defaultTab: 'reg-academic-year',
-    children: [
-      { id: 'reg-academic-year', label: 'Academic Year', targetTab: 'reg-academic-year' },
-      { id: 'reg-academic-semesters', label: 'Semester', targetTab: 'reg-academic-semesters' },
-      { id: 'reg-academic-calendar', label: 'Academic Calendar', targetTab: 'reg-academic-calendar' },
-      { id: 'reg-academic-overview', label: 'Academic Overview', targetTab: 'reg-academic-overview' }
-    ]
-  },
-  {
-    id: 'students-group',
-    label: 'Student Administration',
-    icon: GraduationCap,
-    defaultTab: 'reg-students-search',
-    children: [
-      { id: 'reg-students-search', label: 'Student Search', targetTab: 'reg-students-search' },
-      { id: 'reg-students-profile', label: 'Student Profile', targetTab: 'reg-students-profile' },
-      { id: 'reg-students-records', label: 'Student Records', targetTab: 'reg-students-records' },
-      { id: 'reg-students-status', label: 'Student Status', targetTab: 'reg-students-status' },
-      { id: 'reg-students-international', label: 'International Students', targetTab: 'reg-students-international' },
-      { id: 'reg-students-stats', label: 'Student Statistics', targetTab: 'reg-students-stats' }
-    ]
-  },
-  {
-    id: 'faculty-group',
-    label: 'Faculty & Staff',
-    icon: UserCheck,
-    defaultTab: 'reg-faculty-overview',
-    children: [
-      { id: 'reg-faculty-overview', label: 'Faculty Overview', targetTab: 'reg-faculty-overview' },
-      { id: 'reg-faculty-staff', label: 'Staff Overview', targetTab: 'reg-faculty-staff' },
-      { id: 'reg-faculty-inst-strength', label: 'Institute-wise Strength', targetTab: 'reg-faculty-inst-strength' },
-      { id: 'reg-faculty-dept-strength', label: 'Department-wise Strength', targetTab: 'reg-faculty-dept-strength' }
-    ]
-  },
-  COMMON_NOTESHEET_NAV_GROUP,
-  {
-    id: 'requests-group',
-    label: 'Requests & Service Desk',
-    icon: MessageSquare,
-    defaultTab: 'reg-requests-pending'
-  },
-  {
-    id: 'approvals-group',
-    label: 'Approval Center',
-    icon: CheckSquare,
-    defaultTab: 'reg-approvals-pending',
-    children: [
-      { id: 'reg-approvals-pending', label: 'Pending Approvals', targetTab: 'reg-approvals-pending' },
-      { id: 'reg-approvals-academic', label: 'Academic Approvals', targetTab: 'reg-approvals-academic' },
-      { id: 'reg-approvals-admin', label: 'Administrative Approvals', targetTab: 'reg-approvals-admin' },
-      { id: 'reg-approvals-financial', label: 'Financial Approvals', targetTab: 'reg-approvals-financial' },
-      { id: 'reg-approvals-special', label: 'Special Approvals', targetTab: 'reg-approvals-special' }
-    ]
-  },
-  {
-    id: 'examination-group',
-    label: 'Examination Oversight',
-    icon: Award,
-    defaultTab: 'reg-exam-overview',
-    children: [
-      { id: 'reg-exam-overview', label: 'Exam Overview', targetTab: 'reg-exam-overview' },
-      { id: 'reg-exam-forms', label: 'Exam Form Status', targetTab: 'reg-exam-forms' },
-      { id: 'reg-exam-eligibility', label: 'Exam Eligibility', targetTab: 'reg-exam-eligibility' },
-      { id: 'reg-exam-halltickets', label: 'Hall Ticket Status', targetTab: 'reg-exam-halltickets' },
-      { id: 'reg-exam-centres', label: 'Exam Centre Status', targetTab: 'reg-exam-centres' },
-      { id: 'reg-exam-results', label: 'Result Status', targetTab: 'reg-exam-results' }
-    ]
-  },
-  {
-    id: 'records-group',
-    label: 'Documents & Certificates',
-    icon: FolderCheck,
-    defaultTab: 'reg-docs-overview',
-    children: [
-      { id: 'reg-docs-overview', label: 'Document Overview', targetTab: 'reg-docs-overview' },
-      { id: 'reg-docs-certificates', label: 'Certificate Requests', targetTab: 'reg-docs-certificates' },
-      { id: 'reg-docs-transcripts', label: 'Transcript Records', targetTab: 'reg-docs-transcripts' },
-      { id: 'reg-docs-degrees', label: 'Degree Records', targetTab: 'reg-docs-degrees' },
-      { id: 'reg-docs-migration', label: 'Migration Records', targetTab: 'reg-docs-migration' },
-      { id: 'reg-docs-verification', label: 'Verification Status', targetTab: 'reg-docs-verification' }
-    ]
-  },
-  {
-    id: 'finance-group',
-    label: 'Financial Overview',
-    icon: IndianRupee,
-    defaultTab: 'reg-finance-fees',
-    children: [
-      { id: 'reg-finance-fees', label: 'Fee Overview', targetTab: 'reg-finance-fees' },
-      { id: 'reg-finance-collection', label: 'Collection Overview', targetTab: 'reg-finance-collection' },
-      { id: 'reg-finance-pending', label: 'Pending Fees', targetTab: 'reg-finance-pending' },
-      { id: 'reg-finance-notesheets', label: 'Financial Notesheets', targetTab: 'reg-finance-notesheets' },
-      { id: 'reg-finance-reports', label: 'Finance Reports', targetTab: 'reg-finance-reports' }
-    ]
-  },
-  {
-    id: 'correspondence-group',
-    label: 'Official Correspondence',
-    icon: Mail,
-    defaultTab: 'reg-corr-incoming',
-    children: [
-      { id: 'reg-corr-incoming', label: 'Incoming Letters', targetTab: 'reg-corr-incoming' },
-      { id: 'reg-corr-outgoing', label: 'Outgoing Letters', targetTab: 'reg-corr-outgoing' },
-      { id: 'reg-corr-circulars', label: 'Circulars', targetTab: 'reg-corr-circulars' },
-      { id: 'reg-corr-external', label: 'External Communication', targetTab: 'reg-corr-external' },
-      { id: 'reg-corr-register', label: 'Correspondence Register', targetTab: 'reg-corr-register' }
-    ]
-  },
-  {
-    id: 'files-group',
-    label: 'File & Record Management',
-    icon: Archive,
-    defaultTab: 'reg-files-register',
-    children: [
-      { id: 'reg-files-register', label: 'Official File Register', targetTab: 'reg-files-register' },
-      { id: 'reg-files-movement', label: 'File Movement', targetTab: 'reg-files-movement' },
-      { id: 'reg-files-archive', label: 'Archive', targetTab: 'reg-files-archive' },
-      { id: 'reg-files-search', label: 'Record Search', targetTab: 'reg-files-search' }
-    ]
-  },
-  {
-    id: 'committees-group',
-    label: 'Committee Management',
-    icon: Users,
-    defaultTab: 'reg-comm-master',
-    children: [
-      { id: 'reg-comm-master', label: 'Committee Master', targetTab: 'reg-comm-master' },
-      { id: 'reg-comm-members', label: 'Members', targetTab: 'reg-comm-members' },
-      { id: 'reg-comm-meetings', label: 'Meetings', targetTab: 'reg-comm-meetings' },
-      { id: 'reg-comm-agenda', label: 'Agenda', targetTab: 'reg-comm-agenda' },
-      { id: 'reg-comm-mom', label: 'MOM', targetTab: 'reg-comm-mom' },
-      { id: 'reg-comm-actions', label: 'Action Items', targetTab: 'reg-comm-actions' }
-    ]
-  },
-  {
-    id: 'notices-group',
-    label: 'Notices & Circulars',
-    icon: Bell,
-    defaultTab: 'reg-notices-published',
-    children: [
-      { id: 'reg-notices-create', label: 'Create Notice', targetTab: 'reg-notices-create' },
-      { id: 'reg-notices-published', label: 'Published Notices', targetTab: 'reg-notices-published' },
-      { id: 'reg-notices-circulars', label: 'Circulars', targetTab: 'reg-notices-circulars' },
-      { id: 'reg-notices-history', label: 'Notice History', targetTab: 'reg-notices-history' }
-    ]
-  },
-  {
-    id: 'inventory-group',
-    label: 'Inventory Overview',
-    icon: Boxes,
-    defaultTab: 'reg-inv-inst',
-    children: [
-      { id: 'reg-inv-inst', label: 'Institute Assets', targetTab: 'reg-inv-inst' },
-      { id: 'reg-inv-dept', label: 'Department Assets', targetTab: 'reg-inv-dept' },
-      { id: 'reg-inv-transfers', label: 'Transfers', targetTab: 'reg-inv-transfers' },
-      { id: 'reg-inv-maintenance', label: 'Maintenance', targetTab: 'reg-inv-maintenance' },
-      { id: 'reg-inv-reports', label: 'Inventory Reports', targetTab: 'reg-inv-reports' }
-    ]
-  },
-  {
-    id: 'reports-group',
-    label: 'Reports & Analytics',
-    icon: FileSpreadsheet,
-    defaultTab: 'reg-rep-uni',
-    children: [
-      { id: 'reg-rep-uni', label: 'University Reports', targetTab: 'reg-rep-uni' },
-      { id: 'reg-rep-inst', label: 'Institute Reports', targetTab: 'reg-rep-inst' },
-      { id: 'reg-rep-dept', label: 'Department Reports', targetTab: 'reg-rep-dept' },
-      { id: 'reg-rep-student', label: 'Student Reports', targetTab: 'reg-rep-student' },
-      { id: 'reg-rep-academic', label: 'Academic Reports', targetTab: 'reg-rep-academic' },
-      { id: 'reg-rep-faculty', label: 'Faculty Reports', targetTab: 'reg-rep-faculty' },
-      { id: 'reg-rep-exam', label: 'Examination Reports', targetTab: 'reg-rep-exam' },
-      { id: 'reg-rep-financial', label: 'Financial Reports', targetTab: 'reg-rep-financial' },
-      { id: 'reg-rep-inventory', label: 'Inventory Reports', targetTab: 'reg-rep-inventory' },
-      { id: 'reg-rep-custom', label: 'Custom Reports', targetTab: 'reg-rep-custom' }
-    ]
+    defaultTab: 'dashboard',
+    category: 'QUICK ACCESS'
   },
   {
     id: 'notifications',
     label: 'Notifications',
     icon: Bell,
-    defaultTab: 'notifications'
+    defaultTab: 'notifications',
+    category: 'QUICK ACCESS'
   },
   {
-    id: 'audit-group',
-    label: 'Audit & Activity',
-    icon: ShieldCheck,
-    defaultTab: 'reg-audit-log',
-    children: [
-      { id: 'reg-audit-log', label: 'Audit Log', targetTab: 'reg-audit-log' },
-      { id: 'reg-audit-login', label: 'Login History', targetTab: 'reg-audit-login' },
-      { id: 'reg-audit-approvals', label: 'Approval History', targetTab: 'reg-audit-approvals' },
-      { id: 'reg-audit-notesheets', label: 'Notesheet History', targetTab: 'reg-audit-notesheets' },
-      { id: 'reg-audit-system', label: 'System Activity', targetTab: 'reg-audit-system' }
-    ]
+    id: 'my-tasks',
+    label: 'My Tasks',
+    icon: CheckSquare,
+    defaultTab: 'reg-approvals-pending',
+    category: 'QUICK ACCESS'
+  },
+
+  // ─── 🎓 ACADEMIC ───
+  {
+    id: 'university-overview',
+    label: 'University Overview',
+    icon: Building2,
+    defaultTab: 'reg-uni-overview',
+    category: '🎓 ACADEMIC'
   },
   {
-    id: 'excel-group',
-    label: 'Excel Center',
+    id: 'institutes',
+    label: 'Institutes',
+    icon: Building2,
+    defaultTab: 'reg-uni-institutes',
+    category: '🎓 ACADEMIC'
+  },
+  {
+    id: 'departments',
+    label: 'Departments',
+    icon: Layers,
+    defaultTab: 'reg-uni-departments',
+    category: '🎓 ACADEMIC'
+  },
+  {
+    id: 'programs',
+    label: 'Programs',
+    icon: BookOpen,
+    defaultTab: 'reg-uni-programs',
+    category: '🎓 ACADEMIC'
+  },
+  {
+    id: 'students',
+    label: 'Students',
+    icon: GraduationCap,
+    defaultTab: 'reg-students-search',
+    category: '🎓 ACADEMIC'
+  },
+  {
+    id: 'faculty-staff',
+    label: 'Faculty & Staff',
+    icon: UserCheck,
+    defaultTab: 'reg-faculty-overview',
+    category: '🎓 ACADEMIC'
+  },
+  {
+    id: 'academic-admin',
+    label: 'Academic Administration',
+    icon: Calendar,
+    defaultTab: 'reg-academic-overview',
+    category: '🎓 ACADEMIC'
+  },
+  {
+    id: 'attendance',
+    label: 'Attendance',
+    icon: Clock,
+    defaultTab: 'reg-attendance-overview',
+    category: '🎓 ACADEMIC'
+  },
+  {
+    id: 'examination',
+    label: 'Examination',
+    icon: Award,
+    defaultTab: 'reg-exam-overview',
+    category: '🎓 ACADEMIC'
+  },
+  {
+    id: 'note-sheets',
+    label: 'Notesheet',
+    icon: FileSignature,
+    defaultTab: 'reg-notesheets',
+    category: '🎓 ACADEMIC'
+  },
+  {
+    id: 'academic-requests',
+    label: 'Academic Requests',
+    icon: MessageSquare,
+    defaultTab: 'reg-requests-pending',
+    category: '🎓 ACADEMIC'
+  },
+  {
+    id: 'academic-approvals',
+    label: 'Academic Approvals',
+    icon: CheckSquare,
+    defaultTab: 'reg-approvals-academic',
+    category: '🎓 ACADEMIC'
+  },
+  {
+    id: 'academic-reports',
+    label: 'Academic Reports',
     icon: FileSpreadsheet,
-    defaultTab: 'reg-excel-templates',
+    defaultTab: 'reg-rep-academic',
+    category: '🎓 ACADEMIC'
+  },
+  {
+    id: 'academic-risks',
+    label: 'Academic Risks',
+    icon: AlertTriangle,
+    defaultTab: 'reg-uni-structure',
+    category: '🎓 ACADEMIC'
+  },
+
+  // ─── 🏢 NON-ACADEMIC / REGISTRAR OFFICE ───
+  {
+    id: 'reg-office-overview',
+    label: 'Registrar Office Overview',
+    icon: Landmark,
+    defaultTab: 'reg-my-office',
+    category: '🏢 NON-ACADEMIC / REGISTRAR OFFICE'
+  },
+  {
+    id: 'office-staff-group',
+    label: 'Office Staff',
+    icon: Users,
+    defaultTab: 'reg-faculty-staff',
+    category: '🏢 NON-ACADEMIC / REGISTRAR OFFICE',
     children: [
-      { id: 'reg-excel-templates', label: 'Excel Templates', targetTab: 'reg-excel-templates' },
-      { id: 'reg-excel-history', label: 'Import History', targetTab: 'reg-excel-history' },
-      { id: 'reg-excel-failed', label: 'Failed Imports', targetTab: 'reg-excel-failed' },
-      { id: 'reg-excel-export', label: 'Export Center', targetTab: 'reg-excel-export' }
+      { id: 'reg-office-deputy', label: 'Deputy Registrar', targetTab: 'reg-faculty-staff' },
+      { id: 'reg-office-assistant', label: 'Assistant Registrar', targetTab: 'reg-faculty-staff' },
+      { id: 'reg-office-other', label: 'Other Staff', targetTab: 'reg-faculty-staff' }
     ]
   },
-  HIGHER_AUTHORITY_WORK_TRANSFER_NAV_GROUP,
   {
-    id: 'settings-group',
-    label: 'Settings',
-    icon: Settings,
-    defaultTab: 'reg-preferences',
-    children: [
-      { id: 'reg-preferences', label: 'Preferences', targetTab: 'reg-preferences' },
-      { id: 'reg-change-password', label: 'Change Password', targetTab: 'reg-change-password' }
-    ]
+    id: 'work-allocation',
+    label: 'Work Allocation',
+    icon: Briefcase,
+    defaultTab: 'reg-my-office',
+    category: '🏢 NON-ACADEMIC / REGISTRAR OFFICE'
+  },
+  {
+    id: 'office-requests',
+    label: 'Office Requests',
+    icon: Inbox,
+    defaultTab: 'reg-my-office',
+    category: '🏢 NON-ACADEMIC / REGISTRAR OFFICE'
+  },
+  {
+    id: 'office-approvals',
+    label: 'Office Approvals',
+    icon: ShieldCheck,
+    defaultTab: 'reg-approvals-admin',
+    category: '🏢 NON-ACADEMIC / REGISTRAR OFFICE'
+  },
+  {
+    id: 'office-documents',
+    label: 'Office Documents',
+    icon: FolderCheck,
+    defaultTab: 'reg-docs-overview',
+    category: '🏢 NON-ACADEMIC / REGISTRAR OFFICE'
+  },
+  {
+    id: 'office-reports',
+    label: 'Office Reports',
+    icon: FileSpreadsheet,
+    defaultTab: 'reg-rep-uni',
+    category: '🏢 NON-ACADEMIC / REGISTRAR OFFICE'
+  },
+  {
+    id: 'office-notifications',
+    label: 'Office Notifications',
+    icon: Bell,
+    defaultTab: 'notifications',
+    category: '🏢 NON-ACADEMIC / REGISTRAR OFFICE'
+  },
+  {
+    id: 'office-audit-trail',
+    label: 'Office Audit Trail',
+    icon: Clock,
+    defaultTab: 'reg-audit-logs',
+    category: '🏢 NON-ACADEMIC / REGISTRAR OFFICE'
   }
 ];
 
@@ -2229,6 +2278,7 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
     'dashboard',
     'reg-uni-overview', 'reg-uni-institutes', 'reg-uni-departments', 'reg-uni-programs', 'reg-uni-structure',
     'reg-academic-year', 'reg-academic-semesters', 'reg-academic-calendar', 'reg-academic-overview',
+    'reg-attendance-overview', 'reg-attendance-shortage', 'reg-attendance-approvals', 'reg-attendance-reports',
     'student-search', 'reg-students-search', 'reg-students-profile', 'reg-students-records', 'reg-students-status', 'reg-students-international', 'reg-students-stats',
     'reg-faculty-overview', 'reg-faculty-staff', 'reg-faculty-inst-strength', 'reg-faculty-dept-strength',
     'reg-notesheets', 'reg-notesheet-create', 'reg-notesheet-pending', 'reg-notesheet-my', 'reg-notesheet-drafts', 'reg-notesheet-sent', 'reg-notesheet-financial', 'reg-notesheet-returned', 'reg-notesheet-clarification', 'reg-notesheet-action-pending', 'reg-notesheet-approved', 'reg-notesheet-rejected', 'reg-notesheet-closed', 'reg-notesheet-history',
@@ -2395,7 +2445,10 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
     'student-search', 'students', 'mentor-assignment', 'faculty', 'departments', 'programs', 'subjects', 'document-master', 'hr',
     'calendar', 'attendance', 'exam-dashboard', 'exam-eligibility', 'fees', 'crm', 'certificates',
     'ptm-management', 'ptm-dashboard', 'ptm-schedule', 'ptm-my', 'ptm-records', 'ptm-feedback', 'ptm-followups', 'ptm-reports',
-    'requests', 'edp-duties', 'tickets', 'feedback', 'notices', 'events', 'reports', 'bulk-import', 'settings', 'security-audit', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary'
+    'requests', 'edp-duties', 'tickets', 'feedback', 'notices', 'events', 'reports', 'bulk-import', 'settings', 'security-audit', 'inventory-assets', 'note-sheets', 'notesheet-create', 'notesheet-pending', 'notesheet-my', 'notesheet-drafts', 'notesheet-sent', 'notesheet-returned', 'notesheet-clarification', 'notesheet-action-pending', 'notesheet-approved', 'notesheet-rejected', 'notesheet-closed', 'inward-outward', 'work-diary',
+    'org-governance', 'rbac-matrix', 'db-health', 'students-hub', 'staff-hub',
+    'hr-hub', 'attendance-hub', 'fees-hub', 'finance-hub',
+    'timetable-generator', 'examination-hub', 'lms-hub', 'dms-hub'
   ]
 };
 

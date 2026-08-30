@@ -468,10 +468,11 @@ const nsClarification: NoteSheet = {
 assert(db.isNotesheetPendingForUser(facultyCSE, 'FACULTY', nsClarification), '7.8 Creator Faculty sees CLARIFICATION_REQUIRED notesheet in pending queue');
 assert(!db.isNotesheetPendingForUser(hodCSE, 'HOD', nsClarification), '7.9 HOD does NOT see CLARIFICATION_REQUIRED until clarified');
 
-console.log('\n========================================================================');
-console.log(`TEST SUITE RESULTS: ${passCount} PASSED, ${failCount} FAILED out of ${passCount + failCount} tests`);
-console.log('========================================================================\n');
+import { describe, it, expect } from 'vitest';
 
-if (failCount > 0) {
-  throw new Error(`${failCount} tests failed in Global Notesheet Pending Queue Audit suite.`);
-}
+describe('Global Notesheet Pending Queue Audit Across All Login Roles', () => {
+  it('verifies all 53 role-scoped pending queue assertions', () => {
+    expect(failCount).toBe(0);
+    expect(passCount).toBeGreaterThanOrEqual(53);
+  });
+});

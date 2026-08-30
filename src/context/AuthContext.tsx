@@ -9,6 +9,8 @@ interface AuthContextType {
   role: UserRole | null;
   activeRole: UserRole | null;
   setActiveRole: (role: UserRole) => void;
+  registrarViewContext: 'ACADEMIC' | 'NON_ACADEMIC';
+  setRegistrarViewContext: (ctx: 'ACADEMIC' | 'NON_ACADEMIC') => void;
   login: (identifier: string, password?: string) => { success: boolean; error?: string };
   logout: () => void;
   updateProfile: (updates: Partial<User>) => void;
@@ -49,9 +51,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (savedUser) {
         const parsed = JSON.parse(savedUser) as User;
         if (parsed && typeof parsed === 'object' && parsed.id) {
-          const savedActiveRole = localStorage.getItem(`sscit_active_workspace_${parsed.id}`);
-          if (savedActiveRole && (savedActiveRole === 'FACULTY' || savedActiveRole === 'MENTOR' || savedActiveRole === parsed.role)) {
-            return savedActiveRole as UserRole;
+          // Strictly restrict workspace switcher to authentic FACULTY / MENTOR accounts only
+          if (parsed.role === 'FACULTY' || parsed.role === 'MENTOR') {
+            const savedActiveRole = localStorage.getItem(`sscit_active_workspace_${parsed.id}`);
+            if (savedActiveRole === 'FACULTY' || savedActiveRole === 'MENTOR') {
+              return savedActiveRole as UserRole;
+            }
           }
           return parsed.role || null;
         }
@@ -62,10 +67,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   });
 
+  const [registrarViewContext, setRegistrarViewContextState] = useState<'ACADEMIC' | 'NON_ACADEMIC'>(() => {
+    try {
+      const saved = localStorage.getItem('sscit_registrar_view_context');
+      if (saved === 'ACADEMIC' || saved === 'NON_ACADEMIC') {
+        return saved;
+      }
+    } catch (e) {
+      console.error('Error reading registrar view context:', e);
+    }
+    return 'ACADEMIC';
+  });
+
+  const setRegistrarViewContext = (ctx: 'ACADEMIC' | 'NON_ACADEMIC') => {
+    setRegistrarViewContextState(ctx);
+    try {
+      localStorage.setItem('sscit_registrar_view_context', ctx);
+    } catch (e) {
+      console.error('Error saving registrar view context:', e);
+    }
+  };
+
   const setActiveRole = (newRole: UserRole) => {
-    setActiveRoleState(newRole);
-    if (user) {
-      localStorage.setItem(`sscit_active_workspace_${user.id}`, newRole);
+    if (!user) return;
+    // Guard: Only authentic FACULTY or MENTOR accounts can toggle view
+    if (user.role === 'FACULTY' || user.role === 'MENTOR') {
+      if (newRole === 'FACULTY' || newRole === 'MENTOR') {
+        setActiveRoleState(newRole);
+        localStorage.setItem(`sscit_active_workspace_${user.id}`, newRole);
+      }
     }
   };
 
@@ -199,12 +229,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     setUser(foundUser);
-    const savedActiveRole = localStorage.getItem(`sscit_active_workspace_${foundUser.id}`);
-    const initialActiveRole = (savedActiveRole && (savedActiveRole === 'FACULTY' || savedActiveRole === 'MENTOR'))
-      ? (savedActiveRole as UserRole)
-      : foundUser.role;
+    
+    // Strict role resolution: Non-faculty accounts (REGISTRAR, PRINCIPAL, HOD, etc.) MUST NEVER resolve as FACULTY
+    let initialActiveRole: UserRole = foundUser.role;
+    if (foundUser.role === 'FACULTY' || foundUser.role === 'MENTOR') {
+      const savedActiveRole = localStorage.getItem(`sscit_active_workspace_${foundUser.id}`);
+      if (savedActiveRole === 'FACULTY' || savedActiveRole === 'MENTOR') {
+        initialActiveRole = savedActiveRole as UserRole;
+      }
+    } else {
+      // Clear any stale workspace cache for non-faculty accounts
+      try {
+        localStorage.removeItem(`sscit_active_workspace_${foundUser.id}`);
+      } catch (e) {}
+    }
+
     setActiveRoleState(initialActiveRole);
-    localStorage.setItem(`sscit_active_workspace_${foundUser.id}`, initialActiveRole);
+    if (foundUser.role === 'FACULTY' || foundUser.role === 'MENTOR') {
+      localStorage.setItem(`sscit_active_workspace_${foundUser.id}`, initialActiveRole);
+    }
 
     securityAuditService.trackLoginSuccess(foundUser);
     return { success: true };
@@ -213,7 +256,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     if (user) {
       securityAuditService.trackLogout(user);
+      try {
+        localStorage.removeItem(`sscit_active_workspace_${user.id}`);
+      } catch (e) {}
     }
+    try {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+    } catch (e) {}
     setUser(null);
     setActiveRoleState(null);
   };
@@ -258,6 +307,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: effectiveRole,
         activeRole: effectiveRole,
         setActiveRole,
+        registrarViewContext,
+        setRegistrarViewContext,
         login,
         logout,
         updateProfile,

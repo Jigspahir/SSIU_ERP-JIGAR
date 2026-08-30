@@ -61,10 +61,12 @@ import { BulkImportModule } from './bulk-import/bulk-import.module';
 import { MentorAssignmentModule } from './mentor-assignment/mentor-assignment.module';
 // Student Feedback & Suggestion System
 import { FeedbackModule } from './feedback/feedback.module';
-// Document Master & International Student Documents
+// Centralized Document Master & International Documents
 import { DocumentsModule } from './documents/documents.module';
 // Student Data Change Request & Approval Workflow
 import { StudentDataChangeModule } from './student-data-change/student-data-change.module';
+// Stage 5.2: 24/7 AI Student Helpdesk Module
+import { AiHelpdeskModule } from './ai-helpdesk/ai-helpdesk.module';
 
 @Module({
   imports: [
@@ -136,6 +138,8 @@ import { StudentDataChangeModule } from './student-data-change/student-data-chan
     DocumentsModule,
     // Student Data Change Request & Approval Workflow
     StudentDataChangeModule,
+    // Stage 5.2: 24/7 AI Student Helpdesk Module
+    AiHelpdeskModule,
   ],
 })
 export class AppModule {}
