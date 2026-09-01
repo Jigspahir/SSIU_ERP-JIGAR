@@ -60,6 +60,17 @@ import {
   UpdateEdpDutyStatusDto,
   EdpDutyQueryDto,
 } from './dto/exam.dto';
+import {
+  CreateQuestionDto,
+  UpdateQuestionDto,
+  ReviewQuestionDto,
+  BulkUploadQuestionsDto,
+  CreateExamPaperDto,
+  UpdateExamPaperDto,
+  ReviewExamPaperDto,
+} from './dto/question-bank.dto';
+import { QuestionBankService } from './question-bank.service';
+import { ExamPaperService } from './exam-paper.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RbacGuard } from '../rbac/rbac.guard';
 
@@ -68,7 +79,11 @@ import { RbacGuard } from '../rbac/rbac.guard';
 @Controller('api/v1/exams')
 @UseGuards(JwtAuthGuard, RbacGuard)
 export class ExamController {
-  constructor(private readonly examService: ExamService) {}
+  constructor(
+    private readonly examService: ExamService,
+    private readonly questionBankService: QuestionBankService,
+    private readonly examPaperService: ExamPaperService,
+  ) {}
 
   @Get('dashboard')
   @ApiOperation({ summary: 'Get Examination KPI metrics & dashboard statistics' })
@@ -982,5 +997,183 @@ export class ExamController {
       ...body,
       markedByUserId: req.user.id,
     });
+  }
+
+  // ── 17. SMART QUESTION BANK ENGINE ────────────────────────────────────────
+
+  @Post('questions')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a new question in Question Bank' })
+  createQuestion(@Body() dto: CreateQuestionDto, @Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'faculty-01';
+    const userRole = req.user?.role || 'FACULTY';
+    return this.questionBankService.createQuestion(dto, tenantId, userId, userRole);
+  }
+
+  @Get('questions')
+  @ApiOperation({ summary: 'List Question Bank questions with RBAC scoping' })
+  listQuestions(@Query() query: any, @Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'faculty-01';
+    const userRole = req.user?.role || 'FACULTY';
+    return this.questionBankService.listQuestions(query, tenantId, userId, userRole);
+  }
+
+  @Get('questions/metrics')
+  @ApiOperation({ summary: 'Get Question Bank KPI metrics & analytics' })
+  getQuestionMetrics(@Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'faculty-01';
+    const userRole = req.user?.role || 'FACULTY';
+    return this.questionBankService.getQuestionBankMetrics(tenantId, userId, userRole);
+  }
+
+  @Get('questions/:id')
+  @ApiOperation({ summary: 'Get Question Bank question details' })
+  getQuestionDetails(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'faculty-01';
+    const userRole = req.user?.role || 'FACULTY';
+    return this.questionBankService.getQuestionDetails(id, tenantId, userId, userRole);
+  }
+
+  @Patch('questions/:id')
+  @ApiOperation({ summary: 'Update question in Question Bank' })
+  updateQuestion(@Param('id') id: string, @Body() dto: UpdateQuestionDto, @Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'faculty-01';
+    const userRole = req.user?.role || 'FACULTY';
+    return this.questionBankService.updateQuestion(id, dto, tenantId, userId, userRole);
+  }
+
+  @Delete('questions/:id')
+  @ApiOperation({ summary: 'Delete draft question from Question Bank' })
+  deleteQuestion(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'faculty-01';
+    const userRole = req.user?.role || 'FACULTY';
+    return this.questionBankService.deleteQuestion(id, tenantId, userId, userRole);
+  }
+
+  @Post('questions/:id/submit')
+  @ApiOperation({ summary: 'Submit question for HOD review' })
+  submitQuestionForReview(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'faculty-01';
+    const userRole = req.user?.role || 'FACULTY';
+    return this.questionBankService.submitQuestionForReview(id, tenantId, userId, userRole);
+  }
+
+  @Post('questions/:id/review')
+  @ApiOperation({ summary: 'HOD review of question (Approve/Reject)' })
+  reviewQuestion(@Param('id') id: string, @Body() dto: ReviewQuestionDto, @Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'hod-01';
+    const userRole = req.user?.role || 'HOD';
+    return this.questionBankService.reviewQuestion(id, dto, tenantId, userId, userRole);
+  }
+
+  @Post('questions/bulk-upload')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Bulk upload questions via CSV/JSON' })
+  bulkUploadQuestions(@Body() dto: BulkUploadQuestionsDto, @Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'faculty-01';
+    const userRole = req.user?.role || 'FACULTY';
+    return this.questionBankService.bulkUploadQuestions(dto, tenantId, userId, userRole);
+  }
+
+  // ── 18. SMART EXAM PAPER ENGINE & WORKFLOW ────────────────────────────────
+
+  @Post('papers')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a new Exam Paper draft' })
+  createExamPaper(@Body() dto: CreateExamPaperDto, @Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'faculty-01';
+    const userRole = req.user?.role || 'FACULTY';
+    return this.examPaperService.createExamPaper(dto, tenantId, userId, userRole);
+  }
+
+  @Get('papers')
+  @ApiOperation({ summary: 'List Exam Papers with RBAC scoping' })
+  listExamPapers(@Query() query: any, @Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'faculty-01';
+    const userRole = req.user?.role || 'FACULTY';
+    return this.examPaperService.listExamPapers(query, tenantId, userId, userRole);
+  }
+
+  @Get('papers/metrics')
+  @ApiOperation({ summary: 'Get Exam Paper KPI metrics & analytics' })
+  getPaperMetrics(@Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'faculty-01';
+    const userRole = req.user?.role || 'FACULTY';
+    return this.examPaperService.getPaperMetrics(tenantId, userId, userRole);
+  }
+
+  @Get('papers/:id')
+  @ApiOperation({ summary: 'Get Exam Paper details, questions, and preview' })
+  getExamPaperDetails(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'faculty-01';
+    const userRole = req.user?.role || 'FACULTY';
+    return this.examPaperService.getExamPaperDetails(id, tenantId, userId, userRole);
+  }
+
+  @Patch('papers/:id')
+  @ApiOperation({ summary: 'Update Exam Paper (if not locked)' })
+  updateExamPaper(@Param('id') id: string, @Body() dto: UpdateExamPaperDto, @Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'faculty-01';
+    const userRole = req.user?.role || 'FACULTY';
+    return this.examPaperService.updateExamPaper(id, dto, tenantId, userId, userRole);
+  }
+
+  @Delete('papers/:id')
+  @ApiOperation({ summary: 'Delete draft Exam Paper' })
+  deleteExamPaper(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'faculty-01';
+    const userRole = req.user?.role || 'FACULTY';
+    return this.examPaperService.deleteExamPaper(id, tenantId, userId, userRole);
+  }
+
+  @Post('papers/:id/submit-hod')
+  @ApiOperation({ summary: 'Submit Exam Paper for HOD approval' })
+  submitPaperForHOD(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'faculty-01';
+    const userRole = req.user?.role || 'FACULTY';
+    return this.examPaperService.submitPaperForHOD(id, tenantId, userId, userRole);
+  }
+
+  @Post('papers/:id/review-hod')
+  @ApiOperation({ summary: 'HOD review of Exam Paper (Approve/Reject)' })
+  reviewPaperByHOD(@Param('id') id: string, @Body() dto: ReviewExamPaperDto, @Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'hod-01';
+    const userRole = req.user?.role || 'HOD';
+    return this.examPaperService.reviewPaperByHOD(id, dto, tenantId, userId, userRole);
+  }
+
+  @Post('papers/:id/submit-hoi')
+  @ApiOperation({ summary: 'Escalate HOD-approved paper to HOI for locking' })
+  submitPaperForHOI(@Param('id') id: string, @Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'hod-01';
+    const userRole = req.user?.role || 'HOD';
+    return this.examPaperService.submitPaperForHOI(id, tenantId, userId, userRole);
+  }
+
+  @Post('papers/:id/review-hoi')
+  @ApiOperation({ summary: 'HOI final review: Lock, Reject, or Publish paper' })
+  reviewPaperByHOI(@Param('id') id: string, @Body() dto: ReviewExamPaperDto, @Req() req: any) {
+    const tenantId = req.user?.instituteId || req.user?.tenantId || 'DEFAULT';
+    const userId = req.user?.id || 'hoi-01';
+    const userRole = req.user?.role || 'PRINCIPAL';
+    return this.examPaperService.reviewPaperByHOI(id, dto, tenantId, userId, userRole);
   }
 }

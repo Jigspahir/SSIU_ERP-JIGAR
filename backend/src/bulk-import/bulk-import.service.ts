@@ -34,7 +34,7 @@ export class BulkImportService {
       throw new ForbiddenException('Students are strictly prohibited from performing bulk data imports.');
     }
 
-    if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'ADMIN') {
+    if (role === 'SUPER_ADMIN' || role === 'SYSTEM_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'ADMIN') {
       return true; // Full access across all datasets
     }
 
@@ -61,7 +61,7 @@ export class BulkImportService {
     }
 
     // Institute-level scope checks
-    if (user.instituteId && targetInstituteId && targetInstituteId !== user.instituteId && role !== 'SUPER_ADMIN') {
+    if (user.instituteId && targetInstituteId && targetInstituteId !== user.instituteId && role !== 'SUPER_ADMIN' && role !== 'SYSTEM_ADMIN') {
       throw new ForbiddenException('Cross-institute bulk imports are strictly prohibited for your role.');
     }
 
@@ -72,7 +72,7 @@ export class BulkImportService {
 
   getTemplates(user?: any) {
     const list = this.templateService.getTemplateList();
-    if (!user || user.role === 'SUPER_ADMIN' || user.role === 'ADMIN' || user.role === 'UNIVERSITY_ADMIN') {
+    if (!user || user.role === 'SUPER_ADMIN' || user.role === 'SYSTEM_ADMIN' || user.role === 'ADMIN' || user.role === 'UNIVERSITY_ADMIN') {
       return list;
     }
     // Filter templates to authorized types for this role
@@ -1370,7 +1370,7 @@ export class BulkImportService {
     if (filter.status) where.status = filter.status.toUpperCase();
 
     // Role-based restrictions
-    if (user && user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN' && user.role !== 'UNIVERSITY_ADMIN') {
+    if (user && user.role !== 'SUPER_ADMIN' && user.role !== 'SYSTEM_ADMIN' && user.role !== 'ADMIN' && user.role !== 'UNIVERSITY_ADMIN') {
       if (user.role === 'HOD' && user.departmentId) {
         where.OR = [{ uploadedByUserId: user.id }, { departmentId: user.departmentId }];
       } else {

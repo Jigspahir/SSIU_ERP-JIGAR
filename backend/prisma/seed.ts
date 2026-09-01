@@ -101,12 +101,26 @@ async function main() {
   });
 
   // 6. Semester & Division
-  const semester = await prisma.semester.create({
-    data: { semesterNumber: 1, name: 'Semester 1', batchId: batch.id, status: 'ACTIVE' },
+  const semester = await prisma.semester.upsert({
+    where: {
+      batchId_semesterNumber: {
+        batchId: batch.id,
+        semesterNumber: 1,
+      },
+    },
+    update: {},
+    create: { semesterNumber: 1, name: 'Semester 1', batchId: batch.id, status: 'ACTIVE' },
   });
 
-  const division = await prisma.division.create({
-    data: { name: 'A', semesterId: semester.id, status: 'ACTIVE' },
+  const division = await prisma.division.upsert({
+    where: {
+      semesterId_name: {
+        semesterId: semester.id,
+        name: 'A',
+      },
+    },
+    update: {},
+    create: { name: 'A', semesterId: semester.id, status: 'ACTIVE' },
   });
 
   // 7. Seed Subject / Course Master
@@ -293,35 +307,274 @@ async function main() {
 
   const student01 = await prisma.student.upsert({
     where: { enrollmentNo: '2026SSIUCE0101' },
-    update: {},
+    update: {
+      abcId: 'ABC-8940-12345',
+      abcIdStatus: 'VERIFIED',
+      abcIdVerifiedByName: 'Prof. ABC (HOD)',
+      abcIdVerifiedAt: new Date(),
+    },
     create: {
       erpId: 'STU000001',
       enrollmentNo: '2026SSIUCE0101',
-      firstName: 'Demo',
-      lastName: 'Student 01',
+      firstName: 'Aarav',
+      lastName: 'Sharma',
       email: 'student01@swarrnim.edu.in',
       instituteId: institute.id,
       departmentId: department.id,
       batchId: batch.id,
       currentDivisionId: division.id,
+      abcId: 'ABC-8940-12345',
+      abcIdStatus: 'VERIFIED',
+      abcIdVerifiedByName: 'Prof. ABC (HOD)',
+      abcIdVerifiedAt: new Date(),
       status: 'ACTIVE',
     },
   });
 
   const student02 = await prisma.student.upsert({
     where: { enrollmentNo: '2026SSIUCE0102' },
-    update: {},
+    update: {
+      abcId: 'ABC-8940-67890',
+      abcIdStatus: 'VERIFIED',
+      abcIdVerifiedByName: 'Prof. ABC (HOD)',
+      abcIdVerifiedAt: new Date(),
+    },
     create: {
       erpId: 'STU000002',
       enrollmentNo: '2026SSIUCE0102',
-      firstName: 'Demo',
-      lastName: 'Student 02',
+      firstName: 'Diya',
+      lastName: 'Patel',
       email: 'student02@swarrnim.edu.in',
       instituteId: institute.id,
       departmentId: department.id,
       batchId: batch.id,
       currentDivisionId: division.id,
+      abcId: 'ABC-8940-67890',
+      abcIdStatus: 'VERIFIED',
+      abcIdVerifiedByName: 'Prof. ABC (HOD)',
+      abcIdVerifiedAt: new Date(),
       status: 'ACTIVE',
+    },
+  });
+
+  const student03 = await prisma.student.upsert({
+    where: { enrollmentNo: '2026SSIUCE0103' },
+    update: {},
+    create: {
+      erpId: 'STU000003',
+      enrollmentNo: '2026SSIUCE0103',
+      firstName: 'Rohan',
+      lastName: 'Verma',
+      email: 'student03@swarrnim.edu.in',
+      instituteId: institute.id,
+      departmentId: department.id,
+      batchId: batch.id,
+      currentDivisionId: division.id,
+      abcId: 'ABC-8940-11223',
+      abcIdStatus: 'PENDING_VERIFICATION',
+      status: 'ACTIVE',
+    },
+  });
+
+  const student04 = await prisma.student.upsert({
+    where: { enrollmentNo: '2026SSIUCE0104' },
+    update: {},
+    create: {
+      erpId: 'STU000004',
+      enrollmentNo: '2026SSIUCE0104',
+      firstName: 'Pooja',
+      lastName: 'Mehta',
+      email: 'student04@swarrnim.edu.in',
+      instituteId: institute.id,
+      departmentId: department.id,
+      batchId: batch.id,
+      currentDivisionId: division.id,
+      abcId: 'ABC-8940-99887',
+      abcIdStatus: 'REJECTED',
+      abcIdRejectionReason: 'Name on APAAR/Aadhaar card does not match student records',
+      status: 'ACTIVE',
+    },
+  });
+
+  const student05 = await prisma.student.upsert({
+    where: { enrollmentNo: '2026SSIUCE0105' },
+    update: {},
+    create: {
+      erpId: 'STU000005',
+      enrollmentNo: '2026SSIUCE0105',
+      firstName: 'Ananya',
+      lastName: 'Desai',
+      email: 'student05@swarrnim.edu.in',
+      instituteId: institute.id,
+      departmentId: department.id,
+      batchId: batch.id,
+      currentDivisionId: division.id,
+      abcId: null,
+      abcIdStatus: 'NOT_SUBMITTED',
+      status: 'ACTIVE',
+    },
+  });
+
+  // Seed ABC Profiles & Credit Ledgers
+  const profile01 = await prisma.academicBankOfCredit.upsert({
+    where: { studentId: student01.id },
+    update: {},
+    create: {
+      studentId: student01.id,
+      abcId: 'ABC-8940-12345',
+      totalCredits: 22,
+      verificationStatus: 'VERIFIED',
+      syncStatus: 'SYNCED',
+      lastSyncAt: new Date(),
+      tenantId: institute.id,
+    },
+  });
+
+  await prisma.academicCreditLedger.upsert({
+    where: {
+      studentId_courseCode_academicYear: {
+        studentId: student01.id,
+        courseCode: 'CSE101',
+        academicYear: '2026-27',
+      },
+    },
+    update: {},
+    create: {
+      abcProfileId: profile01.id,
+      studentId: student01.id,
+      courseCode: 'CSE101',
+      courseName: 'Data Structures & Algorithms',
+      creditValue: 4.0,
+      creditType: 'CORE',
+      academicYear: '2026-27',
+      status: 'EARNED',
+      sourceReference: 'SSIU End Semester Exam 2026',
+      tenantId: institute.id,
+    },
+  });
+
+  await prisma.abcSyncRecord.create({
+    data: {
+      abcProfileId: profile01.id,
+      studentId: student01.id,
+      abcId: 'ABC-8940-12345',
+      operation: 'SYNC_CREDITS',
+      status: 'SUCCESS',
+      correlationId: `sync-${Date.now()}`,
+      tenantId: institute.id,
+    },
+  });
+
+  // Seed DigiLocker Data
+  const consent01 = await prisma.digiLockerConsent.upsert({
+    where: { studentId: student01.id },
+    update: {},
+    create: {
+      tenantId: institute.id,
+      studentId: student01.id,
+      consentGiven: true,
+      consentVersion: 'v1.0',
+      consentAt: new Date(),
+    },
+  });
+
+  const dlConnection01 = await prisma.digiLockerConnection.upsert({
+    where: { studentId: student01.id },
+    update: {},
+    create: {
+      tenantId: institute.id,
+      studentId: student01.id,
+      status: 'CONNECTED',
+      provider: 'DIGILOCKER_NAD',
+      externalUserReference: 'DL-AARAV-2026',
+      connectedAt: new Date(),
+      lastSyncAt: new Date(),
+    },
+  });
+
+  await prisma.digiLockerDocument.upsert({
+    where: {
+      studentId_documentType_documentNumber: {
+        studentId: student01.id,
+        documentType: 'DEGREE',
+        documentNumber: 'SSIU-DEG-2026-0101',
+      },
+    },
+    update: {},
+    create: {
+      tenantId: institute.id,
+      studentId: student01.id,
+      documentType: 'DEGREE',
+      documentNumber: 'SSIU-DEG-2026-0101',
+      issuer: 'Swarrnim University',
+      status: 'ISSUED',
+      issuedAt: new Date(),
+      publishedAt: new Date(),
+      lastSyncedAt: new Date(),
+      connectionId: dlConnection01.id,
+    },
+  });
+
+  await prisma.digiLockerDocument.upsert({
+    where: {
+      studentId_documentType_documentNumber: {
+        studentId: student01.id,
+        documentType: 'MARKSHEET',
+        documentNumber: 'SSIU-MS-2026-S1-0101',
+      },
+    },
+    update: {},
+    create: {
+      tenantId: institute.id,
+      studentId: student01.id,
+      documentType: 'MARKSHEET',
+      documentNumber: 'SSIU-MS-2026-S1-0101',
+      issuer: 'Swarrnim University',
+      status: 'ISSUED',
+      issuedAt: new Date(),
+      publishedAt: new Date(),
+      lastSyncedAt: new Date(),
+      connectionId: dlConnection01.id,
+    },
+  });
+
+  await prisma.digiLockerSyncLog.create({
+    data: {
+      tenantId: institute.id,
+      studentId: student01.id,
+      connectionId: dlConnection01.id,
+      operation: 'ISSUE_DOCUMENT',
+      status: 'SUCCESS',
+      correlationId: `dl-init-${Date.now()}`,
+      errorMessage: 'Official degree certificate issued and stored in national depository.',
+    },
+  });
+
+  // Seed NAAC Framework
+  const naacFramework = await prisma.accreditationFramework.upsert({
+    where: { id: 'naac-framework-2026' },
+    update: {},
+    create: {
+      id: 'naac-framework-2026',
+      name: 'NAAC',
+      version: 'v2026.1',
+      status: 'ACTIVE',
+      academicYearRange: '2021-22 to 2025-26',
+      tenantId: institute.id,
+    },
+  });
+
+  await prisma.accreditationCriterion.upsert({
+    where: { id: 'naac-cr1-2026' },
+    update: {},
+    create: {
+      id: 'naac-cr1-2026',
+      frameworkId: naacFramework.id,
+      criterionNumber: 1,
+      code: 'CR1',
+      title: 'Curricular Aspects',
+      weightage: 100.0,
+      tenantId: institute.id,
     },
   });
 
@@ -395,7 +648,7 @@ async function main() {
   await createDemoUser('REG000001', 'reg_demo01', regPasswordHash, 'REGISTRAR');
   await createDemoUser('HOI000001', 'hoi_demo01', hoiPasswordHash, 'HOI');
   await createDemoUser('HOD000001', 'hod_demo01', hodPasswordHash, 'HOD', { facultyId: faculty01.id });
-  await createDemoUser('FAC000001', 'fac_amitshah', facPasswordHash, 'FACULTY', { facultyId: faculty01.id });
+  await createDemoUser('FAC000001', 'fac_amitshah', facPasswordHash, 'FACULTY', { facultyId: faculty02.id });
   await createDemoUser('STU000001', 'stu_demo01', stuPasswordHash, 'STUDENT', { studentId: student01.id });
   await createDemoUser('STU000002', 'stu_demo02', stuPasswordHash, 'STUDENT', { studentId: student02.id });
 

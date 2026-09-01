@@ -1,13 +1,31 @@
 import { Module } from '@nestjs/common';
+import { PrismaModule } from '../prisma/prisma.module';
 import { ComplianceController } from './compliance.controller';
 import { ComplianceService } from './compliance.service';
-import { PrismaModule } from '../prisma/prisma.module';
-import { RbacModule } from '../rbac/rbac.module';
+import { NEPIndicatorService } from './nep-indicator.service';
+import { OBEComplianceService } from './obe-compliance.service';
+import { AccreditationSnapshotService } from './accreditation-snapshot.service';
+import { NBAComplianceService } from './nba-compliance.service';
+import { ComplianceAuditService } from './compliance-audit.service';
 
 @Module({
-  imports: [PrismaModule, RbacModule],
+  imports: [PrismaModule],
   controllers: [ComplianceController],
-  providers: [ComplianceService],
-  exports: [ComplianceService],
+  providers: [
+    ComplianceService,
+    NEPIndicatorService,
+    OBEComplianceService,
+    AccreditationSnapshotService,
+    NBAComplianceService,
+    ComplianceAuditService,
+  ],
+  exports: [
+    ComplianceService,
+    NEPIndicatorService,
+    OBEComplianceService,
+    AccreditationSnapshotService,
+    NBAComplianceService,
+    ComplianceAuditService,
+  ],
 })
 export class ComplianceModule {}

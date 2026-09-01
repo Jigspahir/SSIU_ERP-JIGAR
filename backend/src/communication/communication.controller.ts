@@ -55,6 +55,20 @@ export class CommunicationController {
     return this.commService.getCommunications(req.user.id, folder, search);
   }
 
+  @Get('dispatch')
+  @ApiOperation({ summary: 'Get Dispatch Tracking Records' })
+  getDispatchRecords() {
+    return this.commService.getDispatchRecords();
+  }
+
+  @Post('dispatch')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create Courier/Post Dispatch Record' })
+  createDispatchRecord(@Req() req: any, @Body() body: any) {
+    this.checkNonStudent(req);
+    return this.commService.createDispatchRecord(req.user.id, body);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get Communication Details by ID' })
   getCommunicationById(@Param('id') id: string) {
@@ -80,19 +94,5 @@ export class CommunicationController {
   scheduleMeetingFromCommunication(@Req() req: any, @Param('id') id: string, @Body() body: any) {
     this.checkNonStudent(req);
     return this.commService.scheduleMeetingFromCommunication(req.user.id, id, body);
-  }
-
-  @Post('dispatch')
-  @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create Courier/Post Dispatch Record' })
-  createDispatchRecord(@Req() req: any, @Body() body: any) {
-    this.checkNonStudent(req);
-    return this.commService.createDispatchRecord(req.user.id, body);
-  }
-
-  @Get('dispatch')
-  @ApiOperation({ summary: 'Get Dispatch Tracking Records' })
-  getDispatchRecords() {
-    return this.commService.getDispatchRecords();
   }
 }

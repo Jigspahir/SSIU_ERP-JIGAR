@@ -13,7 +13,7 @@ import { RbacModule } from '../rbac/rbac.module';
 
 @Module({
   imports: [PrismaModule, RbacModule],
-  controllers: [FeesController, PaymentController, ReceiptController, LateFeeController],
+  controllers: [LateFeeController, ReceiptController, PaymentController, FeesController],
   providers: [FeesService, PaymentService, PaymentGatewayService, ReceiptService, LateFeeService],
   exports: [FeesService, PaymentService, PaymentGatewayService, ReceiptService, LateFeeService],
 })

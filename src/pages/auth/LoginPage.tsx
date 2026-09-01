@@ -1477,7 +1477,7 @@ export const LoginPage: React.FC = () => {
                       {isLoading ? (
                         <>
                           <div className="swarrnim-spinner" />
-                          <span>Authenticating...</span>
+                          <span>Checking latest updates...</span>
                         </>
                       ) : (
                         <>

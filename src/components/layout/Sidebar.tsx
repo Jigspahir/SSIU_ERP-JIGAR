@@ -99,6 +99,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setExpandedGroup(prev => (prev === groupId ? null : groupId));
   };
 
+  // Auto-expand the parent group when activeTab matches any of its child submenus
+  useEffect(() => {
+    if (!activeTab) return;
+    const isStructured = isERPCoordinator || isParent || isVicePresident || isStudent || isStudentAdmin || isFaculty || isMentor || isHOD || isPrincipal || isRegistrar || isDeputyRegistrar || isStudentSection;
+    if (isStructured) {
+      const navStructure = isERPCoordinator
+        ? ERP_COORDINATOR_NAVIGATION_STRUCTURE
+        : (isParent
+          ? PARENT_NAVIGATION_STRUCTURE
+          : (isVicePresident
+              ? VICE_PRESIDENT_NAVIGATION_STRUCTURE
+              : (isStudent 
+                  ? STUDENT_NAVIGATION_STRUCTURE 
+                  : (isStudentAdmin
+                      ? STUDENT_ADMIN_NAVIGATION_STRUCTURE
+                      : (isRegistrar
+                          ? registrarNavigationStructure
+                          : (isDeputyRegistrar
+                              ? DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE
+                              : (isStudentSection
+                                  ? STUDENT_SECTION_NAVIGATION_STRUCTURE
+                                  : (isPrincipal
+                                      ? PRINCIPAL_NAVIGATION_STRUCTURE
+                                      : (isHOD
+                                          ? HOD_NAVIGATION_STRUCTURE
+                                          : (isMentor
+                                              ? MENTOR_NAVIGATION_STRUCTURE
+                                              : (isFaculty ? FACULTY_NAVIGATION_STRUCTURE : [])))))))))));
+
+      for (const group of navStructure) {
+        if (group.id === 'obe-group' && (activeTab === 'obe' || activeTab.startsWith('obe-') || activeTab === 'course-outcomes' || activeTab === 'program-outcomes' || activeTab === 'program-specific-outcomes' || activeTab === 'co-po-mapping' || activeTab === 'co-pso-mapping' || activeTab === 'assessment-mapping' || activeTab === 'attainment')) {
+          setExpandedGroup(group.id);
+          break;
+        }
+        if (group.children && group.children.some(c => c.targetTab === activeTab || c.id === activeTab)) {
+          setExpandedGroup(group.id);
+          break;
+        }
+      }
+    }
+  }, [activeTab, isERPCoordinator, isParent, isVicePresident, isStudent, isStudentAdmin, isFaculty, isMentor, isHOD, isPrincipal, isRegistrar, isDeputyRegistrar, isStudentSection, registrarNavigationStructure]);
+
   const canAccessPending = db.hasPendingWithMeAccess(user, role);
   const canCreateNotesheet = db.hasNoteSheetPermission(user, role, 'NOTESHEET_CREATE');
   const canViewNotesheet = db.hasNoteSheetPermission(user, role, 'NOTESHEET_VIEW');
@@ -228,14 +270,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return quickAccessList.filter(i => i.isPinned).length;
   }, [quickAccessList]);
 
-  // Case-insensitive, trimmed, partial match across label & parentLabel
+  // Case-insensitive, trimmed, partial match across label, parentLabel, id & targetTab
   const filteredResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return [];
     return searchableItems.filter(item => {
       const matchLabel = item.label.toLowerCase().includes(q);
       const matchParent = item.parentLabel ? item.parentLabel.toLowerCase().includes(q) : false;
-      return matchLabel || matchParent;
+      const matchId = item.id.toLowerCase().includes(q) || item.targetTab.toLowerCase().includes(q);
+      return matchLabel || matchParent || matchId;
     });
   }, [searchQuery, searchableItems]);
 
@@ -998,7 +1041,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     const isNotesheetTabActive = activeTab === 'note-sheets' || activeTab === 'reg-notesheets' || activeTab.startsWith('note-sheet') || activeTab.startsWith('notesheet-') || activeTab.startsWith('reg-notesheet');
                     const isRequestsItem = group.id === 'requests' || group.id === 'requests-group' || group.defaultTab === 'requests' || group.defaultTab === 'requests-my-requests' || group.defaultTab === 'mentee-requests-pending' || group.defaultTab === 'hod-requests-pending' || group.defaultTab === 'hoi-requests-pending' || group.defaultTab === 'section-services-all';
                     const isRequestsTabActive = activeTab === 'requests' || activeTab.startsWith('requests-') || activeTab.startsWith('mentee-requests') || activeTab.startsWith('hod-requests') || activeTab.startsWith('hoi-requests') || activeTab.startsWith('section-services') || activeTab === 'student-requests' || activeTab === 'faculty-student-requests';
-                    const isDirectActive = activeTab === group.id || activeTab === group.defaultTab || (isNotesheetItem && isNotesheetTabActive) || (isRequestsItem && isRequestsTabActive);
+                    const isAccreditationItem = group.id === 'accreditation-group' || group.id === 'accreditation-naac-nba' || group.id === 'accreditation' || group.defaultTab === 'accreditation';
+                    const isAccreditationTabActive = activeTab === 'accreditation' || activeTab.startsWith('accreditation-') || activeTab === 'naac' || activeTab === 'nba' || activeTab === 'iqac-accreditation';
+                    const isOBEItem = group.id === 'obe-group' || group.id === 'obe' || group.defaultTab === 'obe';
+                    const isOBETabActive = activeTab === 'obe' || activeTab.startsWith('obe-') || activeTab === 'course-outcomes' || activeTab === 'program-outcomes' || activeTab === 'program-specific-outcomes' || activeTab === 'co-po-mapping' || activeTab === 'co-pso-mapping' || activeTab === 'assessment-mapping' || activeTab === 'attainment';
+                    const isDirectActive = activeTab === group.id || activeTab === group.defaultTab || (isNotesheetItem && isNotesheetTabActive) || (isRequestsItem && isRequestsTabActive) || (isAccreditationItem && isAccreditationTabActive) || (isOBEItem && isOBETabActive);
                     const isParentActive = isChildTabActive || isDirectActive;
 
                     // ── COLLAPSED VIEW: UNIFORM CENTERED ICON CONTAINER ──
@@ -1131,7 +1178,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     return true;
                                   })
                                   .map(sub => {
-                                  const isSubActive = activeTab === sub.targetTab || (activeTab === 'feedback' && sub.targetTab === 'feedback-give') || (activeTab === sub.id && sub.id !== 'feedback');
+                                  const isSubActive = activeTab === sub.targetTab || (activeTab === 'feedback' && sub.targetTab === 'feedback-give') || (activeTab === sub.id && sub.id !== 'feedback') || (sub.targetTab === 'obe' && isOBETabActive);
                                   const isSubPinned = pinnedIdsSet.has(sub.targetTab);
 
                                   return (

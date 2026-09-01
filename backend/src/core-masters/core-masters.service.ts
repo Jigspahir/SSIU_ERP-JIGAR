@@ -393,15 +393,26 @@ export class CoreMastersService {
     });
   }
 
-  async updateStudent(id: string, dto: UpdateStudentDto) {
+  async updateStudent(id: string, dto: UpdateStudentDto, user?: any) {
     const student = await this.prisma.student.findUnique({ where: { id } });
     if (!student) throw new NotFoundException('Student not found.');
+
+    // Check if student identity is verified via DigiLocker
+    const dlConn = await this.prisma.digiLockerConnection.findUnique({ where: { studentId: id } });
+    const isDlVerified = dlConn && dlConn.status === 'CONNECTED';
+
+    if (isDlVerified && user?.role === 'STUDENT') {
+      const isNameModified = (dto.firstName && dto.firstName !== student.firstName) || (dto.lastName && dto.lastName !== student.lastName);
+      if (isNameModified) {
+        throw new BadRequestException('Student legal name is verified via DigiLocker and cannot be manually modified. Please update via issuing authority and synchronize DigiLocker.');
+      }
+    }
 
     return this.prisma.student.update({
       where: { id },
       data: {
-        firstName: dto.firstName || (dto.name ? dto.name.trim() : student.firstName),
-        lastName: dto.lastName || student.lastName,
+        firstName: isDlVerified && user?.role === 'STUDENT' ? student.firstName : (dto.firstName || (dto.name ? dto.name.trim() : student.firstName)),
+        lastName: isDlVerified && user?.role === 'STUDENT' ? student.lastName : (dto.lastName || student.lastName),
         email: dto.email ? dto.email.trim().toLowerCase() : student.email,
         phone: dto.phone !== undefined ? dto.phone : student.phone,
         currentDivisionId: dto.divisionId || dto.currentDivisionId || student.currentDivisionId,

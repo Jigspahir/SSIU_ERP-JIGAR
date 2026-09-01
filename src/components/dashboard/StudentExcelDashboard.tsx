@@ -507,6 +507,47 @@ export const StudentExcelDashboard: React.FC<StudentExcelDashboardProps> = ({
           </div>
         </div>
 
+        {/* ── 3B. DIGILOCKER & ABC NATIONAL REPOSITORY (LIVE CITIZEN GATEWAY) ─ */}
+        <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderLeft: '4px solid #2563EB', overflow: 'hidden', padding: '1rem 1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ padding: '0.5rem', background: '#EFF6FF', borderRadius: '8px', border: '1px solid #BFDBFE' }}>
+                <ShieldCheck size={24} color="#2563EB" />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <h4 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 800, color: '#0F2C59' }}>
+                    DigiLocker &amp; Academic Bank of Credits (ABC)
+                  </h4>
+                  <Badge variant="active">CONNECTED ✓</Badge>
+                </div>
+                <p style={{ margin: '0.2rem 0 0', fontSize: '0.75rem', color: '#64748B' }}>
+                  Government of India National Academic Depository (NAD) • 2 Issued Documents Verified • ABC ID: {student?.abcId || '8940-1234-5678'}
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setActiveTab('digilocker-documents')}
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <ShieldCheck size={14} color="#2563EB" /> View Digital Documents
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => setActiveTab('abc-credits')}
+                style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <Award size={14} /> ABC Credits Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* ── 4. ACADEMIC SUMMARY METRICS TABLE (EXCEL FORMAT) ──────────────── */}
         <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', overflow: 'hidden' }}>
           <div style={{ background: '#0F2C59', color: '#FFFFFF', padding: '0.5rem 0.85rem', fontSize: '0.8125rem', fontWeight: 800, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

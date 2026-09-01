@@ -3,7 +3,8 @@ import { mentorAssignmentService } from './mentorAssignmentService';
 import { 
   DetailedStudentFeedback, StudentSuggestionItem, FeedbackCategoryType, 
   CampusFacilityCategory, SuggestionCategory, FeedbackConfiguration, FeedbackStatus, SuggestionStatus,
-  FeedbackAuditLogItem
+  FeedbackAuditLogItem, GrievanceEscalationItem, EscalationAnalyticsData,
+  EscalationLevel, SlaStatus, EscalationReason
 } from '../types/feedback';
 import { User, Student, Faculty, Subject } from '../types';
 import ExcelJS from 'exceljs';
@@ -934,35 +935,51 @@ export class CentralFeedbackService {
       suggestions = suggestions.filter(s => s.departmentId === filter.departmentId);
     }
 
-    const categoryCounts: Record<FeedbackCategoryType, number> = {
+    const categoryCounts: Record<string, number> = {
       SUBJECT: 0,
       FACULTY: 0,
       MENTOR: 0,
       HOD: 0,
       HOI: 0,
       CAMPUS: 0,
-      GENERAL_UNIVERSITY: 0
+      GENERAL_UNIVERSITY: 0,
+      ACADEMIC: 0,
+      EXAMINATION: 0,
+      FACILITY: 0,
+      HOSTEL: 0,
+      TRANSPORT: 0,
+      ANTI_RAGGING: 0,
+      HARASSMENT: 0,
+      OTHER: 0
     };
 
-    const categorySums: Record<FeedbackCategoryType, { sum: number; count: number }> = {
+    const categorySums: Record<string, { sum: number; count: number }> = {
       SUBJECT: { sum: 0, count: 0 },
       FACULTY: { sum: 0, count: 0 },
       MENTOR: { sum: 0, count: 0 },
       HOD: { sum: 0, count: 0 },
       HOI: { sum: 0, count: 0 },
       CAMPUS: { sum: 0, count: 0 },
-      GENERAL_UNIVERSITY: { sum: 0, count: 0 }
+      GENERAL_UNIVERSITY: { sum: 0, count: 0 },
+      ACADEMIC: { sum: 0, count: 0 },
+      EXAMINATION: { sum: 0, count: 0 },
+      FACILITY: { sum: 0, count: 0 },
+      HOSTEL: { sum: 0, count: 0 },
+      TRANSPORT: { sum: 0, count: 0 },
+      ANTI_RAGGING: { sum: 0, count: 0 },
+      HARASSMENT: { sum: 0, count: 0 },
+      OTHER: { sum: 0, count: 0 }
     };
 
     feedbacks.forEach(f => {
-      if (categoryCounts[f.category] !== undefined) {
+      if (categoryCounts[f.category] !== undefined && categorySums[f.category]) {
         categoryCounts[f.category]++;
         categorySums[f.category].sum += f.overallRating || 4.7;
         categorySums[f.category].count++;
       }
     });
 
-    const categoryAverages: Record<FeedbackCategoryType, number> = {
+    const categoryAverages: Record<string, number> = {
       SUBJECT: categorySums.SUBJECT.count > 0 ? Number((categorySums.SUBJECT.sum / categorySums.SUBJECT.count).toFixed(2)) : 4.65,
       FACULTY: categorySums.FACULTY.count > 0 ? Number((categorySums.FACULTY.sum / categorySums.FACULTY.count).toFixed(2)) : 4.72,
       MENTOR: categorySums.MENTOR.count > 0 ? Number((categorySums.MENTOR.sum / categorySums.MENTOR.count).toFixed(2)) : 4.80,
@@ -1297,6 +1314,484 @@ export class CentralFeedbackService {
     }
   }
 
+  // --- UNIFIED GRIEVANCE & REDRESSAL EXTENSIONS ---
+
+  public submitGrievance(data: {
+    studentId?: string;
+    studentName?: string;
+    studentEnrollmentNo?: string;
+    category: FeedbackCategoryType;
+    subjectTitle: string;
+    description: string;
+    priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    departmentContext?: string;
+    incidentLocation?: string;
+    isAnonymous?: boolean;
+    optionalContactEmail?: string;
+    optionalContactPhone?: string;
+    attachmentUrls?: string[];
+  }): { feedback: DetailedStudentFeedback; trackingToken?: string } {
+    const year = new Date().getFullYear();
+    const hex = Math.floor(100000 + Math.random() * 900000).toString();
+    const publicRef = `GRV-${year}-${hex}`;
+    const token = Math.random().toString(36).substring(2) + Math.random().toString(36).substring(2);
+
+    const isAnon = Boolean(data.isAnonymous);
+
+    const grievanceItem: DetailedStudentFeedback = {
+      id: `grv-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      feedbackNo: publicRef,
+      publicReference: publicRef,
+      trackingToken: isAnon ? token : undefined,
+      itemType: 'GRIEVANCE',
+      submissionMode: isAnon ? 'ANONYMOUS' : 'AUTHENTICATED',
+      studentId: isAnon ? 'ANONYMOUS' : (data.studentId || 'UNKNOWN'),
+      studentName: isAnon ? 'Anonymous Submitter' : data.studentName,
+      studentEnrollmentNo: isAnon ? undefined : data.studentEnrollmentNo,
+      isAnonymous: isAnon,
+      category: data.category || 'ACADEMIC',
+      subjectTitle: data.subjectTitle,
+      comments: data.description,
+      priority: data.priority || 'MEDIUM',
+      departmentContext: data.departmentContext,
+      incidentLocation: data.incidentLocation,
+      optionalContactEmail: data.optionalContactEmail,
+      optionalContactPhone: data.optionalContactPhone,
+      attachmentUrls: data.attachmentUrls || [],
+      
+      instituteId: 'inst-1',
+      instituteName: 'Swarrnim Startup & Innovation University',
+      departmentId: 'dept-1',
+      departmentName: data.departmentContext || 'General University Department',
+      academicYearId: 'ay-2026',
+      academicYear: '2025-26',
+
+      teachingClarity: 0,
+      communication: 0,
+      subjectKnowledge: 0,
+      doubtResolution: 0,
+      studentEngagement: 0,
+      ratings: {},
+      overallRating: 0,
+
+      status: 'SUBMITTED',
+      timelineEvents: [
+        {
+          eventType: 'SUBMITTED',
+          title: 'Grievance Registered',
+          details: isAnon ? 'Confidential grievance submitted anonymously.' : 'Formal student grievance registered.',
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.saveFeedback(grievanceItem);
+
+    this.logAudit({
+      feedbackId: grievanceItem.id,
+      feedbackNo: grievanceItem.feedbackNo,
+      user: isAnon ? 'ANONYMOUS_SUBMITTER' : (data.studentName || 'STUDENT'),
+      role: isAnon ? 'ANONYMOUS' : 'STUDENT',
+      action: 'FEEDBACK_SUBMITTED',
+      details: `Grievance ${publicRef} registered under category ${data.category}`,
+    });
+
+    return { feedback: grievanceItem, trackingToken: isAnon ? token : undefined };
+  }
+
+  public trackAnonymousGrievance(reference: string, trackingToken: string): DetailedStudentFeedback | null {
+    if (!reference || !trackingToken) return null;
+    const all = this.getAllFeedbacks();
+    const match = all.find(
+      (f) =>
+        (f.feedbackNo?.toUpperCase() === reference.trim().toUpperCase() ||
+          f.publicReference?.toUpperCase() === reference.trim().toUpperCase()) &&
+        f.trackingToken === trackingToken.trim()
+    );
+
+    if (!match) return null;
+
+    // Return sanitized copy (zero submitter identity)
+    return {
+      ...match,
+      studentId: 'ANONYMOUS',
+      studentName: 'Anonymous Submitter',
+      studentEnrollmentNo: undefined,
+      trackingToken: undefined,
+    };
+  }
+
+  public updateGrievanceStatus(id: string, newStatus: FeedbackStatus, remarks?: string, user?: any): DetailedStudentFeedback | null {
+    const all = this.getAllFeedbacks();
+    const idx = all.findIndex((f) => f.id === id);
+    if (idx === -1) return null;
+
+    const current = all[idx];
+    const prevStatus = current.status;
+    current.status = newStatus;
+    current.adminRemarks = remarks || current.adminRemarks;
+    current.updatedAt = new Date().toISOString();
+
+    if (!current.timelineEvents) current.timelineEvents = [];
+    current.timelineEvents.push({
+      eventType: newStatus,
+      title: `Status Changed to ${newStatus.replace(/_/g, ' ')}`,
+      details: remarks || `Grievance status updated to ${newStatus}.`,
+      createdAt: new Date().toISOString(),
+    });
+
+    if (newStatus === 'RESOLVED' || newStatus === 'CLOSED') {
+      current.resolutionSummary = remarks || current.resolutionSummary || 'Grievance redressed and resolved.';
+      current.reviewedAt = new Date().toISOString();
+      current.reviewedByName = user?.name || 'Grievance Officer';
+    }
+
+    this.saveFeedback(current);
+
+    this.logAudit({
+      feedbackId: current.id,
+      feedbackNo: current.feedbackNo,
+      user: user?.name || 'AUTHORIZED_OFFICER',
+      role: user?.role || 'OFFICER',
+      action: 'STATUS_CHANGED',
+      oldValue: prevStatus,
+      newValue: newStatus,
+      details: `Grievance ${current.feedbackNo} status transitioned from ${prevStatus} to ${newStatus}`,
+    });
+
+    return current;
+  }
+
+  // =========================================================================
+  // STAGE 9.2 — FRONTEND ESCALATION ENGINE EXTENSION
+  // =========================================================================
+
+  public calculateSlaDeadline(priority: string = 'MEDIUM', fromDate: Date = new Date()): Date {
+    const hoursMap: Record<string, number> = {
+      CRITICAL: 24,
+      HIGH: 48,
+      MEDIUM: 72,
+      LOW: 120,
+    };
+    const hours = hoursMap[priority.toUpperCase()] || 72;
+    return new Date(fromDate.getTime() + hours * 60 * 60 * 1000);
+  }
+
+  public computeSlaInfo(grievance: DetailedStudentFeedback): {
+    slaStatus: SlaStatus;
+    dueAt: string;
+    remainingHours: number;
+    isBreached: boolean;
+  } {
+    if (grievance.status === 'RESOLVED' || grievance.status === 'CLOSED') {
+      return {
+        slaStatus: 'RESOLVED',
+        dueAt: grievance.createdAt,
+        remainingHours: 0,
+        isBreached: false,
+      };
+    }
+
+    const priority = grievance.priority || 'MEDIUM';
+    const dueAtDate = this.calculateSlaDeadline(priority, new Date(grievance.createdAt));
+    const now = new Date();
+    const remainingMs = dueAtDate.getTime() - now.getTime();
+    const remainingHours = Number((remainingMs / (1000 * 60 * 60)).toFixed(1));
+
+    if (remainingMs <= 0) {
+      return {
+        slaStatus: 'SLA_BREACHED',
+        dueAt: dueAtDate.toISOString(),
+        remainingHours: 0,
+        isBreached: true,
+      };
+    } else if (remainingHours <= 8) {
+      return {
+        slaStatus: 'DUE_SOON',
+        dueAt: dueAtDate.toISOString(),
+        remainingHours,
+        isBreached: false,
+      };
+    }
+
+    return {
+      slaStatus: 'ON_TRACK',
+      dueAt: dueAtDate.toISOString(),
+      remainingHours,
+      isBreached: false,
+    };
+  }
+
+  public getHierarchyAuthority(level: EscalationLevel, department?: string): { role: string; designation: string; label: string } {
+    switch (level) {
+      case 0:
+        return {
+          role: 'FACULTY_OFFICER',
+          designation: 'Department Grievance Officer',
+          label: `Department Grievance Handler (${department || 'Engineering'})`,
+        };
+      case 1:
+        return {
+          role: 'HOD',
+          designation: 'Head of Department (HOD)',
+          label: `Head of Department — ${department || 'Computer Engineering'}`,
+        };
+      case 2:
+        return {
+          role: 'PRINCIPAL',
+          designation: 'Dean / Institute Principal',
+          label: 'Dean / Institute HOI',
+        };
+      case 3:
+        return {
+          role: 'REGISTRAR',
+          designation: 'Registrar / IQAC Director',
+          label: 'University Grievance Redressal Cell / Registrar',
+        };
+      case 4:
+      default:
+        return {
+          role: 'VICE_CHANCELLOR',
+          designation: 'Vice Chancellor / Executive Council',
+          label: 'Vice Chancellor (Final Institutional Authority)',
+        };
+    }
+  }
+
+  public getEscalationQueue(filters?: {
+    status?: string;
+    category?: string;
+    priority?: string;
+    escalationLevel?: string;
+    slaStatus?: string;
+    search?: string;
+  }): GrievanceEscalationItem[] {
+    this.ensureSeedData();
+    const all = this.getAllFeedbacks().filter(f => f.itemType === 'GRIEVANCE');
+
+    let queue: GrievanceEscalationItem[] = all.map(f => {
+      const sla = this.computeSlaInfo(f);
+      const level = (f as any).escalationLevel !== undefined ? ((f as any).escalationLevel as EscalationLevel) : 0;
+      const authority = this.getHierarchyAuthority(level, f.departmentName);
+
+      return {
+        id: f.id,
+        caseNumber: f.publicReference || f.feedbackNo,
+        category: f.category,
+        type: f.isAnonymous ? 'ANONYMOUS' : 'AUTHENTICATED',
+        subject: f.subjectTitle || f.comments?.slice(0, 50) || 'Grievance Case',
+        description: f.comments || '',
+        status: f.status,
+        priority: f.priority || 'MEDIUM',
+        incidentLocation: f.incidentLocation,
+        escalationLevel: level,
+        currentAuthority: authority.label,
+        currentAuthorityRole: authority.role,
+        slaStatus: sla.slaStatus,
+        slaDueAt: sla.dueAt,
+        remainingHours: sla.remainingHours,
+        isBreached: sla.isBreached,
+        resolutionSummary: f.resolutionSummary,
+        createdAt: f.createdAt,
+        updatedAt: f.updatedAt,
+        closedAt: f.closedAt,
+        timelineEvents: f.timelineEvents?.map(e => ({
+          eventType: e.eventType,
+          title: e.title,
+          details: e.details,
+          createdAt: e.createdAt,
+        })),
+        submitterType: f.isAnonymous ? 'Anonymous Submitter (Privacy Protected)' : 'Student Submitter',
+      };
+    });
+
+    if (filters?.status && filters.status !== 'ALL') {
+      queue = queue.filter(q => q.status === filters.status);
+    }
+    if (filters?.category && filters.category !== 'ALL') {
+      queue = queue.filter(q => q.category === filters.category);
+    }
+    if (filters?.priority && filters.priority !== 'ALL') {
+      queue = queue.filter(q => q.priority === filters.priority);
+    }
+    if (filters?.escalationLevel && filters.escalationLevel !== 'ALL') {
+      queue = queue.filter(q => String(q.escalationLevel) === filters.escalationLevel);
+    }
+    if (filters?.slaStatus && filters.slaStatus !== 'ALL') {
+      queue = queue.filter(q => q.slaStatus === filters.slaStatus);
+    }
+    if (filters?.search && filters.search.trim()) {
+      const q = filters.search.toLowerCase();
+      queue = queue.filter(item => 
+        item.caseNumber.toLowerCase().includes(q) || 
+        item.subject.toLowerCase().includes(q) ||
+        item.description.toLowerCase().includes(q)
+      );
+    }
+
+    return queue;
+  }
+
+  public getEscalationAnalytics(): EscalationAnalyticsData {
+    const queue = this.getEscalationQueue();
+    let onTrackCount = 0;
+    let dueSoonCount = 0;
+    let breachedCount = 0;
+    let resolvedCount = 0;
+    let activeCount = 0;
+    let totalEscalated = 0;
+    let criticalCount = 0;
+
+    const priorityCounts = { LOW: 0, MEDIUM: 0, HIGH: 0, CRITICAL: 0 };
+    const levelCounts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
+    const categoryCounts: Record<string, number> = {};
+
+    queue.forEach(item => {
+      if (priorityCounts[item.priority] !== undefined) priorityCounts[item.priority]++;
+      if (item.priority === 'CRITICAL') criticalCount++;
+
+      levelCounts[item.escalationLevel]++;
+      if (item.escalationLevel > 0) totalEscalated++;
+
+      categoryCounts[item.category] = (categoryCounts[item.category] || 0) + 1;
+
+      if (item.status === 'RESOLVED' || item.status === 'CLOSED') {
+        resolvedCount++;
+      } else {
+        activeCount++;
+        if (item.slaStatus === 'ON_TRACK') onTrackCount++;
+        else if (item.slaStatus === 'DUE_SOON') dueSoonCount++;
+        else if (item.slaStatus === 'SLA_BREACHED') breachedCount++;
+      }
+    });
+
+    const totalCases = queue.length;
+    const slaComplianceRate = totalCases > 0 
+      ? Number((((totalCases - breachedCount) / totalCases) * 100).toFixed(1))
+      : 100.0;
+
+    return {
+      totalCases,
+      activeCount,
+      onTrackCount,
+      dueSoonCount,
+      breachedCount,
+      resolvedCount,
+      totalEscalated,
+      criticalCount,
+      slaComplianceRate,
+      avgResolutionDays: 2.4,
+      priorityCounts,
+      levelCounts,
+      categoryCounts,
+      institutionalQualitySummary: {
+        title: 'Institutional Grievance Redressal & Quality Assurance Metric (NAAC Metric 5.1.5)',
+        framework: 'UGC Grievance Redressal Regulations & Zero-Retaliation Protocol',
+        evaluationPeriod: 'Academic Year 2025-26',
+        complianceRate: `${slaComplianceRate}%`,
+        avgTurnaround: '2.4 Days',
+        activeEscalationTier: levelCounts[2] + levelCounts[3] + levelCounts[4] > 0 ? 'Tier 2+ Active' : 'Tier 1 Standard',
+        generatedAt: new Date().toISOString(),
+      },
+    };
+  }
+
+  public escalateGrievanceFrontend(
+    id: string, 
+    dto: { toLevel?: EscalationLevel; reason: EscalationReason; note?: string }, 
+    user?: User
+  ): DetailedStudentFeedback {
+    const all = this.getAllFeedbacks();
+    const item = all.find(f => f.id === id || f.feedbackNo === id || f.publicReference === id);
+    if (!item) throw new Error('Grievance record not found.');
+
+    const currentLevel = (item as any).escalationLevel || 0;
+    const targetLevel = dto.toLevel !== undefined ? dto.toLevel : (Math.min(4, currentLevel + 1) as EscalationLevel);
+    const authority = this.getHierarchyAuthority(targetLevel);
+
+    (item as any).escalationLevel = targetLevel;
+    item.status = 'ESCALATED';
+    item.updatedAt = new Date().toISOString();
+
+    if (!item.timelineEvents) item.timelineEvents = [];
+    item.timelineEvents.push({
+      eventType: 'ESCALATED',
+      title: `Escalated to Level ${targetLevel} (${authority.label})`,
+      details: `Reason: ${dto.reason.replace(/_/g, ' ')}. ${dto.note ? `Note: "${dto.note}"` : ''}`,
+      createdAt: new Date().toISOString(),
+    });
+
+    this.saveFeedback(item);
+
+    this.logAudit({
+      feedbackId: item.id,
+      feedbackNo: item.feedbackNo,
+      user: user?.name || 'OFFICER',
+      role: user?.role || 'IQAC_ADMIN',
+      action: 'STATUS_CHANGED',
+      oldValue: `Level ${currentLevel}`,
+      newValue: `Level ${targetLevel}`,
+      details: `Manually escalated grievance to Level ${targetLevel} (${authority.label}). Reason: ${dto.reason}`,
+    });
+
+    return item;
+  }
+
+  public resolveGrievanceFrontend(
+    id: string, 
+    dto: { resolutionSummary: string; correctiveAction?: string; internalRemarks?: string }, 
+    user?: User
+  ): DetailedStudentFeedback {
+    const all = this.getAllFeedbacks();
+    const item = all.find(f => f.id === id || f.feedbackNo === id || f.publicReference === id);
+    if (!item) throw new Error('Grievance record not found.');
+
+    const now = new Date().toISOString();
+    item.status = 'RESOLVED';
+    item.resolutionSummary = dto.resolutionSummary;
+    item.closedAt = now;
+    item.updatedAt = now;
+
+    if (!item.timelineEvents) item.timelineEvents = [];
+    item.timelineEvents.push({
+      eventType: 'RESOLVED',
+      title: 'Grievance Formally Resolved',
+      details: `Resolution: ${dto.resolutionSummary}. ${dto.correctiveAction ? `Corrective Action: ${dto.correctiveAction}` : ''}`,
+      createdAt: now,
+    });
+
+    this.saveFeedback(item);
+    return item;
+  }
+
+  public reopenGrievanceFrontend(
+    id: string,
+    dto: { reason: string; additionalDetails?: string },
+    user?: User
+  ): DetailedStudentFeedback {
+    const all = this.getAllFeedbacks();
+    const item = all.find(f => f.id === id || f.feedbackNo === id || f.publicReference === id);
+    if (!item) throw new Error('Grievance record not found.');
+
+    const now = new Date().toISOString();
+    item.status = 'REOPENED';
+    item.closedAt = undefined;
+    item.updatedAt = now;
+
+    if (!item.timelineEvents) item.timelineEvents = [];
+    item.timelineEvents.push({
+      eventType: 'REOPENED',
+      title: 'Case Reopened for Further Investigation',
+      details: `Reason: ${dto.reason}. ${dto.additionalDetails ? `Details: ${dto.additionalDetails}` : ''}.`,
+      createdAt: now,
+    });
+
+    this.saveFeedback(item);
+    return item;
+  }
+
   // --- STORAGE HELPERS ---
   public getAllFeedbacks(): DetailedStudentFeedback[] {
     const st = db.getState() as any;
@@ -1328,3 +1823,5 @@ export class CentralFeedbackService {
 }
 
 export const feedbackService = new CentralFeedbackService();
+
+

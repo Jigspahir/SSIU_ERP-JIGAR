@@ -1,13 +1,42 @@
 import { Module } from '@nestjs/common';
+import { PrismaModule } from '../prisma/prisma.module';
 import { ResearchController } from './research.controller';
 import { ResearchService } from './research.service';
-import { PrismaModule } from '../prisma/prisma.module';
-import { RbacModule } from '../rbac/rbac.module';
+import { ResearchProjectService } from './research-project.service';
+import { PublicationService } from './publication.service';
+import { PatentService } from './patent.service';
+import { ResearchValidationService } from './research-validation.service';
+import { ResearchApprovalService } from './research-approval.service';
+import { ResearchAuditService } from './research-audit.service';
+import { DOIValidationService } from './adapters/doi-validation.service';
+import { CrossrefValidationService } from './adapters/crossref-validation.service';
+import { OpenAlexValidationService } from './adapters/openalex-validation.service';
+import { ORCIDValidationService } from './adapters/orcid-validation.service';
 
 @Module({
-  imports: [PrismaModule, RbacModule],
+  imports: [PrismaModule],
   controllers: [ResearchController],
-  providers: [ResearchService],
-  exports: [ResearchService],
+  providers: [
+    ResearchService,
+    ResearchProjectService,
+    PublicationService,
+    PatentService,
+    ResearchValidationService,
+    ResearchApprovalService,
+    ResearchAuditService,
+    DOIValidationService,
+    CrossrefValidationService,
+    OpenAlexValidationService,
+    ORCIDValidationService,
+  ],
+  exports: [
+    ResearchService,
+    ResearchProjectService,
+    PublicationService,
+    PatentService,
+    ResearchValidationService,
+    ResearchApprovalService,
+    ResearchAuditService,
+  ],
 })
 export class ResearchModule {}

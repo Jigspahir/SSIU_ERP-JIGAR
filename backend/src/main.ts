@@ -54,14 +54,51 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup('api/docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      docExpansion: 'list',
+      filter: true,
+      tagsSorter: 'alpha',
+      operationsSorter: 'alpha',
+    },
+    customSiteTitle: 'SSIU ERP Production REST API Docs',
+  });
+
+  app.enableShutdownHooks();
 
   const port = process.env.PORT || 3001;
   await app.listen(port);
 
+  const server = app.getHttpServer();
+  const router = server?._events?.request?._router;
+  if (router?.stack) {
+    const availableRoutes: string[] = [];
+    router.stack.forEach((layer: any) => {
+      if (layer.route) {
+        const path = layer.route?.path;
+        const method = Object.keys(layer.route?.methods || {}).join(', ').toUpperCase();
+        availableRoutes.push(`Mapped {${path}, ${method}}`);
+      }
+    });
+    const agentRoutes = availableRoutes.filter((r) => r.toLowerCase().includes('agent'));
+    logger.log(`🔍 [Router Diagnostic] ${agentRoutes.length} Agent routes mapped in Express:`);
+    agentRoutes.forEach((r) => logger.log(`   ${r}`));
+  }
+
   logger.log(`🚀 SSIU ERP Production Backend Engine listening on http://localhost:${port}`);
   logger.log(`📖 OpenAPI / Swagger Live Documentation: http://localhost:${port}/api/docs`);
   logger.log(`🔐 Authentication Endpoints active: http://localhost:${port}/api/v1/auth/login`);
+  logger.log(`🤖 Agentic ERP Automation Platform active: http://localhost:${port}/api/v1/agents`);
   logger.log(`🏥 Health endpoints active: http://localhost:${port}/health & http://localhost:${port}/api/v1/health`);
 }
-bootstrap();
+
+bootstrap().catch((err) => {
+  const logger = new Logger('SSIU_ERP_Bootstrap');
+  if (err?.code === 'EADDRINUSE') {
+    logger.error(`Port ${process.env.PORT || 3001} is already in use by another running backend process. Please stop duplicate instances.`);
+  } else {
+    logger.error('Failed to start SSIU ERP backend:', err);
+  }
+  process.exit(1);
+});

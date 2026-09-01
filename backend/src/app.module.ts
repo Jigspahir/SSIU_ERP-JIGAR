@@ -65,8 +65,23 @@ import { FeedbackModule } from './feedback/feedback.module';
 import { DocumentsModule } from './documents/documents.module';
 // Student Data Change Request & Approval Workflow
 import { StudentDataChangeModule } from './student-data-change/student-data-change.module';
-// Stage 5.2: 24/7 AI Student Helpdesk Module
-import { AiHelpdeskModule } from './ai-helpdesk/ai-helpdesk.module';
+// Stage 6: Enterprise Agentic ERP Automation Platform
+import { AgentPlatformModule } from './agent-platform/agent-platform.module';
+import { TimetableAgentModule } from './agents/timetable/timetable.module';
+// Stage 7.1: ABC / Academic Credit Foundation
+import { AbcModule } from './abc/abc.module';
+// Stage 7.2: DigiLocker Integration
+import { DigiLockerModule } from './digilocker/digilocker.module';
+// Stage 7.3: NAAC + NBA Accreditation & Report Generator
+import { AccreditationModule } from './accreditation/accreditation.module';
+// Stage 7.4: Outcome-Based Education (OBE) Engine
+import { OBEModule } from './obe/obe.module';
+// Stage 7.5: UGC Grievance, Anti-Ragging & ICC Management
+import { GrievanceModule } from './grievance/grievance.module';
+// Stage 7.7: Startup, SSIP & Grant/Fund Management
+import { StartupGrantModule } from './startup-grant/startup-grant.module';
+// Stage 7.8: ABC + DigiLocker + Government Integration Foundation
+import { GovernmentIntegrationModule } from './government-integration/government-integration.module';
 
 @Module({
   imports: [
@@ -138,8 +153,24 @@ import { AiHelpdeskModule } from './ai-helpdesk/ai-helpdesk.module';
     DocumentsModule,
     // Student Data Change Request & Approval Workflow
     StudentDataChangeModule,
-    // Stage 5.2: 24/7 AI Student Helpdesk Module
-    AiHelpdeskModule,
+    // Stage 6: Enterprise Agentic ERP Automation Platform
+    AgentPlatformModule,
+    // Stage 6.2: Autonomous Timetable & Faculty Substitution Agent
+    TimetableAgentModule,
+    // Stage 7.1: ABC / Academic Credit Foundation
+    AbcModule,
+    // Stage 7.2: DigiLocker Integration
+    DigiLockerModule,
+    // Stage 7.3: NAAC + NBA Accreditation & Report Generator
+    AccreditationModule,
+    // Stage 7.4: Outcome-Based Education (OBE) Engine
+    OBEModule,
+    // Stage 7.5: UGC Grievance, Anti-Ragging & ICC Management
+    GrievanceModule,
+    // Stage 7.7: Startup, SSIP & Grant/Fund Management
+    StartupGrantModule,
+    // Stage 7.8: ABC + DigiLocker + Government Integration Foundation
+    GovernmentIntegrationModule,
   ],
 })
 export class AppModule {}

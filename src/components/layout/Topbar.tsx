@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { 
   Bell, LogOut, User, RefreshCw, 
-  CheckCircle2, ChevronDown, Menu, Bot
+  CheckCircle2, ChevronDown, Menu
 } from 'lucide-react';
 import { UserRole } from '../../types';
 import { db } from '../../services/db';
 import { notificationService } from '../../services/notificationService';
-import { AIStudentHelpdeskModal } from '../helpdesk/AIStudentHelpdeskModal';
 
 interface TopbarProps {
   activeTab: string;
@@ -20,7 +19,6 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab, mobileO
   const { user, role, logout, resetSystemDatabase } = useAuth();
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showAiHelpdesk, setShowAiHelpdesk] = useState(false);
 
   const rolesList: { role: UserRole; label: string; bg: string; text: string }[] = [
     { role: 'SUPER_ADMIN', label: 'Super Admin', bg: '#0F2C59', text: '#FFFFFF' },
@@ -212,29 +210,6 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab, mobileO
           title="Reset database to default seed state"
         >
           <RefreshCw size={14} /> Reset Seed Data
-        </button>
-
-        {/* 24/7 AI Student Helpdesk Button */}
-        <button
-          onClick={() => setShowAiHelpdesk(true)}
-          className="btn btn-sm"
-          style={{
-            borderRadius: 'var(--radius-full)',
-            background: 'linear-gradient(135deg, #2563EB 0%, #4F46E5 50%, #9333EA 100%)',
-            color: '#FFFFFF',
-            fontWeight: 700,
-            border: 'none',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '0.4rem',
-            padding: '0.4rem 0.85rem',
-            boxShadow: '0 2px 8px rgba(79, 70, 229, 0.35)',
-            cursor: 'pointer',
-          }}
-          title="24/7 AI Student Helpdesk — Ask fees, attendance, results, timetable..."
-        >
-          <Bot size={15} />
-          <span>AI Helpdesk</span>
         </button>
 
         {/* Centralized ERP Notifications */}
@@ -444,12 +419,6 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab, mobileO
           )}
         </div>
       </div>
-
-      {/* 24/7 AI Student Helpdesk Modal */}
-      <AIStudentHelpdeskModal
-        isOpen={showAiHelpdesk}
-        onClose={() => setShowAiHelpdesk(false)}
-      />
     </header>
   );
 };

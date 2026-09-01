@@ -33,6 +33,7 @@ import { AcademicCalendarPage } from './pages/academic/AcademicCalendarPage';
 import { QuizPage } from './pages/academic/QuizPage';
 import { FeedbackPage } from './pages/feedback/FeedbackPage';
 import { AdminFeedbackDashboardPage } from './pages/feedback/AdminFeedbackDashboardPage';
+import { FeedbackEscalationsDashboardPage } from './pages/feedback/FeedbackEscalationsDashboardPage';
 import { SupportTicketsPage } from './pages/support/SupportTicketsPage';
 
 // Campus & Support Pages
@@ -115,8 +116,23 @@ import { ExamEdpDutyPage } from './pages/exams/ExamEdpDutyPage';
 import { ExamDayControlPage } from './pages/exams/ExamDayControlPage';
 
 import { WhatsNewModal } from './components/common/WhatsNewModal';
+import { PostLoginUpdateModal } from './components/common/PostLoginUpdateModal';
 import { AccessDeniedPage } from './components/common/AccessDeniedPage';
 import { NotFoundPage } from './components/common/NotFoundPage';
+import { AIControlCenterPage } from './pages/ai-automation/AIControlCenterPage';
+import { StudentAbcPortal } from './pages/academics/StudentAbcPortal';
+import { AbcComplianceDashboard } from './pages/academics/AbcComplianceDashboard';
+import { StudentDigiLockerPortal } from './pages/digilocker/StudentDigiLockerPortal';
+import { AdminDigiLockerDashboard } from './pages/digilocker/AdminDigiLockerDashboard';
+import { AccreditationDashboard } from './pages/accreditation/AccreditationDashboard';
+import { OBEDashboard } from './pages/obe/OBEDashboard';
+import { GrievanceDashboard } from './pages/grievance/GrievanceDashboard';
+import { ResearchDashboard } from './pages/research/ResearchDashboard';
+import { StartupGrantDashboard } from './pages/startup-grant/StartupGrantDashboard';
+import { GrantsManagementDashboard } from './pages/grants/GrantsManagementDashboard';
+import { QuestionBankDashboard } from './pages/exams/QuestionBankDashboard';
+import { GovernmentIntegrationDashboard } from './pages/government-integration/GovernmentIntegrationDashboard';
+import { ComplianceEngineDashboard } from './pages/compliance/ComplianceEngineDashboard';
 import { db } from './services/db';
 import { isTabPermittedForRole, ALL_NAV_ITEMS } from './constants/navigationConfig';
 
@@ -127,9 +143,17 @@ export const ROUTE_PATH_MAP: Record<string, string> = {
   'dashboard': 'dashboard',
   'settings': 'settings',
   'inventory-assets': 'inventory-assets',
-  'inventory': 'inventory-assets',
   'feedback': 'feedback',
-  'faculty/assets': 'faculty-assets',
+  'feedback/give': 'feedback-give',
+  'feedback/anonymous': 'feedback-anonymous-grievance',
+  'feedback/track': 'feedback-track',
+  'feedback/desk': 'feedback-desk',
+  'feedback/reports': 'feedback-reports',
+  'feedback-reports': 'feedback-reports',
+  'feedback/escalations': 'feedback-escalations',
+  'feedback-escalations': 'feedback-escalations',
+  'feedback-anonymous-grievance': 'feedback-anonymous-grievance',
+  'feedback-track': 'feedback-track',
   'faculty-assets': 'faculty-assets',
   'my-assets': 'faculty-assets',
   'faculty/students/search': 'student-search',
@@ -163,6 +187,12 @@ export const ROUTE_PATH_MAP: Record<string, string> = {
   'calendar': 'calendar',
   'examination': 'exam-dashboard',
   'exam-dashboard': 'exam-dashboard',
+  'question-bank': 'question-bank',
+  'paper-builder': 'paper-builder',
+  'paper-approval': 'paper-approval',
+  'published-papers': 'published-papers',
+  'student-question-bank': 'student-question-bank',
+  'exam-reports': 'exam-reports',
   'exam-duties': 'exam-duties',
   'exam-eligibility': 'exam-eligibility',
   'exam-forms': 'exam-forms',
@@ -225,7 +255,89 @@ export const ROUTE_PATH_MAP: Record<string, string> = {
   'ptm-parent': 'ptm-parent',
   'ptm-student': 'ptm-student',
   'fees': 'fees',
-  'notifications': 'notifications'
+  'notifications': 'notifications',
+  'abc-credits': 'abc-credits',
+  'academic/abc': 'abc-credits',
+  'abc': 'abc-credits',
+  'digilocker': 'digilocker',
+  'digilocker-documents': 'digilocker',
+  'digilocker-admin': 'digilocker',
+  'accreditation': 'accreditation',
+  'accreditation-overview': 'accreditation-overview',
+  'accreditation/overview': 'accreditation-overview',
+  'accreditation-naac': 'accreditation-naac',
+  'accreditation/naac': 'accreditation-naac',
+  'accreditation-nba': 'accreditation-nba',
+  'accreditation/nba': 'accreditation-nba',
+  'accreditation-evidence': 'accreditation-evidence',
+  'accreditation/evidence': 'accreditation-evidence',
+  'accreditation-reports': 'accreditation-reports',
+  'accreditation/reports': 'accreditation-reports',
+  'naac': 'accreditation-naac',
+  'nba': 'accreditation-nba',
+  'obe': 'obe',
+  'obe-dashboard': 'obe',
+  'obe/overview': 'obe',
+  'obe/dashboard': 'obe',
+  'obe/course-outcomes': 'course-outcomes',
+  'obe/program-outcomes': 'program-outcomes',
+  'obe/program-specific-outcomes': 'program-specific-outcomes',
+  'obe/co-po-mapping': 'co-po-mapping',
+  'obe/co-pso-mapping': 'co-pso-mapping',
+  'obe/assessment-mapping': 'assessment-mapping',
+  'obe/attainment': 'attainment',
+  'course-outcomes': 'course-outcomes',
+  'program-outcomes': 'program-outcomes',
+  'program-specific-outcomes': 'program-specific-outcomes',
+  'co-po-mapping': 'co-po-mapping',
+  'co-pso-mapping': 'co-pso-mapping',
+  'assessment-mapping': 'assessment-mapping',
+  'attainment': 'attainment',
+  'grievance': 'grievance',
+  'grievance/anonymous': 'grievance-anonymous',
+  'grievance/track': 'grievance-track',
+  'grievance/desk': 'grievance-desk',
+  'anti-ragging': 'grievance',
+  'icc': 'grievance',
+  'student-grievance': 'grievance',
+  'research': 'research',
+  'research-dashboard': 'research',
+  'publications': 'research',
+  'research-publications': 'research',
+  'patents': 'research',
+  'research-patents': 'research',
+  'research-projects': 'research',
+  'research-grants': 'research',
+  'research-scholars': 'research',
+  'research-consultancy': 'research',
+  'research-conferences': 'research',
+  'research-books': 'research',
+  'research-awards': 'research',
+  'research-reports': 'research',
+  'startup-grants': 'startup-grants',
+  'startups': 'startup-grants',
+  'startups-directory': 'startup-grants',
+  'ssip': 'startup-grants',
+  'grants': 'startup-grants',
+  'hackathons': 'startup-grants',
+  'innovation': 'startup-grants',
+  'innovation-dashboard': 'startup-grants',
+  'innovation-projects': 'startup-grants',
+  'incubation-centre': 'startup-grants',
+  'innovation-mentors': 'startup-grants',
+  'innovation-funding': 'startup-grants',
+  'industry-collaboration': 'startup-grants',
+  'innovation-events': 'startup-grants',
+  'innovation-hackathons': 'startup-grants',
+  'innovation-awards': 'startup-grants',
+  'innovation-reports': 'startup-grants',
+  'government-integrations': 'government-integrations',
+  'government-abc': 'government-integrations',
+  'government-digilocker': 'government-integrations',
+  'compliance-engine': 'compliance-engine',
+  'compliance': 'compliance-engine',
+  'accreditation-engine': 'compliance-engine',
+  'nep-indicators': 'compliance-engine'
 };
 
 export const TAB_TO_CANONICAL_PATH: Record<string, string> = {
@@ -237,7 +349,22 @@ export const TAB_TO_CANONICAL_PATH: Record<string, string> = {
   'student-search': '/faculty/students/search',
   'my-students': '/faculty/students/my-students',
   'student-academics': '/faculty/students/academic',
-  'student-requests': '/faculty/students/requests'
+  'student-requests': '/faculty/students/requests',
+  'accreditation': '/accreditation',
+  'accreditation-overview': '/accreditation',
+  'accreditation-naac': '/accreditation/naac',
+  'accreditation-nba': '/accreditation/nba',
+  'accreditation-evidence': '/accreditation/evidence',
+  'accreditation-reports': '/accreditation/reports',
+  'obe': '/obe',
+  'obe-overview': '/obe',
+  'course-outcomes': '/obe/course-outcomes',
+  'program-outcomes': '/obe/program-outcomes',
+  'program-specific-outcomes': '/obe/program-specific-outcomes',
+  'co-po-mapping': '/obe/co-po-mapping',
+  'co-pso-mapping': '/obe/co-pso-mapping',
+  'assessment-mapping': '/obe/assessment-mapping',
+  'attainment': '/obe/attainment',
 };
 
 const getInitialTabFromLocation = (): string => {
@@ -290,7 +417,24 @@ const MainAppContent: React.FC = () => {
   };
   const [collapsed, setCollapsed] = useState<boolean>(false);
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
-  const [showWhatsNew, setShowWhatsNew] = useState<boolean>(true);
+  const [showPostLoginUpdates, setShowPostLoginUpdates] = useState<boolean>(() => {
+    if (typeof window === 'undefined' || !user) return false;
+    try {
+      const sessionSeen = sessionStorage.getItem(`sscit_post_login_updates_seen_${user.id}`);
+      return sessionSeen !== 'true';
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const handleDismissPostLoginUpdates = () => {
+    setShowPostLoginUpdates(false);
+    if (user?.id && typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem(`sscit_post_login_updates_seen_${user.id}`, 'true');
+      } catch (e) { }
+    }
+  };
 
   // Sync browser popstate (back/forward)
   React.useEffect(() => {
@@ -319,9 +463,9 @@ const MainAppContent: React.FC = () => {
   const renderActivePage = () => {
     if (activeTab === 'not-found') {
       return (
-        <NotFoundPage 
-          onNavigateHome={() => setActiveTab('dashboard')} 
-          requestedPath={typeof window !== 'undefined' ? window.location.pathname : ''} 
+        <NotFoundPage
+          onNavigateHome={() => setActiveTab('dashboard')}
+          requestedPath={typeof window !== 'undefined' ? window.location.pathname : ''}
         />
       );
     }
@@ -329,10 +473,10 @@ const MainAppContent: React.FC = () => {
     const isAllowed = getIsTabAllowed(activeTab);
     if (!isAllowed) {
       return (
-        <AccessDeniedPage 
-          onNavigateHome={() => setActiveTab('dashboard')} 
-          tabName={activeTab.replace(/-/g, ' ').toUpperCase()} 
-          userRole={role || 'GUEST'} 
+        <AccessDeniedPage
+          onNavigateHome={() => setActiveTab('dashboard')}
+          tabName={activeTab.replace(/-/g, ' ').toUpperCase()}
+          userRole={role || 'GUEST'}
         />
       );
     }
@@ -403,6 +547,15 @@ const MainAppContent: React.FC = () => {
         return <AcademicCalendarPage />;
 
       // ─── 3. Examination Section ───
+      case 'question-bank':
+      case 'paper-builder':
+      case 'paper-approval':
+      case 'published-papers':
+      case 'student-question-bank':
+      case 'exam-reports':
+      case 'bulk-upload':
+      case 'question-review':
+        return <QuestionBankDashboard activeRouteTab={activeTab} />;
       case 'examination':
       case 'exam-dashboard':
       case 'faculty-exam-info':
@@ -1040,11 +1193,142 @@ const MainAppContent: React.FC = () => {
         return <ReportsPage />;
       case 'settings':
         return <SystemSettingsPage />;
+      case 'ai-control-center':
+      case 'ai-agents':
+      case 'ai-activity':
+      case 'ai-approvals':
+      case 'ai-policies':
+      case 'ai-audit-logs':
+      case 'ai-automation':
+        return <AIControlCenterPage />;
+      case 'abc-credits':
+      case 'academic/abc':
+      case 'abc':
+      case 'abc-management':
+      case 'abc-compliance':
+        return role === 'STUDENT' ? <StudentAbcPortal /> : <AbcComplianceDashboard />;
+      case 'digilocker':
+      case 'digilocker-documents':
+      case 'digilocker-admin':
+      case 'student/digilocker':
+        return role === 'STUDENT' ? <StudentDigiLockerPortal /> : <AdminDigiLockerDashboard />;
+      case 'accreditation':
+      case 'accreditation-overview':
+        return <AccreditationDashboard initialTab="OVERVIEW" />;
+      case 'accreditation-naac':
+      case 'naac':
+        return <AccreditationDashboard initialTab="CRITERIA" initialFramework="NAAC" />;
+      case 'accreditation-nba':
+      case 'nba':
+        return <AccreditationDashboard initialTab="CRITERIA" initialFramework="NBA" />;
+      case 'accreditation-evidence':
+        return <AccreditationDashboard initialTab="EVIDENCE" />;
+      case 'accreditation-reports':
+      case 'iqac-accreditation':
+        return <AccreditationDashboard initialTab="REPORTS" />;
+      case 'obe':
+      case 'obe-dashboard':
+        return <OBEDashboard initialTab="MAPPING_MATRIX" />;
+      case 'course-outcomes':
+      case 'obe-co':
+        return <OBEDashboard initialTab="CO_MANAGER" />;
+      case 'program-outcomes':
+      case 'obe-po':
+        return <OBEDashboard initialTab="PROGRAM_OUTCOMES" />;
+      case 'program-specific-outcomes':
+      case 'obe-pso':
+        return <OBEDashboard initialTab="PSO" />;
+      case 'co-po-mapping':
+      case 'obe-copo-map':
+        return <OBEDashboard initialTab="MAPPING_MATRIX" />;
+      case 'co-pso-mapping':
+      case 'obe-copso-map':
+        return <OBEDashboard initialTab="CO_PSO_MAPPING" />;
+      case 'assessment-mapping':
+      case 'obe-assessment-map':
+        return <OBEDashboard initialTab="ASSESSMENT_MAPPING" />;
+      case 'attainment':
+      case 'obe-attainment':
+      case 'co-attainment':
+      case 'po-attainment':
+        return <OBEDashboard initialTab="ATTAINMENT" />;
+      case 'grievance':
+      case 'anti-ragging':
+      case 'icc':
+      case 'student-grievance':
+        return <GrievanceDashboard initialTab="OVERVIEW" />;
+      case 'grievance-anonymous':
+        return <GrievanceDashboard initialTab="ANONYMOUS_FILE" />;
+      case 'grievance-track':
+        return <GrievanceDashboard initialTab="ANONYMOUS_TRACK" />;
+      case 'grievance-desk':
+        return <GrievanceDashboard initialTab="AUTHORIZED_DESK" />;
+      case 'research':
+      case 'research-dashboard':
+      case 'publications':
+      case 'research-publications':
+      case 'patents':
+      case 'research-patents':
+      case 'research-projects':
+      case 'research-grants':
+      case 'research-scholars':
+      case 'research-consultancy':
+      case 'research-conferences':
+      case 'research-books':
+      case 'research-awards':
+      case 'research-reports':
+        return <ResearchDashboard activeRouteTab={activeTab} />;
+      case 'startup-grants':
+      case 'startups':
+      case 'startups-directory':
+      case 'hackathons':
+      case 'incubation':
+      case 'incubation-centre':
+      case 'innovation':
+      case 'innovation-dashboard':
+      case 'innovation-projects':
+      case 'innovation-mentors':
+      case 'innovation-funding':
+      case 'industry-collaboration':
+      case 'innovation-events':
+      case 'innovation-hackathons':
+      case 'innovation-awards':
+      case 'innovation-reports':
+        return <StartupGrantDashboard activeRouteTab={activeTab} />;
+      case 'grants':
+      case 'grants-dashboard':
+      case 'grant-opportunities':
+      case 'grant-applications':
+      case 'grant-disbursements':
+      case 'grant-milestones':
+      case 'grant-utilization':
+      case 'grant-documents':
+      case 'grant-reports':
+      case 'ssip':
+      case 'ssip-projects':
+      case 'seed-funding':
+        return <GrantsManagementDashboard activeRouteTab={activeTab} />;
+      case 'government-integrations':
+      case 'government-abc':
+      case 'government-digilocker':
+        return <GovernmentIntegrationDashboard />;
+      case 'compliance-engine':
+      case 'compliance':
+      case 'accreditation-engine':
+      case 'nep-indicators':
+        return <ComplianceEngineDashboard />;
       case 'feedback':
       case 'feedback-give':
+      case 'feedback-anonymous':
+      case 'feedback-anonymous-grievance':
+      case 'feedback-track':
+      case 'feedback-desk':
+      case 'feedback-reports':
       case 'feedback-my':
       case 'feedback-suggestions':
         return <FeedbackPage activeTab={activeTab} setActiveTab={setActiveTab} />;
+      case 'feedback-escalations':
+        return <FeedbackEscalationsDashboardPage />;
       case 'tickets':
       case 'service-desk':
       case 'support-tickets':
@@ -1102,7 +1386,7 @@ const MainAppContent: React.FC = () => {
           return <MentorPage initialTab="MY_STUDENTS" />;
         }
         return role !== 'STUDENT' ? (
-          <StudentDirectorySearchPage 
+          <StudentDirectorySearchPage
             initialRecordId={tabParams?.recordId}
             initialStudentId={tabParams?.studentId}
             initialTab={tabParams?.initialTab}
@@ -1113,7 +1397,7 @@ const MainAppContent: React.FC = () => {
         );
       case 'students-directory':
         return role !== 'STUDENT' ? (
-          <StudentDirectorySearchPage 
+          <StudentDirectorySearchPage
             initialRecordId={tabParams?.recordId}
             initialStudentId={tabParams?.studentId}
             initialTab={tabParams?.initialTab}
@@ -1201,7 +1485,7 @@ const MainAppContent: React.FC = () => {
         return <InventoryAssetPage initialTab="REPORTS" />;
       case 'inventory-audit':
         return <InventoryAssetPage initialTab="AUDIT_LOG" />;
-      
+
       // ─── University Resource Allocation & Central Asset Management Routes ───
       case 'university-asset-management':
       case 'resource-allocation':
@@ -1264,15 +1548,26 @@ const MainAppContent: React.FC = () => {
     }
   };
 
-  const unreadNotifs = user ? db.getNotifications(user, role).filter(n => !(n.isReadByUsers || []).includes(user.id)) : [];
+  const unreadNotifs = React.useMemo(() => {
+    if (!user) return [];
+    try {
+      return db.getNotifications(user, role).filter(n => !(n.isReadByUsers || []).includes(user.id));
+    } catch (err) {
+      console.warn('[PostLoginUpdate] Notification check safely bypassed:', err);
+      return [];
+    }
+  }, [user, role]);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-main)' }}>
-      {showWhatsNew && unreadNotifs.length > 0 && (
-        <WhatsNewModal
+      {showPostLoginUpdates && unreadNotifs.length > 0 && (
+        <PostLoginUpdateModal
           notifications={unreadNotifs}
-          onClose={() => setShowWhatsNew(false)}
-          onNavigateTab={setActiveTab}
+          onClose={handleDismissPostLoginUpdates}
+          onNavigateTab={(tab, params) => {
+            handleDismissPostLoginUpdates();
+            setActiveTab(tab, params);
+          }}
         />
       )}
       <Sidebar

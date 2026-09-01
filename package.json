@@ -1,7 +1,7 @@
 {
   "name": "sscit-erp",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -26,6 +26,7 @@
     "lucide-react": "^1.30.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "recharts": "^3.10.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
@@ -47,5 +48,3 @@
     "seed": "npx tsx prisma/seed.ts"
   }
 }
-
-

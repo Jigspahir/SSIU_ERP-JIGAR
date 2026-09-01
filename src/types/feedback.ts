@@ -1,3 +1,6 @@
+export type FeedbackItemType = 'FEEDBACK' | 'GRIEVANCE';
+export type SubmissionMode = 'AUTHENTICATED' | 'ANONYMOUS';
+
 export type FeedbackCategoryType = 
   | 'SUBJECT'
   | 'FACULTY'
@@ -5,7 +8,15 @@ export type FeedbackCategoryType =
   | 'HOD'
   | 'HOI'
   | 'CAMPUS'
-  | 'GENERAL_UNIVERSITY';
+  | 'GENERAL_UNIVERSITY'
+  | 'ACADEMIC'
+  | 'FACILITY'
+  | 'HOSTEL'
+  | 'TRANSPORT'
+  | 'EXAMINATION'
+  | 'ANTI_RAGGING'
+  | 'HARASSMENT'
+  | 'OTHER';
 
 export type CampusFacilityCategory = 
   | 'CAMPUS_INFRASTRUCTURE'
@@ -45,11 +56,16 @@ export type FeedbackStatus =
   | 'DRAFT'
   | 'SUBMITTED'
   | 'UNDER_REVIEW'
+  | 'ASSIGNED'
+  | 'IN_PROGRESS'
   | 'REVIEWED'
   | 'ACKNOWLEDGED'
   | 'ACTION_REQUIRED'
   | 'RESOLVED'
-  | 'CLOSED';
+  | 'CLOSED'
+  | 'REJECTED'
+  | 'ESCALATED'
+  | 'REOPENED';
 
 export type SuggestionStatus = 
   | 'SUBMITTED'
@@ -69,12 +85,23 @@ export interface FeedbackRatingItem {
 
 export interface DetailedStudentFeedback {
   id: string;
-  feedbackNo: string; // FDB/2026/000001
+  feedbackNo: string; // FDB/2026/000001 or GRV-2026-XXXXXX
   studentId: string;
   studentName?: string; // Hidden in UI when isAnonymous = true or in faculty view
   studentEnrollmentNo?: string;
   isAnonymous: boolean;
   
+  itemType?: FeedbackItemType; // FEEDBACK or GRIEVANCE
+  submissionMode?: SubmissionMode; // AUTHENTICATED or ANONYMOUS
+  publicReference?: string;
+  trackingToken?: string;
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  subjectTitle?: string;
+  departmentContext?: string;
+  incidentLocation?: string;
+  optionalContactEmail?: string;
+  optionalContactPhone?: string;
+
   category: FeedbackCategoryType;
   campusFacilityCategory?: CampusFacilityCategory;
   
@@ -123,9 +150,12 @@ export interface DetailedStudentFeedback {
 
   status: FeedbackStatus;
   adminRemarks?: string;
+  resolutionSummary?: string;
   reviewedByUserId?: string;
   reviewedByName?: string;
   reviewedAt?: string;
+  closedAt?: string;
+  timelineEvents?: Array<{ eventType: string; title: string; details?: string; createdAt: string }>;
 
   createdAt: string;
   updatedAt: string;
@@ -196,3 +226,85 @@ export interface FeedbackConfiguration {
     5: string;
   };
 }
+
+export type EscalationLevel = 0 | 1 | 2 | 3 | 4;
+
+export type SlaStatus = 'ON_TRACK' | 'DUE_SOON' | 'SLA_BREACHED' | 'RESOLVED';
+
+export type EscalationReason = 
+  | 'SLA_BREACH' 
+  | 'CRITICAL_PRIORITY' 
+  | 'MANUAL_ESCALATION' 
+  | 'REPEATED_UNRESOLVED' 
+  | 'AUTHORITY_UNAVAILABLE' 
+  | 'REOPENED_CASE' 
+  | 'OTHER';
+
+export interface GrievanceEscalationItem {
+  id: string;
+  caseNumber: string;
+  category: FeedbackCategoryType;
+  type: SubmissionMode;
+  subject: string;
+  description: string;
+  status: FeedbackStatus;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  incidentLocation?: string;
+  escalationLevel: EscalationLevel;
+  currentAuthority: string;
+  currentAuthorityRole: string;
+  slaStatus: SlaStatus;
+  slaDueAt: string;
+  remainingHours: number;
+  isBreached: boolean;
+  resolutionSummary?: string;
+  correctiveAction?: string;
+  createdAt: string;
+  updatedAt: string;
+  closedAt?: string;
+  evidencesCount?: number;
+  timelineEvents?: Array<{
+    eventType: string;
+    title: string;
+    details?: string;
+    createdAt: string;
+  }>;
+  submitterType: string;
+}
+
+export interface EscalationAnalyticsData {
+  totalCases: number;
+  activeCount: number;
+  onTrackCount: number;
+  dueSoonCount: number;
+  breachedCount: number;
+  resolvedCount: number;
+  totalEscalated: number;
+  criticalCount: number;
+  slaComplianceRate: number;
+  avgResolutionDays: number;
+  priorityCounts: {
+    LOW: number;
+    MEDIUM: number;
+    HIGH: number;
+    CRITICAL: number;
+  };
+  levelCounts: {
+    0: number;
+    1: number;
+    2: number;
+    3: number;
+    4: number;
+  };
+  categoryCounts: Record<string, number>;
+  institutionalQualitySummary: {
+    title: string;
+    framework: string;
+    evaluationPeriod: string;
+    complianceRate: string;
+    avgTurnaround: string;
+    activeEscalationTier: string;
+    generatedAt: string;
+  };
+}
+

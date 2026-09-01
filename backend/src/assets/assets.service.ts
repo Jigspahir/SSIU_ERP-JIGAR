@@ -428,7 +428,8 @@ export class AssetsService {
         data: {
           assetTag: dto.assetTag.toUpperCase(),
           name: dto.name,
-          categoryId: dto.categoryId,
+          category: { connect: { id: dto.categoryId } },
+          instituteId: dto.instituteId || 'INST-01',
           serialNo: dto.serialNo,
           manufacturer: dto.manufacturer,
           modelNo: dto.modelNo,
@@ -449,10 +450,12 @@ export class AssetsService {
         data: {
           transferNo: await this.nextSeq('TRN', () => tx.assetTransfer.count()),
           assetId: asset.id,
+          fromInstituteId: dto.instituteId || 'INST-01',
+          toInstituteId: dto.instituteId || 'INST-01',
           toLocation: dto.location || 'Central University Store',
           reason: 'Vendor procurement and stock inward receipt',
           transferredByUserId: userId,
-          transferredAt: new Date()
+          transferDate: new Date()
         }
       });
 
@@ -479,11 +482,13 @@ export class AssetsService {
         data: {
           transferNo: await this.nextSeq('TRN', () => tx.assetTransfer.count()),
           assetId: asset.id,
+          fromInstituteId: asset.instituteId || 'INST-01',
+          toInstituteId: dto.instituteId || asset.instituteId || 'INST-01',
           toLocation: dto.location || 'Institution Store',
           reason: dto.remarks || `Stock issued to ${dto.recipientRole}`,
           receivedByUserId: dto.issueToUserId,
           transferredByUserId: userId,
-          transferredAt: new Date()
+          transferDate: new Date()
         }
       });
 
@@ -551,7 +556,7 @@ export class AssetsService {
       // Mark active assignments as COMPLETED
       await tx.assetAssignment.updateMany({
         where: { assetId, status: 'ACTIVE' },
-        data: { status: 'COMPLETED', returnedDate: new Date(), returnRemarks: dto.remarks }
+        data: { status: 'COMPLETED', returnDate: new Date() }
       });
 
       return tx.asset.update({

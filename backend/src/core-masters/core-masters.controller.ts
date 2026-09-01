@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, Query, Req, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CoreMastersService } from './core-masters.service';
 import { PaginationQueryDto } from '../common/dto/pagination.dto';
@@ -171,8 +171,8 @@ export class CoreMastersController {
   @ApiOperation({ summary: 'Update Student details or status' })
   @Patch('students/:id')
   @RequirePermission('STUDENT', 'EDIT')
-  async updateStudent(@Param('id') id: string, @Body() dto: UpdateStudentDto) {
-    return this.coreMastersService.updateStudent(id, dto);
+  async updateStudent(@Param('id') id: string, @Body() dto: UpdateStudentDto, @Req() req: any) {
+    return this.coreMastersService.updateStudent(id, dto, req.user);
   }
 
   @ApiOperation({ summary: 'Authorized Bulk Student Import' })

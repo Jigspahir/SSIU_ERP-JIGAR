@@ -20,9 +20,11 @@ import {
   BulkImportFilterDto,
 } from './dto/bulk-import.dto';
 import { Response } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('Centralized Bulk Excel Import')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('bulk-import')
 export class BulkImportController {
   constructor(private readonly bulkImportService: BulkImportService) {}

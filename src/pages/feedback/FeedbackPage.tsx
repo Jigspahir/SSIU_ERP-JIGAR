@@ -11,7 +11,16 @@ export interface FeedbackPageProps {
 export const FeedbackPage: React.FC<FeedbackPageProps> = ({ activeTab, setActiveTab }) => {
   const { role } = useAuth();
 
-  if (role === 'STUDENT') {
+  // Route sub-tabs (such as anonymous grievance filing, tracking, or feedback submission) to StudentFeedbackPage
+  if (
+    role === 'STUDENT' || 
+    activeTab === 'feedback-anonymous-grievance' || 
+    activeTab === 'feedback-anonymous' || 
+    activeTab === 'feedback-track' || 
+    activeTab === 'feedback-give' || 
+    activeTab === 'feedback-my' || 
+    activeTab === 'feedback-suggestions'
+  ) {
     return <StudentFeedbackPage activeSubTab={activeTab} onTabChange={setActiveTab} />;
   }
 

@@ -7,6 +7,8 @@ import {
   FeedbackStatus, SuggestionStatus, FeedbackAuditLogItem 
 } from '../../types/feedback';
 import { Badge } from '../../components/common/Badge';
+import { FeedbackReportsPage } from './FeedbackReportsPage';
+import { FeedbackEscalationsDashboardPage } from './FeedbackEscalationsDashboardPage';
 import { 
   MessageSquare, Star, Download, Printer, Filter, CheckCircle2, 
   Search, Eye, X, Check, Clock, Plus, Shield, UserCheck, 
@@ -22,7 +24,7 @@ export const AdminFeedbackDashboardPage: React.FC = () => {
   // Sub-Navigation Tabs
   const [activeTab, setActiveTab] = useState<
     'MY_FEEDBACK' | 'FACULTY_EVALUATION' | 'SUBJECT_EVALUATION' | 
-    'MENTOR_EVALUATION' | 'SUGGESTIONS' | 'ANALYTICS' | 'REPORTS_EXPORT'
+    'MENTOR_EVALUATION' | 'SUGGESTIONS' | 'GRIEVANCE_DESK' | 'ESCALATIONS' | 'ANALYTICS' | 'REPORTS_EXPORT'
   >(isFaculty ? 'FACULTY_EVALUATION' : 'FACULTY_EVALUATION');
 
   // Selected Faculty for Evaluation Card
@@ -38,6 +40,7 @@ export const AdminFeedbackDashboardPage: React.FC = () => {
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('ALL');
   const [selectedRatingFilter, setSelectedRatingFilter] = useState<string>('ALL');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('ALL');
+  const [selectedGrievanceTypeFilter, setSelectedGrievanceTypeFilter] = useState<string>('ALL');
 
   // Table Sorting & Pagination
   const [sortColumn, setSortColumn] = useState<string>('date');
@@ -50,6 +53,12 @@ export const AdminFeedbackDashboardPage: React.FC = () => {
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState<boolean>(false);
   const [isAuditModalOpen, setIsAuditModalOpen] = useState<boolean>(false);
   const [auditTargetFeedbackNo, setAuditTargetFeedbackNo] = useState<string | null>(null);
+
+  // Grievance Action Modal
+  const [actioningGrievance, setActioningGrievance] = useState<DetailedStudentFeedback | null>(null);
+  const [grievanceNewStatus, setGrievanceNewStatus] = useState<FeedbackStatus>('UNDER_REVIEW');
+  const [grievanceRemarks, setGrievanceRemarks] = useState<string>('');
+  const [grievanceResolutionSummary, setGrievanceResolutionSummary] = useState<string>('');
 
   // Suggestion Action Modal
   const [actioningSuggestion, setActioningSuggestion] = useState<StudentSuggestionItem | null>(null);
@@ -400,6 +409,8 @@ export const AdminFeedbackDashboardPage: React.FC = () => {
               { id: 'SUBJECT_EVALUATION', label: 'Subject Evaluation', count: stats.categoryCounts.SUBJECT || 1 },
               { id: 'MENTOR_EVALUATION', label: 'Mentor Evaluation', count: stats.categoryCounts.MENTOR || 1 },
               { id: 'SUGGESTIONS', label: 'Suggestions', count: stats.totalSuggestions },
+              { id: 'GRIEVANCE_DESK', label: 'Grievance Redressal Desk', count: stats.feedbacks.filter(f => f.itemType === 'GRIEVANCE').length },
+              { id: 'ESCALATIONS', label: 'Escalation & SLA Engine' },
               { id: 'ANALYTICS', label: 'Analytics' },
               { id: 'REPORTS_EXPORT', label: 'Reports & Export' }
             ].map(tab => (
@@ -961,6 +972,16 @@ export const AdminFeedbackDashboardPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ─── 9. DEDICATED REPORTS & ANALYTICS SECTION (STAGE 9.2) ──────────── */}
+      {activeTab === 'REPORTS_EXPORT' && (
+        <FeedbackReportsPage />
+      )}
+
+      {/* ─── 10. DEDICATED ESCALATION & SLA ENGINE SECTION (STAGE 9.2) ──────── */}
+      {activeTab === 'ESCALATIONS' && (
+        <FeedbackEscalationsDashboardPage />
       )}
 
       {/* ─── MODAL 1: FEEDBACK DETAILS DRAWER / MODAL ───────────────────────── */}

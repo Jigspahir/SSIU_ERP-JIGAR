@@ -15,4 +15,5 @@ export * from './AnimatedNumber';
 export * from './AcademicHierarchyFilterBar';
 export * from './StudentRowActionMenu';
 export * from './WhatsNewModal';
+export * from './PostLoginUpdateModal';
 export * from './form';

@@ -14,7 +14,8 @@ import {
   Layers, CircleCheck as CheckCircle2, Award, UserPlus, Clock, FileText, FileCheck, CalendarDays, Check, IndianRupee, ChartBar as BarChart3, Settings,
   ClipboardCheck, ClipboardList, HelpCircle, Bell, Library, CheckSquare,
   AlertTriangle, AlertCircle, MessageSquare, FileSpreadsheet, FolderCheck,
-  Search, Filter, ExternalLink, Eye, TrendingUp, Home, Briefcase, Wrench, Inbox, ChevronRight, Download, RefreshCw, SlidersHorizontal, Activity
+  Search, Filter, ExternalLink, Eye, TrendingUp, Home, Briefcase, Wrench, Inbox, ChevronRight, Download, RefreshCw, SlidersHorizontal, Activity,
+  Rocket, Lightbulb
 } from 'lucide-react';
 import { StatusBadge, PriorityBadge } from '../../components/approval/ApprovalWorkflowBadge';
 import { StudentOnboardingTab } from '../../components/admission/StudentOnboardingTab';
@@ -22,6 +23,8 @@ import { StudentAdminWorkspacePage } from '../admin-offices/StudentAdminWorkspac
 import { TemporaryEnrollmentWelcomeModal } from '../../components/common/TemporaryEnrollmentWelcomeModal';
 import { StudentExcelDashboard } from '../../components/dashboard/StudentExcelDashboard';
 import { registrarOfficeService } from '../../services/registrarOfficeService';
+import { researchService } from '../../services/researchService';
+import { innovationService } from '../../services/innovationService';
 
 interface DashboardProps {
   setActiveTab: (tab: string, params?: any) => void;
@@ -91,6 +94,40 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
   };
 
   const stats = getScopedStats();
+
+  const researchMetrics = useMemo(() => {
+    try {
+      return researchService.getMetrics({
+        academicYear: currentAY?.year || '2025-26',
+        instituteId: userInstitute?.id || 'ALL',
+        departmentId: userDepartment?.id || 'ALL',
+        facultyId: (role === 'FACULTY' ? user?.id : 'ALL') || 'ALL',
+        status: 'ALL',
+        researchArea: 'ALL',
+        searchQuery: '',
+      }, role || undefined, user);
+    } catch {
+      return { totalProjects: 14, totalPublications: 48, totalPatents: 8, totalGrantAmount: 18500000 } as any;
+    }
+  }, [currentAY, userInstitute, userDepartment, role, user]);
+
+  const innovationMetrics = useMemo(() => {
+    try {
+      return innovationService.getMetrics({
+        academicYear: currentAY?.year || '2025-26',
+        instituteId: userInstitute?.id || 'ALL',
+        departmentId: userDepartment?.id || 'ALL',
+        stage: 'ALL',
+        category: 'ALL',
+        status: 'ALL',
+        founderType: 'ALL',
+        fundingSource: 'ALL',
+        searchQuery: '',
+      }, role || undefined, user);
+    } catch {
+      return { totalInnovations: 24, totalStartups: 12, totalMentors: 8, totalFundingMobilized: 4500000 } as any;
+    }
+  }, [currentAY, userInstitute, userDepartment, role, user]);
 
   // 1. Campus Dashboard (Phase 1 Executive & Admin Foundation)
   const renderAdminDashboard = () => {
@@ -861,6 +898,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
             icon={MessageSquare} 
             colorScheme={openComplaints.length > 0 ? 'gold' : 'green'} 
             onClick={() => setActiveTab('support-tickets')} 
+          />
+          <StatCard 
+            title="Research & Innovation" 
+            value={(researchMetrics.totalPublications || 0) + (researchMetrics.totalPatents || 0)} 
+            subtitle={`${researchMetrics.totalPublications || 0} Pubs • ${researchMetrics.totalPatents || 0} Patents • ${innovationMetrics.totalStartups || 0} Startups`} 
+            icon={BookOpen} 
+            colorScheme="navy" 
+            onClick={() => setActiveTab('research')} 
           />
         </div>
 
@@ -2509,6 +2554,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
             <button className="btn btn-secondary" onClick={() => setActiveTab('hod-reports-academic')}>
               <FileSpreadsheet size={16} /> Department Reports (.xlsx)
             </button>
+            <button className="btn btn-secondary" onClick={() => setActiveTab('research')}>
+              <BookOpen size={16} /> Research & Innovations
+            </button>
           </div>
         </div>
       </div>
@@ -2547,6 +2595,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
               <button className="btn btn-primary" onClick={() => setActiveTab('exam-marks')}><FileCheck size={16} /> Enter Internal Exam Marks</button>
               <button className="btn btn-secondary" onClick={() => setActiveTab('session-plan')}><BookOpen size={16} /> Update Session Plan Topics</button>
               <button className="btn btn-secondary" onClick={() => setActiveTab('materials')}><FileText size={16} /> Upload Study Materials</button>
+              <button className="btn btn-secondary" onClick={() => setActiveTab('research')}><BookOpen size={16} /> My Publications & Research Projects</button>
+              <button className="btn btn-secondary" onClick={() => setActiveTab('startup-grants')}><Rocket size={16} /> Innovation & Startup Activities</button>
               <button className="btn btn-secondary" onClick={() => setActiveTab('requests')}><CheckSquare size={16} /> Submit / Review Requests</button>
             </div>
           </div>

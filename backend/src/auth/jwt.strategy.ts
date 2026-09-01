@@ -25,7 +25,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
-    const user = await this.prisma.user.findUnique({
+    let user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       include: {
         userRoles: {
@@ -58,7 +58,47 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
 
     if (!user) {
-      throw new UnauthorizedException('User account no longer exists.');
+      user = await this.prisma.user.findFirst({
+        where: {
+          OR: [
+            { id: payload.sub },
+            { erpId: payload.erpId || payload.sub },
+            { username: payload.username || payload.sub },
+          ],
+        },
+        include: {
+          userRoles: {
+            include: { role: true },
+          },
+          student: {
+            select: {
+              id: true,
+              enrollmentNo: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              instituteId: true,
+              departmentId: true,
+            },
+          },
+          faculty: {
+            select: {
+              id: true,
+              employeeCode: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              designation: true,
+              instituteId: true,
+              departmentId: true,
+            },
+          },
+        },
+      });
+    }
+
+    if (!user) {
+      throw new UnauthorizedException('User account no longer exists or credentials invalid.');
     }
 
     if (user.accountStatus !== 'ACTIVE') {

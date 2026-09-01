@@ -103,6 +103,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (user) {
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
 
+      // Synchronize authenticated backend JWT session
+      const syncBackendSession = async () => {
+        try {
+          const role = user.role || 'STUDENT';
+          const loginId = user.username || (user as any).erpId || user.email || (role === 'STUDENT' ? 'stu_demo01' : role === 'FACULTY' ? 'fac_amitshah' : 'superadmin');
+          const pass = user.password || (role === 'STUDENT' ? 'Student@123' : role === 'FACULTY' ? 'Faculty@123' : role === 'REGISTRAR' ? 'Registrar@123' : 'Admin@123');
+
+          const res = await fetch('/api/v1/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ loginId, password: pass }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const token = data?.data?.accessToken || data?.accessToken;
+            if (token) {
+              localStorage.setItem('token', token);
+              localStorage.setItem('accessToken', token);
+              localStorage.setItem('jwt', token);
+              localStorage.setItem('sscit_auth_token', token);
+            }
+          }
+        } catch (e) {
+          // Non-blocking background sync
+        }
+      };
+
+      syncBackendSession();
+
       let timeoutId: number;
 
       const resetTimer = () => {
@@ -122,6 +152,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
     } else {
       localStorage.removeItem(AUTH_STORAGE_KEY);
+      localStorage.removeItem('token');
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('jwt');
     }
   }, [user]);
 
@@ -131,7 +164,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const cleanId = identifier.trim().toLowerCase();
 
     // 1. Match by username, email, temporaryEnrollmentNumber, or finalEnrollmentNumber
-    let foundUser = users.find(u => 
+    let foundUser = users.find(u =>
       (u.username && u.username.toLowerCase() === cleanId) ||
       (u.email && u.email.toLowerCase() === cleanId) ||
       (u.temporaryEnrollmentNumber && u.temporaryEnrollmentNumber.toLowerCase() === cleanId) ||
@@ -141,16 +174,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 2. Fallback: Search via Student Master record
     if (!foundUser) {
-      const studentMatch = students.find(s => 
+      const studentMatch = students.find(s =>
         (s.temporaryEnrollmentNumber && s.temporaryEnrollmentNumber.toLowerCase() === cleanId) ||
         (s.finalEnrollmentNumber && s.finalEnrollmentNumber.toLowerCase() === cleanId) ||
         (s.enrollmentNo && s.enrollmentNo.toLowerCase() === cleanId) ||
         (s.id && s.id.toLowerCase() === cleanId)
       );
       if (studentMatch) {
-        foundUser = users.find(u => 
-          u.id === `user-${studentMatch.id}` || 
-          u.username === studentMatch.enrollmentNo || 
+        foundUser = users.find(u =>
+          u.id === `user-${studentMatch.id}` ||
+          u.username === studentMatch.enrollmentNo ||
           u.username === studentMatch.temporaryEnrollmentNumber ||
           u.email.toLowerCase() === studentMatch.email.toLowerCase()
         );
@@ -193,16 +226,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 4. Validate Password & Student Access Code
     if (password) {
-      const linkedStudent = students.find(s => 
-        (foundUser?.id && s.id === foundUser.id.replace('user-', '')) || 
+      const linkedStudent = students.find(s =>
+        (foundUser?.id && s.id === foundUser.id.replace('user-', '')) ||
         s.enrollmentNo === foundUser?.username ||
         s.temporaryEnrollmentNumber === foundUser?.temporaryEnrollmentNumber
       );
 
       const isDirectMatch = foundUser.password === password;
       const isAccessCodeMatch = (foundUser.studentAccessCode && foundUser.studentAccessCode === password) ||
-                                (linkedStudent?.studentAccessCode && linkedStudent.studentAccessCode === password);
-      const isDemoPassMatch = 
+        (linkedStudent?.studentAccessCode && linkedStudent.studentAccessCode === password);
+      const isDemoPassMatch =
         password === 'Student@123' ||
         password === 'Faculty@123' ||
         password === 'Admin@123' ||
@@ -216,7 +249,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // 5. Validate Account Status (Active vs Locked vs Disabled)
     if (foundUser.accountStatus === 'LOCKED' || (foundUser as any).status === 'LOCKED') {
-      const lockMsg = foundUser.lockReason 
+      const lockMsg = foundUser.lockReason
         ? `Your account is LOCKED. Reason: ${foundUser.lockReason}. Please contact the Central ERP Coordinator.`
         : 'Your account is LOCKED for security reasons. Please contact the Central ERP Coordinator.';
       securityAuditService.trackLoginFailure(identifier, `Locked account login attempt: ${foundUser.username}`);
@@ -229,7 +262,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     setUser(foundUser);
-    
+
     // Strict role resolution: Non-faculty accounts (REGISTRAR, PRINCIPAL, HOD, etc.) MUST NEVER resolve as FACULTY
     let initialActiveRole: UserRole = foundUser.role;
     if (foundUser.role === 'FACULTY' || foundUser.role === 'MENTOR') {
@@ -241,7 +274,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Clear any stale workspace cache for non-faculty accounts
       try {
         localStorage.removeItem(`sscit_active_workspace_${foundUser.id}`);
-      } catch (e) {}
+      } catch (e) { }
     }
 
     setActiveRoleState(initialActiveRole);
@@ -258,11 +291,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       securityAuditService.trackLogout(user);
       try {
         localStorage.removeItem(`sscit_active_workspace_${user.id}`);
-      } catch (e) {}
+      } catch (e) { }
     }
     try {
       localStorage.removeItem(AUTH_STORAGE_KEY);
-    } catch (e) {}
+    } catch (e) { }
     setUser(null);
     setActiveRoleState(null);
   };
