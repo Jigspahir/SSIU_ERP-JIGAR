@@ -436,6 +436,17 @@ const MainAppContent: React.FC = () => {
     }
   };
 
+  // Safely compute unread updates for post-login announcement popup
+  const unreadNotifs = React.useMemo(() => {
+    if (!user) return [];
+    try {
+      return db.getNotifications(user, role).filter(n => !(n.isReadByUsers || []).includes(user.id));
+    } catch (err) {
+      console.warn('[PostLoginUpdate] Notification check safely bypassed:', err);
+      return [];
+    }
+  }, [user, role]);
+
   // Sync browser popstate (back/forward)
   React.useEffect(() => {
     const handlePopState = (event: PopStateEvent) => {
@@ -1547,16 +1558,6 @@ const MainAppContent: React.FC = () => {
         return role === 'PARENT' ? <ParentPTMDashboard /> : <Dashboard setActiveTab={setActiveTab} />;
     }
   };
-
-  const unreadNotifs = React.useMemo(() => {
-    if (!user) return [];
-    try {
-      return db.getNotifications(user, role).filter(n => !(n.isReadByUsers || []).includes(user.id));
-    } catch (err) {
-      console.warn('[PostLoginUpdate] Notification check safely bypassed:', err);
-      return [];
-    }
-  }, [user, role]);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-main)' }}>
