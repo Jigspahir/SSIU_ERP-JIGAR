@@ -1142,9 +1142,7 @@ export const STUDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     icon: IndianRupee,
     defaultTab: 'fees-semester',
     children: [
-      { id: 'fees-semester', label: 'Semester Fees', targetTab: 'fees-semester' },
-      { id: 'fees-receipts', label: 'Receipts', targetTab: 'fees-receipts' },
-      { id: 'fees-query', label: 'Fee Query', targetTab: 'fees-query' }
+      { id: 'fees-semester', label: 'Semester Fees', targetTab: 'fees-semester' }
     ]
   },
   {

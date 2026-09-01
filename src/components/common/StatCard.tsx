@@ -67,8 +67,8 @@ export const StatCard: React.FC<StatCardProps> = ({
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 0, flex: 1, paddingRight: '0.65rem' }}>
         <span 
           style={{ 
-            fontSize: '0.71875rem', 
-            fontWeight: 600, 
+            fontSize: '0.6875rem', 
+            fontWeight: 700, 
             color: 'var(--text-muted, #64748B)', 
             textTransform: 'uppercase', 
             letterSpacing: '0.04em',
@@ -84,11 +84,11 @@ export const StatCard: React.FC<StatCardProps> = ({
         
         <div 
           style={{ 
-            fontSize: '1.5rem', 
+            fontSize: '1.25rem', 
             fontWeight: 700, 
             color: 'var(--text-main, #0F172A)', 
             marginTop: '0.15rem', 
-            lineHeight: 1.15,
+            lineHeight: 1.2,
             letterSpacing: '-0.02em',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
@@ -101,7 +101,7 @@ export const StatCard: React.FC<StatCardProps> = ({
         {subText && (
           <div 
             style={{ 
-              fontSize: '0.6875rem', 
+              fontSize: '0.65625rem', 
               color: 'var(--text-muted, #64748B)', 
               marginTop: '0.15rem', 
               lineHeight: 1.2,

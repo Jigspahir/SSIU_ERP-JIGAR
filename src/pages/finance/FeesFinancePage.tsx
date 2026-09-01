@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/db';
 import { Badge } from '../../components/common/Badge';
@@ -18,6 +18,7 @@ import { FeeQueryModal } from '../../components/finance/FeeQueryModal';
 import { FeeQueryResolveModal } from '../../components/finance/FeeQueryResolveModal';
 import { ExcelTableContainer, ExcelTable, ExcelTh, ExcelTd } from '../../components/common/ExcelTable';
 import { feeQueryService } from '../../services/feeQueryService';
+import { studentFeeService, STANDARD_SEMESTER_BASE_FEE, COURSE_SEMESTERS_COUNT, STANDARD_COURSE_TOTAL_BASE_FEE } from '../../services/studentFeeService';
 import { FeeQuery } from '../../types/feeQuery';
 import { 
   FeeStructure, StudentFeeRecord, FeeInvoice, FeePaymentTransaction, PaymentMode, FeePaymentStatus 
@@ -90,7 +91,7 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   // Student Semester View State
-  const [studentSelectedSem, setStudentSelectedSem] = useState<string>('sem-cse-4');
+  const [selectedSemNumber, setSelectedSemNumber] = useState<number>(4);
 
   // Form State: Online Payment Gateway Simulation
   const [onlinePayType, setOnlinePayType] = useState<'SEMESTER' | 'EXAM' | 'CUSTOM'>('SEMESTER');
@@ -367,10 +368,22 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
     const studentId = user?.id || 'stu-1';
     const studentFee = feeRecords.find(r => r.studentId === studentId || r.enrollmentNo === user?.enrollmentNo) || feeRecords[0];
     const studentTxs = paymentTransactions.filter(t => t.studentId === studentFee?.studentId || t.enrollmentNo === user?.enrollmentNo);
-
-    const paidPct = studentFee ? Math.round((studentFee.paidAmount / Math.max(1, studentFee.totalAmount)) * 100) : 0;
-    const { daysOverdue, lateFee } = getLateFeeCalculation(studentFee);
     const studentQueries = feeQueryService.getScopedQueries(user, role);
+
+    // Single Source of Truth: Centralized 8-Semester Course Summary & Calculation
+    const courseSummary = useMemo(() => {
+      return studentFeeService.calculateCourseFeeSummary(
+        studentId,
+        user?.enrollmentNo || '2024BCSE001'
+      );
+    }, [studentId, user?.enrollmentNo, feeRecords, paymentTransactions]);
+
+    const semesterPlans = courseSummary.semesters;
+    const totalCourseFee = courseSummary.totalCourseFee;
+    const totalCoursePaid = courseSummary.totalPaidAmount;
+    const totalCoursePending = courseSummary.totalPendingAmount;
+    const totalCourseConcession = courseSummary.totalConcession;
+    const selectedSemester = semesterPlans.find(s => s.semesterNumber === selectedSemNumber) || semesterPlans[3];
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
@@ -382,7 +395,7 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
               Student Fees, Payment &amp; Accounts Portal
             </h2>
             <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-              Semester-wise fee breakdown, online payment gateway, verified downloadable receipts, and direct Accounts fee query desk
+              Semester-wise fee breakdown (8 Semesters • ₹35,500 / Sem), online payment gateway, verified downloadable receipts, and direct Accounts fee query desk
             </p>
           </div>
 
@@ -415,110 +428,160 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
         {studentTab === 'MY_FEES' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
             
-            {/* Action Bar */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-              {/* Semester Selection Filter */}
-              <div className="card" style={{ padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', margin: 0, flex: 1 }}>
-                <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
-                  Select Academic Semester:
-                </span>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  {semesters.map(s => (
-                    <button
-                      key={s.id}
-                      className={`btn btn-sm ${studentSelectedSem === s.id ? 'btn-primary' : 'btn-secondary'}`}
-                      onClick={() => setStudentSelectedSem(s.id)}
-                    >
-                      {s.code} (Sem {s.number})
-                    </button>
-                  ))}
+            {/* 8-Semester Selection Cards Grid */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Calendar size={18} color="var(--brand-navy)" />
+                  <span style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
+                    Course Semester Schedule (8 Semesters • ₹35,500 / Sem)
+                  </span>
                 </div>
+                <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                  Click any semester card below to inspect itemized fee heads &amp; ledger breakdown
+                </span>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button 
-                  className="btn btn-primary"
-                  onClick={() => handleOpenStudentOnlinePayment(studentFee, 'SEMESTER')}
-                >
-                  <CreditCard size={16} /> Pay Semester Fees (₹{studentFee?.pendingAmount.toLocaleString()})
-                </button>
-                <button 
-                  className="btn btn-navy"
-                  onClick={() => handleOpenStudentOnlinePayment(studentFee, 'EXAM')}
-                >
-                  <IndianRupee size={16} /> Pay Exam Fee (₹1,200)
-                </button>
+              <div className="semester-selector-grid">
+                {semesterPlans.map(s => {
+                  const isSelected = selectedSemNumber === s.semesterNumber;
+                  const statusBadgeVariant = s.status === 'PAID' ? 'success' : s.status === 'OVERDUE' ? 'danger' : s.status === 'PARTIALLY_PAID' ? 'gold' : 'navy';
+                  
+                  return (
+                    <div
+                      key={s.semesterNumber}
+                      onClick={() => setSelectedSemNumber(s.semesterNumber)}
+                      className="card clickable"
+                      style={{
+                        padding: '0.875rem 0.75rem',
+                        cursor: 'pointer',
+                        border: isSelected ? '2px solid var(--brand-orange)' : '1px solid var(--border-color)',
+                        backgroundColor: isSelected ? 'var(--brand-orange-light, #FFF4ED)' : 'var(--bg-surface)',
+                        boxShadow: isSelected ? '0 4px 14px rgba(243, 112, 35, 0.2)' : 'var(--shadow-sm)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        gap: '0.5rem',
+                        transition: 'all 0.2s ease',
+                        position: 'relative'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.25rem' }}>
+                        <div>
+                          <div style={{ fontSize: '0.8125rem', fontWeight: 800, color: isSelected ? 'var(--brand-orange)' : 'var(--brand-navy)' }}>
+                            {s.semesterLabel}
+                          </div>
+                          <div style={{ fontSize: '0.65625rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+                            {s.academicYear}
+                          </div>
+                        </div>
+                        {s.isCurrent && (
+                          <span style={{ fontSize: '0.5625rem', fontWeight: 800, padding: '0.15rem 0.35rem', borderRadius: '4px', background: 'var(--brand-navy)', color: '#FFF' }}>
+                            CURRENT
+                          </span>
+                        )}
+                      </div>
+
+                      <div>
+                        <div style={{ fontSize: '1.0625rem', fontWeight: 900, color: isSelected ? 'var(--brand-orange)' : 'var(--brand-navy)' }}>
+                          ₹{s.baseFee.toLocaleString('en-IN')}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.35rem' }}>
+                          <Badge variant={statusBadgeVariant}>
+                            {s.status === 'PARTIALLY_PAID' ? 'PARTIAL' : s.status}
+                          </Badge>
+                          <span style={{ fontSize: '0.625rem', fontWeight: 600, color: s.pendingAmount > 0 ? 'var(--brand-orange)' : '#10B981' }}>
+                            {s.pendingAmount > 0 ? `Due: ₹${s.pendingAmount.toLocaleString('en-IN')}` : 'Settled'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
             {/* Student KPI Cards */}
-            <div className="grid-5" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-              <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--brand-navy)' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>TOTAL FEES</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--brand-navy)', marginTop: '0.25rem' }}>
-                  ₹{studentFee?.totalAmount.toLocaleString()}
+            <div className="fees-summary-kpi-grid">
+              <div className="card" style={{ padding: '1rem 0.875rem', borderLeft: '4px solid var(--brand-navy)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>TOTAL COURSE FEES</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy)', marginTop: '0.2rem', lineHeight: 1.2 }}>
+                  ₹{totalCourseFee.toLocaleString('en-IN')}
                 </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Assigned Semester Base</div>
+                <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>8 Semesters @ ₹35,500</div>
               </div>
 
-              <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #10B981' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>PAID SETTLED</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#10B981', marginTop: '0.25rem' }}>
-                  ₹{studentFee?.paidAmount.toLocaleString()}
+              <div className="card" style={{ padding: '1rem 0.875rem', borderLeft: '4px solid #10B981', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>PAID SETTLED</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10B981', marginTop: '0.2rem', lineHeight: 1.2 }}>
+                  ₹{totalCoursePaid.toLocaleString('en-IN')}
                 </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Gateway Verified</div>
+                <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Course Ledger Paid</div>
               </div>
 
-              <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid var(--brand-orange)' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>PENDING DUE</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: 'var(--brand-orange)', marginTop: '0.25rem' }}>
-                  ₹{studentFee?.pendingAmount.toLocaleString()}
+              <div className="card" style={{ padding: '1rem 0.875rem', borderLeft: '4px solid var(--brand-orange)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>TOTAL PENDING DUE</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-orange)', marginTop: '0.2rem', lineHeight: 1.2 }}>
+                  ₹{totalCoursePending.toLocaleString('en-IN')}
                 </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Due: {studentFee?.dueDate}</div>
+                <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Overall Course Balance</div>
               </div>
 
-              <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #EF4444' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>OVERDUE LATE FEE</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: lateFee > 0 ? '#EF4444' : 'var(--brand-navy)', marginTop: '0.25rem' }}>
-                  {lateFee > 0 ? `+₹${lateFee.toLocaleString()}` : '₹0'}
+              <div className="card" style={{ padding: '1rem 0.875rem', borderLeft: '4px solid #EF4444', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>{selectedSemester.semesterLabel.toUpperCase()} OVERDUE</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: selectedSemester.lateFee > 0 ? '#EF4444' : 'var(--brand-navy)', marginTop: '0.2rem', lineHeight: 1.2 }}>
+                  {selectedSemester.lateFee > 0 ? `+₹${selectedSemester.lateFee.toLocaleString('en-IN')}` : '₹0'}
                 </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
-                  {daysOverdue > 0 ? `${daysOverdue} Days Overdue` : 'No Penalties'}
+                <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {selectedSemester.lateFee > 0 ? 'Late Fee Applied' : 'No Penalties'}
                 </div>
               </div>
 
-              <div className="card" style={{ padding: '1.25rem', borderLeft: '4px solid #8B5CF6' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>TOTAL PAYABLE NOW</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 900, color: '#8B5CF6', marginTop: '0.25rem' }}>
-                  ₹{(studentFee ? studentFee.pendingAmount + lateFee : 0).toLocaleString()}
+              <div className="card" style={{ padding: '1rem 0.875rem', borderLeft: '4px solid #8B5CF6', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.02em' }}>TOTAL PAYABLE NOW</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#8B5CF6', marginTop: '0.2rem', lineHeight: 1.2 }}>
+                  ₹{(selectedSemester.pendingAmount + selectedSemester.lateFee).toLocaleString('en-IN')}
                 </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Calculated by Backend</div>
+                <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: '0.2rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedSemester.semesterLabel} Payable</div>
               </div>
             </div>
 
-            {/* Fee-Wise Breakdown Table as Required by Section 1 */}
+            {/* Fee-Wise Breakdown Table for Selected Semester */}
             <div className="card" style={{ padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
                   <h3 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--brand-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <FileText size={18} color="var(--brand-orange)" /> Itemized Semester Fee Heads &amp; Breakdown
+                    <FileText size={18} color="var(--brand-orange)" /> Itemized {selectedSemester.semesterLabel} Fee Heads &amp; Breakdown
                   </h3>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0.25rem 0 0 0' }}>
-                    Official fee schedule per academic component with concession credits, late charges, and real-time ledger settlement
+                    Official standard semester schedule (₹35,500 Base) • Academic Year: <strong>{selectedSemester.academicYear}</strong> • Due: <strong>{selectedSemester.dueDate}</strong>
                   </p>
                 </div>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Academic Year: <strong>2026-27</strong> • Semester: <strong>Semester 4</strong>
-                </span>
+
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <button 
+                    className="btn btn-primary"
+                    disabled={selectedSemester.pendingAmount === 0 && selectedSemester.lateFee === 0}
+                    onClick={() => handleOpenStudentOnlinePayment(selectedSemester.rawRecord || studentFee, 'SEMESTER')}
+                  >
+                    <CreditCard size={16} /> Pay {selectedSemester.semesterLabel} Fees (₹{(selectedSemester.pendingAmount + selectedSemester.lateFee).toLocaleString('en-IN')})
+                  </button>
+                  <button 
+                    className="btn btn-navy"
+                    onClick={() => handleOpenStudentOnlinePayment(selectedSemester.rawRecord || studentFee, 'EXAM')}
+                  >
+                    <IndianRupee size={16} /> Pay Exam Fee (₹{selectedSemester.examFee.toLocaleString('en-IN')})
+                  </button>
+                </div>
               </div>
 
               <ExcelTableContainer minWidth="1100px">
                 <ExcelTable>
                   <thead>
                     <tr>
-                      <ExcelTh align="left" style={{ minWidth: '180px' }}>Fee Head</ExcelTh>
+                      <ExcelTh align="left" style={{ minWidth: '200px' }}>Fee Head</ExcelTh>
                       <ExcelTh align="center" style={{ minWidth: '100px' }}>Academic Year</ExcelTh>
-                      <ExcelTh align="center" style={{ minWidth: '90px' }}>Semester</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '100px' }}>Semester</ExcelTh>
                       <ExcelTh align="right" style={{ minWidth: '110px' }}>Original Amount</ExcelTh>
                       <ExcelTh align="right" style={{ minWidth: '95px' }}>Concession</ExcelTh>
                       <ExcelTh align="right" style={{ minWidth: '90px' }}>Late Fee</ExcelTh>
@@ -531,133 +594,148 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
                     </tr>
                   </thead>
                   <tbody>
+                    {/* 1. Tuition Fee */}
                     <tr>
                       <ExcelTd align="left" bold color="var(--brand-navy)">Tuition Fee</ExcelTd>
-                      <ExcelTd align="center">2026-27</ExcelTd>
-                      <ExcelTd align="center">Semester 4</ExcelTd>
-                      <ExcelTd align="right">₹{(studentFee?.tuitionFee || 0).toLocaleString('en-IN')}</ExcelTd>
+                      <ExcelTd align="center">{selectedSemester.academicYear}</ExcelTd>
+                      <ExcelTd align="center">{selectedSemester.semesterLabel}</ExcelTd>
+                      <ExcelTd align="right">₹{selectedSemester.tuitionFee.toLocaleString('en-IN')}</ExcelTd>
                       <ExcelTd align="right" color="#10B981">-₹0</ExcelTd>
-                      <ExcelTd align="right" color={lateFee > 0 ? '#EF4444' : 'inherit'}>
-                        {lateFee > 0 ? `+₹${Math.round(lateFee * 0.6).toLocaleString('en-IN')}` : '₹0'}
+                      <ExcelTd align="right" color={selectedSemester.lateFee > 0 ? '#EF4444' : 'inherit'}>
+                        {selectedSemester.lateFee > 0 ? `+₹${Math.round(selectedSemester.lateFee * 0.6).toLocaleString('en-IN')}` : '₹0'}
                       </ExcelTd>
                       <ExcelTd align="right" bold>
-                        ₹{((studentFee?.tuitionFee || 0) + (lateFee > 0 ? Math.round(lateFee * 0.6) : 0)).toLocaleString('en-IN')}
+                        ₹{(selectedSemester.tuitionFee + (selectedSemester.lateFee > 0 ? Math.round(selectedSemester.lateFee * 0.6) : 0)).toLocaleString('en-IN')}
                       </ExcelTd>
                       <ExcelTd align="right" bold color="#8B5CF6">
-                        ₹{(Math.max(0, (studentFee?.tuitionFee || 0) - (studentFee?.paidAmount || 0)) + (lateFee > 0 ? Math.round(lateFee * 0.6) : 0)).toLocaleString('en-IN')}
+                        ₹{(selectedSemester.status === 'PAID' ? 0 : selectedSemester.tuitionFee + (selectedSemester.lateFee > 0 ? Math.round(selectedSemester.lateFee * 0.6) : 0)).toLocaleString('en-IN')}
                       </ExcelTd>
                       <ExcelTd align="right" bold color="#10B981">
-                        ₹{Math.min(studentFee?.paidAmount || 0, studentFee?.tuitionFee || 0).toLocaleString('en-IN')}
+                        ₹{(selectedSemester.status === 'PAID' ? selectedSemester.tuitionFee : Math.min(selectedSemester.paidAmount, selectedSemester.tuitionFee)).toLocaleString('en-IN')}
                       </ExcelTd>
                       <ExcelTd align="right" bold color="var(--brand-orange)">
-                        ₹{Math.max(0, (studentFee?.tuitionFee || 0) - (studentFee?.paidAmount || 0)).toLocaleString('en-IN')}
+                        ₹{(selectedSemester.status === 'PAID' ? 0 : Math.max(0, selectedSemester.tuitionFee - selectedSemester.paidAmount)).toLocaleString('en-IN')}
                       </ExcelTd>
-                      <ExcelTd align="center">{studentFee?.dueDate || '2026-09-15'}</ExcelTd>
+                      <ExcelTd align="center">{selectedSemester.dueDate}</ExcelTd>
                       <ExcelTd align="center">
-                        <Badge variant={studentFee?.paidAmount && studentFee.paidAmount >= (studentFee?.tuitionFee || 0) ? 'success' : lateFee > 0 ? 'danger' : 'gold'}>
-                          {studentFee?.paidAmount && studentFee.paidAmount >= (studentFee?.tuitionFee || 0) ? 'PAID' : lateFee > 0 ? 'OVERDUE' : 'PARTIALLY_PAID'}
+                        <Badge variant={selectedSemester.status === 'PAID' ? 'success' : selectedSemester.status === 'OVERDUE' ? 'danger' : selectedSemester.status === 'PARTIALLY_PAID' ? 'gold' : 'navy'}>
+                          {selectedSemester.status}
                         </Badge>
                       </ExcelTd>
                     </tr>
+
+                    {/* 2. Lab & Computing Infrastructure Fee */}
                     <tr>
                       <ExcelTd align="left" bold color="var(--brand-navy)">Lab &amp; Computing Infrastructure Fee</ExcelTd>
-                      <ExcelTd align="center">2026-27</ExcelTd>
-                      <ExcelTd align="center">Semester 4</ExcelTd>
-                      <ExcelTd align="right">₹{(studentFee?.labFee || 0).toLocaleString('en-IN')}</ExcelTd>
+                      <ExcelTd align="center">{selectedSemester.academicYear}</ExcelTd>
+                      <ExcelTd align="center">{selectedSemester.semesterLabel}</ExcelTd>
+                      <ExcelTd align="right">₹{selectedSemester.labFee.toLocaleString('en-IN')}</ExcelTd>
                       <ExcelTd align="right" color="#10B981">-₹0</ExcelTd>
-                      <ExcelTd align="right" color={lateFee > 0 ? '#EF4444' : 'inherit'}>
-                        {lateFee > 0 ? `+₹${Math.round(lateFee * 0.2).toLocaleString('en-IN')}` : '₹0'}
+                      <ExcelTd align="right" color={selectedSemester.lateFee > 0 ? '#EF4444' : 'inherit'}>
+                        {selectedSemester.lateFee > 0 ? `+₹${Math.round(selectedSemester.lateFee * 0.2).toLocaleString('en-IN')}` : '₹0'}
                       </ExcelTd>
                       <ExcelTd align="right" bold>
-                        ₹{((studentFee?.labFee || 0) + (lateFee > 0 ? Math.round(lateFee * 0.2) : 0)).toLocaleString('en-IN')}
+                        ₹{(selectedSemester.labFee + (selectedSemester.lateFee > 0 ? Math.round(selectedSemester.lateFee * 0.2) : 0)).toLocaleString('en-IN')}
                       </ExcelTd>
                       <ExcelTd align="right" bold color="#8B5CF6">
-                        ₹{(studentFee?.status === 'PAID' ? 0 : (studentFee?.labFee || 0) + (lateFee > 0 ? Math.round(lateFee * 0.2) : 0)).toLocaleString('en-IN')}
+                        ₹{(selectedSemester.status === 'PAID' ? 0 : selectedSemester.labFee + (selectedSemester.lateFee > 0 ? Math.round(selectedSemester.lateFee * 0.2) : 0)).toLocaleString('en-IN')}
                       </ExcelTd>
                       <ExcelTd align="right" bold color="#10B981">
-                        ₹{(studentFee?.status === 'PAID' ? (studentFee?.labFee || 0) : 0).toLocaleString('en-IN')}
+                        ₹{(selectedSemester.status === 'PAID' ? selectedSemester.labFee : 0).toLocaleString('en-IN')}
                       </ExcelTd>
                       <ExcelTd align="right" bold color="var(--brand-orange)">
-                        ₹{(studentFee?.status === 'PAID' ? 0 : (studentFee?.labFee || 0)).toLocaleString('en-IN')}
+                        ₹{(selectedSemester.status === 'PAID' ? 0 : selectedSemester.labFee).toLocaleString('en-IN')}
                       </ExcelTd>
-                      <ExcelTd align="center">{studentFee?.dueDate || '2026-09-15'}</ExcelTd>
+                      <ExcelTd align="center">{selectedSemester.dueDate}</ExcelTd>
                       <ExcelTd align="center">
-                        <Badge variant={studentFee?.status === 'PAID' ? 'success' : lateFee > 0 ? 'danger' : 'gold'}>
-                          {studentFee?.status === 'PAID' ? 'PAID' : lateFee > 0 ? 'OVERDUE' : 'PENDING'}
+                        <Badge variant={selectedSemester.status === 'PAID' ? 'success' : selectedSemester.status === 'OVERDUE' ? 'danger' : 'navy'}>
+                          {selectedSemester.status === 'PAID' ? 'PAID' : selectedSemester.status === 'OVERDUE' ? 'OVERDUE' : 'PENDING'}
                         </Badge>
                       </ExcelTd>
                     </tr>
+
+                    {/* 3. Examination Fee */}
                     <tr>
-                      <ExcelTd align="left" bold color="var(--brand-navy)">Campus Development Fee</ExcelTd>
-                      <ExcelTd align="center">2026-27</ExcelTd>
-                      <ExcelTd align="center">Semester 4</ExcelTd>
-                      <ExcelTd align="right">₹{(studentFee?.developmentFee || 0).toLocaleString('en-IN')}</ExcelTd>
+                      <ExcelTd align="left" bold color="var(--brand-navy)">Examination Fee</ExcelTd>
+                      <ExcelTd align="center">{selectedSemester.academicYear}</ExcelTd>
+                      <ExcelTd align="center">{selectedSemester.semesterLabel}</ExcelTd>
+                      <ExcelTd align="right">₹{selectedSemester.examFee.toLocaleString('en-IN')}</ExcelTd>
                       <ExcelTd align="right" color="#10B981">-₹0</ExcelTd>
-                      <ExcelTd align="right" color={lateFee > 0 ? '#EF4444' : 'inherit'}>
-                        {lateFee > 0 ? `+₹${Math.round(lateFee * 0.2).toLocaleString('en-IN')}` : '₹0'}
-                      </ExcelTd>
-                      <ExcelTd align="right" bold>
-                        ₹{((studentFee?.developmentFee || 0) + (lateFee > 0 ? Math.round(lateFee * 0.2) : 0)).toLocaleString('en-IN')}
-                      </ExcelTd>
+                      <ExcelTd align="right">₹0</ExcelTd>
+                      <ExcelTd align="right" bold>₹{selectedSemester.examFee.toLocaleString('en-IN')}</ExcelTd>
                       <ExcelTd align="right" bold color="#8B5CF6">
-                        ₹{(studentFee?.status === 'PAID' ? 0 : (studentFee?.developmentFee || 0) + (lateFee > 0 ? Math.round(lateFee * 0.2) : 0)).toLocaleString('en-IN')}
+                        ₹{(selectedSemester.status === 'PAID' ? 0 : selectedSemester.examFee).toLocaleString('en-IN')}
                       </ExcelTd>
                       <ExcelTd align="right" bold color="#10B981">
-                        ₹{(studentFee?.status === 'PAID' ? (studentFee?.developmentFee || 0) : 0).toLocaleString('en-IN')}
+                        ₹{(selectedSemester.status === 'PAID' ? selectedSemester.examFee : 0).toLocaleString('en-IN')}
                       </ExcelTd>
                       <ExcelTd align="right" bold color="var(--brand-orange)">
-                        ₹{(studentFee?.status === 'PAID' ? 0 : (studentFee?.developmentFee || 0)).toLocaleString('en-IN')}
+                        ₹{(selectedSemester.status === 'PAID' ? 0 : selectedSemester.examFee).toLocaleString('en-IN')}
                       </ExcelTd>
-                      <ExcelTd align="center">{studentFee?.dueDate || '2026-09-15'}</ExcelTd>
+                      <ExcelTd align="center">{selectedSemester.dueDate}</ExcelTd>
                       <ExcelTd align="center">
-                        <Badge variant={studentFee?.status === 'PAID' ? 'success' : lateFee > 0 ? 'danger' : 'gold'}>
-                          {studentFee?.status === 'PAID' ? 'PAID' : lateFee > 0 ? 'OVERDUE' : 'PENDING'}
+                        <Badge variant={selectedSemester.status === 'PAID' ? 'success' : selectedSemester.status === 'OVERDUE' ? 'danger' : 'navy'}>
+                          {selectedSemester.status === 'PAID' ? 'PAID' : selectedSemester.status === 'OVERDUE' ? 'OVERDUE' : 'PENDING'}
                         </Badge>
                       </ExcelTd>
                     </tr>
-                    {studentFee?.hostelFee && studentFee.hostelFee > 0 ? (
-                      <tr>
-                        <ExcelTd align="left" bold color="var(--brand-navy)">Hostel &amp; Dining Fee</ExcelTd>
-                        <ExcelTd align="center">2026-27</ExcelTd>
-                        <ExcelTd align="center">Semester 4</ExcelTd>
-                        <ExcelTd align="right">₹{studentFee.hostelFee.toLocaleString('en-IN')}</ExcelTd>
-                        <ExcelTd align="right" color="#10B981">-₹0</ExcelTd>
-                        <ExcelTd align="right">₹0</ExcelTd>
-                        <ExcelTd align="right" bold>₹{studentFee.hostelFee.toLocaleString('en-IN')}</ExcelTd>
-                        <ExcelTd align="right" bold color="#8B5CF6">₹0</ExcelTd>
-                        <ExcelTd align="right" bold color="#10B981">₹{studentFee.hostelFee.toLocaleString('en-IN')}</ExcelTd>
-                        <ExcelTd align="right" bold color="var(--brand-orange)">₹0</ExcelTd>
-                        <ExcelTd align="center">{studentFee.dueDate || '2026-09-15'}</ExcelTd>
-                        <ExcelTd align="center"><Badge variant="success">PAID</Badge></ExcelTd>
-                      </tr>
-                    ) : null}
+
+                    {/* 4. Library & Student Activity Fee */}
+                    <tr>
+                      <ExcelTd align="left" bold color="var(--brand-navy)">Library &amp; Student Activity Fee</ExcelTd>
+                      <ExcelTd align="center">{selectedSemester.academicYear}</ExcelTd>
+                      <ExcelTd align="center">{selectedSemester.semesterLabel}</ExcelTd>
+                      <ExcelTd align="right">₹{selectedSemester.otherFee.toLocaleString('en-IN')}</ExcelTd>
+                      <ExcelTd align="right" color="#10B981">-₹0</ExcelTd>
+                      <ExcelTd align="right" color={selectedSemester.lateFee > 0 ? '#EF4444' : 'inherit'}>
+                        {selectedSemester.lateFee > 0 ? `+₹${Math.round(selectedSemester.lateFee * 0.2).toLocaleString('en-IN')}` : '₹0'}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold>
+                        ₹{(selectedSemester.otherFee + (selectedSemester.lateFee > 0 ? Math.round(selectedSemester.lateFee * 0.2) : 0)).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold color="#8B5CF6">
+                        ₹{(selectedSemester.status === 'PAID' ? 0 : selectedSemester.otherFee + (selectedSemester.lateFee > 0 ? Math.round(selectedSemester.lateFee * 0.2) : 0)).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold color="#10B981">
+                        ₹{(selectedSemester.status === 'PAID' ? selectedSemester.otherFee : 0).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="right" bold color="var(--brand-orange)">
+                        ₹{(selectedSemester.status === 'PAID' ? 0 : selectedSemester.otherFee).toLocaleString('en-IN')}
+                      </ExcelTd>
+                      <ExcelTd align="center">{selectedSemester.dueDate}</ExcelTd>
+                      <ExcelTd align="center">
+                        <Badge variant={selectedSemester.status === 'PAID' ? 'success' : selectedSemester.status === 'OVERDUE' ? 'danger' : 'navy'}>
+                          {selectedSemester.status === 'PAID' ? 'PAID' : selectedSemester.status === 'OVERDUE' ? 'OVERDUE' : 'PENDING'}
+                        </Badge>
+                      </ExcelTd>
+                    </tr>
                   </tbody>
                   <tfoot>
                     <tr>
-                      <ExcelTd align="left" bold style={{ color: 'var(--brand-navy)' }}>TOTAL SUMMARY DEMAND</ExcelTd>
-                      <ExcelTd align="center" bold>2026-27</ExcelTd>
-                      <ExcelTd align="center" bold>Semester 4</ExcelTd>
-                      <ExcelTd align="right" bold>₹{(studentFee?.totalAmount || 0).toLocaleString('en-IN')}</ExcelTd>
+                      <ExcelTd align="left" bold style={{ color: 'var(--brand-navy)' }}>{selectedSemester.semesterLabel.toUpperCase()} TOTAL DEMAND</ExcelTd>
+                      <ExcelTd align="center" bold>{selectedSemester.academicYear}</ExcelTd>
+                      <ExcelTd align="center" bold>{selectedSemester.semesterLabel}</ExcelTd>
+                      <ExcelTd align="right" bold>₹{selectedSemester.baseFee.toLocaleString('en-IN')}</ExcelTd>
                       <ExcelTd align="right" bold color="#10B981">-₹0</ExcelTd>
-                      <ExcelTd align="right" bold color={lateFee > 0 ? '#EF4444' : 'inherit'}>
-                        {lateFee > 0 ? `+₹${lateFee.toLocaleString('en-IN')}` : '₹0'}
+                      <ExcelTd align="right" bold color={selectedSemester.lateFee > 0 ? '#EF4444' : 'inherit'}>
+                        {selectedSemester.lateFee > 0 ? `+₹${selectedSemester.lateFee.toLocaleString('en-IN')}` : '₹0'}
                       </ExcelTd>
                       <ExcelTd align="right" bold style={{ color: '#8B5CF6' }}>
-                        ₹{((studentFee ? studentFee.totalAmount + lateFee : 0)).toLocaleString('en-IN')}
+                        ₹{(selectedSemester.baseFee + selectedSemester.lateFee).toLocaleString('en-IN')}
                       </ExcelTd>
                       <ExcelTd align="right" bold style={{ color: '#8B5CF6' }}>
-                        ₹{((studentFee ? studentFee.pendingAmount + lateFee : 0)).toLocaleString('en-IN')}
+                        ₹{(selectedSemester.pendingAmount + selectedSemester.lateFee).toLocaleString('en-IN')}
                       </ExcelTd>
                       <ExcelTd align="right" bold color="#10B981">
-                        ₹{(studentFee?.paidAmount || 0).toLocaleString('en-IN')}
+                        ₹{selectedSemester.paidAmount.toLocaleString('en-IN')}
                       </ExcelTd>
                       <ExcelTd align="right" bold color="var(--brand-orange)">
-                        ₹{(studentFee?.pendingAmount || 0).toLocaleString('en-IN')}
+                        ₹{selectedSemester.pendingAmount.toLocaleString('en-IN')}
                       </ExcelTd>
-                      <ExcelTd align="center" bold>{studentFee?.dueDate || '2026-09-15'}</ExcelTd>
+                      <ExcelTd align="center" bold>{selectedSemester.dueDate}</ExcelTd>
                       <ExcelTd align="center">
-                        <Badge variant={studentFee?.status === 'PAID' ? 'success' : lateFee > 0 ? 'danger' : studentFee?.paidAmount && studentFee.paidAmount > 0 ? 'gold' : 'gold'}>
-                          {studentFee?.status === 'PAID' ? 'PAID' : lateFee > 0 ? 'OVERDUE' : studentFee?.paidAmount && studentFee.paidAmount > 0 ? 'PARTIALLY_PAID' : 'PENDING'}
+                        <Badge variant={selectedSemester.status === 'PAID' ? 'success' : selectedSemester.status === 'OVERDUE' ? 'danger' : selectedSemester.status === 'PARTIALLY_PAID' ? 'gold' : 'navy'}>
+                          {selectedSemester.status}
                         </Badge>
                       </ExcelTd>
                     </tr>
@@ -776,42 +854,34 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
                 </span>
               </div>
 
-              <ExcelTableContainer minWidth="940px">
+              <ExcelTableContainer minWidth="100%">
                 <ExcelTable>
                   <thead>
                     <tr>
-                      <ExcelTh align="left" style={{ minWidth: '170px' }}>Receipt No</ExcelTh>
-                      <ExcelTh align="center" style={{ minWidth: '110px' }}>Payment Date</ExcelTh>
-                      <ExcelTh align="center" style={{ minWidth: '100px' }}>Type</ExcelTh>
-                      <ExcelTh align="center" style={{ minWidth: '130px' }}>Payment Mode</ExcelTh>
-                      <ExcelTh align="left" style={{ minWidth: '160px' }}>Gateway Ref</ExcelTh>
-                      <ExcelTh align="right" style={{ minWidth: '120px' }}>Amount Paid</ExcelTh>
-                      <ExcelTh align="center" style={{ minWidth: '100px' }}>Status</ExcelTh>
-                      <ExcelTh align="center" style={{ minWidth: '130px' }}>Receipt Action</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '130px' }}>Payment Date</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '120px' }}>Type</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '140px' }}>Payment Mode</ExcelTh>
+                      <ExcelTh align="right" style={{ minWidth: '140px' }}>Amount Paid</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '120px' }}>Status</ExcelTh>
+                      <ExcelTh align="center" style={{ minWidth: '140px' }}>Receipt Action</ExcelTh>
                     </tr>
                   </thead>
                   <tbody>
                     {studentTxs.length === 0 ? (
                       <tr>
-                        <ExcelTd colSpan={8} align="center" style={{ padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+                        <ExcelTd colSpan={6} align="center" style={{ padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
                           No payment transactions recorded for your account yet.
                         </ExcelTd>
                       </tr>
                     ) : (
                       studentTxs.map(tx => (
                         <tr key={tx.id}>
-                          <ExcelTd align="left" mono color="#1E40AF">
-                            {tx.receiptNo}
-                          </ExcelTd>
                           <ExcelTd align="center">{tx.paymentDate}</ExcelTd>
                           <ExcelTd align="center">
                             <Badge variant="navy">{tx.feeType || 'TUITION'}</Badge>
                           </ExcelTd>
                           <ExcelTd align="center">
                             <Badge variant="orange">{tx.paymentMode}</Badge>
-                          </ExcelTd>
-                          <ExcelTd align="left" mono style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                            {tx.transactionId}
                           </ExcelTd>
                           <ExcelTd align="right" bold color={tx.status === 'REFUNDED' ? '#EF4444' : '#10B981'}>
                             ₹{tx.paidAmount.toLocaleString('en-IN')}
@@ -823,10 +893,19 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
                           </ExcelTd>
                           <ExcelTd align="center">
                             <button
+                              type="button"
                               className="btn btn-sm btn-secondary"
                               onClick={() => feeReceiptPdfService.openInNewTab(fromFeePaymentTransaction(tx))}
+                              title="Print Receipt"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                padding: '0.35rem 0.75rem',
+                                fontSize: '0.78125rem'
+                              }}
                             >
-                              <FileText size={13} /> Receipt PDF
+                              <Printer size={13} /> Receipt
                             </button>
                           </ExcelTd>
                         </tr>

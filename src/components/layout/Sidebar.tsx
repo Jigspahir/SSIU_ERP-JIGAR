@@ -1125,7 +1125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
-                                padding: '0.625rem 0.75rem',
+                                padding: '0.55rem 0.75rem',
                                 borderRadius: 'var(--radius-md)',
                                 border: 'none',
                                 background: isParentActive && !isGroupExpanded
@@ -1135,20 +1135,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                   : 'transparent',
                                 color: isParentActive ? '#FFFFFF' : 'rgba(255,255,255,0.85)',
                                 fontWeight: isParentActive ? 700 : 600,
-                                fontSize: '0.875rem',
+                                fontSize: '0.8125rem',
                                 cursor: 'pointer',
                                 transition: 'all var(--transition-fast)',
                                 width: '100%'
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', overflow: 'hidden' }}>
-                                <Icon size={18} style={{ color: isParentActive ? 'var(--brand-orange)' : 'var(--brand-gold)', flexShrink: 0 }} />
+                                <Icon size={17} style={{ color: isParentActive ? 'var(--brand-orange)' : 'var(--brand-gold)', flexShrink: 0 }} />
                                 <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {group.label}
                                 </span>
                               </div>
                               <span style={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center' }}>
-                                {isGroupExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                                {isGroupExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                               </span>
                             </button>
 
@@ -1189,7 +1189,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                           display: 'flex',
                                           alignItems: 'center',
                                           gap: '0.5rem',
-                                          padding: '0.45rem 1.85rem 0.45rem 0.65rem',
+                                          padding: '0.4rem 1.85rem 0.4rem 0.65rem',
                                           borderRadius: 'var(--radius-sm)',
                                           border: 'none',
                                           background: isSubActive
@@ -1197,7 +1197,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                             : 'transparent',
                                           color: isSubActive ? '#FFFFFF' : 'rgba(255,255,255,0.7)',
                                           fontWeight: isSubActive ? 700 : 500,
-                                          fontSize: '0.8125rem',
+                                          fontSize: '0.78125rem',
                                           cursor: 'pointer',
                                           transition: 'all var(--transition-fast)',
                                           textAlign: 'left',
@@ -1286,7 +1286,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         {cat !== 'Main' && (
                           <div
                             style={{
-                              fontSize: '0.6875rem',
+                              fontSize: '0.65625rem',
                               fontWeight: 700,
                               textTransform: 'uppercase',
                               letterSpacing: '1.2px',
@@ -1314,7 +1314,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: '0.75rem',
-                                    padding: '0.625rem 2rem 0.625rem 0.75rem',
+                                    padding: '0.55rem 2rem 0.55rem 0.75rem',
                                     justifyContent: 'flex-start',
                                     borderRadius: 'var(--radius-md)',
                                     border: 'none',
@@ -1323,7 +1323,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                       : 'transparent',
                                     color: isActive ? '#FFFFFF' : 'rgba(255,255,255,0.75)',
                                     fontWeight: isActive ? 700 : 500,
-                                    fontSize: '0.875rem',
+                                    fontSize: '0.8125rem',
                                     cursor: 'pointer',
                                     transition: 'all var(--transition-fast)',
                                     boxShadow: isActive ? '0 4px 12px rgba(243, 112, 35, 0.3)' : 'none',

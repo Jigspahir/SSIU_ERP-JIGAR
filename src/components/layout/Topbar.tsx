@@ -124,10 +124,10 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab, mobileO
         </button>
 
         <div className="topbar-header-text">
-          <div style={{ fontSize: '0.71875rem', fontWeight: 700, color: 'var(--brand-orange)', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+          <div style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--brand-orange)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             SSIU ERP • University Management System
           </div>
-          <h1 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0 }}>
+          <h1 style={{ fontSize: '1.0625rem', fontWeight: 700, color: 'var(--brand-navy)', margin: 0 }}>
             {getBreadcrumbTitle(activeTab)}
           </h1>
         </div>
@@ -140,15 +140,15 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab, mobileO
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '0.4rem',
+            gap: '0.35rem',
             backgroundColor: 'var(--brand-navy-subtle, #F0F4F8)',
             border: '1px solid var(--border-color, #E2E8F0)',
             color: 'var(--brand-navy, #0B192C)',
-            fontSize: '0.75rem',
+            fontSize: '0.71875rem',
             fontWeight: 700,
-            padding: '0.35rem 0.75rem',
+            padding: '0.3rem 0.65rem',
             borderRadius: 'var(--radius-full)',
-            letterSpacing: '0.3px'
+            letterSpacing: '0.2px'
           }}
           title="Current University Academic Session"
         >
@@ -160,20 +160,20 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab, mobileO
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '0.4rem',
+            gap: '0.35rem',
             backgroundColor: 'rgba(245, 166, 35, 0.12)',
             border: '1px solid rgba(245, 166, 35, 0.4)',
             color: '#D97706',
-            fontSize: '0.75rem',
+            fontSize: '0.71875rem',
             fontWeight: 800,
-            padding: '0.35rem 0.75rem',
+            padding: '0.3rem 0.65rem',
             borderRadius: 'var(--radius-full)',
-            letterSpacing: '0.5px',
+            letterSpacing: '0.4px',
             textTransform: 'uppercase'
           }}
           title="DEMO MODE ACTIVE — Isolated Dummy Sandbox Data"
         >
-          <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#F5A623', boxShadow: '0 0 6px #F5A623' }}></span>
+          <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#F5A623', boxShadow: '0 0 6px #F5A623' }}></span>
           <span>⚡ DEMO MODE</span>
         </div>
 
@@ -183,12 +183,12 @@ export const Topbar: React.FC<TopbarProps> = ({ activeTab, setActiveTab, mobileO
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: '0.45rem',
+            gap: '0.4rem',
             backgroundColor: currentRoleInfo.bg,
             color: currentRoleInfo.text,
-            fontSize: '0.8125rem',
+            fontSize: '0.78125rem',
             fontWeight: 600,
-            padding: '0.4rem 0.85rem',
+            padding: '0.35rem 0.75rem',
             borderRadius: 'var(--radius-full)',
             boxShadow: '0 2px 6px rgba(0,0,0,0.08)'
           }}

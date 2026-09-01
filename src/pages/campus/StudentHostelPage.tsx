@@ -374,48 +374,65 @@ export const StudentHostelPage: React.FC = () => {
 
       {/* Tab 4: VISITORS */}
       {activeTab === 'VISITORS' && (
-        <div className="card" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
+        <div className="card" style={{ padding: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, color: 'var(--brand-navy)', margin: 0 }}>
               Visitor &amp; Parent Gate Entry Passes
             </h3>
             <button className="btn btn-primary" onClick={() => setIsVisitorModalOpen(true)}>
-              <Plus size={16} /> Request Visitor Pass
+              <Plus size={15} /> Request Visitor Pass
             </button>
           </div>
 
           {myVisitorRequests.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
-              <User size={48} style={{ opacity: 0.3, margin: '0 auto 1rem' }} />
-              <p style={{ fontWeight: 600 }}>No visitor gate passes recorded.</p>
-              <p style={{ fontSize: '0.85rem' }}>Pre-apply for visiting parents or guardians to facilitate quick campus security verification.</p>
+              <User size={42} style={{ opacity: 0.3, margin: '0 auto 0.75rem' }} />
+              <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>No visitor gate passes recorded.</p>
+              <p style={{ fontSize: '0.78125rem' }}>Pre-apply for visiting parents or guardians to facilitate quick campus security verification.</p>
             </div>
           ) : (
-            <div className="table-responsive">
-              <table className="table">
+            <div className="erp-excel-table-container">
+              <table className="erp-excel-table">
                 <thead>
                   <tr>
-                    <th>Pass No</th>
+                    <th style={{ width: '150px' }}>Pass No</th>
                     <th>Visitor Name</th>
-                    <th>Phone</th>
-                    <th>Visit Date</th>
-                    <th>Status</th>
+                    <th style={{ width: '160px' }}>Phone</th>
+                    <th style={{ width: '130px' }}>Visit Date</th>
+                    <th style={{ width: '120px', textAlign: 'center' }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {myVisitorRequests.map(v => (
-                    <tr key={v.id}>
-                      <td><code style={{ fontWeight: 700, color: 'var(--brand-orange)' }}>{v.passNumber}</code></td>
-                      <td style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{v.visitorName}</td>
-                      <td>{v.mobileNumber}</td>
-                      <td>{v.entryDate}</td>
-                      <td>
-                        <Badge variant={v.status === 'APPROVED' ? 'active' : v.status === 'REJECTED' ? 'danger' : 'gold'}>
-                          {v.status}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
+                  {myVisitorRequests.map(v => {
+                    const isInside = v.status === 'INSIDE' || v.status === 'APPROVED';
+                    const isExited = v.status === 'EXITED' || v.status === 'COMPLETED';
+                    const badgeVariant = isInside ? 'active' : isExited ? 'navy' : v.status === 'REJECTED' ? 'danger' : 'gold';
+                    const statusLabel = v.status === 'APPROVED' ? 'INSIDE' : v.status === 'COMPLETED' ? 'EXITED' : v.status;
+
+                    return (
+                      <tr key={v.id}>
+                        <td>
+                          <code style={{ fontWeight: 700, color: 'var(--brand-orange)', fontFamily: 'ui-monospace, monospace', fontSize: '0.8125rem' }}>
+                            {v.passNumber}
+                          </code>
+                        </td>
+                        <td style={{ fontWeight: 600, color: 'var(--brand-navy)' }}>
+                          {v.visitorName}
+                        </td>
+                        <td style={{ color: 'var(--text-main)' }}>
+                          {v.mobileNumber}
+                        </td>
+                        <td style={{ color: 'var(--text-muted)' }}>
+                          {v.entryDate}
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <Badge variant={badgeVariant}>
+                            {statusLabel}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -431,9 +448,27 @@ export const StudentHostelPage: React.FC = () => {
               Log Room Maintenance Complaint
             </h3>
             <form onSubmit={handleCreateMaintenance} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div>
-                <label style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-muted)' }}>Category</label>
-                <select className="form-control" value={maintenanceCategory} onChange={e => setMaintenanceCategory(e.target.value as any)}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <label style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
+                  Category
+                </label>
+                <select 
+                  className="form-control" 
+                  value={maintenanceCategory} 
+                  onChange={e => setMaintenanceCategory(e.target.value as any)}
+                  style={{
+                    width: '100%',
+                    padding: '0.55rem 0.75rem',
+                    fontSize: '0.84375rem',
+                    borderRadius: '6px',
+                    border: '1px solid #1f2937',
+                    backgroundColor: '#ffffff',
+                    color: '#0f172a',
+                    fontWeight: 500,
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
                   <option value="ELECTRICAL">Electrical (Fan / Light / Plug Socket)</option>
                   <option value="PLUMBING">Plumbing (Tap / Washroom / Drainage)</option>
                   <option value="CARPENTRY">Carpentry (Bed / Desk / Wardrobe)</option>
@@ -444,9 +479,27 @@ export const StudentHostelPage: React.FC = () => {
                 </select>
               </div>
 
-              <div>
-                <label style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-muted)' }}>Priority</label>
-                <select className="form-control" value={maintenancePriority} onChange={e => setMaintenancePriority(e.target.value as any)}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <label style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
+                  Priority
+                </label>
+                <select 
+                  className="form-control" 
+                  value={maintenancePriority} 
+                  onChange={e => setMaintenancePriority(e.target.value as any)}
+                  style={{
+                    width: '100%',
+                    padding: '0.55rem 0.75rem',
+                    fontSize: '0.84375rem',
+                    borderRadius: '6px',
+                    border: '1px solid #1f2937',
+                    backgroundColor: '#ffffff',
+                    color: '#0f172a',
+                    fontWeight: 500,
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
                   <option value="LOW">Low (Routine Check)</option>
                   <option value="MEDIUM">Medium (Normal Repair)</option>
                   <option value="HIGH">High (Urgent Attention)</option>
@@ -454,14 +507,55 @@ export const StudentHostelPage: React.FC = () => {
                 </select>
               </div>
 
-              <div>
-                <label style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-muted)' }}>Complaint Title *</label>
-                <input className="form-control" placeholder="e.g. Ceiling fan regulator not working" value={maintenanceTitle} onChange={e => setMaintenanceTitle(e.target.value)} required />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <label style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
+                  Complaint Title *
+                </label>
+                <input 
+                  className="form-control" 
+                  placeholder="e.g. Ceiling fan regulator not working" 
+                  value={maintenanceTitle} 
+                  onChange={e => setMaintenanceTitle(e.target.value)} 
+                  required 
+                  style={{
+                    width: '100%',
+                    padding: '0.55rem 0.75rem',
+                    fontSize: '0.84375rem',
+                    borderRadius: '6px',
+                    border: '1px solid #1f2937',
+                    backgroundColor: '#ffffff',
+                    color: '#0f172a',
+                    fontWeight: 500,
+                    outline: 'none'
+                  }}
+                />
               </div>
 
-              <div>
-                <label style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-muted)' }}>Detailed Description *</label>
-                <textarea className="form-control" rows={3} placeholder="Provide exact problem description and room location..." value={maintenanceDesc} onChange={e => setMaintenanceDesc(e.target.value)} required />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <label style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
+                  Detailed Description *
+                </label>
+                <textarea 
+                  className="form-control" 
+                  rows={3} 
+                  placeholder="Provide exact problem description and room location..." 
+                  value={maintenanceDesc} 
+                  onChange={e => setMaintenanceDesc(e.target.value)} 
+                  required 
+                  style={{
+                    width: '100%',
+                    padding: '0.55rem 0.75rem',
+                    fontSize: '0.84375rem',
+                    borderRadius: '6px',
+                    border: '1px solid #1f2937',
+                    backgroundColor: '#ffffff',
+                    color: '#0f172a',
+                    fontWeight: 500,
+                    outline: 'none',
+                    minHeight: '85px',
+                    resize: 'vertical'
+                  }}
+                />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>

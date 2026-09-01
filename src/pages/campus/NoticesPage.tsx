@@ -5,8 +5,9 @@ import { ExcelTableContainer, ExcelTable, ExcelTh, ExcelTd } from '../../compone
 import { Modal } from '../../components/common/Modal';
 import { 
   Bell, Plus, Pin, Calendar, FileText, Download, Eye, 
-  CheckCircle, Building, User, Info
+  CheckCircle, Building, User, Info, Loader2
 } from 'lucide-react';
+import { downloadNoticePdf } from '../../services/noticePdfService';
 
 interface NoticeItem {
   id: string;
@@ -64,6 +65,13 @@ export const NoticesPage: React.FC = () => {
   const [notices, setNotices] = useState<NoticeItem[]>(initialNotices);
   const [showModal, setShowModal] = useState(false);
   const [viewNotice, setViewNotice] = useState<NoticeItem | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+
+  const showToast = (type: 'success' | 'error' | 'info', text: string) => {
+    setToastMessage({ type, text });
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   // Form State
   const [title, setTitle] = useState('');
@@ -90,6 +98,35 @@ export const NoticesPage: React.FC = () => {
     setTitle('');
     setContent('');
     setIsPinned(false);
+    showToast('success', `Notice "${newNot.title}" published successfully.`);
+  };
+
+  const handleDownloadNotice = async (n: NoticeItem, index: number, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    if (downloadingId) return; // Prevent concurrent downloads
+
+    setDownloadingId(n.id);
+    showToast('info', `Generating PDF for "${n.title}"...`);
+
+    try {
+      const success = await downloadNoticePdf({
+        ...n,
+        serialNo: index + 1
+      });
+
+      if (success) {
+        showToast('success', 'Official Notice PDF downloaded.');
+      } else {
+        showToast('error', 'Unable to generate PDF. Please try again.');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('error', 'An error occurred during PDF generation.');
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   const getCategoryBadge = (cat: NoticeItem['category']) => {
@@ -106,14 +143,27 @@ export const NoticesPage: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div style={{
+          position: 'fixed', top: '1.5rem', right: '1.5rem', zIndex: 1000,
+          backgroundColor: toastMessage.type === 'success' ? '#10B981' : toastMessage.type === 'error' ? '#EF4444' : 'var(--brand-navy)',
+          color: '#FFFFFF', padding: '0.75rem 1.25rem', borderRadius: '8px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.2)', fontWeight: 600, fontSize: '0.8125rem',
+          display: 'flex', alignItems: 'center', gap: '0.5rem'
+        }}>
+          {toastMessage.type === 'info' && <Loader2 size={15} className="animate-spin" />}
+          {toastMessage.text}
+        </div>
+      )}
+
       {/* Page Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
+          <h2 style={{ fontSize: '1.3125rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
             Official Notice Board &amp; Campus Circulars
           </h2>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+          <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
             Swarrnim Startup &amp; Innovation University Official Circulars, Exam Notices &amp; Administrative Bulletins
           </p>
         </div>
@@ -125,113 +175,120 @@ export const NoticesPage: React.FC = () => {
             className="btn btn-primary"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, background: 'var(--brand-orange, #F37023)', borderColor: 'var(--brand-orange, #F37023)' }}
           >
-            <Plus size={16} /> Post New Notice
+            <Plus size={15} /> Post New Notice
           </button>
         )}
       </div>
 
       {/* Excel-Style Notice Board Table */}
-      <div className="card" style={{ padding: '1.5rem' }}>
-        <ExcelTableContainer minWidth="1370px">
+      <div className="card" style={{ padding: '1.25rem' }}>
+        <ExcelTableContainer minWidth="100%">
           <ExcelTable>
             <thead>
               <tr>
-                <ExcelTh align="center" style={{ width: '70px', minWidth: '70px' }}>Sr. No.</ExcelTh>
-                <ExcelTh align="center" style={{ width: '120px', minWidth: '120px' }}>Notice Date</ExcelTh>
-                <ExcelTh align="center" style={{ width: '120px', minWidth: '120px' }}>Notice Type</ExcelTh>
-                <ExcelTh align="left" style={{ width: '300px', minWidth: '300px' }}>Notice Title</ExcelTh>
-                <ExcelTh align="left" style={{ width: '400px', minWidth: '400px' }}>Notice / Description</ExcelTh>
-                <ExcelTh align="left" style={{ width: '220px', minWidth: '220px' }}>Issued By</ExcelTh>
-                <ExcelTh align="center" style={{ width: '140px', minWidth: '140px' }}>Action</ExcelTh>
+                <ExcelTh align="center" style={{ width: '80px', minWidth: '80px' }}>SR. NO.</ExcelTh>
+                <ExcelTh align="center" style={{ width: '140px', minWidth: '140px' }}>NOTICE DATE</ExcelTh>
+                <ExcelTh align="center" style={{ width: '140px', minWidth: '140px' }}>NOTICE TYPE</ExcelTh>
+                <ExcelTh align="left" style={{ minWidth: '280px' }}>NOTICE TITLE</ExcelTh>
               </tr>
             </thead>
             <tbody>
               {notices.length === 0 ? (
                 <tr>
-                  <ExcelTd colSpan={7} align="center" style={{ padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+                  <ExcelTd colSpan={4} align="center" style={{ padding: '3rem 1rem', color: 'var(--text-muted)' }}>
                     <Bell size={40} style={{ margin: '0 auto 0.75rem auto', color: 'var(--border-color)', opacity: 0.6 }} />
-                    <p style={{ margin: 0, fontWeight: 700, fontSize: '1rem', color: 'var(--brand-navy)' }}>No notices posted yet</p>
-                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.825rem' }}>Official campus circulars will appear here</p>
+                    <p style={{ margin: 0, fontWeight: 700, fontSize: '0.9375rem', color: 'var(--brand-navy)' }}>No notices posted yet</p>
+                    <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.78125rem' }}>Official campus circulars will appear here</p>
                   </ExcelTd>
                 </tr>
               ) : (
-                notices.map((n, idx) => (
-                  <tr key={n.id} style={{ background: n.isPinned ? 'rgba(243, 112, 35, 0.03)' : undefined }}>
-                    <ExcelTd align="center" mono color="var(--brand-navy)">
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontWeight: 700 }}>
-                        {n.isPinned && <Pin size={13} color="var(--brand-orange, #F37023)" />}
-                        <span>{idx + 1}</span>
-                      </div>
-                    </ExcelTd>
+                notices.map((n, idx) => {
+                  const isDownloading = downloadingId === n.id;
+                  return (
+                    <tr 
+                      key={n.id} 
+                      style={{ 
+                        background: n.isPinned ? 'rgba(243, 112, 35, 0.03)' : undefined,
+                        cursor: 'pointer'
+                      }}
+                      onClick={(e) => handleDownloadNotice(n, idx, e)}
+                      title="Click to download official PDF notice"
+                    >
+                      <ExcelTd align="center" mono color="var(--brand-navy)">
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontWeight: 700 }}>
+                          {n.isPinned && <Pin size={13} color="var(--brand-orange, #F37023)" />}
+                          <span>{idx + 1}</span>
+                        </div>
+                      </ExcelTd>
 
-                    <ExcelTd align="center">
-                      <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{n.publishedDate}</span>
-                    </ExcelTd>
+                      <ExcelTd align="center">
+                        <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{n.publishedDate}</span>
+                      </ExcelTd>
 
-                    <ExcelTd align="center">
-                      {getCategoryBadge(n.category)}
-                    </ExcelTd>
+                      <ExcelTd align="center">
+                        {getCategoryBadge(n.category)}
+                      </ExcelTd>
 
-                    <ExcelTd align="left">
-                      <div 
-                        style={{ 
-                          fontWeight: 700, 
-                          color: 'var(--brand-navy)',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          lineHeight: 1.35,
-                          fontSize: '0.85rem'
-                        }}
-                        title={n.title}
-                      >
-                        {n.title}
-                      </div>
-                    </ExcelTd>
+                      <ExcelTd align="left">
+                        <div 
+                          style={{ 
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '0.5rem'
+                          }}
+                        >
+                          <span 
+                            style={{ 
+                              fontWeight: 600, 
+                              color: 'var(--brand-navy)',
+                              lineHeight: 1.35,
+                              fontSize: '0.84375rem',
+                              transition: 'color 0.15s ease'
+                            }}
+                            className="hover:underline"
+                          >
+                            {n.title}
+                          </span>
 
-                    <ExcelTd align="left">
-                      <div 
-                        style={{ 
-                          fontSize: '0.8125rem',
-                          color: 'var(--text-main)',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 3,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          lineHeight: 1.45
-                        }}
-                        title={n.content}
-                      >
-                        {n.content}
-                      </div>
-                    </ExcelTd>
-
-                    <ExcelTd align="left">
-                      <span style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--brand-navy)' }}>
-                        {n.publishedBy}
-                      </span>
-                    </ExcelTd>
-
-                    <ExcelTd align="center">
-                      <button
-                        type="button"
-                        onClick={() => setViewNotice(n)}
-                        className="btn btn-secondary btn-sm"
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap', padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
-                      >
-                        <Eye size={13} /> View Notice
-                      </button>
-                    </ExcelTd>
-                  </tr>
-                ))
+                          <span 
+                            style={{ 
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              fontSize: '0.71875rem',
+                              fontWeight: 600,
+                              color: isDownloading ? 'var(--brand-orange)' : 'var(--text-muted)',
+                              flexShrink: 0,
+                              padding: '0.2rem 0.5rem',
+                              borderRadius: '4px',
+                              backgroundColor: 'rgba(0,0,0,0.03)'
+                            }}
+                          >
+                            {isDownloading ? (
+                              <>
+                                <Loader2 size={12} className="animate-spin" />
+                                <span>Generating...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Download size={12} />
+                                <span>PDF</span>
+                              </>
+                            )}
+                          </span>
+                        </div>
+                      </ExcelTd>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </ExcelTable>
         </ExcelTableContainer>
 
-        <div style={{ marginTop: '1rem', fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-          Showing {notices.length} Notices
+        <div style={{ marginTop: '0.85rem', fontSize: '0.78125rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+          Showing {notices.length} Notices • Click any notice to download official PDF
         </div>
       </div>
 

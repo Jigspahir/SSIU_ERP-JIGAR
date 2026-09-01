@@ -101,31 +101,32 @@ export const StudentTransportPage: React.FC = () => {
 
       {/* Header Banner */}
       <div className="card" style={{
-        padding: '1.75rem',
+        padding: '1.25rem 1.5rem',
         background: 'linear-gradient(135deg, #6B21A8 0%, #4C1D95 100%)',
         color: '#FFFFFF',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         flexWrap: 'wrap',
-        gap: '1rem'
+        gap: '0.85rem',
+        borderRadius: 'var(--radius-md)'
       }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
             <Badge variant="gold">University Transport Service</Badge>
-            <span style={{ fontSize: '0.8rem', opacity: 0.9 }}>Daily Fleet Management</span>
+            <span style={{ fontSize: '0.71875rem', opacity: 0.9 }}>Daily Fleet Management</span>
           </div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#FFFFFF', marginTop: '0.5rem' }}>
+          <h2 style={{ fontSize: '1.3125rem', fontWeight: 800, color: '#FFFFFF', marginTop: '0.35rem', letterSpacing: '-0.01em' }}>
             {myAllocation.routeName}
           </h2>
-          <p style={{ fontSize: '0.875rem', color: '#E9D5FF', marginTop: '0.25rem' }}>
+          <p style={{ fontSize: '0.8125rem', color: '#E9D5FF', marginTop: '0.2rem' }}>
             Pickup: <strong>{myAllocation.stopName}</strong> at <strong>{myAllocation.pickupTime}</strong> • Bus: <strong>{myAllocation.vehicleNumber}</strong>
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button className="btn" style={{ backgroundColor: '#FFFFFF', color: '#6B21A8', fontWeight: 700 }} onClick={() => setIsRequestModalOpen(true)}>
-            <ArrowRightLeft size={16} /> Request Route / Stop Change
+          <button className="btn" style={{ backgroundColor: '#FFFFFF', color: '#6B21A8', fontWeight: 700, fontSize: '0.78125rem', padding: '0.45rem 0.85rem' }} onClick={() => setIsRequestModalOpen(true)}>
+            <ArrowRightLeft size={14} /> Request Route / Stop Change
           </button>
         </div>
       </div>
@@ -141,74 +142,74 @@ export const StudentTransportPage: React.FC = () => {
       {/* Tabs */}
       <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '2px solid var(--border-color)', paddingBottom: '0.5rem' }}>
         <button className={`btn ${activeTab === 'ROUTE' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('ROUTE')}>
-          <Bus size={16} /> Route &amp; Driver Schedule
+          <Bus size={15} /> Route &amp; Driver Schedule
         </button>
         <button className={`btn ${activeTab === 'REQUESTS' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setActiveTab('REQUESTS')}>
-          <FileText size={16} /> Transport Change Requests ({myRequests.length})
+          <FileText size={15} /> Transport Change Requests ({myRequests.length})
         </button>
       </div>
 
       {/* Tab 1: ROUTE */}
       {activeTab === 'ROUTE' && (
         <div className="grid-2">
-          <div className="card" style={{ padding: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <MapPin size={20} color="var(--brand-orange)" /> My Boarding &amp; Schedule Details
+          <div className="card" style={{ padding: '1.25rem' }}>
+            <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <MapPin size={17} color="var(--brand-orange)" /> My Boarding &amp; Schedule Details
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.78125rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Assigned Route:</span>
-                <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{myAllocation.routeName}</span>
+                <span style={{ fontWeight: 600, color: 'var(--brand-navy)' }}>{myAllocation.routeName}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.78125rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Boarding Stop:</span>
-                <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{myAllocation.stopName}</span>
+                <span style={{ fontWeight: 600, color: 'var(--brand-navy)' }}>{myAllocation.stopName}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.78125rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Morning Pickup Time:</span>
-                <span style={{ fontWeight: 800, color: '#10B981' }}>{myAllocation.pickupTime}</span>
+                <span style={{ fontWeight: 700, color: '#10B981' }}>{myAllocation.pickupTime}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.78125rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Evening Return Departure:</span>
-                <span style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>{myAllocation.dropTime}</span>
+                <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{myAllocation.dropTime}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.78125rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Digital Pass Number:</span>
-                <code style={{ fontWeight: 700, color: 'var(--brand-orange)' }}>{myAllocation.passNumber}</code>
+                <code style={{ fontWeight: 700, color: 'var(--brand-orange)', fontSize: '0.78125rem' }}>{myAllocation.passNumber}</code>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.78125rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Transport Fee Status:</span>
                 <Badge variant="active">PAID (ANNUAL 2026-27)</Badge>
               </div>
             </div>
           </div>
 
-          <div className="card" style={{ padding: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <User size={20} color="var(--brand-orange)" /> Vehicle &amp; Driver Information
+          <div className="card" style={{ padding: '1.25rem' }}>
+            <h3 style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <User size={17} color="var(--brand-orange)" /> Vehicle &amp; Driver Information
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.78125rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Vehicle Reg. Number:</span>
-                <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{myAllocation.vehicleNumber}</span>
+                <span style={{ fontWeight: 600, color: 'var(--brand-navy)' }}>{myAllocation.vehicleNumber}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.78125rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Route Code:</span>
-                <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{myAllocation.routeNumber}</span>
+                <span style={{ fontWeight: 600, color: 'var(--brand-navy)' }}>{myAllocation.routeNumber}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.78125rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Driver Name:</span>
-                <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{myAllocation.driverName}</span>
+                <span style={{ fontWeight: 600, color: 'var(--brand-navy)' }}>{myAllocation.driverName}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.78125rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Driver Mobile:</span>
                 <span style={{ fontWeight: 700, color: 'var(--brand-orange)' }}>{myAllocation.driverPhone}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.78125rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Transport Control Room:</span>
-                <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>+91 98795 00000 / Ext. 108</span>
+                <span style={{ fontWeight: 600, color: 'var(--brand-navy)' }}>+91 98795 00000 / Ext. 108</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.4rem', borderBottom: '1px solid var(--border-color)', fontSize: '0.78125rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>GPS Tracking Status:</span>
                 <Badge variant="active">LIVE ON FLEET GPS</Badge>
               </div>
@@ -219,42 +220,42 @@ export const StudentTransportPage: React.FC = () => {
 
       {/* Tab 2: REQUESTS */}
       {activeTab === 'REQUESTS' && (
-        <div className="card" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
+        <div className="card" style={{ padding: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, color: 'var(--brand-navy)', margin: 0 }}>
               My Transport Change &amp; Allocation Requests
             </h3>
             <button className="btn btn-primary" onClick={() => setIsRequestModalOpen(true)}>
-              <Plus size={16} /> New Transport Request
+              <Plus size={15} /> New Transport Request
             </button>
           </div>
 
           {myRequests.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
-              <Bus size={48} style={{ opacity: 0.3, margin: '0 auto 1rem' }} />
-              <p style={{ fontWeight: 600 }}>No transport requests submitted.</p>
-              <p style={{ fontSize: '0.85rem' }}>If you need to change your boarding stop, switch bus route or request cancellation, apply above.</p>
+              <Bus size={42} style={{ opacity: 0.3, margin: '0 auto 0.75rem' }} />
+              <p style={{ fontWeight: 600, fontSize: '0.875rem' }}>No transport requests submitted.</p>
+              <p style={{ fontSize: '0.78125rem' }}>If you need to change your boarding stop, switch bus route or request cancellation, apply above.</p>
             </div>
           ) : (
-            <div className="table-responsive">
-              <table className="table">
+            <div className="erp-excel-table-container">
+              <table className="erp-excel-table">
                 <thead>
                   <tr>
-                    <th>Request No</th>
-                    <th>Type</th>
+                    <th style={{ width: '150px' }}>Request No</th>
+                    <th style={{ width: '160px' }}>Type</th>
                     <th>Reason / Details</th>
-                    <th>Date</th>
-                    <th>Status</th>
+                    <th style={{ width: '130px' }}>Date</th>
+                    <th style={{ width: '120px', textAlign: 'center' }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {myRequests.map((r: any) => (
                     <tr key={r.id}>
-                      <td><code style={{ fontWeight: 700, color: 'var(--brand-orange)' }}>{r.applicationNo || r.id}</code></td>
+                      <td><code style={{ fontWeight: 700, color: 'var(--brand-orange)', fontSize: '0.78125rem' }}>{r.applicationNo || r.id}</code></td>
                       <td><Badge variant="navy">{r.requestType?.replace(/_/g, ' ') || 'CHANGE'}</Badge></td>
-                      <td style={{ fontSize: '0.85rem' }}>{r.remarks || r.reason || 'Transport adjustment request'}</td>
-                      <td>{new Date(r.createdAt).toLocaleDateString()}</td>
-                      <td>
+                      <td style={{ fontSize: '0.78125rem' }}>{r.remarks || r.reason || 'Transport adjustment request'}</td>
+                      <td style={{ color: 'var(--text-muted)' }}>{new Date(r.createdAt).toLocaleDateString()}</td>
+                      <td style={{ textAlign: 'center' }}>
                         <Badge variant={r.status === 'APPROVED' ? 'active' : r.status === 'REJECTED' ? 'danger' : 'gold'}>
                           {r.status?.replace(/_/g, ' ') || 'SUBMITTED'}
                         </Badge>
