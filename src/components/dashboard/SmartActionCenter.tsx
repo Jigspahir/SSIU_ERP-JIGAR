@@ -266,11 +266,10 @@ export const SmartActionCenter: React.FC<SmartActionCenterProps> = ({ setActiveT
         </div>
       ) : (
         <div 
+          className="dashboard-attention-cards-grid"
           style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', 
-            gap: '1rem' 
-          }}
+            '--action-count': Math.max(1, filteredActions.length)
+          } as React.CSSProperties}
         >
           {filteredActions.map(action => {
             const pStyle = getPriorityStyle(action.priority);
@@ -287,50 +286,62 @@ export const SmartActionCenter: React.FC<SmartActionCenterProps> = ({ setActiveT
                   border: '1px solid #E2E8F0',
                   borderLeft: pStyle.leftBar,
                   borderRadius: 'var(--radius-md)',
-                  padding: '1.1rem 1.25rem',
+                  padding: '0.875rem 0.875rem',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  gap: '0.85rem',
+                  gap: '0.65rem',
                   boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
                   transition: 'transform 0.18s ease, box-shadow 0.18s ease',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  minWidth: 0,
+                  height: '100%'
                 }}
-                className="action-card-hover"
+                className="dashboard-action-card action-card-hover"
               >
                 <div>
                   {/* Top Bar: Icon + Source Module + Priority Badge */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.45rem', gap: '0.35rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', minWidth: 0 }}>
                       <div style={{ 
-                        width: '32px', 
-                        height: '32px', 
-                        borderRadius: '8px', 
+                        width: '28px', 
+                        height: '28px', 
+                        borderRadius: '6px', 
                         background: '#FFFFFF', 
                         border: '1px solid #E2E8F0',
                         display: 'flex', 
                         alignItems: 'center', 
                         justifyContent: 'center',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                        flexShrink: 0,
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
                       }}>
                         {renderActionIcon(action.iconName, action.priority)}
                       </div>
 
                       {action.sourceModule && (
-                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                        <span style={{ 
+                          fontSize: '0.65625rem', 
+                          fontWeight: 800, 
+                          color: 'var(--text-muted)', 
+                          textTransform: 'uppercase', 
+                          letterSpacing: '0.3px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
                           {action.sourceModule}
                         </span>
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', flexShrink: 0 }}>
                       {action.countLabel && (
                         <span style={{
-                          fontSize: '0.75rem',
+                          fontSize: '0.6875rem',
                           fontWeight: 800,
                           background: '#FFFFFF',
-                          padding: '2px 8px',
-                          borderRadius: '6px',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
                           border: '1px solid #CBD5E1',
                           color: 'var(--brand-navy)'
                         }}>
@@ -339,12 +350,12 @@ export const SmartActionCenter: React.FC<SmartActionCenterProps> = ({ setActiveT
                       )}
 
                       <span style={{
-                        fontSize: '0.7rem',
+                        fontSize: '0.625rem',
                         fontWeight: 800,
                         background: pStyle.badgeBg,
                         color: pStyle.badgeColor,
-                        padding: '2px 8px',
-                        borderRadius: '6px',
+                        padding: '1px 6px',
+                        borderRadius: '4px',
                         textTransform: 'uppercase',
                         letterSpacing: '0.3px'
                       }}>
@@ -355,20 +366,24 @@ export const SmartActionCenter: React.FC<SmartActionCenterProps> = ({ setActiveT
 
                   {/* Title & Description */}
                   <h4 style={{ 
-                    fontSize: '0.95rem', 
+                    fontSize: '0.875rem', 
                     fontWeight: 800, 
                     color: 'var(--brand-navy)', 
-                    margin: '0 0 0.35rem 0',
-                    lineHeight: 1.35
+                    margin: '0 0 0.25rem 0',
+                    lineHeight: 1.3
                   }}>
                     {action.title}
                   </h4>
 
                   <p style={{ 
-                    fontSize: '0.8125rem', 
+                    fontSize: '0.75rem', 
                     color: 'var(--text-muted)', 
                     margin: 0, 
-                    lineHeight: 1.45 
+                    lineHeight: 1.4,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden'
                   }}>
                     {action.shortDescription}
                   </p>
@@ -380,16 +395,17 @@ export const SmartActionCenter: React.FC<SmartActionCenterProps> = ({ setActiveT
                   justifyContent: 'space-between', 
                   alignItems: 'center', 
                   borderTop: '1px dashed #E2E8F0', 
-                  paddingTop: '0.75rem',
-                  marginTop: '0.25rem' 
+                  paddingTop: '0.55rem',
+                  marginTop: '0.2rem',
+                  gap: '0.35rem'
                 }}>
                   {action.dueDate ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: '#DC2626', fontWeight: 700 }}>
-                      <Clock size={13} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '0.6875rem', color: '#DC2626', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                      <Clock size={12} />
                       <span>Due: {action.dueDate}</span>
                     </div>
                   ) : (
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                       Authorized Queue
                     </div>
                   )}
@@ -403,18 +419,19 @@ export const SmartActionCenter: React.FC<SmartActionCenterProps> = ({ setActiveT
                     style={{
                       background: action.priority === 'CRITICAL' ? '#EF4444' : action.priority === 'HIGH' ? '#F37023' : 'var(--brand-navy)',
                       color: '#FFFFFF',
-                      fontSize: '0.78125rem',
+                      fontSize: '0.6875rem',
                       fontWeight: 700,
-                      padding: '0.35rem 0.85rem',
+                      padding: '0.25rem 0.6rem',
                       borderRadius: 'var(--radius-sm)',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '4px',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                      gap: '3px',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
+                      whiteSpace: 'nowrap'
                     }}
                   >
                     <span>{action.takeActionText}</span>
-                    <ArrowRight size={13} />
+                    <ArrowRight size={11} />
                   </button>
                 </div>
               </div>

@@ -415,7 +415,24 @@ const MainAppContent: React.FC = () => {
       }
     }
   };
-  const [collapsed, setCollapsed] = useState<boolean>(false);
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      const saved = localStorage.getItem('sscit_sidebar_collapsed');
+      if (saved !== null) {
+        return saved === 'true';
+      }
+    } catch (e) { }
+    return true; // Default state: COLLAPSED by default
+  });
+
+  const handleSetCollapsed = (val: boolean) => {
+    setCollapsed(val);
+    try {
+      localStorage.setItem('sscit_sidebar_collapsed', String(val));
+    } catch (e) { }
+  };
+
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
   const [showPostLoginUpdates, setShowPostLoginUpdates] = useState<boolean>(() => {
     if (typeof window === 'undefined' || !user) return false;
@@ -1575,7 +1592,7 @@ const MainAppContent: React.FC = () => {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         collapsed={collapsed}
-        setCollapsed={setCollapsed}
+        setCollapsed={handleSetCollapsed}
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
       />

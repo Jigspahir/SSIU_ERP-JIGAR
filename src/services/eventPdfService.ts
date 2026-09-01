@@ -38,7 +38,7 @@ export async function generateEventCircularPDF(event: EventCircularData): Promis
   const marginX = 16;
   const contentWidth = pageWidth - marginX * 2; // 178mm
   const brandNavy: [number, number, number] = [15, 44, 89]; // #0F2C59
-  const brandOrange: [number, number, number] = [243, 112, 35]; // #F37023
+  const brandOrange: [number, number, number] = [242, 107, 33]; // #F26B21
   const textDark: [number, number, number] = [15, 23, 42]; // #0F172A
   const textMuted: [number, number, number] = [100, 116, 139]; // #64748B
   const bgLight: [number, number, number] = [248, 250, 252]; // #F8FAFC

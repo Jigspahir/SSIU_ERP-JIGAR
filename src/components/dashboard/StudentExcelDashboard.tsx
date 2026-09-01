@@ -38,10 +38,12 @@ import {
   ChevronRight,
   Sparkles,
   RefreshCw,
-  Award
+  Award,
+  FileDown
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import logoSvg from '../../assets/swarrnim-logo.svg';
+import { downloadStudentReportPdf, StudentReportPdfData } from '../../utils/generateStudentReportPdf';
 
 interface StudentExcelDashboardProps {
   user: User | null;
@@ -77,6 +79,7 @@ export const StudentExcelDashboard: React.FC<StudentExcelDashboardProps> = ({
   currentAY
 }) => {
   const [selectedReceiptTxn, setSelectedReceiptTxn] = useState<FeePaymentTransaction | null>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // 1. Resolve Student Data
   const studentId = user?.id || 'stu-1';
@@ -213,9 +216,70 @@ export const StudentExcelDashboard: React.FC<StudentExcelDashboardProps> = ({
   // 8. Notifications
   const myNotifs = userNotifications.slice(0, 5);
 
-  // Handlers for Print & Excel Export
-  const handlePrintReport = () => {
-    window.print();
+  // Handlers for PDF Report Download & Excel Export
+  const handleDownloadPdfReport = async () => {
+    if (isGeneratingPdf) return;
+    setIsGeneratingPdf(true);
+    try {
+      const pdfData: StudentReportPdfData = {
+        user,
+        student,
+        department: deptObj,
+        program: progObj,
+        semester: semObj,
+        academicYear: ayObj,
+        batch: batchObj,
+        division: divObj,
+        mentor: mentorObj,
+        attendanceStats: stats,
+        subjectAttendanceList,
+        feeRecords: feeTableRows,
+        upcomingExams: upcomingExams.map(e => ({
+          id: e.id,
+          code: e.code,
+          name: e.name,
+          startDate: e.startDate,
+          status: e.status
+        })),
+        serviceRequests: combinedRequests,
+        assignments: studentAssignments.map(a => ({
+          id: a.id,
+          title: a.title,
+          subjectCode: db.getSubjectById(a.subjectId)?.code || 'CSE-401',
+          deadline: a.deadline,
+          status: a.status
+        })),
+        todayClasses: todayClasses.map(tt => {
+          const subj = db.getSubjectById(tt.subjectId);
+          const fac = db.getFaculty().find(f => f.id === tt.facultyId);
+          return {
+            timeSlot: tt.timeSlot,
+            subjectCode: subj?.code || 'CSE-401',
+            subjectName: subj?.name || 'Class',
+            facultyName: fac?.name || 'Professor',
+            roomNo: tt.roomNo || 'Room 302',
+            type: subj?.type || 'THEORY'
+          };
+        }),
+        notifications: myNotifs.map(n => ({
+          id: n.id,
+          title: n.title,
+          message: n.message,
+          category: n.module || 'ACADEMIC',
+          priority: 'IMPORTANT',
+          timestamp: n.timestamp || (n.createdAt ? new Date(n.createdAt).toLocaleDateString() : '2026-08-24')
+        })),
+        profileCompletionPercentage: 85,
+        abcId: student?.abcId || '8940-1234-5678'
+      };
+
+      downloadStudentReportPdf(pdfData);
+    } catch (err) {
+      console.error('Failed to generate student report PDF:', err);
+      alert('Unable to generate PDF report at this moment. Please try again.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   const handleExportExcel = () => {
@@ -372,11 +436,20 @@ export const StudentExcelDashboard: React.FC<StudentExcelDashboardProps> = ({
             <button
               type="button"
               className="btn btn-secondary btn-sm"
-              onClick={handlePrintReport}
-              style={{ fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px', height: '32px' }}
-              title="Print Official A4 ERP Academic Report"
+              onClick={handleDownloadPdfReport}
+              disabled={isGeneratingPdf}
+              style={{ fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', height: '32px' }}
+              title="Download Official A4 ERP Academic Report (PDF)"
             >
-              <Printer size={14} /> Print Report
+              {isGeneratingPdf ? (
+                <>
+                  <RefreshCw size={14} className="animate-spin" /> Generating PDF...
+                </>
+              ) : (
+                <>
+                  <FileDown size={14} color="#DC2626" /> Download PDF Report
+                </>
+              )}
             </button>
 
             <button

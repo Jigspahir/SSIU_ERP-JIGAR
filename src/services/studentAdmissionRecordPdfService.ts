@@ -84,12 +84,12 @@ class StudentAdmissionRecordPdfService {
     doc.text('Website: www.swarrnim.edu.in | Email: admission@swarrnim.edu.in | Contact: +91 70690 03003', margin + 26, 29.5);
 
     // Header dividing rule
-    doc.setDrawColor(243, 112, 35); // Brand Orange (#F37023)
+    doc.setDrawColor(242, 107, 33); // Brand Orange (#F26B21)
     doc.setLineWidth(1);
     doc.line(margin, 36, pageWidth - margin, 36);
 
     // Title Badge
-    doc.setFillColor(243, 112, 35);
+    doc.setFillColor(242, 107, 33);
     doc.roundedRect(margin, 39, contentWidth, 7, 1.5, 1.5, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
@@ -453,7 +453,7 @@ class StudentAdmissionRecordPdfService {
         doc.text(`Student: ${fullNameVal} (${student.enrollmentNo || student.temporaryEnrollmentNumber || student.id}) | Category: ${docItem.category || 'ACADEMIC'}`, margin, 21.5);
         doc.text(`Verification Status: ${docItem.status || 'VERIFIED'} | File: ${docItem.fileName || 'document_scan.pdf'}`, margin, 25.5);
 
-        doc.setDrawColor(243, 112, 35);
+        doc.setDrawColor(242, 107, 33);
         doc.setLineWidth(0.5);
         doc.line(margin, 28, pageWidth - margin, 28);
 

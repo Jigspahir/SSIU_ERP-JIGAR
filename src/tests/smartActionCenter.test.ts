@@ -209,13 +209,14 @@ async function runSmartActionCenterTests() {
   console.log('\n========================================');
   console.log(`TEST RESULTS: ${testsPassed} PASSED, ${testsFailed} FAILED`);
   console.log('========================================\n');
-
-  if (testsFailed > 0) {
-    process.exit(1);
-  }
 }
 
-runSmartActionCenterTests().catch(err => {
-  console.error('Fatal test error:', err);
-  process.exit(1);
+import { describe, it, expect } from 'vitest';
+
+describe('SSIU Smart Action Center ("What Needs My Attention?")', () => {
+  it('executes all 37 action center assertions cleanly without error', async () => {
+    await runSmartActionCenterTests();
+    expect(testsFailed).toBe(0);
+    expect(testsPassed).toBeGreaterThanOrEqual(30);
+  });
 });

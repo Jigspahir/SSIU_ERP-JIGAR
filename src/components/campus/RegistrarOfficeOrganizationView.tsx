@@ -543,7 +543,10 @@ export const RegistrarOfficeOrganizationView: React.FC<RegistrarOfficeOrganizati
               <Badge variant="warning">{kpiStats.actionableExceptions} Actionable Items</Badge>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.75rem' }}>
+            <div 
+              className="dashboard-attention-cards-grid"
+              style={{ '--action-count': 3 } as React.CSSProperties}
+            >
               <div 
                 style={{ padding: '0.85rem', backgroundColor: '#FEF2F2', border: '1px solid #FEE2E2', borderRadius: '8px', cursor: 'pointer' }}
                 onClick={() => setActiveTab('WORK_ALLOCATION')}

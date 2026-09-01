@@ -1608,7 +1608,7 @@ export class ReportEngineService {
           appliedFilters: [{ label: 'Scope', value: 'University Headquarters & All Constituent Schools' }, { label: 'Academic Session', value: 'AY 2026-27' }],
           totalCount: students.length,
           summaryMetrics: [
-            { label: 'Total Enrolled Students', value: students.length, color: '#F37023', sublabel: `${this.calcPercentage(students.filter(s => s.status === 'ACTIVE').length, students.length)}% Active` },
+            { label: 'Total Enrolled Students', value: students.length, color: '#F26B21', sublabel: `${this.calcPercentage(students.filter(s => s.status === 'ACTIVE').length, students.length)}% Active` },
             { label: 'Active Faculty on Roster', value: faculty.length, color: '#0F2C59', sublabel: '1:18 Student-Faculty Ratio' },
             { label: 'Daily Attendance Benchmark', value: '92.4%', color: '#34A853', sublabel: '1,185 Present Today' },
             { label: 'Revenue Realization', value: `₹${(finance.totalCollected / 100000).toFixed(2)} L`, color: '#34A853', sublabel: `${finance.collectionPercentage}% Collected` },

@@ -1827,7 +1827,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
             <span className="text-xs text-slate-500 font-medium">Live priority queues</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div 
+            className="dashboard-attention-cards-grid"
+            style={{ '--action-count': 4 } as React.CSSProperties}
+          >
             {/* 1. Academic Decisions */}
             <div 
               onClick={() => setActiveTab('reg-approvals-pending')}

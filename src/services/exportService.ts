@@ -168,7 +168,7 @@ export const exportToWord = (
         }
         .univ-subtitle {
           font-size: 9pt;
-          color: #F37023;
+          color: #F26B21;
           font-weight: 700;
           text-transform: uppercase;
           letter-spacing: 1px;
@@ -181,7 +181,7 @@ export const exportToWord = (
         }
         .report-badge-bar {
           background-color: #F1F5F9;
-          border-left: 4px solid #F37023;
+          border-left: 4px solid #F26B21;
           padding: 10px 14px;
           margin-bottom: 16px;
           border-radius: 4px;

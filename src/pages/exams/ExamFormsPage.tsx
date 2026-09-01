@@ -466,10 +466,10 @@ export const ExamFormsPage: React.FC = () => {
 
           {/* Tab 1: Available Examinations (Official Table / Grid) */}
           {studentActiveTab === 'AVAILABLE' && (
-            <div className="card" style={{ padding: '1.25rem', overflow: 'hidden', border: '1px solid var(--border-color)', background: '#FFFFFF', borderRadius: '8px' }}>
+            <div className="card" style={{ padding: '1.25rem', overflow: 'hidden' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0 }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-navy, #0F2C59)', margin: 0 }}>
                     Eligible Examination Sessions &amp; Form Windows
                   </h3>
                   <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '2px 0 0 0' }}>
@@ -478,28 +478,28 @@ export const ExamFormsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div style={{ overflowX: 'auto' }}>
-                <table className="table" style={{ width: '100%', fontSize: '0.84375rem', borderCollapse: 'collapse' }}>
+              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+                <table style={{ width: 'auto', borderCollapse: 'collapse', border: '1px solid #CBD5E1', fontSize: '0.84375rem', textAlign: 'left' }}>
                   <thead>
-                    <tr style={{ background: '#0F2C59', color: '#FFFFFF' }}>
-                      <th style={{ padding: '0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Examination</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Academic Year</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Semester</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Exam Session</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Form Start</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Form End</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Fee</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Status</th>
-                      <th style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 800 }}>Action</th>
+                    <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #CBD5E1' }}>
+                      <th style={{ padding: '0.65rem 0.85rem', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>Examination</th>
+                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>Academic Year</th>
+                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>Semester</th>
+                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>Exam Session</th>
+                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>Form Start</th>
+                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>Form End</th>
+                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>Fee</th>
+                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>Status</th>
+                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {availableExams.length === 0 ? (
                       <tr>
-                        <td colSpan={9} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                          <Clock size={32} style={{ margin: '0 auto 0.5rem auto', opacity: 0.5 }} />
-                          <div style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>No Active Examination Registration Windows</div>
-                          <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                        <td colSpan={9} style={{ textAlign: 'center', padding: '2.5rem 1.5rem', color: '#64748B', background: '#FFFFFF', borderBottom: '1px solid #E2E8F0' }}>
+                          <Clock size={32} style={{ margin: '0 auto 0.5rem auto', color: '#94A3B8' }} />
+                          <div style={{ fontWeight: 700, color: '#0F2C59', fontSize: '0.9375rem' }}>No Active Examination Registration Windows</div>
+                          <div style={{ fontSize: '0.8125rem', marginTop: '4px', color: '#64748B' }}>
                             There are currently no published examinations open for form submission matching your program and semester.
                           </div>
                         </td>
@@ -508,11 +508,11 @@ export const ExamFormsPage: React.FC = () => {
                       availableExams.map((item, idx) => {
                         const isEven = idx % 2 === 0;
                         return (
-                          <tr key={item.id} style={{ background: isEven ? '#FFFFFF' : '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
-                            <td style={{ padding: '0.75rem', borderRight: '1px solid #E2E8F0' }}>
-                              <div style={{ fontWeight: 800, color: '#0F2C59' }}>{item.name}</div>
+                          <tr key={item.id} style={{ background: isEven ? '#FFFFFF' : '#F8FAFC', borderBottom: '1px solid #E2E8F0', transition: 'background-color 0.15s ease' }}>
+                            <td style={{ padding: '0.65rem 0.85rem', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              <div style={{ fontWeight: 800, color: '#0F2C59', fontSize: '0.84375rem' }}>{item.name}</div>
                               <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', marginTop: '2px' }}>
-                                <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#F37023', fontWeight: 700 }}>
+                                <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: 'var(--brand-orange, #F26B21)', fontWeight: 700 }}>
                                   {item.examCode}
                                 </span>
                                 <Badge variant={item.type === 'Regular' ? 'navy' : 'orange'}>
@@ -520,33 +520,33 @@ export const ExamFormsPage: React.FC = () => {
                                 </Badge>
                               </div>
                             </td>
-                            <td style={{ padding: '0.75rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 600 }}>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 600, color: '#334155', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                               {item.academicYearCode || '2026-27'}
                             </td>
-                            <td style={{ padding: '0.75rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 700, color: '#0F2C59' }}>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 700, color: '#0F2C59', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                               Semester {item.semesterNumber || 4}
                             </td>
-                            <td style={{ padding: '0.75rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 600 }}>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 600, color: '#334155', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                               {item.session || 'Summer 2026'}
                             </td>
-                            <td style={{ padding: '0.75rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontSize: '0.8125rem' }}>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontSize: '0.8125rem', color: '#334155', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                               {item.formStartDate}
                             </td>
-                            <td style={{ padding: '0.75rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontSize: '0.8125rem' }}>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontSize: '0.8125rem', color: '#334155', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                               <div>{item.formEndDate}</div>
                               {item.isLate && (
                                 <div style={{ fontSize: '0.7rem', color: '#D97706', fontWeight: 700 }}>Late Fee Active</div>
                               )}
                             </td>
-                            <td style={{ padding: '0.75rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 800, color: '#0F2C59' }}>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontWeight: 800, color: '#0F2C59', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                               ₹{item.totalPayable.toLocaleString('en-IN')}
                             </td>
-                            <td style={{ padding: '0.75rem', textAlign: 'center', borderRight: '1px solid #E2E8F0' }}>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                               <Badge variant={item.statusBadgeVariant || 'active'}>
                                 {item.displayStatus || 'Open'}
                               </Badge>
                             </td>
-                            <td style={{ padding: '0.75rem', textAlign: 'right' }}>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                               {item.isSubmitted ? (
                                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                                   <button
@@ -556,7 +556,7 @@ export const ExamFormsPage: React.FC = () => {
                                       const f = studentForms.find(sf => sf.id === item.existingFormId || sf.examId === item.id);
                                       if (f) setViewingFormDetails(f);
                                     }}
-                                    style={{ padding: '0.25rem 0.5rem', fontWeight: 700 }}
+                                    style={{ padding: '0.25rem 0.5rem', fontSize: '0.78125rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
                                   >
                                     <Eye size={14} /> View Form
                                   </button>
@@ -569,7 +569,7 @@ export const ExamFormsPage: React.FC = () => {
                                     const draft = studentForms.find(sf => sf.id === item.existingFormId || sf.examId === item.id);
                                     handleOpenFormModal(item, draft);
                                   }}
-                                  style={{ padding: '0.35rem 0.75rem', fontSize: '0.78125rem', fontWeight: 700 }}
+                                  style={{ padding: '0.3rem 0.65rem', fontSize: '0.78125rem', fontWeight: 700 }}
                                 >
                                   Continue Draft
                                 </button>
@@ -578,7 +578,7 @@ export const ExamFormsPage: React.FC = () => {
                                   type="button"
                                   className="btn btn-secondary btn-sm"
                                   disabled
-                                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', opacity: 0.6, cursor: 'not-allowed' }}
+                                  style={{ padding: '0.3rem 0.65rem', fontSize: '0.75rem', opacity: 0.6, cursor: 'not-allowed' }}
                                 >
                                   {item.timePeriodStatus === 'FORM_NOT_STARTED' ? `Opens ${item.formStartDate}` : 'Closed'}
                                 </button>
@@ -587,7 +587,7 @@ export const ExamFormsPage: React.FC = () => {
                                   type="button"
                                   className="btn btn-primary btn-sm"
                                   onClick={() => handleOpenFormModal(item)}
-                                  style={{ padding: '0.35rem 0.85rem', fontSize: '0.78125rem', fontWeight: 800, background: '#F37023', borderColor: '#F37023', color: '#FFFFFF' }}
+                                  style={{ padding: '0.3rem 0.75rem', fontSize: '0.78125rem', fontWeight: 800, background: 'var(--brand-orange, #F26B21)', borderColor: 'var(--brand-orange, #F26B21)', color: '#FFFFFF', borderRadius: '6px' }}
                                 >
                                   Apply / Fill Exam Form
                                 </button>
@@ -606,53 +606,85 @@ export const ExamFormsPage: React.FC = () => {
           {/* Tab 2: My Exam Forms */}
           {studentActiveTab === 'MY_FORMS' && (
             <div className="card" style={{ padding: '1.25rem', overflow: 'hidden' }}>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="table" style={{ fontSize: '0.875rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--brand-navy, #0F2C59)', margin: 0 }}>
+                  Submitted &amp; Drafted Exam Forms
+                </h3>
+              </div>
+              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+                <table style={{ width: 'auto', borderCollapse: 'collapse', border: '1px solid #CBD5E1', fontSize: '0.84375rem', textAlign: 'left' }}>
                   <thead>
-                    <tr style={{ background: 'var(--bg-surface-hover)' }}>
-                      <th>Form Number</th>
-                      <th>Examination</th>
-                      <th>Applied Date</th>
-                      <th>Total Fee</th>
-                      <th>Payment Status</th>
-                      <th>Form Status</th>
-                      <th style={{ textAlign: 'right' }}>Action</th>
+                    <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #CBD5E1' }}>
+                      <th style={{ padding: '0.65rem 0.85rem', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>
+                        Form Number
+                      </th>
+                      <th style={{ padding: '0.65rem 0.85rem', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>
+                        Examination
+                      </th>
+                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>
+                        Applied Date
+                      </th>
+                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>
+                        Total Fee
+                      </th>
+                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>
+                        Payment Status
+                      </th>
+                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>
+                        Form Status
+                      </th>
+                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
+                        Action
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {studentForms.length === 0 ? (
                       <tr>
-                        <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
-                          You have not submitted or drafted any examination forms yet.
+                        <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem 1.5rem', color: '#64748B', background: '#FFFFFF', borderBottom: '1px solid #E2E8F0' }}>
+                          <FileText size={32} style={{ margin: '0 auto 0.5rem auto', color: '#94A3B8' }} />
+                          <div style={{ fontWeight: 700, color: '#0F2C59', fontSize: '0.9375rem' }}>No Examination Forms Found</div>
+                          <div style={{ fontSize: '0.8125rem', marginTop: '4px', color: '#64748B' }}>
+                            You have not submitted or drafted any examination forms yet.
+                          </div>
                         </td>
                       </tr>
                     ) : (
-                      studentForms.map(form => {
+                      studentForms.map((form, idx) => {
                         const examObj = exams.find(e => e.id === form.examId);
+                        const isEven = idx % 2 === 0;
                         return (
-                          <tr key={form.id}>
-                            <td>
-                              <strong style={{ fontFamily: 'monospace', color: 'var(--brand-orange)' }}>
+                          <tr key={form.id} style={{ background: isEven ? '#FFFFFF' : '#F8FAFC', borderBottom: '1px solid #E2E8F0', transition: 'background-color 0.15s ease' }}>
+                            <td style={{ padding: '0.65rem 0.85rem', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              <strong style={{ fontFamily: 'monospace', color: 'var(--brand-orange)', fontSize: '0.84375rem', letterSpacing: '0.5px' }}>
                                 {form.formNumber || form.id}
                               </strong>
                             </td>
-                            <td>
-                              <strong>{examObj?.name || 'Examination Session'}</strong>
-                              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Semester {form.semesterNumber || 4}</div>
+                            <td style={{ padding: '0.65rem 0.85rem', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              <strong style={{ color: '#0F2C59', fontSize: '0.84375rem', display: 'block' }}>
+                                {examObj?.name || 'Examination Session'}
+                              </strong>
+                              <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '1px', fontWeight: 600 }}>
+                                Semester {form.semesterNumber || 4}
+                              </div>
                             </td>
-                            <td>{form.appliedDate || form.createdAt}</td>
-                            <td>₹{(form.totalAmount ?? form.totalFee ?? 0).toLocaleString('en-IN')}</td>
-                            <td>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', whiteSpace: 'nowrap', color: '#334155', fontWeight: 600 }}>
+                              {form.appliedDate || form.createdAt}
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', whiteSpace: 'nowrap', fontWeight: 700, color: '#0F2C59' }}>
+                              ₹{(form.totalAmount ?? form.totalFee ?? 0).toLocaleString('en-IN')}
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                               <Badge variant={form.paymentStatus === 'PAID' || form.paymentStatus === 'COMPLETED' || form.paymentStatus === 'WAIVED' || form.paymentStatus === 'SUCCESS' ? 'active' : 'warning'}>
                                 {form.paymentStatus}
                               </Badge>
                             </td>
-                            <td>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                               <Badge variant={form.status === 'VERIFIED' ? 'active' : form.status === 'SUBMITTED' ? 'navy' : form.status === 'RETURNED' ? 'warning' : form.status === 'REJECTED' ? 'danger' : 'inactive'}>
                                 {form.status}
                               </Badge>
                             </td>
-                            <td style={{ textAlign: 'right' }}>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
                               <div style={{ display: 'inline-flex', gap: '0.35rem', alignItems: 'center', justifyContent: 'flex-end' }}>
                                 {form.status === 'DRAFT' && (
                                   <button
@@ -661,7 +693,7 @@ export const ExamFormsPage: React.FC = () => {
                                     onClick={() => {
                                       if (examObj) handleOpenFormModal(examObj, form);
                                     }}
-                                    style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
+                                    style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem', fontWeight: 700 }}
                                   >
                                     Continue Draft
                                   </button>
@@ -673,7 +705,7 @@ export const ExamFormsPage: React.FC = () => {
                                     onClick={() => {
                                       if (examObj) handleOpenFormModal(examObj, form);
                                     }}
-                                    style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}
+                                    style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem', fontWeight: 700 }}
                                   >
                                     Edit &amp; Resubmit
                                   </button>
@@ -683,7 +715,7 @@ export const ExamFormsPage: React.FC = () => {
                                     type="button"
                                     className="btn btn-success btn-sm"
                                     onClick={() => handlePayFee(form)}
-                                    style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', background: '#059669', color: '#FFF' }}
+                                    style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem', background: '#059669', color: '#FFF', fontWeight: 700 }}
                                   >
                                     <IndianRupee size={12} /> Pay ₹{(form.totalAmount ?? form.totalFee ?? 0).toLocaleString('en-IN')}
                                   </button>
@@ -692,9 +724,9 @@ export const ExamFormsPage: React.FC = () => {
                                   type="button"
                                   className="btn btn-ghost btn-sm"
                                   onClick={() => setViewingFormDetails(form)}
-                                  style={{ padding: '0.25rem 0.5rem' }}
+                                  style={{ padding: '0.25rem 0.5rem', fontSize: '0.78125rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
                                 >
-                                  <Eye size={15} /> View
+                                  <Eye size={14} /> View
                                 </button>
                               </div>
                             </td>
@@ -712,55 +744,90 @@ export const ExamFormsPage: React.FC = () => {
           {studentActiveTab === 'MY_HALL_TICKETS' && (
             <div className="card" style={{ padding: '1.25rem', overflow: 'hidden' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0 }}>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--brand-navy, #0F2C59)', margin: 0 }}>
                   Official Hall Tickets
                 </h3>
               </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="table" style={{ fontSize: '0.875rem' }}>
+              <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+                <table style={{ width: 'auto', borderCollapse: 'collapse', border: '1px solid #CBD5E1', fontSize: '0.84375rem', textAlign: 'left' }}>
                   <thead>
-                    <tr style={{ background: 'var(--bg-surface-hover)' }}>
-                      <th>Hall Ticket No</th>
-                      <th>Examination</th>
-                      <th>Issue Date</th>
-                      <th>Centre &amp; Seat</th>
-                      <th>Status</th>
-                      <th style={{ textAlign: 'right' }}>Action</th>
+                    <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #CBD5E1' }}>
+                      <th style={{ padding: '0.65rem 0.85rem', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>
+                        Hall Ticket No
+                      </th>
+                      <th style={{ padding: '0.65rem 0.85rem', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>
+                        Examination
+                      </th>
+                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>
+                        Issue Date
+                      </th>
+                      <th style={{ padding: '0.65rem 0.85rem', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>
+                        Centre &amp; Seat
+                      </th>
+                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>
+                        Status
+                      </th>
+                      <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>
+                        Action
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {hallTickets.length === 0 ? (
                       <tr>
-                        <td colSpan={6} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
-                          No Hall Tickets issued yet. Hall Tickets become available after your exam form is Verified by the Examination Section.
+                        <td colSpan={6} style={{ textAlign: 'center', padding: '2.5rem 1.5rem', color: '#64748B', background: '#FFFFFF', borderBottom: '1px solid #E2E8F0' }}>
+                          <FileText size={32} style={{ margin: '0 auto 0.5rem auto', color: '#94A3B8' }} />
+                          <div style={{ fontWeight: 700, color: '#0F2C59', fontSize: '0.9375rem' }}>No Hall Tickets Issued Yet</div>
+                          <div style={{ fontSize: '0.8125rem', marginTop: '4px', color: '#64748B' }}>
+                            Hall Tickets become available after your exam form is verified by the Examination Section.
+                          </div>
                         </td>
                       </tr>
                     ) : (
-                      hallTickets.map(ticket => (
-                        <tr key={ticket.id}>
-                          <td>
-                            <strong style={{ fontFamily: 'monospace', color: 'var(--brand-orange)' }}>
-                              {ticket.hallTicketNo}
-                            </strong>
-                          </td>
-                          <td><strong>{ticket.examSessionName}</strong></td>
-                          <td>{ticket.issueDate}</td>
-                          <td>{ticket.centreName || 'SSIU Main Centre'} — {ticket.seatNumber || 'Seat Allocated'}</td>
-                          <td>
-                            <Badge variant="active">{ticket.status}</Badge>
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <button
-                              type="button"
-                              className="btn btn-primary btn-sm"
-                              onClick={() => setViewingHallTicket(ticket)}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700 }}
-                            >
-                              <Printer size={14} /> View &amp; Print
-                            </button>
-                          </td>
-                        </tr>
-                      ))
+                      hallTickets.map((ticket, idx) => {
+                        const isEven = idx % 2 === 0;
+                        return (
+                          <tr key={ticket.id} style={{ background: isEven ? '#FFFFFF' : '#F8FAFC', borderBottom: '1px solid #E2E8F0', transition: 'background-color 0.15s ease' }}>
+                            <td style={{ padding: '0.65rem 0.85rem', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              <strong style={{ fontFamily: 'monospace', color: 'var(--brand-orange)', fontSize: '0.84375rem', letterSpacing: '0.5px' }}>
+                                {ticket.hallTicketNo}
+                              </strong>
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              <strong style={{ color: '#0F2C59', fontSize: '0.84375rem', display: 'block' }}>
+                                {ticket.examSessionName}
+                              </strong>
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', whiteSpace: 'nowrap', color: '#334155', fontWeight: 600 }}>
+                              {ticket.issueDate}
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle' }}>
+                              <div style={{ fontWeight: 600, color: '#1E293B' }}>
+                                {ticket.centreName || 'SSIU Main Centre'}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '1px', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <span>Seat:</span>
+                                <strong style={{ color: '#0F2C59', fontFamily: 'monospace' }}>
+                                  {ticket.seatNumber || 'Seat Allocated'}
+                                </strong>
+                              </div>
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              <Badge variant="active">{ticket.status}</Badge>
+                            </td>
+                            <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                              <button
+                                type="button"
+                                className="btn btn-primary btn-sm"
+                                onClick={() => setViewingHallTicket(ticket)}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700, padding: '0.3rem 0.65rem', fontSize: '0.78125rem', background: 'var(--brand-orange)', borderColor: 'var(--brand-orange)', color: '#FFFFFF', borderRadius: '6px' }}
+                              >
+                                <Printer size={14} /> View &amp; Print
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

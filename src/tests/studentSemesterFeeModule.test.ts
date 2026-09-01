@@ -155,7 +155,7 @@ describe('SSIU ERP — Semester-Wise Student Fees Management Module', () => {
     });
 
     expect(payRes.transaction).toBeDefined();
-    expect(payRes.transaction.amount).toBe(15000);
+    expect(payRes.transaction.paidAmount).toBe(15000);
     expect(payRes.transaction.status).toBe('SUCCESS');
     expect(payRes.receiptNo).toContain('SSIU/REC/');
 

@@ -10,7 +10,8 @@ import {
   X, 
   LogOut,
   Star,
-  AlertCircle
+  AlertCircle,
+  Menu
 } from 'lucide-react';
 import { 
   getRoleNavigationItems, NavItemConfig, 
@@ -94,6 +95,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [quickAccessVersion, setQuickAccessVersion] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Floating Tooltip state for unclipped, pixel-perfect collapsed sidebar tooltips
+  const [activeTooltip, setActiveTooltip] = useState<{ label: string; top: number; left: number } | null>(null);
+
+  const handleTooltipEnter = (label: string, e: React.MouseEvent<HTMLElement>) => {
+    if (!collapsed) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    setActiveTooltip({
+      label,
+      top: rect.top + rect.height / 2,
+      left: rect.right + 12
+    });
+  };
+
+  const handleTooltipLeave = () => {
+    setActiveTooltip(null);
+  };
 
   const toggleGroup = (groupId: string) => {
     setExpandedGroup(prev => (prev === groupId ? null : groupId));
@@ -309,6 +327,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [collapsed, setCollapsed]);
 
   const handleNavClick = (id: string) => {
+    setActiveTooltip(null);
     if (id === 'logout') {
       logout();
       return;
@@ -375,8 +394,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className={`sidebar-mobile-drawer ${mobileOpen ? 'mobile-open' : ''}`}
         style={{
           width: collapsed ? 'var(--sidebar-collapsed-width)' : 'var(--sidebar-width)',
-          backgroundColor: 'var(--bg-sidebar)',
-          color: 'var(--text-on-navy)',
+          backgroundColor: '#FFFFFF',
+          color: '#0F2C59',
+          borderRight: '1px solid #E2E8F0',
           height: '100vh',
           maxHeight: '100vh',
           position: 'sticky',
@@ -386,7 +406,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           flexDirection: 'column',
           transition: 'width var(--transition-normal)',
           zIndex: 90,
-          boxShadow: '4px 0 20px rgba(0,0,0,0.15)',
+          boxShadow: '2px 0 10px rgba(15, 44, 89, 0.04)',
           flexShrink: 0
         }}
       >
@@ -403,7 +423,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               border: '1px solid var(--brand-orange)',
               borderRadius: '8px',
               padding: '0.65rem 0.8rem',
-              boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
               display: 'flex',
               alignItems: 'center',
               gap: '0.5rem',
@@ -433,7 +453,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div
           style={{
             padding: collapsed ? '1.1rem 0.5rem 0.85rem 0.5rem' : '1.25rem 1.5rem',
-            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            borderBottom: '1px solid #E2E8F0',
             display: 'flex',
             flexDirection: collapsed ? 'column' : 'row',
             alignItems: 'center',
@@ -443,13 +463,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             boxSizing: 'border-box'
           }}
         >
-          <HeaderLogo collapsed={collapsed} />
+          <HeaderLogo collapsed={collapsed} onClick={() => handleNavClick('dashboard')} />
 
           <button
-            onClick={() => setCollapsed(!collapsed)}
+            onClick={() => {
+              setActiveTooltip(null);
+              setCollapsed(!collapsed);
+            }}
+            onMouseEnter={(e) => handleTooltipEnter(collapsed ? "Expand Sidebar" : "Collapse Sidebar", e)}
+            onMouseLeave={handleTooltipLeave}
             style={{
-              background: 'rgba(255,255,255,0.08)',
-              border: '1px solid rgba(255,255,255,0.12)',
+              background: '#F8FAFC',
+              border: '1px solid #E2E8F0',
               color: 'var(--brand-orange)',
               width: collapsed ? '34px' : '28px',
               height: collapsed ? '34px' : '28px',
@@ -463,7 +488,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
             aria-label={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
           >
-            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            <Menu size={18} />
           </button>
         </div>
 
@@ -473,13 +498,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="collapsed-nav-item-wrapper">
               <button
                 onClick={() => {
+                  setActiveTooltip(null);
                   setCollapsed(false);
                   setTimeout(() => searchInputRef.current?.focus(), 100);
                 }}
+                onMouseEnter={(e) => handleTooltipEnter("Search Menu (/)", e)}
+                onMouseLeave={handleTooltipLeave}
                 className="collapsed-nav-btn"
                 aria-label="Search menu (/)"
               >
-                <Search size={20} className="collapsed-nav-icon" />
+                <Search size={17} className="collapsed-nav-icon" />
               </button>
               <span className="collapsed-nav-tooltip">Search Menu (/)</span>
             </div>
@@ -490,7 +518,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 style={{
                   position: 'absolute',
                   left: '10px',
-                  color: 'rgba(255,255,255,0.45)',
+                  color: '#64748B',
                   pointerEvents: 'none'
                 }}
               />
@@ -505,9 +533,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   width: '100%',
                   height: '34px',
                   borderRadius: '7px',
-                  border: '1px solid rgba(255,255,255,0.12)',
-                  background: 'rgba(255,255,255,0.06)',
-                  color: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  background: '#F8FAFC',
+                  color: '#0F2C59',
                   fontSize: '0.8125rem',
                   fontFamily: 'inherit',
                   padding: '0 2rem 0 2.15rem',
@@ -529,8 +557,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     height: '22px',
                     borderRadius: '4px',
                     border: 'none',
-                    background: 'rgba(255,255,255,0.12)',
-                    color: 'rgba(255,255,255,0.8)',
+                    background: '#E2E8F0',
+                    color: '#475569',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -549,8 +577,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     right: '8px',
                     fontSize: '0.65rem',
                     fontWeight: 700,
-                    color: 'rgba(255,255,255,0.35)',
-                    background: 'rgba(255,255,255,0.08)',
+                    color: '#64748B',
+                    background: '#E2E8F0',
                     padding: '1px 5px',
                     borderRadius: '3px',
                     pointerEvents: 'none',
@@ -569,10 +597,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div
               style={{
                 padding: '0.35rem 0.75rem',
-                backgroundColor: 'rgba(245,166,35,0.12)',
-                border: '1px solid rgba(245,166,35,0.3)',
+                backgroundColor: '#FFF7ED',
+                border: '1px solid #FFEDD5',
                 borderRadius: 'var(--radius-full)',
-                color: 'var(--brand-gold)',
+                color: '#C2410C',
                 fontSize: '0.6875rem',
                 fontWeight: 800,
                 letterSpacing: '0.5px',
@@ -583,7 +611,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 gap: '0.4rem'
               }}
             >
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#F5A623', boxShadow: '0 0 6px #F5A623' }}></span>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--brand-orange)' }}></span>
               <span>⚡ {isStudentAdmin ? 'ONBOARDING OFFICER PORTAL' : (isStudent ? 'STUDENT PORTAL' : (isRegistrar ? 'REGISTRAR OFFICE PORTAL' : (isDeputyRegistrar ? 'DEPUTY REGISTRAR PORTAL' : (isStudentSection ? 'STUDENT SECTION PORTAL' : (isPrincipal ? 'PRINCIPAL / HOI PORTAL' : (isHOD ? 'HOD PORTAL' : (isMentor ? 'MENTOR PORTAL' : (isFaculty ? 'FACULTY PORTAL' : 'DEMO MODE ACTIVE'))))))))}</span>
             </div>
 
@@ -603,9 +631,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     fontSize: '0.65rem',
                     fontWeight: 700,
                     borderRadius: '4px',
-                    border: '1px solid ' + (role === 'FACULTY' ? 'var(--brand-orange)' : 'rgba(255,255,255,0.15)'),
-                    backgroundColor: role === 'FACULTY' ? 'var(--brand-orange)' : 'rgba(255,255,255,0.05)',
-                    color: role === 'FACULTY' ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
+                    border: '1px solid ' + (role === 'FACULTY' ? 'var(--brand-orange)' : '#E2E8F0'),
+                    backgroundColor: role === 'FACULTY' ? 'var(--brand-orange)' : '#F8FAFC',
+                    color: role === 'FACULTY' ? '#FFFFFF' : '#475569',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
@@ -626,9 +654,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     fontSize: '0.65rem',
                     fontWeight: 700,
                     borderRadius: '4px',
-                    border: '1px solid ' + (role === 'MENTOR' ? 'var(--brand-gold)' : 'rgba(255,255,255,0.15)'),
-                    backgroundColor: role === 'MENTOR' ? 'var(--brand-gold)' : 'rgba(255,255,255,0.05)',
-                    color: role === 'MENTOR' ? 'var(--brand-navy)' : 'rgba(255,255,255,0.6)',
+                    border: '1px solid ' + (role === 'MENTOR' ? '#0F2C59' : '#E2E8F0'),
+                    backgroundColor: role === 'MENTOR' ? '#0F2C59' : '#F8FAFC',
+                    color: role === 'MENTOR' ? '#FFFFFF' : '#475569',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease'
                   }}
@@ -653,9 +681,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     fontSize: '0.65rem',
                     fontWeight: 700,
                     borderRadius: '4px',
-                    border: '1px solid ' + (registrarViewContext === 'ACADEMIC' ? 'var(--brand-orange)' : 'rgba(255,255,255,0.15)'),
-                    backgroundColor: registrarViewContext === 'ACADEMIC' ? 'var(--brand-orange)' : 'rgba(255,255,255,0.05)',
-                    color: registrarViewContext === 'ACADEMIC' ? '#FFFFFF' : 'rgba(255,255,255,0.6)',
+                    border: '1px solid ' + (registrarViewContext === 'ACADEMIC' ? 'var(--brand-orange)' : '#E2E8F0'),
+                    backgroundColor: registrarViewContext === 'ACADEMIC' ? 'var(--brand-orange)' : '#F8FAFC',
+                    color: registrarViewContext === 'ACADEMIC' ? '#FFFFFF' : '#475569',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
                     display: 'flex',
@@ -679,9 +707,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     fontSize: '0.65rem',
                     fontWeight: 700,
                     borderRadius: '4px',
-                    border: '1px solid ' + (registrarViewContext === 'NON_ACADEMIC' ? 'var(--brand-gold)' : 'rgba(255,255,255,0.15)'),
-                    backgroundColor: registrarViewContext === 'NON_ACADEMIC' ? 'var(--brand-gold)' : 'rgba(255,255,255,0.05)',
-                    color: registrarViewContext === 'NON_ACADEMIC' ? 'var(--brand-navy)' : 'rgba(255,255,255,0.6)',
+                    border: '1px solid ' + (registrarViewContext === 'NON_ACADEMIC' ? '#0F2C59' : '#E2E8F0'),
+                    backgroundColor: registrarViewContext === 'NON_ACADEMIC' ? '#0F2C59' : '#F8FAFC',
+                    color: registrarViewContext === 'NON_ACADEMIC' ? '#FFFFFF' : '#475569',
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
                     display: 'flex',
@@ -699,6 +727,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation Items Container / Search Results View */}
         <div
+          onScroll={() => setActiveTooltip(null)}
           style={{
             flex: 1,
             overflowY: 'auto',
@@ -723,7 +752,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   fontWeight: 700,
                   textTransform: 'uppercase',
                   letterSpacing: '0.8px',
-                  color: 'var(--brand-gold)',
+                  color: '#0F2C59',
                   marginBottom: '0.25rem',
                   paddingLeft: '0.5rem',
                   display: 'flex',
@@ -732,7 +761,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }}
               >
                 <span>Results ({filteredResults.length})</span>
-                <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', textTransform: 'none', fontWeight: 500 }}>
+                <span style={{ fontSize: '0.65rem', color: '#64748B', textTransform: 'none', fontWeight: 500 }}>
                   Esc to clear
                 </span>
               </div>
@@ -746,16 +775,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: '0.45rem',
-                    background: 'rgba(255,255,255,0.02)',
+                    background: '#F8FAFC',
                     borderRadius: 'var(--radius-md)',
-                    border: '1px dashed rgba(255,255,255,0.1)'
+                    border: '1px dashed #CBD5E1'
                   }}
                 >
-                  <Search size={22} style={{ color: 'rgba(245,166,35,0.6)' }} />
-                  <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#FFFFFF' }}>
+                  <Search size={22} style={{ color: 'var(--brand-orange)' }} />
+                  <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#0F2C59' }}>
                     No matching menu found
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: '0.72rem', color: '#64748B', lineHeight: 1.4 }}>
                     Try another module or menu name.
                   </div>
                 </div>
@@ -784,13 +813,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           gap: '0.75rem',
                           padding: isPinnable ? '0.6rem 2.25rem 0.6rem 0.75rem' : '0.6rem 0.75rem',
                           borderRadius: 'var(--radius-md)',
-                          border: isSelected ? '1px solid var(--brand-orange)' : '1px solid transparent',
+                          border: isSelected ? '1px solid var(--brand-orange)' : '1px solid #E2E8F0',
                           background: isActive
-                            ? 'linear-gradient(90deg, var(--brand-orange) 0%, #D95300 100%)'
+                            ? 'var(--brand-orange)'
                             : isSelected
-                            ? 'rgba(243, 112, 35, 0.2)'
-                            : 'rgba(255,255,255,0.03)',
-                          color: isActive || isSelected ? '#FFFFFF' : 'rgba(255,255,255,0.85)',
+                            ? '#FFF7ED'
+                            : '#FFFFFF',
+                          color: isActive ? '#FFFFFF' : '#0F2C59',
                           cursor: 'pointer',
                           transition: 'all var(--transition-fast)',
                           textAlign: 'left',
@@ -802,7 +831,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <ItemIcon
                           size={17}
                           style={{
-                            color: isActive ? '#FFFFFF' : 'var(--brand-gold)',
+                            color: isActive ? '#FFFFFF' : 'var(--brand-orange)',
                             flexShrink: 0
                           }}
                         />
@@ -822,7 +851,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             <div
                               style={{
                                 fontSize: '0.6875rem',
-                                color: isActive ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.45)',
+                                color: isActive ? 'rgba(255,255,255,0.85)' : '#64748B',
                                 whiteSpace: 'nowrap',
                                 overflow: 'hidden',
                                 textOverflow: 'ellipsis'
@@ -844,7 +873,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             right: '8px',
                             background: 'none',
                             border: 'none',
-                            color: isItemPinned ? '#F5A623' : 'rgba(255,255,255,0.3)',
+                            color: isItemPinned ? '#F5A623' : '#94A3B8',
                             cursor: 'pointer',
                             padding: '4px',
                             display: 'flex',
@@ -881,7 +910,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '0 0.5rem 0.4rem 0.5rem',
-                      borderBottom: '1px solid rgba(255,255,255,0.08)',
+                      borderBottom: '1px solid #E2E8F0',
                       marginBottom: '0.45rem'
                     }}
                   >
@@ -890,25 +919,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         fontSize: '0.6875rem',
                         fontWeight: 800,
                         letterSpacing: '0.8px',
-                        color: 'var(--brand-gold)',
+                        color: '#0F2C59',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.35rem',
                         textTransform: 'uppercase'
                       }}
                     >
-                      <Star size={13} fill="#F5A623" color="#F5A623" />
+                      <Star size={13} fill="#F37023" color="#F37023" />
                       <span>Quick Access</span>
                     </div>
                     <span
                       style={{
                         fontSize: '0.65rem',
                         fontWeight: 700,
-                        color: pinnedCount >= 3 ? '#F58220' : 'rgba(255,255,255,0.5)',
-                        backgroundColor: pinnedCount >= 3 ? 'rgba(245,130,32,0.15)' : 'rgba(255,255,255,0.06)',
+                        color: pinnedCount >= 3 ? '#C2410C' : '#64748B',
+                        backgroundColor: pinnedCount >= 3 ? '#FFF7ED' : '#F1F5F9',
                         padding: '1px 6px',
                         borderRadius: '10px',
-                        border: '1px solid ' + (pinnedCount >= 3 ? 'rgba(245,130,32,0.3)' : 'rgba(255,255,255,0.1)')
+                        border: '1px solid ' + (pinnedCount >= 3 ? '#FFEDD5' : '#E2E8F0')
                       }}
                       title="User can pin a maximum of 3 shortcuts"
                     >
@@ -921,7 +950,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       style={{
                         padding: '0.5rem 0.65rem',
                         fontSize: '0.72rem',
-                        color: 'rgba(255,255,255,0.4)',
+                        color: '#64748B',
                         fontStyle: 'italic',
                         lineHeight: 1.35
                       }}
@@ -958,22 +987,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 borderRadius: 'var(--radius-sm)',
                                 border: 'none',
                                 background: isQAActive
-                                  ? 'linear-gradient(90deg, var(--brand-orange) 0%, #D95300 100%)'
-                                  : 'rgba(255,255,255,0.03)',
-                                color: isQAActive ? '#FFFFFF' : 'rgba(255,255,255,0.85)',
+                                  ? 'var(--brand-orange)'
+                                  : 'transparent',
+                                color: isQAActive ? '#FFFFFF' : '#1E293B',
                                 fontWeight: isQAActive ? 700 : 500,
                                 fontSize: '0.8125rem',
                                 cursor: 'pointer',
                                 transition: 'all var(--transition-fast)',
                                 textAlign: 'left',
                                 width: '100%',
+                                boxShadow: isQAActive ? '0 2px 8px rgba(243, 112, 35, 0.25)' : 'none',
                                 boxSizing: 'border-box'
                               }}
                             >
                               <QAIcon
                                 size={15}
                                 style={{
-                                  color: isQAActive ? '#FFFFFF' : 'var(--brand-gold)',
+                                  color: isQAActive ? '#FFFFFF' : 'var(--brand-orange)',
                                   flexShrink: 0
                                 }}
                               />
@@ -993,7 +1023,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 right: '6px',
                                 background: 'none',
                                 border: 'none',
-                                color: qaItem.isPinned ? '#F5A623' : 'rgba(255,255,255,0.25)',
+                                color: qaItem.isPinned ? '#F5A623' : '#94A3B8',
                                 cursor: 'pointer',
                                 padding: '4px',
                                 display: 'flex',
@@ -1054,10 +1084,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <div key={group.id} className="collapsed-nav-item-wrapper">
                           <button
                             onClick={() => handleNavClick(group.defaultTab || group.children?.[0]?.targetTab || group.id)}
+                            onMouseEnter={(e) => handleTooltipEnter(group.label, e)}
+                            onMouseLeave={handleTooltipLeave}
                             className={`collapsed-nav-btn ${isParentActive ? 'active' : ''}`}
                             aria-label={group.label}
                           >
-                            <Icon size={20} className="collapsed-nav-icon" style={{ color: isParentActive ? '#FFFFFF' : 'var(--brand-gold)' }} />
+                            <Icon size={17} className="collapsed-nav-icon" style={{ color: isParentActive ? '#FFFFFF' : '#0F2C59' }} />
                           </button>
                           <span className="collapsed-nav-tooltip">{group.label}</span>
                         </div>
@@ -1073,13 +1105,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               fontSize: '0.6875rem',
                               fontWeight: 800,
                               textTransform: 'uppercase',
-                              letterSpacing: '0.75px',
-                              color: '#F37023',
+                              letterSpacing: '0.8px',
+                              color: '#0F2C59',
                               display: 'flex',
                               alignItems: 'center',
                               gap: '0.4rem',
                               marginTop: groupIndex > 0 ? '0.35rem' : 0,
-                              borderTop: groupIndex > 0 ? '1px solid rgba(255, 255, 255, 0.08)' : 'none'
+                              borderTop: groupIndex > 0 ? '1px solid #F1F5F9' : 'none'
                             }}
                           >
                             <span>{group.category}</span>
@@ -1099,19 +1131,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               borderRadius: 'var(--radius-md)',
                               border: 'none',
                               background: isParentActive
-                                ? 'linear-gradient(90deg, var(--brand-orange) 0%, #D95300 100%)'
+                                ? 'var(--brand-orange)'
                                 : 'transparent',
-                              color: isParentActive ? '#FFFFFF' : 'rgba(255,255,255,0.8)',
+                              color: isParentActive ? '#FFFFFF' : '#1E293B',
                               fontWeight: isParentActive ? 700 : 500,
                               fontSize: '0.875rem',
                               cursor: 'pointer',
                               transition: 'all var(--transition-fast)',
-                              boxShadow: isParentActive ? '0 4px 12px rgba(243, 112, 35, 0.3)' : 'none',
+                              boxShadow: isParentActive ? '0 2px 8px rgba(243, 112, 35, 0.25)' : 'none',
                               width: '100%',
                               textAlign: 'left'
                             }}
                           >
-                            <Icon size={18} style={{ color: isParentActive ? '#FFFFFF' : 'var(--brand-gold)', flexShrink: 0 }} />
+                            <Icon size={18} style={{ color: isParentActive ? '#FFFFFF' : '#0F2C59', flexShrink: 0 }} />
                             <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {group.label}
                             </span>
@@ -1129,11 +1161,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 borderRadius: 'var(--radius-md)',
                                 border: 'none',
                                 background: isParentActive && !isGroupExpanded
-                                  ? 'rgba(243, 112, 35, 0.25)'
-                                  : isParentActive
-                                  ? 'rgba(255,255,255,0.06)'
+                                  ? '#FFF7ED'
                                   : 'transparent',
-                                color: isParentActive ? '#FFFFFF' : 'rgba(255,255,255,0.85)',
+                                color: isParentActive ? '#C2410C' : '#1E293B',
                                 fontWeight: isParentActive ? 700 : 600,
                                 fontSize: '0.8125rem',
                                 cursor: 'pointer',
@@ -1142,12 +1172,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', overflow: 'hidden' }}>
-                                <Icon size={17} style={{ color: isParentActive ? 'var(--brand-orange)' : 'var(--brand-gold)', flexShrink: 0 }} />
+                                <Icon size={17} style={{ color: isParentActive ? 'var(--brand-orange)' : '#0F2C59', flexShrink: 0 }} />
                                 <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                   {group.label}
                                 </span>
                               </div>
-                              <span style={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center' }}>
+                              <span style={{ color: '#64748B', display: 'flex', alignItems: 'center' }}>
                                 {isGroupExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                               </span>
                             </button>
@@ -1159,7 +1189,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 flexDirection: 'column',
                                 gap: '0.15rem',
                                 paddingLeft: '1.75rem',
-                                borderLeft: '1px solid rgba(255,255,255,0.12)',
+                                borderLeft: '1.5px solid #E2E8F0',
                                 marginLeft: '1.25rem',
                                 marginTop: '0.15rem',
                                 marginBottom: '0.35rem'
@@ -1193,23 +1223,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                           borderRadius: 'var(--radius-sm)',
                                           border: 'none',
                                           background: isSubActive
-                                            ? 'linear-gradient(90deg, var(--brand-orange) 0%, #D95300 100%)'
+                                            ? 'var(--brand-orange)'
                                             : 'transparent',
-                                          color: isSubActive ? '#FFFFFF' : 'rgba(255,255,255,0.7)',
+                                          color: isSubActive ? '#FFFFFF' : '#475569',
                                           fontWeight: isSubActive ? 700 : 500,
                                           fontSize: '0.78125rem',
                                           cursor: 'pointer',
                                           transition: 'all var(--transition-fast)',
                                           textAlign: 'left',
-                                          boxShadow: isSubActive ? '0 2px 8px rgba(243, 112, 35, 0.3)' : 'none',
+                                          boxShadow: isSubActive ? '0 2px 6px rgba(243, 112, 35, 0.25)' : 'none',
                                           width: '100%'
                                         }}
                                       >
                                         <span style={{
-                                          width: '4px',
-                                          height: '4px',
+                                          width: '5px',
+                                          height: '5px',
                                           borderRadius: '50%',
-                                          backgroundColor: isSubActive ? '#FFFFFF' : 'rgba(255,255,255,0.4)'
+                                          backgroundColor: isSubActive ? '#FFFFFF' : '#94A3B8'
                                         }}></span>
                                         <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                           {sub.label}
@@ -1225,7 +1255,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                           right: '4px',
                                           background: 'none',
                                           border: 'none',
-                                          color: isSubPinned ? '#F5A623' : 'rgba(255,255,255,0.25)',
+                                          color: isSubPinned ? '#F5A623' : '#94A3B8',
                                           cursor: 'pointer',
                                           padding: '3px',
                                           display: 'flex',
@@ -1266,10 +1296,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <div key={item.id} className="collapsed-nav-item-wrapper">
                           <button
                             onClick={() => handleNavClick(item.id)}
+                            onMouseEnter={(e) => handleTooltipEnter(item.label, e)}
+                            onMouseLeave={handleTooltipLeave}
                             className={`collapsed-nav-btn ${isActive ? 'active' : ''}`}
                             aria-label={item.label}
                           >
-                            <Icon size={20} className="collapsed-nav-icon" style={{ color: isActive ? '#FFFFFF' : 'var(--brand-gold)' }} />
+                            <Icon size={17} className="collapsed-nav-icon" style={{ color: isActive ? '#FFFFFF' : '#0F2C59' }} />
                           </button>
                           <span className="collapsed-nav-tooltip">{item.label}</span>
                         </div>
@@ -1290,7 +1322,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               fontWeight: 700,
                               textTransform: 'uppercase',
                               letterSpacing: '1.2px',
-                              color: 'var(--brand-gold)',
+                              color: '#0F2C59',
                               marginBottom: '0.5rem',
                               paddingLeft: '0.75rem',
                               opacity: 0.9
@@ -1319,19 +1351,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     borderRadius: 'var(--radius-md)',
                                     border: 'none',
                                     background: isActive
-                                      ? 'linear-gradient(90deg, var(--brand-orange) 0%, #D95300 100%)'
+                                      ? 'var(--brand-orange)'
                                       : 'transparent',
-                                    color: isActive ? '#FFFFFF' : 'rgba(255,255,255,0.75)',
+                                    color: isActive ? '#FFFFFF' : '#1E293B',
                                     fontWeight: isActive ? 700 : 500,
                                     fontSize: '0.8125rem',
                                     cursor: 'pointer',
                                     transition: 'all var(--transition-fast)',
-                                    boxShadow: isActive ? '0 4px 12px rgba(243, 112, 35, 0.3)' : 'none',
+                                    boxShadow: isActive ? '0 2px 8px rgba(243, 112, 35, 0.25)' : 'none',
                                     width: '100%',
                                     textAlign: 'left'
                                   }}
                                 >
-                                  <Icon size={18} style={{ color: isActive ? '#FFFFFF' : 'var(--brand-gold)' }} />
+                                  <Icon size={18} style={{ color: isActive ? '#FFFFFF' : '#0F2C59' }} />
                                   <span>{item.label}</span>
                                 </button>
 
@@ -1343,7 +1375,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     right: '6px',
                                     background: 'none',
                                     border: 'none',
-                                    color: isItemPinned ? '#F5A623' : 'rgba(255,255,255,0.25)',
+                                    color: isItemPinned ? '#F5A623' : '#94A3B8',
                                     cursor: 'pointer',
                                     padding: '4px',
                                     display: 'flex',
@@ -1375,18 +1407,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* Canonical Single Logout Action for All Roles */}
           {collapsed ? (
-            <div className="collapsed-nav-item-wrapper" style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            <div className="collapsed-nav-item-wrapper" style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #E2E8F0' }}>
               <button
-                onClick={() => logout()}
+                onClick={() => {
+                  setActiveTooltip(null);
+                  logout();
+                }}
+                onMouseEnter={(e) => handleTooltipEnter("Logout", e)}
+                onMouseLeave={handleTooltipLeave}
                 className="collapsed-nav-btn logout-btn"
                 aria-label="Logout"
               >
-                <LogOut size={20} />
+                <LogOut size={17} />
               </button>
               <span className="collapsed-nav-tooltip">Logout</span>
             </div>
           ) : (
-            <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #E2E8F0' }}>
               <button
                 onClick={() => logout()}
                 style={{
@@ -1396,9 +1433,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   padding: '0.625rem 0.75rem',
                   justifyContent: 'flex-start',
                   borderRadius: 'var(--radius-md)',
-                  border: 'none',
-                  background: 'transparent',
-                  color: '#EF4444',
+                  border: '1px solid #FEE2E2',
+                  background: '#FEF2F2',
+                  color: '#DC2626',
                   fontWeight: 600,
                   fontSize: '0.875rem',
                   cursor: 'pointer',
@@ -1408,7 +1445,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }}
                 aria-label="Logout"
               >
-                <LogOut size={18} style={{ color: '#EF4444', flexShrink: 0 }} />
+                <LogOut size={18} style={{ color: '#DC2626', flexShrink: 0 }} />
                 <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   Logout
                 </span>
@@ -1417,6 +1454,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
       </aside>
+
+      {/* ── UNCLIPPED FLOATING TOOLTIP FOR COLLAPSED SIDEBAR ── */}
+      {collapsed && activeTooltip && (
+        <div
+          className="erp-floating-sidebar-tooltip"
+          style={{
+            position: 'fixed',
+            top: `${activeTooltip.top}px`,
+            left: `${activeTooltip.left}px`,
+            transform: 'translateY(-50%)',
+            zIndex: 99999,
+            pointerEvents: 'none',
+            backgroundColor: '#0F172A',
+            color: '#FFFFFF',
+            fontSize: '0.78125rem',
+            fontWeight: 700,
+            letterSpacing: '0.2px',
+            padding: '6px 12px',
+            borderRadius: '6px',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 10px 25px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -4px rgba(0, 0, 0, 0.4)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            display: 'flex',
+            alignItems: 'center'
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: '50%',
+              right: '100%',
+              transform: 'translateY(-50%)',
+              width: 0,
+              height: 0,
+              borderTop: '5px solid transparent',
+              borderBottom: '5px solid transparent',
+              borderRight: '6px solid #0F172A'
+            }}
+          />
+          {activeTooltip.label}
+        </div>
+      )}
     </>
   );
 };

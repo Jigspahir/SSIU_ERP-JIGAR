@@ -1,31 +1,47 @@
 import React from 'react';
 import logoSvg from '../../assets/SSIUlogo.png';
+import collapsedLogoImg from '../../assets/ssiu-collapsed-logo.png';
 
 interface HeaderLogoProps {
   collapsed?: boolean;
   lightMode?: boolean;
+  onClick?: () => void;
 }
 
-export const HeaderLogo: React.FC<HeaderLogoProps> = ({ collapsed = false, lightMode = false }) => {
+export const HeaderLogo: React.FC<HeaderLogoProps> = ({ collapsed = false, lightMode = false, onClick }) => {
   if (collapsed) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }} title="Swarrnim Startup & Innovation University">
+      <div
+        onClick={onClick}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          cursor: onClick ? 'pointer' : 'default'
+        }}
+        title="Swarrnim Startup & Innovation University - Go to Dashboard"
+        role={onClick ? 'button' : undefined}
+        tabIndex={onClick ? 0 : undefined}
+        onKeyDown={(e) => {
+          if (onClick && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+      >
         <div
           style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, #0B192C 0%, #183B70 100%)',
-            border: '1.5px solid var(--brand-orange, #F37023)',
+            width: '52px',
+            height: '52px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '3px',
             boxSizing: 'border-box'
           }}
         >
           <img
-            src={logoSvg}
+            src={collapsedLogoImg}
             alt="SSIU"
             style={{
               width: '100%',
@@ -39,7 +55,26 @@ export const HeaderLogo: React.FC<HeaderLogoProps> = ({ collapsed = false, light
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', padding: '0.2rem 0', minWidth: 0, overflow: 'hidden' }}>
+    <div
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '0.2rem 0',
+        minWidth: 0,
+        overflow: 'hidden',
+        cursor: onClick ? 'pointer' : 'default'
+      }}
+      title="Swarrnim Startup & Innovation University - Go to Dashboard"
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (onClick && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+    >
       <img
         src={logoSvg}
         alt="Swarrnim Startup & Innovation University"
@@ -51,17 +86,6 @@ export const HeaderLogo: React.FC<HeaderLogoProps> = ({ collapsed = false, light
           flexShrink: 0
         }}
       />
-      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
-        <div style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#FFFFFF', letterSpacing: '0.6px', textTransform: 'uppercase', lineHeight: 1.15, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          SWARRNIM
-        </div>
-        <div style={{ fontSize: '0.625rem', fontWeight: 700, color: 'var(--brand-gold, #F5A623)', letterSpacing: '0.4px', textTransform: 'uppercase', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          STARTUP & INNOVATION UNIVERSITY
-        </div>
-        <div style={{ fontSize: '0.6875rem', fontWeight: 600, color: 'rgba(255, 255, 255, 0.75)', letterSpacing: '0.2px', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          SSIU ERP • University Management
-        </div>
-      </div>
     </div>
   );
 };

@@ -7,9 +7,61 @@ import {
   RotateCcw, RefreshCw, LogOut, Boxes, Package, Layers, Archive,
   Mail, Send, Inbox, Briefcase, History, UserPlus, FileStack, KeyRound, Users, CheckCircle2,
   FileSignature, Landmark, FileBox, FileQuestion, DollarSign, FileDown, Search, ArrowLeftRight,
-  AlertTriangle, Sparkles, Bot, Compass, Target, Wallet, Lock
+  AlertTriangle, Sparkles, Bot, Compass, Target, Wallet, Lock,
+  Bus, Megaphone, FlaskConical, FolderArchive, MessagesSquare, ClipboardList
 } from 'lucide-react';
 import { UserRole } from '../types';
+
+/**
+ * CANONICAL SEMANTIC NAVIGATION ICONS REGISTRY
+ * Single source of truth ensuring every menu item has a semantically correct icon.
+ */
+export const NAV_ICONS = {
+  dashboard: LayoutDashboard,
+  digilocker: FolderArchive,
+  documents: FolderCheck,
+  abc: Award,
+  academic: GraduationCap,
+  attendance: UserCheck,
+  timetable: Clock,
+  sessionPlan: BookOpen,
+  materials: BookOpen,
+  assignments: FileText,
+  quiz: CheckSquare,
+  examination: FileCheck,
+  fees: IndianRupee,
+  studentSection: UserCheck,
+  students: Users,
+  faculty: Briefcase,
+  mentees: Users,
+  requests: ClipboardList,
+  research: FlaskConical,
+  grants: Wallet,
+  feedback: MessageSquare,
+  ptm: MessagesSquare,
+  notices: Megaphone,
+  events: CalendarDays,
+  hostel: Building2,
+  transport: Bus,
+  serviceDesk: HelpCircle,
+  notifications: Bell,
+  notesheet: FileSignature,
+  workTransfer: ArrowLeftRight,
+  workDiary: BookOpen,
+  accreditation: Award,
+  obe: Target,
+  inventory: Boxes,
+  security: ShieldCheck,
+  settings: Settings,
+  logout: LogOut,
+  department: Building2,
+  institute: Building2,
+  incubation: Rocket,
+  library: Library,
+  crm: UserPlus,
+  hr: Briefcase,
+  reports: BarChart3
+} as const;
 
 export interface NavItemConfig {
   id: string;
@@ -45,7 +97,7 @@ export const ALL_NAV_ITEMS: Record<string, NavItemConfig> = {
   'digilocker': {
     id: 'digilocker',
     label: 'DigiLocker Documents',
-    icon: ShieldCheck,
+    icon: NAV_ICONS.digilocker,
     allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRESIDENT', 'VICE_PRESIDENT', 'PROVOST', 'PRINCIPAL', 'HOD', 'FACULTY', 'MENTOR', 'STUDENT', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'STUDENT_SECTION', 'IQAC', 'EXAM_CELL'],
     category: 'Academic'
   },
@@ -150,7 +202,7 @@ export const ALL_NAV_ITEMS: Record<string, NavItemConfig> = {
   'research': {
     id: 'research',
     label: 'Research & Innovation',
-    icon: BookOpen,
+    icon: NAV_ICONS.research,
     allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 'PROVOST', 'PRESIDENT', 'PRINCIPAL', 'HOD', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'IQAC', 'FACULTY', 'STUDENT'],
     category: 'Academic'
   },
@@ -436,7 +488,7 @@ export const ALL_NAV_ITEMS: Record<string, NavItemConfig> = {
   'requests': {
     id: 'requests',
     label: 'Digital Approvals',
-    icon: CheckSquare,
+    icon: NAV_ICONS.requests,
     allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR', 'IQAC', 'EXAM_CELL', 'STUDENT_SECTION', 'HOSTEL_ADMIN', 'LIBRARY_ADMIN', 'TRANSPORT_ADMIN', 'MAINTENANCE_ADMIN', 'ACCOUNTS_ADMIN'],
     category: 'Finance & Admin'
   },
@@ -487,14 +539,14 @@ export const ALL_NAV_ITEMS: Record<string, NavItemConfig> = {
   'notices': {
     id: 'notices',
     label: 'Notices',
-    icon: Bell,
+    icon: NAV_ICONS.notices,
     allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT', 'REGISTRAR'],
     category: 'Campus'
   },
   'events': {
     id: 'events',
     label: 'Events',
-    icon: CalendarCheck,
+    icon: NAV_ICONS.events,
     allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'],
     category: 'Campus'
   },
@@ -636,28 +688,28 @@ export const ALL_NAV_ITEMS: Record<string, NavItemConfig> = {
   'student-section': {
     id: 'student-section',
     label: 'Student Section',
-    icon: FolderCheck,
+    icon: NAV_ICONS.studentSection,
     allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'STUDENT_SECTION'],
     category: 'Administration'
   },
   'hostel-admin': {
     id: 'hostel-admin',
     label: 'Hostel Office',
-    icon: Building2,
+    icon: NAV_ICONS.hostel,
     allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'HOSTEL_ADMIN'],
     category: 'Administration'
   },
   'library-admin': {
     id: 'library-admin',
     label: 'Library Office',
-    icon: Library,
+    icon: NAV_ICONS.library,
     allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'LIBRARY_ADMIN'],
     category: 'Administration'
   },
   'transport-admin': {
     id: 'transport-admin',
     label: 'Transport Fleet',
-    icon: Clock,
+    icon: NAV_ICONS.transport,
     allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'TRANSPORT_ADMIN'],
     category: 'Administration'
   },
@@ -1019,7 +1071,7 @@ export interface StudentNavGroup {
 export const COMMON_RESEARCH_INNOVATION_NAV_GROUP: StudentNavGroup = {
   id: 'research-innovation-group',
   label: 'Research & Innovation',
-  icon: BookOpen,
+  icon: NAV_ICONS.research,
   defaultTab: 'research',
   category: '🎓 ACADEMIC',
   children: [
@@ -1038,7 +1090,7 @@ export const COMMON_RESEARCH_INNOVATION_NAV_GROUP: StudentNavGroup = {
 export const STUDENT_RESEARCH_INNOVATION_NAV_GROUP: StudentNavGroup = {
   id: 'student-research-innovation-group',
   label: 'Research & Innovation',
-  icon: BookOpen,
+  icon: NAV_ICONS.research,
   defaultTab: 'startup-grants',
   children: [
     { id: 'nav-student-innovations', label: 'Innovation / Startup Activities', targetTab: 'startup-grants' },
@@ -1054,7 +1106,7 @@ export const STUDENT_RESEARCH_INNOVATION_NAV_GROUP: StudentNavGroup = {
 export const COMMON_GRANTS_SSIP_NAV_GROUP: StudentNavGroup = {
   id: 'grants-ssip-group',
   label: 'Grants & SSIP',
-  icon: Wallet,
+  icon: NAV_ICONS.grants,
   defaultTab: 'grants',
   category: '🎓 ACADEMIC',
   children: [
@@ -1074,7 +1126,7 @@ export const COMMON_GRANTS_SSIP_NAV_GROUP: StudentNavGroup = {
 export const STUDENT_GRANTS_SSIP_NAV_GROUP: StudentNavGroup = {
   id: 'student-grants-ssip-group',
   label: 'Grants & SSIP',
-  icon: Wallet,
+  icon: NAV_ICONS.grants,
   defaultTab: 'ssip-projects',
   children: [
     { id: 'nav-stu-ssip-projects', label: 'SSIP Projects', targetTab: 'ssip-projects' },
@@ -1092,25 +1144,25 @@ export const STUDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
-    icon: LayoutDashboard,
+    icon: NAV_ICONS.dashboard,
     defaultTab: 'dashboard'
   },
   {
     id: 'student-digilocker',
     label: 'DigiLocker & Documents',
-    icon: ShieldCheck,
+    icon: NAV_ICONS.digilocker,
     defaultTab: 'digilocker-documents'
   },
   {
     id: 'student-abc',
     label: 'Academic Credits / ABC',
-    icon: Award,
+    icon: NAV_ICONS.abc,
     defaultTab: 'abc-credits'
   },
   {
     id: 'academic',
     label: 'Academic',
-    icon: GraduationCap,
+    icon: NAV_ICONS.academic,
     defaultTab: 'subjects',
     children: [
       { id: 'academic-subjects', label: 'My Subjects', targetTab: 'subjects' },
@@ -1125,7 +1177,7 @@ export const STUDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'examination',
     label: 'Examination',
-    icon: FileCheck,
+    icon: NAV_ICONS.examination,
     defaultTab: 'exam-forms',
     children: [
       { id: 'exam-forms', label: 'Exam Forms', targetTab: 'exam-forms' },
@@ -1139,7 +1191,7 @@ export const STUDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'fees',
     label: 'Fees & Payments',
-    icon: IndianRupee,
+    icon: NAV_ICONS.fees,
     defaultTab: 'fees-semester',
     children: [
       { id: 'fees-semester', label: 'Semester Fees', targetTab: 'fees-semester' }
@@ -1148,7 +1200,7 @@ export const STUDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'student-section',
     label: 'Student Section',
-    icon: Award,
+    icon: NAV_ICONS.studentSection,
     defaultTab: 'student-section-services',
     children: [
       { id: 'student-section-services', label: 'Services', targetTab: 'student-section-services' },
@@ -1161,7 +1213,7 @@ export const STUDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'requests',
     label: 'Requests',
-    icon: CheckSquare,
+    icon: NAV_ICONS.requests,
     defaultTab: 'requests-my-requests',
     children: [
       { id: 'requests-subject-query', label: 'Subject Query', targetTab: 'requests-subject-query' },
@@ -1174,7 +1226,7 @@ export const STUDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'feedback',
     label: 'Feedback',
-    icon: MessageSquare,
+    icon: NAV_ICONS.feedback,
     defaultTab: 'feedback-give',
     children: [
       { id: 'feedback-give', label: 'Student Feedback', targetTab: 'feedback-give' },
@@ -1187,43 +1239,43 @@ export const STUDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'student-ptm',
     label: 'PTM Consultation',
-    icon: Users,
+    icon: NAV_ICONS.ptm,
     defaultTab: 'student-ptm'
   },
   {
     id: 'notices',
     label: 'Notice',
-    icon: Bell,
+    icon: NAV_ICONS.notices,
     defaultTab: 'notices'
   },
   {
     id: 'events',
     label: 'Events',
-    icon: CalendarCheck,
+    icon: NAV_ICONS.events,
     defaultTab: 'events'
   },
   {
     id: 'hostel',
     label: 'Hostel',
-    icon: Building2,
+    icon: NAV_ICONS.hostel,
     defaultTab: 'hostel'
   },
   {
     id: 'transport',
     label: 'Transport',
-    icon: Clock,
+    icon: NAV_ICONS.transport,
     defaultTab: 'transport'
   },
   {
     id: 'service-desk',
     label: 'Service Desk',
-    icon: HelpCircle,
+    icon: NAV_ICONS.serviceDesk,
     defaultTab: 'tickets'
   },
   {
     id: 'notifications',
     label: 'Notifications',
-    icon: Bell,
+    icon: NAV_ICONS.notifications,
     defaultTab: 'notifications'
   }
 ];
@@ -1234,7 +1286,7 @@ export const STUDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
 export const COMMON_NOTESHEET_NAV_GROUP: StudentNavGroup = {
   id: 'note-sheets',
   label: 'Notesheet',
-  icon: FileSignature,
+  icon: NAV_ICONS.notesheet,
   defaultTab: 'note-sheets'
 };
 
@@ -1244,58 +1296,61 @@ export const COMMON_NOTESHEET_NAV_GROUP: StudentNavGroup = {
 export const COMMON_PTM_NAV_GROUP: StudentNavGroup = {
   id: 'ptm-management',
   label: 'PTM Management',
-  icon: Users,
+  icon: NAV_ICONS.ptm,
   defaultTab: 'ptm-dashboard',
+  category: '🎓 ACADEMIC',
   children: [
-    { id: 'ptm-dashboard-item', label: 'Dashboard', targetTab: 'ptm-dashboard' },
-    { id: 'ptm-schedule-item', label: 'PTM Schedule', targetTab: 'ptm-schedule' },
-    { id: 'ptm-my-item', label: 'My PTMs', targetTab: 'ptm-my' },
-    { id: 'ptm-records-item', label: 'PTM Records', targetTab: 'ptm-records' },
-    { id: 'ptm-feedback-item', label: 'Parent Feedback', targetTab: 'ptm-feedback' },
-    { id: 'ptm-followups-item', label: 'Follow-up Actions', targetTab: 'ptm-followups' },
-    { id: 'ptm-reports-item', label: 'Reports', targetTab: 'ptm-reports' }
+    { id: 'nav-ptm-dashboard', label: 'PTM Dashboard', targetTab: 'ptm-dashboard' },
+    { id: 'nav-ptm-meetings', label: 'Schedule & Meetings', targetTab: 'ptm-management' },
+    { id: 'nav-ptm-feedback', label: 'Parent Feedback', targetTab: 'ptm-parent' },
+    { id: 'nav-ptm-history', label: 'Consultation History', targetTab: 'ptm-student' }
   ]
 };
 
 /**
- * COMMON WORKLOAD & WORK TRANSFER / DELEGATION NAVIGATION GROUP
+ * COMMON AUTHORIZED WORK TRANSFER NAVIGATION GROUP (Stage 10.3)
  */
 export const COMMON_WORK_TRANSFER_NAV_GROUP: StudentNavGroup = {
   id: 'work-transfer-group',
-  label: 'Workload & Transfer',
-  icon: ArrowLeftRight,
-  defaultTab: 'work-transfer',
+  label: 'Work Transfer',
+  icon: NAV_ICONS.workTransfer,
+  defaultTab: 'my-work',
+  category: '🎓 ACADEMIC',
   children: [
-    { id: 'workload-my-work', label: 'My Work', targetTab: 'work-transfer' },
-    { id: 'workload-transfer-action', label: 'Transfer Work', targetTab: 'work-transfer-new' },
-    { id: 'workload-received', label: 'Received Work', targetTab: 'work-transfer-received' },
-    { id: 'workload-active', label: 'Active Transfers', targetTab: 'work-transfer-active' },
-    { id: 'workload-history', label: 'Transfer History', targetTab: 'work-transfer-history' }
+    { id: 'nav-wt-my-work', label: 'My Work', targetTab: 'my-work' },
+    { id: 'nav-wt-transfer', label: 'Transfer Work', targetTab: 'transfer-work' },
+    { id: 'nav-wt-received', label: 'Received Work', targetTab: 'received-work' },
+    { id: 'nav-wt-active', label: 'Active Handover', targetTab: 'active-transfers' },
+    { id: 'nav-wt-history', label: 'Handover Log', targetTab: 'transfer-history' }
   ]
 };
 
 /**
- * HIGHER AUTHORITY WORKLOAD & WORK TRANSFER AUDIT NAVIGATION GROUP
+ * HIGHER AUTHORITY WORK TRANSFER AUDIT & CONTROL NAVIGATION GROUP
  */
 export const HIGHER_AUTHORITY_WORK_TRANSFER_NAV_GROUP: StudentNavGroup = {
   id: 'work-transfer-group',
-  label: 'Workload & Transfer Audit',
-  icon: ArrowLeftRight,
-  defaultTab: 'work-transfer-audit',
+  label: 'Work Handover & Delegation',
+  icon: NAV_ICONS.workTransfer,
+  defaultTab: 'my-work',
+  category: '🎓 ACADEMIC',
   children: [
-    { id: 'workload-active', label: 'Active Transfers', targetTab: 'work-transfer-active' },
-    { id: 'workload-history', label: 'Transfer History', targetTab: 'work-transfer-history' },
-    { id: 'workload-audit', label: 'Work Transfer Audit', targetTab: 'work-transfer-audit' }
+    { id: 'nav-wt-my-work', label: 'My Work Portfolio', targetTab: 'my-work' },
+    { id: 'nav-wt-transfer', label: 'Transfer Responsibility', targetTab: 'transfer-work' },
+    { id: 'nav-wt-received', label: 'Assumed Tasks', targetTab: 'received-work' },
+    { id: 'nav-wt-active', label: 'Active Delegations', targetTab: 'active-transfers' },
+    { id: 'nav-wt-history', label: 'Department Audit Trail', targetTab: 'transfer-history' },
+    { id: 'nav-wt-audit-center', label: 'Work Transfer Audit Center', targetTab: 'work-transfer-audit-center' }
   ]
 };
 
 /**
- * COMMON AUTHORIZED ACCREDITATION & NAAC/NBA NAVIGATION GROUP
+ * COMMON AUTHORIZED ACCREDITATION NAVIGATION GROUP
  */
 export const COMMON_ACCREDITATION_NAV_GROUP: StudentNavGroup = {
   id: 'accreditation-group',
   label: 'Accreditation',
-  icon: Award,
+  icon: NAV_ICONS.accreditation,
   defaultTab: 'accreditation',
   category: '🎓 ACADEMIC',
   children: [
@@ -1308,16 +1363,23 @@ export const COMMON_ACCREDITATION_NAV_GROUP: StudentNavGroup = {
 };
 
 /**
- * COMMON AUTHORIZED OUTCOME-BASED EDUCATION (OBE) NAVIGATION GROUP
+ * COMMON AUTHORIZED OBE (OUTCOME-BASED EDUCATION) NAVIGATION GROUP
  */
 export const COMMON_OBE_NAV_GROUP: StudentNavGroup = {
   id: 'obe-group',
-  label: 'Outcome Based Education (OBE)',
-  icon: GraduationCap,
+  label: 'Outcome-Based Education',
+  icon: NAV_ICONS.obe,
   defaultTab: 'obe',
   category: '🎓 ACADEMIC',
   children: [
     { id: 'obe-overview', label: 'OBE Overview', targetTab: 'obe' },
+    { id: 'obe-course-outcomes', label: 'Course Outcomes (CO)', targetTab: 'course-outcomes' },
+    { id: 'obe-program-outcomes', label: 'Program Outcomes (PO)', targetTab: 'program-outcomes' },
+    { id: 'obe-program-specific-outcomes', label: 'Program Specific (PSO)', targetTab: 'program-specific-outcomes' },
+    { id: 'obe-co-po-mapping', label: 'CO-PO Mapping Matrix', targetTab: 'co-po-mapping' },
+    { id: 'obe-co-pso-mapping', label: 'CO-PSO Mapping Matrix', targetTab: 'co-pso-mapping' },
+    { id: 'obe-assessment-mapping', label: 'Assessment Mapping', targetTab: 'assessment-mapping' },
+    { id: 'obe-attainment', label: 'Attainment Calculations', targetTab: 'attainment' },
   ]
 };
 
@@ -1328,13 +1390,13 @@ export const FACULTY_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
-    icon: LayoutDashboard,
+    icon: NAV_ICONS.dashboard,
     defaultTab: 'dashboard'
   },
   {
     id: 'academic',
     label: 'Academic',
-    icon: GraduationCap,
+    icon: NAV_ICONS.academic,
     defaultTab: 'subjects',
     children: [
       { id: 'faculty-subjects', label: 'My Subjects', targetTab: 'subjects' },
@@ -1349,7 +1411,7 @@ export const FACULTY_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'attendance',
     label: 'Attendance',
-    icon: UserCheck,
+    icon: NAV_ICONS.attendance,
     defaultTab: 'attendance',
     children: [
       { id: 'faculty-mark-attendance', label: 'Mark Attendance', targetTab: 'attendance' },
@@ -1362,7 +1424,7 @@ export const FACULTY_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'examination',
     label: 'Examination',
-    icon: FileCheck,
+    icon: NAV_ICONS.examination,
     defaultTab: 'exam-duties',
     children: [
       { id: 'faculty-exam-duties', label: 'My Exam Duties', targetTab: 'exam-duties' },
@@ -1374,7 +1436,7 @@ export const FACULTY_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'students',
     label: 'Students',
-    icon: Users2,
+    icon: NAV_ICONS.students,
     defaultTab: 'my-students',
     children: [
       { id: 'faculty-my-students', label: 'My Students', targetTab: 'my-students' }
@@ -1389,13 +1451,13 @@ export const FACULTY_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'requests',
     label: 'Requests',
-    icon: CheckSquare,
+    icon: NAV_ICONS.requests,
     defaultTab: 'requests-my-requests'
   },
   {
     id: 'documents',
     label: 'Documents',
-    icon: FolderCheck,
+    icon: NAV_ICONS.documents,
     defaultTab: 'student-documents',
     children: [
       { id: 'faculty-student-docs', label: 'Student Documents', targetTab: 'student-documents' },
@@ -1406,7 +1468,7 @@ export const FACULTY_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'feedback',
     label: 'Feedback',
-    icon: MessageSquare,
+    icon: NAV_ICONS.feedback,
     defaultTab: 'feedback',
     children: [
       { id: 'faculty-student-feedback', label: 'Student Feedback', targetTab: 'feedback' }
@@ -1415,31 +1477,31 @@ export const FACULTY_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'notices',
     label: 'Notices',
-    icon: Bell,
+    icon: NAV_ICONS.notices,
     defaultTab: 'notices'
   },
   {
     id: 'events',
     label: 'Events',
-    icon: CalendarCheck,
+    icon: NAV_ICONS.events,
     defaultTab: 'events'
   },
   {
     id: 'inventory-assets',
     label: 'Inventory & Assets',
-    icon: Boxes,
+    icon: NAV_ICONS.inventory,
     defaultTab: 'inventory-assets'
   },
   {
     id: 'notifications',
     label: 'Notifications',
-    icon: Bell,
+    icon: NAV_ICONS.notifications,
     defaultTab: 'notifications'
   },
   {
     id: 'settings',
     label: 'Settings',
-    icon: Settings,
+    icon: NAV_ICONS.settings,
     defaultTab: 'settings'
   }
 ];
@@ -1451,13 +1513,13 @@ export const MENTOR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
-    icon: LayoutDashboard,
+    icon: NAV_ICONS.dashboard,
     defaultTab: 'dashboard'
   },
   {
     id: 'mentees-group',
     label: 'My Mentees',
-    icon: GraduationCap,
+    icon: NAV_ICONS.mentees,
     defaultTab: 'mentee-list',
     children: [
       { id: 'mentee-list', label: 'Mentee List', targetTab: 'mentee-list' }
@@ -1466,7 +1528,7 @@ export const MENTOR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'academic-group',
     label: 'Academic',
-    icon: BookOpen,
+    icon: NAV_ICONS.academic,
     defaultTab: 'mentee-subjects',
     children: [
       { id: 'mentee-subjects', label: 'My Subjects', targetTab: 'mentee-subjects' },
@@ -1477,7 +1539,7 @@ export const MENTOR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'attendance-group',
     label: 'Attendance',
-    icon: Clock,
+    icon: NAV_ICONS.attendance,
     defaultTab: 'mentee-attendance-overview',
     children: [
       { id: 'mentee-attendance-overview', label: 'Mentee Attendance', targetTab: 'mentee-attendance-overview' },
@@ -1487,7 +1549,7 @@ export const MENTOR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'examination-group',
     label: 'Examination',
-    icon: Award,
+    icon: NAV_ICONS.examination,
     defaultTab: 'mentee-exam-eligibility',
     children: [
       { id: 'mentee-exam-eligibility', label: 'Exam Eligibility', targetTab: 'mentee-exam-eligibility' },
@@ -1498,7 +1560,7 @@ export const MENTOR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'documents-group',
     label: 'Student Documents',
-    icon: FolderCheck,
+    icon: NAV_ICONS.documents,
     defaultTab: 'mentee-docs-pending',
     children: [
       { id: 'mentee-docs-pending', label: 'Pending Verification', targetTab: 'mentee-docs-pending' },
@@ -1509,13 +1571,13 @@ export const MENTOR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'requests-group',
     label: 'Student Requests',
-    icon: MessageSquare,
+    icon: NAV_ICONS.requests,
     defaultTab: 'mentee-requests-pending'
   },
   {
     id: 'counseling-group',
     label: 'Counseling',
-    icon: Calendar,
+    icon: NAV_ICONS.ptm,
     defaultTab: 'counseling',
     children: [
       { id: 'mentor-counseling-sessions', label: 'Counseling Sessions', targetTab: 'counseling' }
@@ -1528,13 +1590,13 @@ export const MENTOR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'notifications',
     label: 'Notifications',
-    icon: Bell,
+    icon: NAV_ICONS.notifications,
     defaultTab: 'notifications'
   },
   {
     id: 'settings',
     label: 'Settings',
-    icon: Settings,
+    icon: NAV_ICONS.settings,
     defaultTab: 'settings'
   }
 ];
@@ -1546,13 +1608,13 @@ export const HOD_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
-    icon: LayoutDashboard,
+    icon: NAV_ICONS.dashboard,
     defaultTab: 'dashboard'
   },
   {
     id: 'department-group',
     label: 'Department',
-    icon: Building2,
+    icon: NAV_ICONS.department,
     defaultTab: 'hod-dept-overview',
     children: [
       { id: 'hod-dept-overview', label: 'Department Overview', targetTab: 'hod-dept-overview' },
@@ -1566,7 +1628,7 @@ export const HOD_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'academic-group',
     label: 'Academic',
-    icon: BookOpen,
+    icon: NAV_ICONS.academic,
     defaultTab: 'hod-academic-subjects',
     children: [
       { id: 'hod-academic-subjects', label: 'Subjects', targetTab: 'hod-academic-subjects' },
@@ -1582,7 +1644,7 @@ export const HOD_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'attendance-group',
     label: 'Attendance',
-    icon: Clock,
+    icon: NAV_ICONS.attendance,
     defaultTab: 'hod-attendance-overview',
     children: [
       { id: 'hod-attendance-overview', label: 'Department Attendance', targetTab: 'hod-attendance-overview' },
@@ -1594,7 +1656,7 @@ export const HOD_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'students-group',
     label: 'Students',
-    icon: GraduationCap,
+    icon: NAV_ICONS.students,
     defaultTab: 'hod-students-list',
     children: [
       { id: 'hod-students-list', label: 'Student List', targetTab: 'hod-students-list' }
@@ -1603,7 +1665,7 @@ export const HOD_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'faculty-group',
     label: 'Faculty',
-    icon: UserCheck,
+    icon: NAV_ICONS.faculty,
     defaultTab: 'hod-faculty-list',
     children: [
       { id: 'hod-faculty-list', label: 'Faculty List', targetTab: 'hod-faculty-list' },
@@ -1615,7 +1677,7 @@ export const HOD_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'examination-group',
     label: 'Examination',
-    icon: Award,
+    icon: NAV_ICONS.examination,
     defaultTab: 'hod-exam-eligibility',
     children: [
       { id: 'hod-exam-eligibility', label: 'Exam Eligibility', targetTab: 'hod-exam-eligibility' },
@@ -1627,13 +1689,13 @@ export const HOD_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'requests-group',
     label: 'Requests',
-    icon: MessageSquare,
+    icon: NAV_ICONS.requests,
     defaultTab: 'hod-requests-pending'
   },
   {
     id: 'documents-group',
     label: 'Documents',
-    icon: FolderCheck,
+    icon: NAV_ICONS.documents,
     defaultTab: 'hod-docs-students',
     children: [
       { id: 'hod-docs-students', label: 'Student Documents', targetTab: 'hod-docs-students' },
@@ -1648,7 +1710,7 @@ export const HOD_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'feedback-group',
     label: 'Feedback',
-    icon: BarChart3,
+    icon: NAV_ICONS.feedback,
     defaultTab: 'hod-feedback-department',
     children: [
       { id: 'hod-feedback-faculty', label: 'Faculty Feedback', targetTab: 'hod-feedback-faculty' },
@@ -1659,7 +1721,7 @@ export const HOD_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'resource-assets-group',
     label: 'Department Resources & Assets',
-    icon: Package,
+    icon: NAV_ICONS.inventory,
     defaultTab: 'university-asset-management',
     children: [
       { id: 'university-asset-management', label: 'My Department Assets', targetTab: 'university-asset-management' },
@@ -1670,19 +1732,19 @@ export const HOD_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'notices',
     label: 'Notices',
-    icon: Bell,
+    icon: NAV_ICONS.notices,
     defaultTab: 'notices'
   },
   {
     id: 'events',
     label: 'Events',
-    icon: CalendarCheck,
+    icon: NAV_ICONS.events,
     defaultTab: 'events'
   },
   {
     id: 'reports-group',
     label: 'Reports',
-    icon: FileSpreadsheet,
+    icon: NAV_ICONS.reports,
     defaultTab: 'hod-reports-academic',
     children: [
       { id: 'hod-reports-academic', label: 'Academic Reports', targetTab: 'hod-reports-academic' },
@@ -1696,19 +1758,19 @@ export const HOD_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'inventory-assets',
     label: 'Inventory & Assets',
-    icon: Boxes,
+    icon: NAV_ICONS.inventory,
     defaultTab: 'inventory-assets'
   },
   {
     id: 'notifications',
     label: 'Notifications',
-    icon: Bell,
+    icon: NAV_ICONS.notifications,
     defaultTab: 'notifications'
   },
   {
     id: 'settings',
     label: 'Settings',
-    icon: Settings,
+    icon: NAV_ICONS.settings,
     defaultTab: 'settings'
   }
 ];
@@ -1720,13 +1782,13 @@ export const PRINCIPAL_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
-    icon: LayoutDashboard,
+    icon: NAV_ICONS.dashboard,
     defaultTab: 'dashboard'
   },
   {
     id: 'institute-group',
     label: 'Institute',
-    icon: Building2,
+    icon: NAV_ICONS.institute,
     defaultTab: 'hoi-inst-overview',
     children: [
       { id: 'hoi-inst-overview', label: 'Institute Overview', targetTab: 'hoi-inst-overview' },
@@ -1741,7 +1803,7 @@ export const PRINCIPAL_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'academic-group',
     label: 'Academic',
-    icon: BookOpen,
+    icon: NAV_ICONS.academic,
     defaultTab: 'hoi-academic-overview',
     children: [
       { id: 'hoi-academic-overview', label: 'Academic Overview', targetTab: 'hoi-academic-overview' },
@@ -1757,7 +1819,7 @@ export const PRINCIPAL_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'students-group',
     label: 'Students',
-    icon: GraduationCap,
+    icon: NAV_ICONS.students,
     defaultTab: 'hoi-students-list',
     children: [
       { id: 'hoi-students-list', label: 'Student List', targetTab: 'hoi-students-list' }
@@ -1766,7 +1828,7 @@ export const PRINCIPAL_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'faculty-group',
     label: 'Faculty',
-    icon: UserCheck,
+    icon: NAV_ICONS.faculty,
     defaultTab: 'hoi-faculty-list',
     children: [
       { id: 'hoi-faculty-list', label: 'Faculty List', targetTab: 'hoi-faculty-list' },
@@ -1779,7 +1841,7 @@ export const PRINCIPAL_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'attendance-group',
     label: 'Attendance',
-    icon: Clock,
+    icon: NAV_ICONS.attendance,
     defaultTab: 'hoi-attendance-institute',
     children: [
       { id: 'hoi-attendance-institute', label: 'Institute Attendance', targetTab: 'hoi-attendance-institute' },
@@ -1791,7 +1853,7 @@ export const PRINCIPAL_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'examination-group',
     label: 'Examination',
-    icon: Award,
+    icon: NAV_ICONS.examination,
     defaultTab: 'hoi-exam-eligibility',
     children: [
       { id: 'hoi-exam-eligibility', label: 'Exam Eligibility', targetTab: 'hoi-exam-eligibility' },
@@ -1803,13 +1865,13 @@ export const PRINCIPAL_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'requests-group',
     label: 'Requests',
-    icon: MessageSquare,
+    icon: NAV_ICONS.requests,
     defaultTab: 'hoi-requests-pending'
   },
   {
     id: 'documents-group',
     label: 'Documents',
-    icon: FolderCheck,
+    icon: NAV_ICONS.documents,
     defaultTab: 'hoi-docs-students',
     children: [
       { id: 'hoi-docs-students', label: 'Student Documents', targetTab: 'hoi-docs-students' },
@@ -1824,7 +1886,7 @@ export const PRINCIPAL_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'feedback-group',
     label: 'Feedback',
-    icon: BarChart3,
+    icon: NAV_ICONS.feedback,
     defaultTab: 'hoi-feedback-institute',
     children: [
       { id: 'hoi-feedback-student', label: 'Student Feedback', targetTab: 'hoi-feedback-student' },
@@ -1836,7 +1898,7 @@ export const PRINCIPAL_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'reports-group',
     label: 'Reports',
-    icon: FileSpreadsheet,
+    icon: NAV_ICONS.reports,
     defaultTab: 'hoi-reports-academic',
     children: [
       { id: 'hoi-reports-academic', label: 'Academic Reports', targetTab: 'hoi-reports-academic' },
@@ -1850,32 +1912,32 @@ export const PRINCIPAL_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'notices',
     label: 'Notices',
-    icon: Bell,
+    icon: NAV_ICONS.notices,
     defaultTab: 'notices'
   },
   {
     id: 'events',
     label: 'Events',
-    icon: CalendarCheck,
+    icon: NAV_ICONS.events,
     defaultTab: 'events'
   },
   HIGHER_AUTHORITY_WORK_TRANSFER_NAV_GROUP,
   {
     id: 'inventory-assets',
     label: 'Inventory & Assets',
-    icon: Boxes,
+    icon: NAV_ICONS.inventory,
     defaultTab: 'inventory-assets'
   },
   {
     id: 'notifications',
     label: 'Notifications',
-    icon: Bell,
+    icon: NAV_ICONS.notifications,
     defaultTab: 'notifications'
   },
   {
     id: 'settings',
     label: 'Settings',
-    icon: Settings,
+    icon: NAV_ICONS.settings,
     defaultTab: 'settings'
   }
 ];
@@ -1887,13 +1949,13 @@ export const STUDENT_SECTION_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
-    icon: LayoutDashboard,
+    icon: NAV_ICONS.dashboard,
     defaultTab: 'dashboard'
   },
   {
     id: 'students-group',
     label: 'Students',
-    icon: GraduationCap,
+    icon: NAV_ICONS.students,
     defaultTab: 'section-students-list',
     children: [
       { id: 'section-students-list', label: 'Student List', targetTab: 'section-students-list' },
@@ -1906,7 +1968,7 @@ export const STUDENT_SECTION_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'documents-group',
     label: 'Student Documents',
-    icon: FolderCheck,
+    icon: NAV_ICONS.documents,
     defaultTab: 'section-docs-verification',
     children: [
       { id: 'section-docs-verification', label: 'Document Verification', targetTab: 'section-docs-verification' },
@@ -1920,7 +1982,7 @@ export const STUDENT_SECTION_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'services-group',
     label: 'Student Services',
-    icon: FileText,
+    icon: NAV_ICONS.documents,
     defaultTab: 'section-service-bonafide',
     children: [
       { id: 'section-service-bonafide', label: 'Bonafide Certificate', targetTab: 'section-service-bonafide' },
@@ -1937,13 +1999,13 @@ export const STUDENT_SECTION_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'requests-group',
     label: 'Student Requests',
-    icon: MessageSquare,
+    icon: NAV_ICONS.requests,
     defaultTab: 'section-requests-pending'
   },
   {
     id: 'fees-group',
     label: 'Service Fees & Payments',
-    icon: IndianRupee,
+    icon: NAV_ICONS.fees,
     defaultTab: 'section-fees-pending',
     children: [
       { id: 'section-fees-config', label: 'Service Fee Configuration', targetTab: 'section-fees-config' },
@@ -1956,7 +2018,7 @@ export const STUDENT_SECTION_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'idcard-group',
     label: 'ID Card Management',
-    icon: UserCheck,
+    icon: NAV_ICONS.studentSection,
     defaultTab: 'section-id-generate',
     children: [
       { id: 'section-id-generate', label: 'Generate ID Cards', targetTab: 'section-id-generate' },
@@ -1970,7 +2032,7 @@ export const STUDENT_SECTION_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'academic-records-group',
     label: 'Academic Records',
-    icon: BookOpen,
+    icon: NAV_ICONS.academic,
     defaultTab: 'section-academic-records',
     children: [
       { id: 'section-academic-records', label: 'Student Academic Records', targetTab: 'section-academic-records' },
@@ -1986,19 +2048,19 @@ export const STUDENT_SECTION_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'notices',
     label: 'Notices',
-    icon: Bell,
+    icon: NAV_ICONS.notices,
     defaultTab: 'notices'
   },
   {
     id: 'notifications',
     label: 'Notifications',
-    icon: Bell,
+    icon: NAV_ICONS.notifications,
     defaultTab: 'notifications'
   },
   {
     id: 'reports-group',
     label: 'Reports',
-    icon: FileSpreadsheet,
+    icon: NAV_ICONS.reports,
     defaultTab: 'section-reports-student',
     children: [
       { id: 'section-reports-student', label: 'Student Reports', targetTab: 'section-reports-student' },
@@ -2012,7 +2074,7 @@ export const STUDENT_SECTION_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'settings',
     label: 'Settings',
-    icon: Settings,
+    icon: NAV_ICONS.settings,
     defaultTab: 'settings'
   }
 ];
@@ -2024,13 +2086,13 @@ export const STUDENT_ADMIN_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
-    icon: LayoutDashboard,
+    icon: NAV_ICONS.dashboard,
     defaultTab: 'dashboard'
   },
   {
     id: 'onboarding-group',
     label: 'Admission & Onboarding',
-    icon: UserPlus,
+    icon: NAV_ICONS.crm,
     defaultTab: 'onboarding-applications',
     children: [
       { id: 'onboarding-applications', label: 'Admission Applications', targetTab: 'onboarding-applications' },
@@ -2044,7 +2106,7 @@ export const STUDENT_ADMIN_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'reports-group',
     label: 'Reports',
-    icon: BarChart3,
+    icon: NAV_ICONS.reports,
     defaultTab: 'onboarding-reports',
     children: [
       { id: 'onboarding-reports', label: 'Onboarding Report', targetTab: 'onboarding-reports' },
@@ -2057,7 +2119,7 @@ export const STUDENT_ADMIN_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'resource-assets-group',
     label: 'Resource & Asset Allocation',
-    icon: Package,
+    icon: NAV_ICONS.inventory,
     defaultTab: 'university-asset-management',
     children: [
       { id: 'university-asset-management', label: 'Resource & Asset Workspace', targetTab: 'university-asset-management' },
@@ -2073,7 +2135,7 @@ export const STUDENT_ADMIN_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'system-group',
     label: 'System',
-    icon: Bell,
+    icon: NAV_ICONS.notifications,
     defaultTab: 'notifications',
     children: [
       { id: 'notifications', label: 'Notifications', targetTab: 'notifications' }
@@ -2089,14 +2151,14 @@ export const REGISTRAR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
-    icon: LayoutDashboard,
+    icon: NAV_ICONS.dashboard,
     defaultTab: 'dashboard',
     category: 'QUICK ACCESS'
   },
   {
     id: 'notifications',
     label: 'Notifications',
-    icon: Bell,
+    icon: NAV_ICONS.notifications,
     defaultTab: 'notifications',
     category: 'QUICK ACCESS'
   },
@@ -2112,14 +2174,14 @@ export const REGISTRAR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'university-overview',
     label: 'University Overview',
-    icon: Building2,
+    icon: NAV_ICONS.institute,
     defaultTab: 'reg-uni-overview',
     category: '🎓 ACADEMIC'
   },
   {
     id: 'institutes',
     label: 'Institutes',
-    icon: Building2,
+    icon: NAV_ICONS.institute,
     defaultTab: 'reg-uni-institutes',
     category: '🎓 ACADEMIC'
   },
@@ -2140,49 +2202,49 @@ export const REGISTRAR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'students',
     label: 'Students',
-    icon: GraduationCap,
+    icon: NAV_ICONS.students,
     defaultTab: 'reg-students-search',
     category: '🎓 ACADEMIC'
   },
   {
     id: 'faculty-staff',
     label: 'Faculty & Staff',
-    icon: UserCheck,
+    icon: NAV_ICONS.faculty,
     defaultTab: 'reg-faculty-overview',
     category: '🎓 ACADEMIC'
   },
   {
     id: 'academic-admin',
     label: 'Academic Administration',
-    icon: Calendar,
+    icon: NAV_ICONS.academic,
     defaultTab: 'reg-academic-overview',
     category: '🎓 ACADEMIC'
   },
   {
     id: 'attendance',
     label: 'Attendance',
-    icon: Clock,
+    icon: NAV_ICONS.attendance,
     defaultTab: 'reg-attendance-overview',
     category: '🎓 ACADEMIC'
   },
   {
     id: 'examination',
     label: 'Examination',
-    icon: Award,
+    icon: NAV_ICONS.examination,
     defaultTab: 'reg-exam-overview',
     category: '🎓 ACADEMIC'
   },
   {
     id: 'note-sheets',
     label: 'Notesheet',
-    icon: FileSignature,
+    icon: NAV_ICONS.notesheet,
     defaultTab: 'reg-notesheets',
     category: '🎓 ACADEMIC'
   },
   {
     id: 'academic-requests',
     label: 'Academic Requests',
-    icon: MessageSquare,
+    icon: NAV_ICONS.requests,
     defaultTab: 'reg-requests-pending',
     category: '🎓 ACADEMIC'
   },
@@ -2196,7 +2258,7 @@ export const REGISTRAR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'academic-reports',
     label: 'Academic Reports',
-    icon: FileSpreadsheet,
+    icon: NAV_ICONS.reports,
     defaultTab: 'reg-rep-academic',
     category: '🎓 ACADEMIC'
   },
@@ -2210,7 +2272,7 @@ export const REGISTRAR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'accreditation-group',
     label: 'Accreditation',
-    icon: Award,
+    icon: NAV_ICONS.accreditation,
     defaultTab: 'accreditation',
     category: '🎓 ACADEMIC',
     children: [
@@ -2227,14 +2289,14 @@ export const REGISTRAR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'digilocker-admin-center',
     label: 'DigiLocker Command Center',
-    icon: ShieldCheck,
+    icon: NAV_ICONS.digilocker,
     defaultTab: 'digilocker-admin',
     category: '🎓 ACADEMIC'
   },
   {
     id: 'abc-compliance-center',
     label: 'ABC Compliance & Verification',
-    icon: Award,
+    icon: NAV_ICONS.abc,
     defaultTab: 'abc-credits',
     category: '🎓 ACADEMIC'
   },
@@ -2250,7 +2312,7 @@ export const REGISTRAR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'office-staff-group',
     label: 'Office Staff',
-    icon: Users,
+    icon: NAV_ICONS.faculty,
     defaultTab: 'reg-faculty-staff',
     category: '🏢 NON-ACADEMIC / REGISTRAR OFFICE',
     children: [
@@ -2262,42 +2324,42 @@ export const REGISTRAR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'work-allocation',
     label: 'Work Allocation',
-    icon: Briefcase,
+    icon: NAV_ICONS.hr,
     defaultTab: 'reg-my-office',
     category: '🏢 NON-ACADEMIC / REGISTRAR OFFICE'
   },
   {
     id: 'office-requests',
     label: 'Office Requests',
-    icon: Inbox,
+    icon: NAV_ICONS.requests,
     defaultTab: 'reg-my-office',
     category: '🏢 NON-ACADEMIC / REGISTRAR OFFICE'
   },
   {
     id: 'office-approvals',
     label: 'Office Approvals',
-    icon: ShieldCheck,
+    icon: NAV_ICONS.security,
     defaultTab: 'reg-approvals-admin',
     category: '🏢 NON-ACADEMIC / REGISTRAR OFFICE'
   },
   {
     id: 'office-documents',
     label: 'Office Documents',
-    icon: FolderCheck,
+    icon: NAV_ICONS.documents,
     defaultTab: 'reg-docs-overview',
     category: '🏢 NON-ACADEMIC / REGISTRAR OFFICE'
   },
   {
     id: 'office-reports',
     label: 'Office Reports',
-    icon: FileSpreadsheet,
+    icon: NAV_ICONS.reports,
     defaultTab: 'reg-rep-uni',
     category: '🏢 NON-ACADEMIC / REGISTRAR OFFICE'
   },
   {
     id: 'office-notifications',
     label: 'Office Notifications',
-    icon: Bell,
+    icon: NAV_ICONS.notifications,
     defaultTab: 'notifications',
     category: '🏢 NON-ACADEMIC / REGISTRAR OFFICE'
   },
@@ -2317,13 +2379,13 @@ export const DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
-    icon: LayoutDashboard,
+    icon: NAV_ICONS.dashboard,
     defaultTab: 'dashboard'
   },
   {
     id: 'students-group',
     label: 'Student Administration',
-    icon: GraduationCap,
+    icon: NAV_ICONS.students,
     defaultTab: 'deputy-student-records',
     children: [
       { id: 'deputy-student-records', label: 'Student Records', targetTab: 'reg-students-records' }
@@ -2332,7 +2394,7 @@ export const DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'university-group',
     label: 'University',
-    icon: Building2,
+    icon: NAV_ICONS.institute,
     defaultTab: 'reg-uni-institutes',
     children: [
       { id: 'reg-uni-institutes', label: 'Institutes', targetTab: 'reg-uni-institutes' },
@@ -2367,20 +2429,20 @@ export const DEPUTY_REGISTRAR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'notifications',
     label: 'Notifications',
-    icon: Bell,
+    icon: NAV_ICONS.notifications,
     defaultTab: 'notifications'
   },
   {
     id: 'reports',
     label: 'Reports',
-    icon: BarChart3,
+    icon: NAV_ICONS.reports,
     defaultTab: 'reg-rep-uni'
   },
   HIGHER_AUTHORITY_WORK_TRANSFER_NAV_GROUP,
   {
     id: 'settings',
     label: 'Settings',
-    icon: Settings,
+    icon: NAV_ICONS.settings,
     defaultTab: 'settings'
   }
 ];
@@ -2389,7 +2451,7 @@ export const VICE_PRESIDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'dashboard',
     label: 'Executive Dashboard',
-    icon: LayoutDashboard,
+    icon: NAV_ICONS.dashboard,
     defaultTab: 'dashboard'
   },
   COMMON_NOTESHEET_NAV_GROUP,
@@ -2401,7 +2463,7 @@ export const VICE_PRESIDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'governance-group',
     label: 'University Governance',
-    icon: Building2,
+    icon: NAV_ICONS.institute,
     defaultTab: 'institutes',
     children: [
       { id: 'institutes', label: 'Institutes', targetTab: 'institutes' },
@@ -2413,7 +2475,7 @@ export const VICE_PRESIDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'academics-group',
     label: 'Students & Academics',
-    icon: GraduationCap,
+    icon: NAV_ICONS.academic,
     defaultTab: 'students',
     children: [
       { id: 'students', label: 'Student Directory', targetTab: 'students' },
@@ -2425,7 +2487,7 @@ export const VICE_PRESIDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'exams-group',
     label: 'Examinations',
-    icon: Award,
+    icon: NAV_ICONS.examination,
     defaultTab: 'exam-dashboard',
     children: [
       { id: 'exam-dashboard', label: 'Exam Overview', targetTab: 'exam-dashboard' },
@@ -2436,7 +2498,7 @@ export const VICE_PRESIDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'finance-group',
     label: 'Finance & Accounts',
-    icon: IndianRupee,
+    icon: NAV_ICONS.fees,
     defaultTab: 'fees',
     children: [
       { id: 'fees', label: 'Fee Collection', targetTab: 'fees' },
@@ -2447,7 +2509,7 @@ export const VICE_PRESIDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'campus-group',
     label: 'Campus & Facilities',
-    icon: Layers,
+    icon: NAV_ICONS.hostel,
     defaultTab: 'hostel',
     children: [
       { id: 'hostel', label: 'Hostel Management', targetTab: 'hostel' },
@@ -2458,7 +2520,7 @@ export const VICE_PRESIDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'services-group',
     label: 'Student Services & Desk',
-    icon: Users2,
+    icon: NAV_ICONS.requests,
     defaultTab: 'student-requests',
     children: [
       { id: 'student-requests', label: 'Student Requests', targetTab: 'student-requests' },
@@ -2469,7 +2531,7 @@ export const VICE_PRESIDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'hr-group',
     label: 'University HRMS',
-    icon: UserCheck,
+    icon: NAV_ICONS.hr,
     defaultTab: 'university-hrms',
     children: [
       { id: 'university-hrms', label: 'HRMS Dashboard', targetTab: 'university-hrms' },
@@ -2482,25 +2544,25 @@ export const VICE_PRESIDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'audit-group',
     label: 'Audit & Activity',
-    icon: ShieldCheck,
+    icon: NAV_ICONS.security,
     defaultTab: 'security-audit'
   },
   {
     id: 'reports',
     label: 'University Reports',
-    icon: BarChart3,
+    icon: NAV_ICONS.reports,
     defaultTab: 'reports'
   },
   {
     id: 'notifications',
     label: 'Notifications',
-    icon: Bell,
+    icon: NAV_ICONS.notifications,
     defaultTab: 'notifications'
   },
   {
     id: 'settings',
     label: 'Settings',
-    icon: Settings,
+    icon: NAV_ICONS.settings,
     defaultTab: 'settings'
   }
 ];
@@ -2509,13 +2571,13 @@ export const ERP_COORDINATOR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
-    icon: LayoutDashboard,
+    icon: NAV_ICONS.dashboard,
     defaultTab: 'dashboard'
   },
   {
     id: 'settings',
     label: 'Settings',
-    icon: Settings,
+    icon: NAV_ICONS.settings,
     defaultTab: 'settings',
     children: [
       {
@@ -2538,13 +2600,13 @@ export const ERP_COORDINATOR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'inventory-assets',
     label: 'Inventory & Assets',
-    icon: Boxes,
+    icon: NAV_ICONS.inventory,
     defaultTab: 'inventory-assets'
   },
   {
     id: 'feedback',
     label: 'Student Feedback',
-    icon: MessageSquare,
+    icon: NAV_ICONS.feedback,
     defaultTab: 'feedback'
   },
   COMMON_ACCREDITATION_NAV_GROUP,
@@ -2554,19 +2616,19 @@ export const ERP_COORDINATOR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'security-audit',
     label: 'Security Audit Center',
-    icon: ShieldCheck,
+    icon: NAV_ICONS.security,
     defaultTab: 'security-audit'
   },
   {
     id: 'reports',
     label: 'Reports & Analytics',
-    icon: BarChart3,
+    icon: NAV_ICONS.reports,
     defaultTab: 'reports'
   },
   {
     id: 'notifications',
     label: 'Notifications',
-    icon: Bell,
+    icon: NAV_ICONS.notifications,
     defaultTab: 'notifications'
   },
   {
@@ -2581,19 +2643,19 @@ export const PARENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
     id: 'parent-ptm-dashboard',
     label: 'PTM Dashboard',
-    icon: LayoutDashboard,
+    icon: NAV_ICONS.dashboard,
     defaultTab: 'parent-ptm'
   },
   {
     id: 'parent-my-children',
     label: 'My Children',
-    icon: Users,
+    icon: NAV_ICONS.students,
     defaultTab: 'parent-ptm'
   },
   {
     id: 'parent-feedback',
     label: 'Parent Feedback',
-    icon: MessageSquare,
+    icon: NAV_ICONS.feedback,
     defaultTab: 'parent-ptm'
   }
 ];

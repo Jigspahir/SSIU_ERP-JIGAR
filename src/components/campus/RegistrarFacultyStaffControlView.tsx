@@ -730,7 +730,10 @@ export const RegistrarFacultyStaffControlView: React.FC<RegistrarFacultyStaffCon
           <Badge variant="warning">{kpis.pendingActions} Actionable Items</Badge>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '0.75rem' }}>
+        <div 
+          className="dashboard-attention-cards-grid"
+          style={{ '--action-count': 4 } as React.CSSProperties}
+        >
           <div 
             style={{ 
               padding: '0.85rem', 

@@ -962,7 +962,10 @@ export const RegistrarWorkspacePage: React.FC<RegistrarWorkspacePageProps> = ({
                 </Badge>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div 
+                className="dashboard-attention-cards-grid"
+                style={{ '--action-count': 4 } as React.CSSProperties}
+              >
                 {/* Critical Priority Card */}
                 <div className="p-4 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/50 dark:bg-rose-950/20 space-y-3">
                   <div className="flex items-center justify-between">
