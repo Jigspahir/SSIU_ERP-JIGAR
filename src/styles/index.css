@@ -93,6 +93,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 100vh;
 }
 
 /* Custom Scrollbar */
@@ -128,8 +130,8 @@ a {
 .app-container {
   display: flex;
   min-height: 100vh;
-  width: 100vw;
-  overflow: hidden;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 .main-content {
@@ -137,8 +139,7 @@ a {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  height: 100vh;
-  overflow-y: auto;
+  min-height: 100vh;
   transition: margin-left var(--transition-normal);
 }
 
@@ -1024,7 +1025,7 @@ main {
 .table-responsive,
 .erp-excel-table-container,
 .table-container,
-div:has(> table),
+.table-scroll-wrapper,
 div[class*="overflow-x-auto"] {
   width: 100% !important;
   max-width: 100% !important;

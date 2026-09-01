@@ -1586,7 +1586,7 @@ const MainAppContent: React.FC = () => {
           mobileOpen={mobileOpen}
           setMobileOpen={setMobileOpen}
         />
-        <main style={{ flex: 1, padding: '1.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+        <main style={{ flex: 1, padding: '1.5rem', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <div key={activeTab} className="erp-page-transition" style={{ flex: 1 }}>
             {renderActivePage()}
           </div>
