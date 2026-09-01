@@ -1560,7 +1560,7 @@ const MainAppContent: React.FC = () => {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-main)' }}>
+    <div style={{ display: 'flex', height: '100vh', maxHeight: '100vh', overflow: 'hidden', backgroundColor: 'var(--bg-main)' }}>
       {showPostLoginUpdates && unreadNotifs.length > 0 && (
         <PostLoginUpdateModal
           notifications={unreadNotifs}
@@ -1579,18 +1579,18 @@ const MainAppContent: React.FC = () => {
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
       />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: '100vh' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, height: '100vh', maxHeight: '100vh', overflow: 'hidden' }}>
         <Topbar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           mobileOpen={mobileOpen}
           setMobileOpen={setMobileOpen}
         />
-        <main style={{ flex: 1, padding: '1.5rem', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <div key={activeTab} className="erp-page-transition" style={{ flex: 1 }}>
+        <main style={{ flex: 1, padding: '1.5rem', overflowY: 'auto', overflowX: 'hidden', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column', WebkitOverflowScrolling: 'touch' }}>
+          <div key={activeTab} className="erp-page-transition" style={{ flex: '1 0 auto', width: '100%', minHeight: 'min-content' }}>
             {renderActivePage()}
           </div>
-          <footer style={{ marginTop: '2.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', fontSize: '0.78125rem', color: 'var(--text-muted)' }}>
+          <footer style={{ marginTop: '2.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', fontSize: '0.78125rem', color: 'var(--text-muted)', flexShrink: 0 }}>
             <div>
               <strong style={{ color: 'var(--brand-navy)' }}>Swarrnim Startup & Innovation University</strong> • SSIU ERP — University Management System
             </div>
