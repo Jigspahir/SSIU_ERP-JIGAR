@@ -8,6 +8,7 @@ import { SessionTimeoutWarningModal } from '../components/common/SessionTimeoutW
 import { firebaseAuthService } from '../firebase/auth';
 import { firestoreDb } from '../firebase/config';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+import { getUserByEmail } from '../dataconnect-generated';
 
 interface AuthContextType {
   user: User | null;
@@ -266,7 +267,90 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const rawCleanId = identifier.trim();
     const cleanId = rawCleanId.toLowerCase();
 
-    // 1. Match in-memory/local users by username, email, employeeId, or enrollment numbers
+    // 1. Direct Firebase Auth + PostgreSQL User Table Role Profile Resolution for all email domains
+    if (rawCleanId.includes('@') && password) {
+      try {
+        const fbResult = await firebaseAuthService.signInWithEmailPassword(rawCleanId, password);
+        if (fbResult && fbResult.firebaseUser) {
+          // Fetch role profile from PostgreSQL User table (Firebase Data Connect)
+          let pgRole: string | undefined;
+          let pgFirstName: string | undefined;
+          let pgLastName: string | undefined;
+          let pgIsActive: boolean = true;
+          let pgUserId: string | undefined;
+
+          try {
+            const pgRes = await getUserByEmail({ email: cleanId });
+            const pgUser = pgRes?.data?.users?.[0];
+            if (pgUser) {
+              pgRole = pgUser.role;
+              pgFirstName = pgUser.firstName || undefined;
+              pgLastName = pgUser.lastName || undefined;
+              pgIsActive = pgUser.isActive !== false;
+              pgUserId = pgUser.id;
+            }
+          } catch (pgErr) {
+            console.log('[AuthContext] PostgreSQL user lookup fallback:', pgErr);
+          }
+
+          // Fallback to local DB or Firestore if not in PostgreSQL
+          if (!pgRole) {
+            const localMatch = users.find(u => u.email?.toLowerCase() === cleanId);
+            if (localMatch) {
+              pgRole = localMatch.role;
+              pgFirstName = localMatch.name?.split(' ')[0];
+              pgLastName = localMatch.name?.split(' ').slice(1).join(' ');
+              pgIsActive = localMatch.status === 'ACTIVE' && localMatch.is_active !== false;
+            } else if (fbResult.userProfile?.role) {
+              pgRole = fbResult.userProfile.role;
+            }
+          }
+
+          if (!pgIsActive) {
+            return { success: false, error: 'Your account has been deactivated. Please contact the Central ERP Coordinator.' };
+          }
+
+          // Strict Database-Governed RBAC:
+          // Privileged roles (Admin, Coordinator, Faculty, HOD, Registrar) MUST be explicitly assigned in the PostgreSQL / Firestore database.
+          // Arbitrary external sign-ins without database records default to unprivileged 'STUDENT' access.
+          const isDesignatedMasterAdmin = cleanId === 'jigarahir410@gmail.com';
+          const resolvedRole: UserRole = (
+            (pgRole?.toUpperCase() as UserRole) ||
+            (fbResult.userProfile?.role?.toUpperCase() as UserRole) ||
+            (isDesignatedMasterAdmin ? 'SUPER_ADMIN' : 'STUDENT')
+          );
+
+          const authenticatedUser: User = {
+            id: pgUserId ? `user-${pgUserId}` : `user-${fbResult.firebaseUser.uid}`,
+            username: cleanId.split('@')[0],
+            email: fbResult.firebaseUser.email || rawCleanId,
+            name: [pgFirstName, pgLastName].filter(Boolean).join(' ') || fbResult.userProfile?.displayName || fbResult.firebaseUser.displayName || cleanId.split('@')[0],
+            role: resolvedRole,
+            departmentId: fbResult.userProfile?.departmentId || 'dept-cse',
+            instituteId: fbResult.userProfile?.instituteId || 'inst-01',
+            status: 'ACTIVE',
+            accountStatus: 'ACTIVE',
+            is_active: true,
+            password: password,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+
+          db.addEntity<User>('users', authenticatedUser);
+          setUser(authenticatedUser);
+          setActiveRoleState(authenticatedUser.role);
+          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(authenticatedUser));
+          securityAuditService.trackLoginSuccess(authenticatedUser);
+          return { success: true };
+        }
+      } catch (fbErr: any) {
+        if (fbErr?.code === 'auth/wrong-password' || fbErr?.code === 'auth/invalid-credential') {
+          return { success: false, error: 'Incorrect password. Please check your credentials and try again.' };
+        }
+      }
+    }
+
+    // 2. Match in-memory/local users by username, email, employeeId, or enrollment numbers
     let foundUser = users.find(u =>
       (u.username && u.username.toLowerCase() === cleanId) ||
       (u.email && u.email.toLowerCase() === cleanId) ||
@@ -276,7 +360,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (u.enrollmentNo && u.enrollmentNo.toLowerCase() === cleanId)
     );
 
-    // 2. Fallback: Search via Student Master record
+    // 3. Fallback: Search via Student Master record
     if (!foundUser) {
       const studentMatch = students.find(s =>
         (s.temporaryEnrollmentNumber && s.temporaryEnrollmentNumber.toLowerCase() === cleanId) ||
@@ -294,7 +378,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // 3. Fallback role keyword match for demo accounts and administrative emails
+    // 4. Fallback role keyword match for demo accounts and administrative emails
     if (!foundUser) {
       if (cleanId === 'admin' || cleanId === 'jigarahir410@gmail.com' || cleanId === 'jigar' || cleanId.includes('jigarahir')) {
         foundUser = users.find(u => u.role === 'SUPER_ADMIN') || users.find(u => u.role === 'UNIVERSITY_ADMIN');
@@ -323,44 +407,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    // 4. If not found in local db, authenticate directly with Firebase Auth / Firestore
+    // 5. Cloud Firestore 'users' direct lookup fallback
     if (!foundUser && password) {
-      // 4A. Firebase Authentication Attempt
-      try {
-        const fbResult = await firebaseAuthService.signInWithEmailPassword(rawCleanId, password);
-        if (fbResult && fbResult.firebaseUser) {
-          const profile = fbResult.userProfile;
-          const userRole: UserRole = (profile?.role?.toUpperCase() || (cleanId.includes('admin') || cleanId.includes('jigar') ? 'SUPER_ADMIN' : 'STAFF')) as UserRole;
-          const newAuthUser: User = {
-            id: `user-${fbResult.firebaseUser.uid}`,
-            username: profile?.email?.split('@')[0] || cleanId.split('@')[0],
-            email: fbResult.firebaseUser.email || rawCleanId,
-            name: profile?.displayName || fbResult.firebaseUser.displayName || rawCleanId.split('@')[0],
-            role: userRole,
-            departmentId: profile?.departmentId || 'dept-cse',
-            instituteId: profile?.instituteId || 'inst-01',
-            status: 'ACTIVE',
-            accountStatus: 'ACTIVE',
-            is_active: true,
-            password: password,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
-
-          db.addEntity<User>('users', newAuthUser);
-          setUser(newAuthUser);
-          setActiveRoleState(newAuthUser.role);
-          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newAuthUser));
-          securityAuditService.trackLoginSuccess(newAuthUser);
-          return { success: true };
-        }
-      } catch (fbErr: any) {
-        if (fbErr?.code === 'auth/wrong-password' || fbErr?.code === 'auth/invalid-credential') {
-          return { success: false, error: 'Incorrect password. Please check your credentials and try again.' };
-        }
-      }
-
-      // 4B. Cloud Firestore 'users' direct lookup
       try {
         const q = query(collection(firestoreDb, 'users'), where('email', '==', cleanId));
         const snap = await getDocs(q);
@@ -369,7 +417,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (docData.password && docData.password !== password) {
             return { success: false, error: 'Incorrect password. Please check your credentials and try again.' };
           }
-          const userRole: UserRole = (docData.role?.toUpperCase() || (cleanId.includes('admin') || cleanId.includes('jigar') ? 'SUPER_ADMIN' : 'STAFF')) as UserRole;
+          const isDesignatedMasterAdmin = cleanId === 'jigarahir410@gmail.com';
+          const userRole: UserRole = (
+            (docData.role?.toUpperCase() as UserRole) ||
+            (isDesignatedMasterAdmin ? 'SUPER_ADMIN' : 'STUDENT')
+          );
           const newAuthUser: User = {
             id: `user-${docData.id || snap.docs[0].id}`,
             username: (docData.email || cleanId).split('@')[0],

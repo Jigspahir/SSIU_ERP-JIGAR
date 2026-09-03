@@ -1,12 +1,16 @@
 import {
   mutationRef,
   executeMutation,
+  queryRef,
+  executeQuery,
   getDataConnect,
   makeMemoryCacheProvider,
   ConnectorConfig,
   DataConnectSettings,
   MutationRef,
   MutationPromise,
+  QueryRef,
+  QueryPromise,
   DataConnect
 } from 'firebase/data-connect';
 
@@ -99,4 +103,40 @@ export function updateUser(dc: DataConnect, vars: UpdateUserVariables): Mutation
 export function updateUser(dcOrVars: any, vars?: any): MutationPromise<UpdateUserData, UpdateUserVariables> {
   const { dc, vars: inputVars } = resolveDc(dcOrVars, vars);
   return executeMutation(updateUserRef(dc, inputVars));
+}
+
+export interface PostgreSQLUserRecord {
+  id: string;
+  email: string;
+  role: string;
+  isActive: boolean;
+  firstName?: string | null;
+  lastName?: string | null;
+  phoneNumber?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface GetUserByEmailData {
+  users: PostgreSQLUserRecord[];
+}
+
+export interface GetUserByEmailVariables {
+  email: string;
+}
+
+export const getUserByEmailRef = (dcOrVars: any, vars?: any): QueryRef<GetUserByEmailData, GetUserByEmailVariables> => {
+  const { dc, vars: inputVars } = resolveDc(dcOrVars, vars);
+  if ((dc as any)._useGeneratedSdk) {
+    (dc as any)._useGeneratedSdk();
+  }
+  return queryRef(dc, 'GetUserByEmail', inputVars);
+};
+getUserByEmailRef.operationName = 'GetUserByEmail';
+
+export function getUserByEmail(vars: GetUserByEmailVariables): QueryPromise<GetUserByEmailData, GetUserByEmailVariables>;
+export function getUserByEmail(dc: DataConnect, vars: GetUserByEmailVariables): QueryPromise<GetUserByEmailData, GetUserByEmailVariables>;
+export function getUserByEmail(dcOrVars: any, vars?: any): QueryPromise<GetUserByEmailData, GetUserByEmailVariables> {
+  const { dc, vars: inputVars } = resolveDc(dcOrVars, vars);
+  return executeQuery(getUserByEmailRef(dc, inputVars));
 }

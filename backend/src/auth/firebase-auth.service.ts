@@ -104,7 +104,7 @@ export class FirebaseAuthService {
             ? `${u.faculty.firstName || ''} ${u.faculty.lastName || ''}`.trim()
             : u.username;
 
-        const resolvedEmail = u.student?.email || u.faculty?.email || searchEmail || `${u.username}@ssiu.ac.in`;
+        const resolvedEmail = u.student?.email || u.faculty?.email || u.email || searchEmail || (u.username?.includes('@') ? u.username : `${u.username}@swarrnim.edu.in`);
 
         const session: AuthenticatedFirebaseUserSession = {
           uid,
