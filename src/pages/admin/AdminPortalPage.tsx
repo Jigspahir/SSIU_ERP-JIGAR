@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { SystemSettingsPage } from '../settings/SystemSettingsPage';
+import { BulkUserProvisioningCard } from '../../components/admin/BulkUserProvisioningCard';
 import {
   Users,
   Shield,
@@ -340,11 +341,19 @@ export const AdminPortalPage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* ─── CLOUD FIRESTORE BULK PROVISIONING ENGINE ──────────────────────── */}
+          <BulkUserProvisioningCard />
         </div>
       )}
 
       {/* ─── TAB 2: USER MANAGEMENT & CREDENTIALS ───────────────────────────── */}
-      {adminActiveTab === 'USERS' && <SystemSettingsPage initialAdminTab="USERS" />}
+      {adminActiveTab === 'USERS' && (
+        <div className="space-y-6">
+          <BulkUserProvisioningCard />
+          <SystemSettingsPage initialAdminTab="USERS" />
+        </div>
+      )}
 
       {/* ─── TAB 3: ROLE PERMISSION MATRIX ─────────────────────────────────── */}
       {adminActiveTab === 'ROLES' && <SystemSettingsPage initialAdminTab="ROLES" />}

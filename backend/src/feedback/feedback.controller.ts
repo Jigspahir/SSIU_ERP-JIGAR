@@ -68,11 +68,19 @@ export class FeedbackController {
     return this.feedbackService.getStudentFeedbackTargets(req.user);
   }
 
+  @Post()
+  @UseGuards(JwtAuthGuard, RbacGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Submit feedback across any of the feedback categories' })
+  submitFeedback(@Body() dto: SubmitFeedbackDto, @Req() req: any) {
+    return this.feedbackService.submitFeedback(dto, req.user);
+  }
+
   @Post('student/submit')
   @UseGuards(JwtAuthGuard, RbacGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Submit feedback across any of the 7 feedback categories' })
-  submitFeedback(@Body() dto: SubmitFeedbackDto, @Req() req: any) {
+  @ApiOperation({ summary: 'Submit feedback across any of the feedback categories (alias)' })
+  submitStudentFeedback(@Body() dto: SubmitFeedbackDto, @Req() req: any) {
     return this.feedbackService.submitFeedback(dto, req.user);
   }
 
@@ -98,6 +106,30 @@ export class FeedbackController {
   @ApiOperation({ summary: 'Get aggregated mentorship feedback metrics for logged in mentor' })
   getMentorSummary(@Req() req: any) {
     return this.feedbackService.getMentorFeedbackSummary(req.user);
+  }
+
+  @Get('student-feedbacks')
+  @UseGuards(JwtAuthGuard, RbacGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List student feedbacks with strict role & faculty scope isolation' })
+  listStudentFeedbacks(@Query() query: FeedbackFilterQueryDto, @Req() req: any) {
+    return this.feedbackService.listStudentFeedbacks(query, req.user);
+  }
+
+  @Get('student-feedbacks/:id')
+  @UseGuards(JwtAuthGuard, RbacGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get specific student feedback with IDOR verification' })
+  getStudentFeedbackById(@Param('id') id: string, @Req() req: any) {
+    return this.feedbackService.getStudentFeedbackById(id, req.user);
+  }
+
+  @Patch('student-feedbacks/:id')
+  @UseGuards(JwtAuthGuard, RbacGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update student feedback (Immutable & blocked for faculty)' })
+  updateStudentFeedback(@Param('id') id: string, @Body() dto: any, @Req() req: any) {
+    return this.feedbackService.updateStudentFeedback(id, req.user, dto);
   }
 
   @Get('admin/dashboard')

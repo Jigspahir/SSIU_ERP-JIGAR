@@ -1,0 +1,93 @@
+# ==============================================================================
+# SSIU ERP — Firebase Data Connect Mutations
+# ==============================================================================
+
+# Create a new user with credentials and active status
+mutation CreateUser(
+  $email: String!
+  $passwordHash: String!
+  $role: String!
+  $isActive: Boolean!
+  $firstName: String
+  $lastName: String
+  $phoneNumber: String
+  $createdAt: Timestamp!
+  $updatedAt: Timestamp!
+) @auth(level: USER) {
+  user_insert(
+    data: {
+      email: $email
+      passwordHash: $passwordHash
+      role: $role
+      isActive: $isActive
+      firstName: $firstName
+      lastName: $lastName
+      phoneNumber: $phoneNumber
+      createdAt: $createdAt
+      updatedAt: $updatedAt
+    }
+  )
+}
+
+# Update user details or soft-delete (isActive: false)
+mutation UpdateUser(
+  $id: UUID!
+  $isActive: Boolean
+  $role: String
+  $firstName: String
+  $lastName: String
+  $phoneNumber: String
+  $updatedAt: Timestamp!
+) @auth(level: USER) {
+  user_update(
+    id: $id
+    data: {
+      isActive: $isActive
+      role: $role
+      firstName: $firstName
+      lastName: $lastName
+      phoneNumber: $phoneNumber
+      updatedAt: $updatedAt
+    }
+  )
+}
+
+# Log an audit entry
+mutation CreateAuditLog(
+  $action: String!
+  $performedById: UUID!
+  $timestamp: Timestamp!
+  $entityAffected: String
+  $oldValue: String
+  $newValue: String
+) @auth(level: USER) {
+  auditLog_insert(
+    data: {
+      action: $action
+      performedById: $performedById
+      timestamp: $timestamp
+      entityAffected: $entityAffected
+      oldValue: $oldValue
+      newValue: $newValue
+    }
+  )
+}
+
+# Create a bulk operation record
+mutation CreateBulkOperation(
+  $operationName: String!
+  $status: String!
+  $uploadedAt: Timestamp!
+  $totalRecords: Int
+  $successCount: Int
+) @auth(level: USER) {
+  bulkOperation_insert(
+    data: {
+      operationName: $operationName
+      status: $status
+      uploadedAt: $uploadedAt
+      totalRecords: $totalRecords
+      successCount: $successCount
+    }
+  )
+}

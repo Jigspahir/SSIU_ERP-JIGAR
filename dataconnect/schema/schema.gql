@@ -1,0 +1,37 @@
+type User @table {
+  email: String!
+  passwordHash: String!
+  role: String!
+  isActive: Boolean!
+  firstName: String
+  lastName: String
+  phoneNumber: String
+  createdAt: Timestamp!
+  updatedAt: Timestamp!
+}
+
+type Role @table {
+  name: String!
+}
+
+type BulkOperation @table {
+  operationName: String!
+  status: String!
+  uploadedAt: Timestamp!
+  totalRecords: Int
+  successCount: Int
+}
+
+type UserBulkRecord @table {
+  user: User!
+  bulkOperation: BulkOperation!
+}
+
+type AuditLog @table {
+  action: String!
+  performedBy: User!
+  timestamp: Timestamp!
+  entityAffected: String
+  oldValue: String
+  newValue: String
+}

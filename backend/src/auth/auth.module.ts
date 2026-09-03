@@ -9,19 +9,30 @@ import { SupabaseAuthService } from './supabase-auth.service';
 import { SupabaseAuthGuard } from './supabase-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
+import { FirebaseModule } from '../firebase/firebase.module';
+import { FirebaseAuthService } from './firebase-auth.service';
+import { FirebaseAuthGuard } from './firebase-auth.guard';
+import { FirebaseRolesGuard } from './guards/firebase-roles.guard';
 
 @Module({
   imports: [
+    FirebaseModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET') || 'ssiu_erp_jwt_super_secret_key_2026',
-        signOptions: {
-          expiresIn: '15m',
-        },
-      }),
+      useFactory: (config: ConfigService) => {
+        const secret = config.get<string>('JWT_SECRET') || process.env.JWT_SECRET;
+        if (!secret) {
+          throw new Error('[Security Config Error] JWT_SECRET must be configured in environment variables. Application startup aborted.');
+        }
+        return {
+          secret,
+          signOptions: {
+            expiresIn: config.get<string>('JWT_EXPIRATION') || '15m',
+          },
+        };
+      },
     }),
   ],
   controllers: [AuthController],
@@ -31,7 +42,10 @@ import { PermissionsGuard } from './guards/permissions.guard';
     SupabaseAuthService, 
     SupabaseAuthGuard, 
     RolesGuard, 
-    PermissionsGuard
+    PermissionsGuard,
+    FirebaseAuthService,
+    FirebaseAuthGuard,
+    FirebaseRolesGuard
   ],
   exports: [
     AuthService, 
@@ -40,8 +54,10 @@ import { PermissionsGuard } from './guards/permissions.guard';
     SupabaseAuthService, 
     SupabaseAuthGuard, 
     RolesGuard, 
-    PermissionsGuard
+    PermissionsGuard,
+    FirebaseAuthService,
+    FirebaseAuthGuard,
+    FirebaseRolesGuard
   ],
 })
 export class AuthModule {}
-

@@ -1,0 +1,75 @@
+# ==============================================================================
+# SSIU ERP — Firebase Data Connect Queries
+# ==============================================================================
+
+# List all users
+query ListUsers @auth(level: USER) {
+  users {
+    id
+    email
+    role
+    isActive
+    firstName
+    lastName
+    phoneNumber
+    createdAt
+    updatedAt
+  }
+}
+
+# Get a single user by ID
+query GetUserById($id: UUID!) @auth(level: USER) {
+  user(id: $id) {
+    id
+    email
+    role
+    isActive
+    firstName
+    lastName
+    phoneNumber
+    createdAt
+    updatedAt
+  }
+}
+
+# Get users by email address
+query GetUserByEmail($email: String!) @auth(level: USER) {
+  users(where: { email: { eq: $email } }) {
+    id
+    email
+    role
+    isActive
+    firstName
+    lastName
+    phoneNumber
+    createdAt
+    updatedAt
+  }
+}
+
+# List active users filtered by role ('student' or 'staff')
+query ListUsersByRole($role: String!) @auth(level: USER) {
+  users(where: { role: { eq: $role }, isActive: { eq: true } }) {
+    id
+    email
+    role
+    isActive
+    firstName
+    lastName
+    phoneNumber
+    createdAt
+    updatedAt
+  }
+}
+
+# List recent bulk operations
+query ListBulkOperations @auth(level: USER) {
+  bulkOperations(orderBy: [{ uploadedAt: DESC }]) {
+    id
+    operationName
+    status
+    uploadedAt
+    totalRecords
+    successCount
+  }
+}

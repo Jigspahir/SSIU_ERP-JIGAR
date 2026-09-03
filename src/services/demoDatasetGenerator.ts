@@ -97,8 +97,8 @@ export function generateCanonicalFaculty(
 
   for (let i = 1; i <= totalFacultyCount; i++) {
     const padIndex = i.toString().padStart(6, '0');
-    const facultyId = i === 1 ? 'fac-1' : `FAC-2026-${padIndex}`;
-    const empId = `EMP-2026-${i.toString().padStart(4, '0')}`;
+    const facultyId = i <= 20 ? `fac-${i}` : `FAC-2026-${padIndex}`;
+    const empId = i <= 20 ? `FAC00${i}` : `EMP-2026-${i.toString().padStart(4, '0')}`;
 
     const isMale = rng.next() > 0.4;
     const firstName = isMale ? rng.choice(FIRST_NAMES_MALE) : rng.choice(FIRST_NAMES_FEMALE);
@@ -175,7 +175,7 @@ export function generateCanonicalStudents(
 
   for (let i = 1; i <= totalStudents; i++) {
     const padIndex = i.toString().padStart(6, '0');
-    const studentId = i === 1 ? 'stu-1' : `STU-2026-${padIndex}`;
+    const studentId = i <= 20 ? `stu-${i}` : `STU-2026-${padIndex}`;
     const enrollmentNo = `260101${i.toString().padStart(4, '0')}`;
     const rollNo = `26CSE${(i % 120 + 1).toString().padStart(3, '0')}`;
 
@@ -218,7 +218,7 @@ export function generateCanonicalStudents(
     const targetDiv = divisions.find(d => d.semesterId === targetSem.id) || divisions[0];
 
     // Assigned mentor from mentor pool
-    const assignedMentor = mentorPool[(i - 1) % mentorPool.length];
+    const assignedMentor = i <= 2 ? (mentorPool[0] || facultyList[0]) : (i <= 4 ? (mentorPool[1] || facultyList[1]) : mentorPool[(i - 1) % mentorPool.length]);
 
     const cityObj = rng.choice(CITIES);
     const standingRoll = rng.next();

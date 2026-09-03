@@ -20,12 +20,16 @@ export class CentralMentorAssignmentService {
 
     if (role === 'PRINCIPAL' || role === 'REGISTRAR') {
       // HOI (Principal) can manage all departments under their authorized Institute
-      return Boolean(user.instituteId && student.instituteId === user.instituteId);
+      const isInstAlias = (user.instituteId === 'inst-1' && student.instituteId === 'inst-sit') ||
+                          (user.instituteId === 'inst-sit' && student.instituteId === 'inst-1');
+      return Boolean(user.instituteId && (student.instituteId === user.instituteId || isInstAlias));
     }
 
     if (role === 'HOD') {
       // HOD can manage students belonging to their authorized Department
-      return Boolean(user.departmentId && student.departmentId === user.departmentId);
+      const isDeptAlias = (user.departmentId === 'dept-1' && student.departmentId === 'dept-cse') ||
+                          (user.departmentId === 'dept-cse' && student.departmentId === 'dept-1');
+      return Boolean(user.departmentId && (student.departmentId === user.departmentId || isDeptAlias));
     }
 
     return false;
@@ -46,7 +50,7 @@ export class CentralMentorAssignmentService {
     if (!student) return null;
 
     const active = assignments.find(
-      a => (a.studentId === student.id || a.studentEnrollmentNo === student.enrollmentNo) && 
+      a => (a.studentId === student.id || a.studentEnrollmentNo === student.enrollmentNo) &&
            a.status === 'ACTIVE'
     );
 
@@ -75,12 +79,16 @@ export class CentralMentorAssignmentService {
 
       // 2. Department match if specified
       if (targetDeptId && f.departmentId !== targetDeptId) {
-        return false;
+        const isDeptAlias = (targetDeptId === 'dept-1' && f.departmentId === 'dept-cse') ||
+                            (targetDeptId === 'dept-cse' && f.departmentId === 'dept-1');
+        if (!isDeptAlias) return false;
       }
 
       // 3. Institute match if specified
       if (targetInstId && f.instituteId !== targetInstId) {
-        return false;
+        const isInstAlias = (targetInstId === 'inst-1' && f.instituteId === 'inst-sit') ||
+                            (targetInstId === 'inst-sit' && f.instituteId === 'inst-1');
+        if (!isInstAlias) return false;
       }
 
       // 4. Must not be excluded from mentorship

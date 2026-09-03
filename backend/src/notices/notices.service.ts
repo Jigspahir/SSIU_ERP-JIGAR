@@ -20,7 +20,7 @@ const VALID_CATEGORIES = new Set([
 
 const VALID_PRIORITIES = new Set(['URGENT', 'HIGH', 'NORMAL', 'LOW']);
 const VALID_SCOPES = new Set(['UNIVERSITY_WIDE', 'INSTITUTE_WIDE', 'DEPARTMENT_WIDE', 'ROLE_BASED', 'TARGETED']);
-const VALID_ROLES = new Set(['ALL', 'STUDENT', 'FACULTY', 'STAFF', 'HOD', 'PRINCIPAL']);
+const VALID_ROLES = new Set(['ALL', 'STUDENT', 'FACULTY', 'STAFF', 'HOD', 'PRINCIPAL', 'PARENT']);
 
 @Injectable()
 export class NoticesService {
@@ -175,35 +175,37 @@ export class NoticesService {
       // Only see PUBLISHED notices that are currently active
       where.type = 'PUBLISHED';
 
-      // Scope Isolation:
-      const audienceConditions: any[] = [{ scopeType: 'UNIVERSITY_WIDE' }];
+      // Scope Isolation (User belongs to university, institute, or department scope)
+      const scopeConditions: any[] = [{ scopeType: 'UNIVERSITY_WIDE' }];
 
       if (user?.instituteId) {
-        audienceConditions.push({
+        scopeConditions.push({
           scopeType: 'INSTITUTE_WIDE',
           targetInstituteId: user.instituteId,
         });
       }
 
       if (user?.departmentId) {
-        audienceConditions.push({
+        scopeConditions.push({
           scopeType: 'DEPARTMENT_WIDE',
           targetDepartmentId: user.departmentId,
         });
       }
 
-      // Role conditions
-      audienceConditions.push(
+      scopeConditions.push({ scopeType: 'ROLE_BASED' }, { scopeType: 'TARGETED' });
+
+      // Role Conditions (Notice role is ALL or matches one of user's active roles)
+      const roleConditions: any[] = [
         { targetRole: { in: ['ALL', ...userRoles] } },
         { targetRole: null },
-      );
+        { targetRole: '' },
+      ];
 
-      if (where.OR) {
-        where.AND = [{ OR: where.OR }, { OR: audienceConditions }];
-        delete where.OR;
-      } else {
-        where.OR = audienceConditions;
-      }
+      where.AND = [
+        ...(where.AND || []),
+        { OR: scopeConditions },
+        { OR: roleConditions },
+      ];
     } else {
       // Admin filter on status
       if (query?.status && query.status !== 'ALL') {
@@ -218,13 +220,16 @@ export class NoticesService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
+        include: {
+          recipients: user?.id ? { where: { userId: user.id } } : false,
+        },
       }),
     ]);
 
     // Format notices and evaluate scheduled/expired states
     const now = new Date();
     const formatted = rawList
-      .map((r) => this.formatNotice(r))
+      .map((r) => this.formatNotice(r, user?.id))
       .filter((n) => {
         // If not admin, omit expired notices
         if (!isUnivAdmin && n.expiresAt) {
@@ -349,11 +354,103 @@ export class NoticesService {
     return this.updateNotice(id, user, { status: 'ARCHIVED' });
   }
 
-  private formatNotice(r: any) {
+  // 7. Mark specific notice as read for authenticated user
+  async markNoticeAsRead(id: string, user: any) {
+    if (!user?.id) throw new BadRequestException('User identification required.');
+
+    const notice = await this.prisma.notification.findFirst({
+      where: { id, module: 'NOTICE' },
+    });
+    if (!notice) throw new NotFoundException('Notice not found.');
+
+    const role = user.roles?.[0] || user.role || 'USER';
+
+    await this.prisma.notificationRecipient.upsert({
+      where: {
+        notificationId_userId: {
+          notificationId: id,
+          userId: user.id,
+        },
+      },
+      create: {
+        notificationId: id,
+        userId: user.id,
+        userRole: role,
+        isRead: true,
+        readAt: new Date(),
+      },
+      update: {
+        isRead: true,
+        readAt: new Date(),
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Notice marked as read.',
+      noticeId: id,
+    };
+  }
+
+  // 8. Mark all eligible notices as read for authenticated user
+  async markAllNoticesAsRead(user: any) {
+    if (!user?.id) throw new BadRequestException('User identification required.');
+
+    const listResult = await this.getNotices(user, { limit: 100, status: 'PUBLISHED' });
+    const notices = listResult.data || [];
+    const role = user.roles?.[0] || user.role || 'USER';
+
+    for (const n of notices) {
+      await this.prisma.notificationRecipient.upsert({
+        where: {
+          notificationId_userId: {
+            notificationId: n.id,
+            userId: user.id,
+          },
+        },
+        create: {
+          notificationId: n.id,
+          userId: user.id,
+          userRole: role,
+          isRead: true,
+          readAt: new Date(),
+        },
+        update: {
+          isRead: true,
+          readAt: new Date(),
+        },
+      });
+    }
+
+    return {
+      success: true,
+      count: notices.length,
+      message: `Marked ${notices.length} notices as read.`,
+    };
+  }
+
+  // 9. Get real-time unread notice popup feed
+  async getNoticePopupFeed(user: any) {
+    const listResult = await this.getNotices(user, { limit: 20, status: 'PUBLISHED' });
+    const allEligible = listResult.data || [];
+    const unread = allEligible.filter((n: any) => !n.isRead);
+
+    return {
+      success: true,
+      totalEligible: allEligible.length,
+      unreadCount: unread.length,
+      unreadNotices: unread,
+      recentNotices: allEligible.slice(0, 5),
+    };
+  }
+
+  private formatNotice(r: any, userId?: string) {
     let meta: any = {};
     try {
       if (r.linkTab) meta = JSON.parse(r.linkTab);
     } catch {}
+
+    const isRead = r.recipients && r.recipients.length > 0 ? Boolean(r.recipients[0]?.isRead) : false;
 
     return {
       id: r.id,
@@ -369,9 +466,10 @@ export class NoticesService {
       targetDepartmentId: r.targetDepartmentId,
       publishedBy: r.actionLabel || meta.publishedBy || 'University Administration',
       isPinned: Boolean(meta.isPinned),
-      publishAt: meta.publishAt || r.createdAt.toISOString(),
+      publishAt: meta.publishAt || (r.createdAt ? r.createdAt.toISOString() : ''),
       expiresAt: meta.expiresAt || null,
       attachmentUrl: r.actionUrl,
+      isRead,
       publishedDate: r.createdAt ? r.createdAt.toISOString().split('T')[0] : '',
       createdAt: r.createdAt ? r.createdAt.toISOString() : '',
       updatedAt: r.updatedAt ? r.updatedAt.toISOString() : '',

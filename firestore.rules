@@ -1,0 +1,272 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========================================================================
+    // HELPER FUNCTIONS & RBAC SCOPES
+    // ========================================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(roleName) {
+      return isAuthenticated() && (
+        request.auth.token.role == roleName ||
+        getUserData().role == roleName
+      );
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role in ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'ERP_COORDINATOR'] ||
+        getUserData().role in ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'ERP_COORDINATOR']
+      );
+    }
+
+    function isHOD(deptId) {
+      return isAuthenticated() && (
+        isAdmin() ||
+        (hasRole('HOD') && (deptId == null || getUserData().departmentId == deptId))
+      );
+    }
+
+    function isPrincipal(instId) {
+      return isAuthenticated() && (
+        isAdmin() ||
+        (hasRole('PRINCIPAL') && (instId == null || getUserData().instituteId == instId))
+      );
+    }
+
+    function isFaculty() {
+      return isAuthenticated() && (
+        isAdmin() || hasRole('FACULTY') || hasRole('MENTOR') || hasRole('HOD') || hasRole('PRINCIPAL')
+      );
+    }
+
+    function isStudentOwner(studentId) {
+      return isAuthenticated() && (
+        request.auth.uid == studentId ||
+        getUserData().studentId == studentId
+      );
+    }
+
+    function isParentOfStudent(studentId) {
+      return isAuthenticated() && (
+        hasRole('PARENT') &&
+        studentId in getUserData().parentStudentIds
+      );
+    }
+
+    // ========================================================================
+    // 1. USERS COLLECTION
+    // ========================================================================
+    match /users/{uid} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // ========================================================================
+    // 2. MASTER ACADEMIC STRUCTURE (Institutes, Depts, Programs, Semesters, etc.)
+    // ========================================================================
+    match /institutes/{instId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /departments/{deptId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /programs/{progId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /academicYears/{ayId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /semesters/{semId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /divisions/{divId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /subjects/{subjectId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // ========================================================================
+    // 3. STUDENTS, FACULTY & STAFF RECORDS
+    // ========================================================================
+    match /students/{studentId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /faculty/{facultyId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /deputyRegistrars/{id} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /adminStaff/{id} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /facultyAssignments/{assignId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /mentorAssignments/{assignId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // ========================================================================
+    // 4. TIMETABLE, TEACHING SESSIONS & ATTENDANCE
+    // ========================================================================
+    match /timetable/{entryId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /teachingSessions/{sessionId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /attendance/{attendanceId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /attendanceReports/{reportId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // ========================================================================
+    // 5. NOTICES, NOTIFICATIONS & EVENTS
+    // ========================================================================
+    match /notices/{noticeId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /notifications/{notifId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /events/{eventId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // ========================================================================
+    // 6. FEEDBACK, COMPLAINTS & PTM
+    // ========================================================================
+    match /feedback/{feedbackId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /complaints/{complaintId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /ptm/{ptmId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // ========================================================================
+    // 7. WORK TRANSFERS & AUDIT LOGS (HISTORICAL AUDIT PROTECTION)
+    // ========================================================================
+    match /workTransfers/{transferId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Immutable audit log: write-once, never updated or deleted
+    }
+
+    // ========================================================================
+    // 8. DOCUMENTS, EXAMINATIONS & RESULTS
+    // ========================================================================
+    match /documents/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /examinations/{examId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /results/{resultId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    // ========================================================================
+    // DEFAULT CATCH-ALL PROTECTION
+    // ========================================================================
+    match /{document=**} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+  }
+}

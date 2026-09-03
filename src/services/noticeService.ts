@@ -160,4 +160,54 @@ export const noticeService = {
     const json = await res.json();
     return json.data || json;
   },
+
+  async getNoticePopupFeedServer(): Promise<{
+    success: boolean;
+    totalEligible: number;
+    unreadCount: number;
+    unreadNotices: ServerNotice[];
+    recentNotices: ServerNotice[];
+  }> {
+    const res = await fetch('/api/v1/notices/feed/popup', {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to load notice feed: ${res.statusText}`);
+    }
+
+    const json = await res.json();
+    return json.data || json;
+  },
+
+  async markNoticeReadServer(id: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`/api/v1/notices/${id}/read`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to mark notice as read.');
+    }
+
+    const json = await res.json();
+    return json.data || json;
+  },
+
+  async markAllNoticesReadServer(): Promise<{ success: boolean; count: number; message: string }> {
+    const res = await fetch('/api/v1/notices/mark-all-read', {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || 'Failed to mark all notices as read.');
+    }
+
+    const json = await res.json();
+    return json.data || json;
+  },
 };

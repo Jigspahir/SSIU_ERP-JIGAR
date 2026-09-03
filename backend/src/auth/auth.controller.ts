@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Body, Req, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { FirebaseLoginDto } from './dto/firebase-login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
@@ -12,6 +13,17 @@ import { Request } from 'express';
 @Controller('api/v1/auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('firebase')
+  @RateLimit({ limit: 15, ttlSeconds: 60, keyPrefix: 'auth:firebase' })
+  @HttpCode(HttpStatus.OK)
+  async firebaseLogin(@Body() dto: FirebaseLoginDto, @Req() req: Request) {
+    const meta = {
+      ip: req.ip || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'],
+    };
+    return this.authService.firebaseLogin(dto.idToken, meta);
+  }
 
   @Post('login')
   @RateLimit({ limit: 10, ttlSeconds: 60, keyPrefix: 'auth:login', compositeWithBodyField: 'loginId' })

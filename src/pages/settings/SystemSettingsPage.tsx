@@ -16,6 +16,7 @@ import {
   CheckCircle2, AlertCircle, ChevronLeft, ChevronRight, UserCheck, UserX,
   Building2, Sparkles, RefreshCw, Copy, CheckSquare, Square, UserCog, Sliders, Globe, Workflow
 } from 'lucide-react';
+import { BulkUserProvisioningCard } from '../../components/admin/BulkUserProvisioningCard';
 
 export interface SystemSettingsPageProps {
   initialAdminTab?: 'USERS' | 'ROLES' | 'AUDIT' | 'MASTER';
@@ -1081,7 +1082,10 @@ export const SystemSettingsPage: React.FC<SystemSettingsPageProps> = ({ initialA
 
       {/* ─── TAB 1: USERS ACCOUNT MANAGEMENT ─────────────────────────────────── */}
       {activeSettingsTab === 'USERS' && (
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Central ERP Bulk ID Generation & Provisioning Desk */}
+          <BulkUserProvisioningCard />
+
           {/* Top Search Toolbar & Action Bar */}
           <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
             <div className="relative flex-1 max-w-md">

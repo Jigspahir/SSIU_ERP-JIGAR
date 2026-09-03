@@ -23,6 +23,7 @@ export const DEMO_ACCOUNTS = {
   deputyregistrar: { identifier: 'deputyregistrar', password: 'Admin@123', displayName: 'Demo Deputy Registrar 1', email: 'demo.deputyregistrar1@ssiu-demo.ac.in' },
   faculty: { identifier: 'faculty', password: 'Faculty@123', displayName: 'Prof. Demo Faculty', email: 'demo.faculty@university.edu' },
   student: { identifier: 'student', password: 'Student@123', displayName: 'Jigar Patel', email: 'jigar.patel@swarrnim.edu.in' },
+  parent: { identifier: 'parent', password: 'Parent@123', displayName: 'Rajesh Sharma', email: 'rajesh.sharma@parent.ssiu-demo.ac.in' },
 } as const;
 
 // ─── Session Timeout ──────────────────────────────────────────────────────────

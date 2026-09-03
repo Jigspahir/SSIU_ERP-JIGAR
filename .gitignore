@@ -27,6 +27,9 @@ dist-ssr
 !.env.example
 *.sql.gz
 scripts/backup/*.sql.gz
+*.pem
+service-account*.json
+firebase-service-account*.json
 backend/logs/
 backend/dist/
 

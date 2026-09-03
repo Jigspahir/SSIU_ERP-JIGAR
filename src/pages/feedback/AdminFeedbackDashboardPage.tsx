@@ -113,9 +113,15 @@ export const AdminFeedbackDashboardPage: React.FC = () => {
     const q = searchQuery.toLowerCase().trim();
 
     return stats.feedbacks.filter(f => {
-      // Role scope: Faculty only sees feedback assigned to them or their department
-      if (isFaculty && f.facultyId !== user?.id && f.mentorId !== user?.id && f.category === 'FACULTY') {
-        // Faculty viewing their own evaluations
+      // Role scope: Faculty only sees feedback assigned to them, their subjects, or their mentees
+      if (isFaculty) {
+        const isAssigned =
+          f.facultyId === user?.id ||
+          f.mentorId === user?.id ||
+          (user?.id && (f as any).assignedFacultyId === user?.id) ||
+          f.facultyName === user?.name ||
+          (user?.id === 'fac-1' && (f.facultyId === 'fac-1' || f.mentorId === 'fac-1'));
+        if (!isAssigned) return false;
       }
 
       if (fromDate && f.createdAt < fromDate) return false;
@@ -281,17 +287,26 @@ export const AdminFeedbackDashboardPage: React.FC = () => {
           <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-3xl font-medium">
             Aggregated institutional analytics, anonymized evaluations, department routing, and official Excel reporting.
           </p>
+
+          {isFaculty && (
+            <div className="mt-2.5 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-semibold">
+              <Shield className="w-4 h-4 text-emerald-400" />
+              <span>Faculty View (Read-Only): Displaying student evaluations for your assigned courses, subjects, and mentees.</span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setIsSubmitModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-md transition"
-          >
-            <Plus className="w-4 h-4" />
-            <span>+ Submit Feedback</span>
-          </button>
+          {!isFaculty && (
+            <button
+              type="button"
+              onClick={() => setIsSubmitModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-md transition"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Submit Feedback</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -842,12 +857,14 @@ export const AdminFeedbackDashboardPage: React.FC = () => {
               <h3 className="text-base font-bold text-slate-900 dark:text-white">Institutional Suggestions Register</h3>
               <p className="text-xs text-slate-500">Student improvement proposals &amp; academic routing</p>
             </div>
-            <button
-              onClick={() => setIsSubmitModalOpen(true)}
-              className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" /> + New Suggestion
-            </button>
+            {!isFaculty && (
+              <button
+                onClick={() => setIsSubmitModalOpen(true)}
+                className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" /> + New Suggestion
+              </button>
+            )}
           </div>
 
           <div className="overflow-x-auto">
@@ -1119,7 +1136,7 @@ export const AdminFeedbackDashboardPage: React.FC = () => {
       )}
 
       {/* ─── MODAL 2: SUBMIT STUDENT FEEDBACK MODAL ─────────────────────────── */}
-      {isSubmitModalOpen && (
+      {isSubmitModalOpen && !isFaculty && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-2xl w-full border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]">
             <div className="bg-[#001F3F] text-white p-5 flex items-center justify-between border-b border-blue-900">

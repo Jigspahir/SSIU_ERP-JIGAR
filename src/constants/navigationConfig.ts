@@ -2650,22 +2650,52 @@ export const ERP_COORDINATOR_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
 
 export const PARENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
   {
-    id: 'parent-ptm-dashboard',
-    label: 'PTM Dashboard',
+    id: 'dashboard',
+    label: 'Dashboard',
     icon: NAV_ICONS.dashboard,
-    defaultTab: 'parent-ptm'
+    defaultTab: 'dashboard'
   },
   {
-    id: 'parent-my-children',
+    id: 'my-children',
     label: 'My Children',
     icon: NAV_ICONS.students,
-    defaultTab: 'parent-ptm'
+    defaultTab: 'parent-children'
   },
   {
-    id: 'parent-feedback',
-    label: 'Parent Feedback',
+    id: 'ptm-dashboard',
+    label: 'PTM Dashboard',
+    icon: NAV_ICONS.ptm,
+    defaultTab: 'ptm-dashboard'
+  },
+  {
+    id: 'notices',
+    label: 'Notices / Updates',
+    icon: NAV_ICONS.notices,
+    defaultTab: 'notices'
+  },
+  {
+    id: 'feedback',
+    label: 'Feedback & Suggestions',
     icon: NAV_ICONS.feedback,
-    defaultTab: 'parent-ptm'
+    defaultTab: 'feedback'
+  },
+  {
+    id: 'grievance',
+    label: 'Complaints / Grievance',
+    icon: NAV_ICONS.serviceDesk,
+    defaultTab: 'grievance'
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    icon: NAV_ICONS.notifications,
+    defaultTab: 'notifications'
+  },
+  {
+    id: 'profile',
+    label: 'My Profile',
+    icon: User,
+    defaultTab: 'profile'
   }
 ];
 
@@ -2859,7 +2889,22 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
   ],
 
   PARENT: [
-    'parent-ptm', 'ptm-dashboard', 'ptm-schedule', 'ptm-feedback', 'notifications'
+    'dashboard',
+    'parent-dashboard',
+    'my-children',
+    'parent-children',
+    'ptm-dashboard',
+    'parent-ptm',
+    'ptm-schedule',
+    'ptm-feedback',
+    'notices',
+    'feedback',
+    'feedback-give',
+    'feedback-my',
+    'grievance',
+    'student-grievance',
+    'notifications',
+    'profile'
   ],
 
   FACULTY: [
@@ -2942,6 +2987,19 @@ export const getRoleNavigationItems = (role?: UserRole | null): NavItemConfig[] 
 
 export const isTabPermittedForRole = (tab: string, role?: UserRole | null): boolean => {
   if (!role) return false;
+  if (role === 'PARENT') {
+    const parentAllowed = [
+      'dashboard', 'parent-dashboard',
+      'my-children', 'parent-children',
+      'ptm-dashboard', 'parent-ptm', 'ptm-schedule', 'ptm-feedback',
+      'notices',
+      'feedback', 'feedback-give', 'feedback-my',
+      'grievance', 'student-grievance',
+      'notifications',
+      'profile'
+    ];
+    return parentAllowed.includes(tab);
+  }
   if (tab === 'dashboard') return true;
   if (tab === 'settings' || tab === 'user-management' || tab === 'users-management' || tab === 'rbac-matrix' || tab === 'access-control') {
     return ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'ERP_COORDINATOR', 'REGISTRAR'].includes(role);

@@ -18,8 +18,10 @@ export interface AttendancePageProps {
 }
 
 import { StudentAttendancePage } from './StudentAttendancePage';
+import { TeachingLectureItem } from '../../services/attendanceService';
+import { Calendar } from 'lucide-react';
 
-type TabType = 'ATTENDANCE' | 'HISTORY' | 'SUBJECT_STATS' | 'REPORTS' | 'IMPORT_STUDENTS' | 'IMPORT_ATTENDANCE' | 'TEMPLATES';
+type TabType = 'ATTENDANCE' | 'PENDING' | 'HISTORY' | 'SUBJECT_STATS' | 'REPORTS' | 'IMPORT_STUDENTS' | 'IMPORT_ATTENDANCE' | 'TEMPLATES';
 
 export const AttendancePage: React.FC<AttendancePageProps> = ({ initialTab = 'ATTENDANCE' }) => {
   const { user, role } = useAuth();
@@ -48,29 +50,67 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ initialTab = 'AT
     setTimeout(() => setToast(null), 4000);
   };
 
-  // ERP Master Collections
-  const subjects = useMemo(() => attendanceService.getFacultySubjects(user, role || undefined), [user, role, refreshKey]);
-  const divisions = useMemo(() => db.getDivisions(), [refreshKey]);
+  // ERP Master Collections with Strict Teaching Assignment Isolation
+  const teachingAssignments = useMemo(() => attendanceService.getFacultyTeachingAssignments(user, role || undefined), [user, role, refreshKey]);
+  const subjects = useMemo(() => teachingAssignments.subjects, [teachingAssignments]);
   const programs = useMemo(() => db.getPrograms(), [refreshKey]);
   const departments = useMemo(() => db.getDepartments(), [refreshKey]);
-  const semesters = useMemo(() => db.getSemesters(), [refreshKey]);
+  const semesters = useMemo(() => teachingAssignments.semesters, [teachingAssignments]);
   const allSessions = useMemo(() => db.getAttendanceSessions(), [refreshKey]);
 
   // ─── 1. TAB 1: MARK ATTENDANCE STATE ───────────────────────────────────────
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(subjects[0]?.id || 'sub-dsa');
-  const [selectedDivisionId, setSelectedDivisionId] = useState<string>(divisions[0]?.id || 'div-cse-4a');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(() => subjects[0]?.id || 'sub-dbms');
+  const divisions = useMemo(() => attendanceService.getFacultyDivisions(user, role || undefined, selectedSubjectId), [user, role, selectedSubjectId, refreshKey]);
+  const [selectedDivisionId, setSelectedDivisionId] = useState<string>(() => divisions[0]?.id || 'div-cse-4a');
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [lectureNo, setLectureNo] = useState<number>(1);
-  const [timeSlot, setTimeSlot] = useState<string>('10:00 AM - 11:00 AM');
-  const [topicTaught, setTopicTaught] = useState<string>('Binary Search Trees & Balancing Operations');
+  const [timeSlot, setTimeSlot] = useState<string>('09:00 AM - 10:00 AM');
+  const [topicTaught, setTopicTaught] = useState<string>('Relational Algebra & Normalization');
   const [studentSearch, setStudentSearch] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PRESENT' | 'ABSENT' | 'LATE'>('ALL');
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
 
-  // Active student roster for selected subject/division
+  // Synchronize dropdown selections when teaching assignments change
+  useEffect(() => {
+    if (subjects.length > 0 && !subjects.some(s => s.id === selectedSubjectId)) {
+      setSelectedSubjectId(subjects[0].id);
+    }
+  }, [subjects, selectedSubjectId]);
+
+  useEffect(() => {
+    if (divisions.length > 0 && !divisions.some(d => d.id === selectedDivisionId)) {
+      setSelectedDivisionId(divisions[0].id);
+    }
+  }, [divisions, selectedDivisionId]);
+
+  // Teaching schedule, pending lectures, and submitted sessions for the authenticated faculty
+  const todaySchedule = useMemo(() => attendanceService.getFacultyTeachingSchedule(user, role || undefined, selectedDate), [user, role, selectedDate, refreshKey]);
+  const pendingLectures = useMemo(() => attendanceService.getFacultyPendingAttendance(user, role || undefined, selectedDate), [user, role, selectedDate, refreshKey]);
+  const submittedSessions = useMemo(() => attendanceService.getFacultySubmittedAttendance(user, role || undefined), [user, role, refreshKey]);
+
+  // Active student roster for selected teaching subject/division (Strictly NOT mentee-based)
   const activeRoster = useMemo(() => {
     return attendanceService.getStudentRoster(selectedSubjectId, selectedDivisionId);
   }, [selectedSubjectId, selectedDivisionId, refreshKey]);
+
+  // Quick Action to load a scheduled lecture into marking form
+  const handleQuickMarkSchedule = (lecture: TeachingLectureItem) => {
+    setSelectedSubjectId(lecture.subjectId);
+    setSelectedDivisionId(lecture.divisionId);
+    setSelectedDate(lecture.date);
+    setLectureNo(lecture.lectureNo);
+    setTimeSlot(lecture.timeSlot);
+    if (lecture.topicPlanned) {
+      setTopicTaught(lecture.topicPlanned);
+    }
+    if (lecture.status === 'SUBMITTED' && lecture.session) {
+      setEditingSessionId(lecture.session.id);
+    } else {
+      setEditingSessionId(null);
+    }
+    setActiveTab('ATTENDANCE');
+    showToast('info', `Loaded Lecture #${lecture.lectureNo} (${lecture.subjectName}) into attendance marking form.`);
+  };
 
   // Attendance marking state (StudentId -> Status & Remarks)
   const [markingState, setMarkingState] = useState<Record<string, { status: AttendanceStatus; remarks: string }>>({});
@@ -207,7 +247,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ initialTab = 'AT
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
 
   const filteredHistory = useMemo(() => {
-    return allSessions.filter(sess => {
+    return submittedSessions.filter(sess => {
       if (historySubjectFilter !== 'ALL' && sess.subjectId !== historySubjectFilter) {
         return false;
       }
@@ -221,7 +261,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ initialTab = 'AT
       }
       return true;
     });
-  }, [allSessions, historySubjectFilter, historySearch, subjects]);
+  }, [submittedSessions, historySubjectFilter, historySearch, subjects]);
 
   const handleEditHistorySession = (sess: AttendanceSession) => {
     setSelectedSubjectId(sess.subjectId);
@@ -474,10 +514,10 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ initialTab = 'AT
           </div>
         </div>
 
-        {/* 5-Column Context Strip */}
+        {/* My Teaching Attendance Context Strip */}
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', 
           gap: '1rem', 
           marginTop: '1.25rem',
           paddingTop: '1rem',
@@ -485,24 +525,42 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ initialTab = 'AT
           fontSize: '0.8125rem'
         }}>
           <div>
+            <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' }}>Faculty Name</span>
+            <strong style={{ color: '#F8FAFC', fontSize: '0.95rem' }}>{teachingAssignments.faculty?.name || user?.name || 'Prof. Demo Faculty'}</strong>
+          </div>
+          <div>
             <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' }}>Academic Year</span>
             <strong style={{ color: '#F8FAFC', fontSize: '0.95rem' }}>2026-27</strong>
           </div>
           <div>
-            <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' }}>Faculty Name</span>
-            <strong style={{ color: '#F8FAFC', fontSize: '0.95rem' }}>{user?.name || 'Demo Faculty 1'}</strong>
+            <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' }}>Department</span>
+            <strong style={{ color: '#38BDF8', fontSize: '0.95rem' }}>
+              {departments.find(d => d.id === (teachingAssignments.faculty?.departmentId || user?.departmentId))?.name || 'Computer Science & Engineering'}
+            </strong>
           </div>
           <div>
-            <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' }}>Department</span>
-            <strong style={{ color: '#38BDF8', fontSize: '0.95rem' }}>Computer Science &amp; Engineering</strong>
+            <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' }}>Assigned Subjects</span>
+            <strong style={{ color: '#F8FAFC', fontSize: '0.92rem' }}>
+              {teachingAssignments.subjects.map(s => s.code).join(', ') || 'CS401, CS404'}
+            </strong>
+          </div>
+          <div>
+            <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' }}>Assigned Divisions</span>
+            <strong style={{ color: '#F8FAFC', fontSize: '0.92rem' }}>
+              {teachingAssignments.divisions.map(d => d.name).join(', ') || 'Div A, Div B'}
+            </strong>
           </div>
           <div>
             <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' }}>Semester</span>
-            <strong style={{ color: '#F8FAFC', fontSize: '0.95rem' }}>Semester 4 (Division A)</strong>
+            <strong style={{ color: '#F8FAFC', fontSize: '0.95rem' }}>
+              {teachingAssignments.semesters.map(s => `Sem ${s.number}`).join(', ') || 'Semester 4'}
+            </strong>
           </div>
           <div>
-            <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' }}>Current Date</span>
-            <strong style={{ color: '#F37023', fontFamily: 'monospace', fontSize: '0.95rem' }}>26 Aug 2026</strong>
+            <span style={{ color: '#94A3B8', display: 'block', fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase' }}>Today's Lectures</span>
+            <strong style={{ color: '#F37023', fontFamily: 'monospace', fontSize: '0.95rem' }}>
+              {todaySchedule.length} Sessions ({todaySchedule.filter(s => s.status === 'SUBMITTED').length} Done, {pendingLectures.length} Pending)
+            </strong>
           </div>
         </div>
 
@@ -540,7 +598,9 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ initialTab = 'AT
           </div>
           <div>
             <span style={{ fontSize: '0.6875rem', color: '#CBD5E1', textTransform: 'uppercase', fontWeight: 700 }}>Classes Today</span>
-            <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#F37023' }}>3 Sessions</div>
+            <div style={{ fontSize: '1.35rem', fontWeight: 900, color: '#F37023' }}>
+              {todaySchedule.length} Sessions
+            </div>
           </div>
         </div>
       </div>
@@ -555,12 +615,13 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ initialTab = 'AT
       }}>
         {[
           { key: 'ATTENDANCE', label: '1. Mark Attendance', icon: UserCheck },
-          { key: 'HISTORY', label: '2. Attendance History', icon: Clock, count: allSessions.length },
-          { key: 'SUBJECT_STATS', label: '3. Subject Attendance', icon: BarChart3 },
-          { key: 'REPORTS', label: '4. Attendance Reports', icon: FileText },
-          { key: 'IMPORT_STUDENTS', label: '5. Import Students', icon: Upload },
-          { key: 'IMPORT_ATTENDANCE', label: '6. Import Attendance', icon: FileSpreadsheet },
-          { key: 'TEMPLATES', label: '7. Templates', icon: Download }
+          { key: 'PENDING', label: '2. Attendance Pending', icon: AlertTriangle, count: pendingLectures.length },
+          { key: 'HISTORY', label: '3. Attendance Submitted', icon: Clock, count: submittedSessions.length },
+          { key: 'SUBJECT_STATS', label: '4. Subject Attendance', icon: BarChart3 },
+          { key: 'REPORTS', label: '5. Attendance Reports', icon: FileText },
+          { key: 'IMPORT_STUDENTS', label: '6. Import Students', icon: Upload },
+          { key: 'IMPORT_ATTENDANCE', label: '7. Import Attendance', icon: FileSpreadsheet },
+          { key: 'TEMPLATES', label: '8. Templates', icon: Download }
         ].map(tabItem => {
           const isActive = activeTab === tabItem.key;
           const TabIcon = tabItem.icon;
@@ -589,7 +650,7 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ initialTab = 'AT
               <TabIcon size={15} /> {tabItem.label}
               {tabItem.count !== undefined && tabItem.count > 0 && (
                 <span style={{ 
-                  background: isActive ? 'var(--brand-orange, #F37023)' : 'var(--brand-navy, #0B192C)', 
+                  background: isActive ? 'var(--brand-orange, #F37023)' : tabItem.key === 'PENDING' ? '#D97706' : 'var(--brand-navy, #0B192C)', 
                   color: '#FFF', 
                   fontSize: '0.65rem', 
                   padding: '1px 6px', 
@@ -608,6 +669,94 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ initialTab = 'AT
       {activeTab === 'ATTENDANCE' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           
+          {/* Today's Teaching Schedule & Lecture Status Card */}
+          <div className="card" style={{ padding: '1.25rem 1.5rem', borderRadius: '8px', borderLeft: '4px solid var(--brand-navy)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Calendar size={18} color="var(--brand-orange)" /> Today's Teaching Schedule ({selectedDate})
+                </h3>
+                <p style={{ fontSize: '0.78125rem', color: 'var(--text-muted)', margin: '0.2rem 0 0 0' }}>
+                  Track today's curriculum lecture sessions and attendance completion in real time.
+                </p>
+              </div>
+              <Badge variant={pendingLectures.length === 0 ? 'active' : 'warning'}>
+                {pendingLectures.length === 0 ? 'All Attendance Submitted' : `${pendingLectures.length} Attendance Pending`}
+              </Badge>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.85rem' }}>
+              {todaySchedule.map(lec => {
+                const isSubmitted = lec.status === 'SUBMITTED';
+                return (
+                  <div
+                    key={lec.id}
+                    style={{
+                      border: isSubmitted ? '1px solid #A7F3D0' : '1px solid #FDE68A',
+                      background: isSubmitted ? '#F0FDF4' : '#FFFBEB',
+                      borderRadius: '8px',
+                      padding: '0.85rem 1rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      gap: '0.6rem'
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
+                          Lecture #{lec.lectureNo} • {lec.timeSlot}
+                        </span>
+                        {isSubmitted ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.7rem', fontWeight: 800, color: '#059669', background: '#D1FAE5', padding: '2px 7px', borderRadius: '12px' }}>
+                            <CheckCircle2 size={12} /> Attendance Submitted
+                          </span>
+                        ) : (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '0.7rem', fontWeight: 800, color: '#D97706', background: '#FEF3C7', padding: '2px 7px', borderRadius: '12px' }}>
+                            <AlertTriangle size={12} /> Attendance Not Submitted
+                          </span>
+                        )}
+                      </div>
+
+                      <div style={{ fontWeight: 800, fontSize: '0.875rem', color: 'var(--brand-navy)' }}>
+                        {lec.subjectName} ({lec.subjectCode})
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        Division: <strong>{lec.divisionName}</strong> • {lec.roomNo}
+                      </div>
+                      {lec.topicPlanned && (
+                        <div style={{ fontSize: '0.725rem', color: '#475569', marginTop: '4px', fontStyle: 'italic' }}>
+                          Topic: {lec.topicPlanned}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.5rem', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                      {isSubmitted && lec.session ? (
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669' }}>
+                          Present: {lec.session.records.filter(r => r.status === 'PRESENT').length} / {lec.session.records.length}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#D97706' }}>
+                          Pending Submission
+                        </span>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleQuickMarkSchedule(lec)}
+                        className={isSubmitted ? "btn btn-secondary btn-sm" : "btn btn-primary btn-sm"}
+                        style={{ fontSize: '0.725rem', padding: '0.25rem 0.65rem', fontWeight: 700 }}
+                      >
+                        {isSubmitted ? 'Edit Attendance' : 'Mark Attendance'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Duplicate Attendance Warning Alert */}
           {duplicateSession && !editingSessionId && (
             <div style={{
@@ -984,16 +1133,110 @@ export const AttendancePage: React.FC<AttendancePageProps> = ({ initialTab = 'AT
         </div>
       )}
 
-      {/* ─── TAB 2: ATTENDANCE HISTORY & LOGS ──────────────────────────────── */}
+      {/* ─── TAB 2: ATTENDANCE PENDING ───────────────────────────────────── */}
+      {activeTab === 'PENDING' && (
+        <div className="card" style={{ padding: '1.5rem', borderRadius: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <AlertTriangle size={20} color="#D97706" /> Attendance Pending Sessions
+              </h3>
+              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', margin: '0.2rem 0 0 0' }}>
+                All curriculum lectures and classes for which attendance has NOT yet been submitted by you.
+              </p>
+            </div>
+
+            <Badge variant="warning">{pendingLectures.length} Pending Lectures</Badge>
+          </div>
+
+          {pendingLectures.length === 0 ? (
+            <div style={{ padding: '2.5rem', textAlign: 'center', background: '#F8FAFC', borderRadius: '8px' }}>
+              <CheckCircle2 size={36} color="#10B981" style={{ margin: '0 auto 0.75rem' }} />
+              <h4 style={{ fontWeight: 800, color: 'var(--brand-navy)', margin: '0 0 0.25rem' }}>
+                All Attendance Submitted!
+              </h4>
+              <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', margin: 0 }}>
+                You have no pending attendance sessions for today's scheduled lectures.
+              </p>
+            </div>
+          ) : (
+            <ExcelTableContainer minWidth="980px">
+              <ExcelTable>
+                <thead>
+                  <tr style={{ background: '#F1F5F9', borderBottom: '2px solid #CBD5E1' }}>
+                    <th style={{ width: '70px', padding: '0.75rem 0.85rem', textAlign: 'center', fontWeight: 800, color: 'var(--brand-navy)', borderRight: '1px solid #E2E8F0' }}>Lec #</th>
+                    <th style={{ minWidth: '200px', padding: '0.75rem 0.85rem', textAlign: 'left', fontWeight: 800, color: 'var(--brand-navy)', borderRight: '1px solid #E2E8F0' }}>Subject</th>
+                    <th style={{ width: '110px', padding: '0.75rem 0.85rem', textAlign: 'center', fontWeight: 800, color: 'var(--brand-navy)', borderRight: '1px solid #E2E8F0' }}>Division / Class</th>
+                    <th style={{ width: '90px', padding: '0.75rem 0.85rem', textAlign: 'center', fontWeight: 800, color: 'var(--brand-navy)', borderRight: '1px solid #E2E8F0' }}>Semester</th>
+                    <th style={{ width: '110px', padding: '0.75rem 0.85rem', textAlign: 'center', fontWeight: 800, color: 'var(--brand-navy)', borderRight: '1px solid #E2E8F0' }}>Date</th>
+                    <th style={{ width: '150px', padding: '0.75rem 0.85rem', textAlign: 'center', fontWeight: 800, color: 'var(--brand-navy)', borderRight: '1px solid #E2E8F0' }}>Time Slot</th>
+                    <th style={{ minWidth: '200px', padding: '0.75rem 1rem', textAlign: 'left', fontWeight: 800, color: 'var(--brand-navy)', borderRight: '1px solid #E2E8F0' }}>Topic</th>
+                    <th style={{ width: '100px', padding: '0.75rem 0.85rem', textAlign: 'center', fontWeight: 800, color: 'var(--brand-navy)', borderRight: '1px solid #E2E8F0' }}>Status</th>
+                    <th style={{ width: '140px', padding: '0.75rem 0.85rem', textAlign: 'center', fontWeight: 800, color: 'var(--brand-navy)' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingLectures.map((lec, idx) => (
+                    <tr key={lec.id} style={{ background: idx % 2 === 0 ? '#FFFBEB' : '#FEF3C7', borderBottom: '1px solid #E2E8F0' }}>
+                      <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid #F1F5F9' }}>
+                        Lec #{lec.lectureNo}
+                      </td>
+                      <td style={{ padding: '0.75rem 0.85rem', fontWeight: 700, color: 'var(--brand-navy)', borderRight: '1px solid #F1F5F9' }}>
+                        {lec.subjectName} ({lec.subjectCode})
+                      </td>
+                      <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', borderRight: '1px solid #F1F5F9' }}>
+                        <Badge variant="navy">{lec.divisionName}</Badge>
+                      </td>
+                      <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', fontWeight: 600, borderRight: '1px solid #F1F5F9' }}>
+                        Sem {lec.semesterNumber}
+                      </td>
+                      <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', fontFamily: 'monospace', fontWeight: 700, color: '#1E40AF', borderRight: '1px solid #F1F5F9' }}>
+                        {lec.date}
+                      </td>
+                      <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', fontSize: '0.8rem', borderRight: '1px solid #F1F5F9' }}>
+                        {lec.timeSlot}
+                      </td>
+                      <td style={{ padding: '0.75rem 1rem', fontSize: '0.8125rem', borderRight: '1px solid #F1F5F9' }}>
+                        {lec.topicPlanned}
+                      </td>
+                      <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center', borderRight: '1px solid #F1F5F9' }}>
+                        <Badge variant="warning">Pending</Badge>
+                      </td>
+                      <td style={{ padding: '0.75rem 0.85rem', textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickMarkSchedule(lec)}
+                          className="btn btn-primary btn-sm"
+                          style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 800,
+                            padding: '0.3rem 0.75rem',
+                            background: 'var(--brand-orange, #F37023)',
+                            borderColor: 'var(--brand-orange, #F37023)'
+                          }}
+                        >
+                          Mark Attendance
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </ExcelTable>
+            </ExcelTableContainer>
+          )}
+        </div>
+      )}
+
+      {/* ─── TAB 3: ATTENDANCE SUBMITTED & LOGS ─────────────────────────────── */}
       {activeTab === 'HISTORY' && (
         <div className="card" style={{ padding: '1.5rem', borderRadius: '8px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
-              <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0 }}>
-                Attendance Sessions Register &amp; Historical Logs
+              <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Clock size={20} color="#059669" /> Attendance Submitted Sessions &amp; History
               </h3>
               <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', margin: '0.2rem 0 0 0' }}>
-                Full record of all submitted lecture attendance sessions with present/absent breakdown.
+                Full record of all teaching attendance sessions submitted by you with student present/absent breakdown.
               </p>
             </div>
 

@@ -363,6 +363,30 @@ export class RbacService {
       }
     }
 
+    // Canonical role permissions fallback for seeded/standard ERP roles
+    if (!hasRolePermission) {
+      const canonicalRolePermissions: Record<string, string[]> = {
+        FACULTY: [
+          'ATTENDANCE:VIEW', 'ATTENDANCE:CREATE', 'ATTENDANCE:EDIT', 'ATTENDANCE:EXPORT',
+          'STUDENT:VIEW', 'ACADEMIC:VIEW', 'TIMETABLE:VIEW', 'TIMETABLE:CREATE', 'TIMETABLE:EDIT',
+          'EXAM:VIEW', 'FEEDBACK:VIEW'
+        ],
+        STUDENT: ['ATTENDANCE:VIEW', 'STUDENT:VIEW', 'FEES:VIEW', 'ACADEMIC:VIEW', 'EXAM:VIEW'],
+        PARENT: ['ATTENDANCE:VIEW', 'STUDENT:VIEW', 'FEES:VIEW', 'ACADEMIC:VIEW'],
+        HOD: ['ATTENDANCE:VIEW', 'ATTENDANCE:CREATE', 'ATTENDANCE:EDIT', 'ATTENDANCE:DELETE', 'ATTENDANCE:EXPORT', 'STUDENT:VIEW', 'STUDENT:EDIT', 'FACULTY:VIEW'],
+        PRINCIPAL: ['ATTENDANCE:VIEW', 'ATTENDANCE:CREATE', 'ATTENDANCE:EDIT', 'ATTENDANCE:DELETE', 'ATTENDANCE:EXPORT'],
+        REGISTRAR: ['ATTENDANCE:VIEW', 'ATTENDANCE:CREATE', 'ATTENDANCE:EDIT', 'ATTENDANCE:DELETE', 'ATTENDANCE:EXPORT'],
+      };
+
+      for (const ur of user.userRoles) {
+        const canonical = canonicalRolePermissions[ur.role.code.toUpperCase()] || [];
+        if (canonical.includes(`${modUpper}:${actUpper}`)) {
+          hasRolePermission = true;
+          break;
+        }
+      }
+    }
+
     // Direct ALLOW override can grant permission even if not in group template
     const isGrantedByOverride = directOverride && directOverride.granted;
     if (!hasRolePermission && !isGrantedByOverride) {

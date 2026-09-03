@@ -120,6 +120,7 @@ import { WhatsNewModal } from './components/common/WhatsNewModal';
 import { PostLoginUpdateModal } from './components/common/PostLoginUpdateModal';
 import { AccessDeniedPage } from './components/common/AccessDeniedPage';
 import { NotFoundPage } from './components/common/NotFoundPage';
+import { noticeService } from './services/noticeService';
 import { AIControlCenterPage } from './pages/ai-automation/AIControlCenterPage';
 import { StudentAbcPortal } from './pages/academics/StudentAbcPortal';
 import { AbcComplianceDashboard } from './pages/academics/AbcComplianceDashboard';
@@ -135,6 +136,7 @@ import { QuestionBankDashboard } from './pages/exams/QuestionBankDashboard';
 import { GovernmentIntegrationDashboard } from './pages/government-integration/GovernmentIntegrationDashboard';
 import { ComplianceEngineDashboard } from './pages/compliance/ComplianceEngineDashboard';
 import { db } from './services/db';
+import { ERPNotification } from './types';
 import { isTabPermittedForRole, ALL_NAV_ITEMS } from './constants/navigationConfig';
 
 import './styles/index.css';
@@ -161,6 +163,7 @@ export const ROUTE_PATH_MAP: Record<string, string> = {
   'feedback-anonymous-grievance': 'feedback-anonymous-grievance',
   'feedback-track': 'feedback-track',
   'faculty-assets': 'faculty-assets',
+  'faculty/assets': 'faculty-assets',
   'my-assets': 'faculty-assets',
   'faculty/students/search': 'student-search',
   'students/search': 'student-search',
@@ -443,22 +446,102 @@ const MainAppContent: React.FC = () => {
   };
 
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
-  const [showPostLoginUpdates, setShowPostLoginUpdates] = useState<boolean>(() => {
-    if (typeof window === 'undefined' || !user) return false;
-    try {
-      const sessionSeen = sessionStorage.getItem(`sscit_post_login_updates_seen_${user.id}`);
-      return sessionSeen !== 'true';
-    } catch (e) {
-      return true;
+  const [showPostLoginUpdates, setShowPostLoginUpdates] = useState<boolean>(false);
+  const [serverUnreadNotifs, setServerUnreadNotifs] = useState<ERPNotification[]>([]);
+  const seenNoticeIdsRef = React.useRef<Set<string>>(new Set());
+
+  // Polling & real-time sync for server-published notices
+  React.useEffect(() => {
+    if (!user) {
+      setServerUnreadNotifs([]);
+      setShowPostLoginUpdates(false);
+      return;
     }
-  });
+
+    let isMounted = true;
+
+    // Load previously dismissed notice IDs for this user from sessionStorage
+    try {
+      const stored = sessionStorage.getItem(`sscit_seen_notice_ids_${user.id}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((id: string) => seenNoticeIdsRef.current.add(id));
+        }
+      }
+    } catch {}
+
+    const syncServerNotices = async () => {
+      try {
+        const feed = await noticeService.getNoticePopupFeedServer();
+        if (!isMounted || !feed || !feed.unreadNotices) return;
+
+        const mapped: ERPNotification[] = feed.unreadNotices.map((sn: any) => ({
+          id: sn.id,
+          type: 'INFORMATION',
+          title: sn.title,
+          message: sn.content,
+          module: (sn.category as any) || 'NOTICE',
+          priority: (sn.priority as any) || 'NORMAL',
+          scopeType: (sn.scopeType as any) || 'UNIVERSITY_WIDE',
+          referenceId: sn.noticeNo,
+          linkTab: 'notices',
+          timestamp: sn.publishedDate || 'Today',
+          createdAt: sn.createdAt || new Date().toISOString(),
+          isReadByUsers: sn.isRead ? [user.id] : [],
+          targetRole: sn.targetRole as any,
+          targetInstituteId: sn.targetInstituteId,
+          targetDepartmentId: sn.targetDepartmentId,
+        }));
+
+        // Also sync into local db store so topbar bell stays synchronized
+        mapped.forEach((n) => {
+          const existing = db.getNotifications(user, role).find((x) => x.id === n.id);
+          if (!existing) {
+            db.createNotification(n as any);
+          }
+        });
+
+        // Filter unread notifications that haven't been dismissed in this session
+        const unseenUnread = mapped.filter(
+          (n) => !seenNoticeIdsRef.current.has(n.id) && !n.isReadByUsers.includes(user.id)
+        );
+
+        if (isMounted) {
+          setServerUnreadNotifs(mapped.filter((n) => !n.isReadByUsers.includes(user.id)));
+          if (unseenUnread.length > 0) {
+            setShowPostLoginUpdates(true);
+          }
+        }
+      } catch (err) {
+        // Fallback gracefully without breaking UI
+      }
+    };
+
+    // Initial immediate fetch
+    syncServerNotices();
+
+    // Periodic live polling every 10 seconds for real-time delivery
+    const interval = setInterval(syncServerNotices, 10000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [user, role]);
 
   const handleDismissPostLoginUpdates = () => {
     setShowPostLoginUpdates(false);
     if (user?.id && typeof window !== 'undefined') {
       try {
         sessionStorage.setItem(`sscit_post_login_updates_seen_${user.id}`, 'true');
-      } catch (e) { }
+        // Record all current unread notices as seen in session
+        unreadNotifs.forEach((n) => seenNoticeIdsRef.current.add(n.id));
+        sessionStorage.setItem(
+          `sscit_seen_notice_ids_${user.id}`,
+          JSON.stringify(Array.from(seenNoticeIdsRef.current))
+        );
+      } catch (e) {}
     }
   };
 
@@ -466,12 +549,16 @@ const MainAppContent: React.FC = () => {
   const unreadNotifs = React.useMemo(() => {
     if (!user) return [];
     try {
-      return db.getNotifications(user, role).filter(n => !(n.isReadByUsers || []).includes(user.id));
+      const local = db.getNotifications(user, role).filter((n) => !(n.isReadByUsers || []).includes(user.id));
+      const combinedMap = new Map<string, ERPNotification>();
+      local.forEach((n) => combinedMap.set(n.id, n));
+      serverUnreadNotifs.forEach((n) => combinedMap.set(n.id, n));
+      return Array.from(combinedMap.values()).filter((n) => !(n.isReadByUsers || []).includes(user.id));
     } catch (err) {
       console.warn('[PostLoginUpdate] Notification check safely bypassed:', err);
       return [];
     }
-  }, [user, role]);
+  }, [user, role, serverUnreadNotifs]);
 
   // Sync browser popstate (back/forward)
   React.useEffect(() => {
@@ -1645,14 +1732,13 @@ const MainAppContent: React.FC = () => {
       case 'ptm-reports':
         return role === 'PARENT' ? <ParentPTMDashboard /> : <PTMManagementPage initialTab="ptm-reports" />;
       case 'parent-ptm':
-      case 'parent-dashboard':
       case 'parent-children':
         return <ParentPTMDashboard />;
       case 'student-ptm':
         return <StudentPTMView />;
 
       default:
-        return role === 'PARENT' ? <ParentPTMDashboard /> : <Dashboard setActiveTab={setActiveTab} />;
+        return <Dashboard setActiveTab={setActiveTab} />;
     }
   };
 

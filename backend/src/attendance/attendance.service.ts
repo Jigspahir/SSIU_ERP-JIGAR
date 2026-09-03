@@ -1068,17 +1068,153 @@ export class AttendanceService {
     };
   }
 
+  private sessionStore: any[] = [];
+
+  async getFacultyTeachingAssignments(user: any) {
+    const facultyId = user?.facultyId || user?.faculty?.id || user?.id || 'fac-1';
+    
+    let subjects: any[] = [];
+    try {
+      subjects = await this.prisma.subject.findMany({
+        where: {
+          status: 'ACTIVE'
+        },
+        take: 4
+      });
+    } catch (e) {}
+
+    if (subjects.length === 0) {
+      subjects = [
+        { id: 'sub-dbms', code: 'CS401', name: 'Database Management Systems', semesterId: 'sem-4' },
+        { id: 'sub-webtech', code: 'CS404', name: 'Modern Web Architecture', semesterId: 'sem-4' },
+        { id: 'sub-dsa', code: 'CS402', name: 'Data Structures & Algorithms', semesterId: 'sem-4' }
+      ];
+    }
+
+    let divisions: any[] = [];
+    try {
+      divisions = await this.prisma.division.findMany({
+        where: {
+          status: 'ACTIVE'
+        },
+        take: 3
+      });
+    } catch (e) {}
+
+    if (divisions.length === 0) {
+      divisions = [
+        { id: 'div-cse-4a', name: 'Division A (Sem 4)', code: 'DIV-A' },
+        { id: 'div-cse-4b', name: 'Division B (Sem 4)', code: 'DIV-B' }
+      ];
+    }
+
+    return {
+      facultyId,
+      facultyName: user?.faculty ? `${user.faculty.firstName} ${user.faculty.lastName}` : (user?.name || 'Prof. Demo Faculty'),
+      departmentId: user?.departmentId || user?.faculty?.departmentId || 'dept-1',
+      academicYear: '2026-27',
+      subjects: subjects.map(s => ({ id: s.id, code: s.code, name: s.name, semesterId: s.semesterId })),
+      divisions: divisions.map(d => ({ id: d.id, name: d.name, code: d.code }))
+    };
+  }
+
+  async getFacultyTeachingSchedule(user: any, targetDate?: string) {
+    const assignments = await this.getFacultyTeachingAssignments(user);
+    const dateStr = targetDate || new Date().toISOString().split('T')[0];
+    const subjs = assignments.subjects;
+    const divs = assignments.divisions;
+
+    const schedule = [
+      {
+        id: `lec-1-${dateStr}`,
+        lectureNo: 1,
+        timeSlot: '09:00 AM - 10:00 AM',
+        date: dateStr,
+        subjectId: subjs[0]?.id || 'sub-dbms',
+        subjectName: subjs[0]?.name || 'Database Management Systems',
+        subjectCode: subjs[0]?.code || 'CS401',
+        divisionId: divs[0]?.id || 'div-cse-4a',
+        divisionName: divs[0]?.name || 'Division A',
+        semesterNumber: 4,
+        roomNo: 'Room-301',
+        topicPlanned: 'Relational Algebra & Normalization',
+        status: 'SUBMITTED',
+        session: {
+          id: 'att-sess-001',
+          presentCount: 28,
+          absentCount: 2,
+          lateCount: 1,
+          totalRecords: 31,
+          percentage: 93.5
+        }
+      },
+      {
+        id: `lec-2-${dateStr}`,
+        lectureNo: 2,
+        timeSlot: '10:00 AM - 11:00 AM',
+        date: dateStr,
+        subjectId: subjs[1]?.id || subjs[0]?.id || 'sub-webtech',
+        subjectName: subjs[1]?.name || 'Modern Web Architecture',
+        subjectCode: subjs[1]?.code || 'CS404',
+        divisionId: divs[0]?.id || 'div-cse-4a',
+        divisionName: divs[0]?.name || 'Division A',
+        semesterNumber: 4,
+        roomNo: 'Room-301',
+        topicPlanned: 'React State Architecture & Hooks',
+        status: 'PENDING'
+      },
+      {
+        id: `lec-3-${dateStr}`,
+        lectureNo: 3,
+        timeSlot: '01:00 PM - 02:00 PM',
+        date: dateStr,
+        subjectId: subjs[0]?.id || 'sub-dbms',
+        subjectName: subjs[0]?.name || 'Database Management Systems',
+        subjectCode: subjs[0]?.code || 'CS401',
+        divisionId: divs[1]?.id || divs[0]?.id || 'div-cse-4b',
+        divisionName: divs[1]?.name || 'Division B',
+        semesterNumber: 4,
+        roomNo: 'Room-302',
+        topicPlanned: 'SQL Joins & Subqueries',
+        status: 'PENDING'
+      }
+    ];
+
+    return schedule.map(lec => {
+      const recorded = this.sessionStore.find(s => 
+        (s.facultyId === assignments.facultyId || s.facultyId === user?.id) &&
+        s.subjectId === lec.subjectId &&
+        s.divisionId === lec.divisionId &&
+        s.date === lec.date &&
+        Number(s.lectureNo) === Number(lec.lectureNo)
+      );
+      if (recorded) {
+        return {
+          ...lec,
+          status: 'SUBMITTED',
+          session: recorded
+        };
+      }
+      return lec;
+    });
+  }
+
+  async getFacultyPendingAttendance(user: any, targetDate?: string) {
+    const schedule = await this.getFacultyTeachingSchedule(user, targetDate);
+    return schedule.filter(s => s.status === 'PENDING');
+  }
+
   async getFacultyAttendance(facultyId: string) {
     return {
       facultyId,
-      todaysClasses: 6,
-      attendanceCompletedToday: 5,
-      attendancePendingToday: 1,
+      todaysClasses: 3,
+      attendanceCompletedToday: 1,
+      attendancePendingToday: 2,
       averageClassAttendance: 89.4,
       totalConducted: 124,
       subjects: [
-        { subjectId: 'sub-dbms', name: 'Database Management Systems', classes: 40, averageAttendance: 95.0 },
-        { subjectId: 'sub-webtech', name: 'Modern Web Architecture', classes: 40, averageAttendance: 92.5 }
+        { subjectId: 'sub-dbms', name: 'Database Management Systems', code: 'CS401', classes: 40, averageAttendance: 95.0 },
+        { subjectId: 'sub-webtech', name: 'Modern Web Architecture', code: 'CS404', classes: 40, averageAttendance: 92.5 }
       ]
     };
   }
@@ -1236,18 +1372,33 @@ export class AttendanceService {
       throw new ForbiddenException('Students are not authorized to mark or submit attendance sessions.');
     }
 
+    const facultyId = user?.facultyId || user?.faculty?.id || user?.id || 'fac-1';
+    const facultyName = user?.faculty ? `${user.faculty.firstName} ${user.faculty.lastName}` : (user?.username || user?.name || 'Prof. Demo Faculty');
+
+    // Duplicate session prevention for same faculty + subject + division + date + lectureNo
+    const existing = this.sessionStore.find(s => 
+      s.subjectId === dto.subjectId &&
+      s.divisionId === dto.divisionId &&
+      s.date === dto.date &&
+      Number(s.lectureNo) === Number(dto.lectureNo)
+    );
+
+    if (existing) {
+      throw new ConflictException(`Attendance has already been submitted for Lecture #${dto.lectureNo} on ${dto.date} for this subject & division.`);
+    }
+
     const sessionId = `att-sess-${Date.now()}`;
     const totalRecords = dto.records?.length || 0;
     const presentCount = dto.records?.filter(r => r.status === 'PRESENT').length || 0;
     const absentCount = dto.records?.filter(r => r.status === 'ABSENT').length || 0;
     const lateCount = dto.records?.filter(r => r.status === 'LATE').length || 0;
 
-    return {
+    const sessionObj = {
       id: sessionId,
       subjectId: dto.subjectId,
       divisionId: dto.divisionId,
-      facultyId: user?.id,
-      facultyName: user?.username || user?.name || 'Faculty Member',
+      facultyId,
+      facultyName,
       date: dto.date,
       lectureNo: dto.lectureNo,
       timeSlot: dto.timeSlot || '10:00 AM - 11:00 AM',
@@ -1257,8 +1408,12 @@ export class AttendanceService {
       presentCount,
       absentCount,
       lateCount,
+      percentage: totalRecords > 0 ? Math.round(((presentCount + lateCount) / totalRecords) * 1000) / 10 : 100,
       submittedAt: new Date().toISOString()
     };
+
+    this.sessionStore.push(sessionObj);
+    return sessionObj;
   }
 
   /**

@@ -60,31 +60,275 @@ export interface SubjectAttendanceSummaryItem {
   eligibilityStatus: 'GOOD' | 'SHORT_ATTENDANCE' | 'CRITICAL';
 }
 
+export interface TeachingLectureItem {
+  id: string;
+  timetableId?: string;
+  lectureNo: number;
+  timeSlot: string;
+  dayOfWeek: string;
+  date: string;
+  subjectId: string;
+  subjectName: string;
+  subjectCode: string;
+  divisionId: string;
+  divisionName: string;
+  semesterNumber: number;
+  roomNo: string;
+  topicPlanned: string;
+  status: 'SUBMITTED' | 'PENDING' | 'UPCOMING';
+  session?: AttendanceSession;
+}
+
 class AttendanceService {
+  /**
+   * Helper to find faculty profile for user
+   */
+  public findFacultyForUser(user?: User | null) {
+    if (!user) return undefined;
+    const allFaculty = db.getFaculty();
+    return allFaculty.find(f => 
+      f.id === user.id || 
+      f.email === user.email || 
+      (user.username && (f.employeeId === user.username || f.id.includes(user.username)))
+    ) || allFaculty.find(f => f.id === 'fac-1') || allFaculty[0];
+  }
+
+  /**
+   * Get all teaching assignments (subjects, divisions, semesters, timetable) strictly for faculty
+   */
+  public getFacultyTeachingAssignments(user?: User | null, role?: UserRole) {
+    const allSubjects = db.getSubjects();
+    const allDivisions = db.getDivisions();
+    const allSemesters = db.getSemesters();
+    const allTimetable = db.getTimetableEntries();
+
+    if (!user || role !== 'FACULTY') {
+      return {
+        faculty: null,
+        subjects: allSubjects,
+        divisions: allDivisions,
+        semesters: allSemesters,
+        timetableEntries: allTimetable
+      };
+    }
+
+    const fac = this.findFacultyForUser(user);
+    const facId = fac?.id || 'fac-1';
+
+    // 1. Timetable entries for this faculty
+    const facultyTimetable = allTimetable.filter(tt => tt.facultyId === facId || tt.facultyId === user.id);
+
+    // 2. Subjects taught
+    const subjectIds = new Set<string>();
+    if (fac?.subjectIds && fac.subjectIds.length > 0) {
+      fac.subjectIds.forEach(id => subjectIds.add(id));
+    }
+    facultyTimetable.forEach(tt => subjectIds.add(tt.subjectId));
+
+    let subjects = allSubjects.filter(s => subjectIds.has(s.id));
+    if (subjects.length === 0) {
+      const deptSubjs = allSubjects.filter(s => s.departmentId === (fac?.departmentId || user.departmentId));
+      subjects = deptSubjs.length > 0 ? deptSubjs : allSubjects.slice(0, 3);
+    }
+
+    // 3. Divisions taught
+    const divisionIds = new Set<string>();
+    facultyTimetable.forEach(tt => divisionIds.add(tt.divisionId));
+    let divisions = allDivisions.filter(d => divisionIds.has(d.id));
+    if (divisions.length === 0) {
+      divisions = allDivisions.slice(0, 2);
+    }
+
+    // 4. Semesters taught
+    const semesterIds = new Set(subjects.map(s => s.semesterId).filter(Boolean));
+    let semesters = allSemesters.filter(s => semesterIds.has(s.id));
+    if (semesters.length === 0) {
+      semesters = allSemesters.filter(s => s.number === 4);
+    }
+
+    return {
+      faculty: fac,
+      subjects,
+      divisions,
+      semesters: semesters.length > 0 ? semesters : allSemesters.filter(s => s.number === 4),
+      timetableEntries: facultyTimetable
+    };
+  }
+
   /**
    * Get subjects assigned to faculty or all subjects for admins
    */
   public getFacultySubjects(user?: User | null, role?: UserRole): Subject[] {
-    const allSubjects = db.getSubjects();
-    if (!user || role !== 'FACULTY') {
-      return allSubjects;
-    }
-
-    if (role === 'FACULTY') {
-      const fac = db.getFaculty().find(f => f.id === user.id || f.email === user.email);
-      if (fac?.subjectIds && fac.subjectIds.length > 0) {
-        const assigned = allSubjects.filter(s => fac.subjectIds.includes(s.id));
-        if (assigned.length > 0) return assigned;
-      }
-      const deptSubjects = allSubjects.filter(s => s.departmentId === user.departmentId || s.departmentId === fac?.departmentId);
-      if (deptSubjects.length > 0) return deptSubjects;
-    }
-
-    return allSubjects.slice(0, 5);
+    const assignments = this.getFacultyTeachingAssignments(user, role);
+    return assignments.subjects;
   }
 
   /**
-   * Get student roster for a specific subject and division
+   * Get divisions assigned to faculty or all divisions for admins
+   */
+  public getFacultyDivisions(user?: User | null, role?: UserRole, subjectId?: string) {
+    const assignments = this.getFacultyTeachingAssignments(user, role);
+    if (!user || role !== 'FACULTY') {
+      return assignments.divisions;
+    }
+
+    if (subjectId && subjectId !== 'ALL') {
+      const subjectTimetable = assignments.timetableEntries.filter(tt => tt.subjectId === subjectId);
+      if (subjectTimetable.length > 0) {
+        const divIds = new Set(subjectTimetable.map(tt => tt.divisionId));
+        const matchingDivs = assignments.divisions.filter(d => divIds.has(d.id));
+        if (matchingDivs.length > 0) return matchingDivs;
+      }
+    }
+
+    return assignments.divisions;
+  }
+
+  /**
+   * Get Today's Teaching Schedule with lecture attendance status (Completed, Pending, Upcoming)
+   */
+  public getFacultyTeachingSchedule(user?: User | null, role?: UserRole, targetDate?: string): TeachingLectureItem[] {
+    const dateStr = targetDate || new Date().toISOString().split('T')[0];
+    const assignments = this.getFacultyTeachingAssignments(user, role);
+    const allSubjects = db.getSubjects();
+    const allDivisions = db.getDivisions();
+    const allSemesters = db.getSemesters();
+    const allSessions = db.getAttendanceSessions();
+
+    const dateObj = new Date(dateStr);
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+    const rawDay = dayNames[dateObj.getDay()] || 'Monday';
+    const dayOfWeek: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' = 
+      (rawDay === 'Sunday' || rawDay === 'Saturday') ? 'Monday' : rawDay;
+
+    // Default topics per subject
+    const defaultTopics: Record<string, string[]> = {
+      'sub-dbms': ['Relational Algebra & Normalization', 'SQL Joins & Subqueries', 'Transaction ACID Properties & Concurrency', 'B+ Tree Indexing Architecture'],
+      'sub-dsa': ['Binary Search Trees & Balancing Operations', 'Graph BFS & DFS Implementations', 'Dynamic Programming Matrix Chain Multiplication', 'Disjoint Set Union & Kruskal Algorithm'],
+      'sub-webtech': ['React State Architecture & Hooks', 'RESTful API Design & Middleware', 'JWT Authentication & Security Best Practices', 'Full-Stack Performance Optimization'],
+      'sub-cn': ['TCP 3-Way Handshake & Flow Control', 'IP Subnetting & CIDR Routing', 'DNS Protocol & HTTP/2 Transport', 'Network Security & Firewalls'],
+      'sub-ai': ['A* Search Heuristics', 'Minimax Algorithm with Alpha-Beta Pruning', 'Neural Network Backpropagation', 'Reinforcement Learning Q-Learning']
+    };
+
+    // Filter timetable entries for today's day of week
+    let dayEntries = assignments.timetableEntries.filter(tt => tt.dayOfWeek.toLowerCase() === dayOfWeek.toLowerCase());
+    
+    // Fallback if no timetable entries for day: generate standard canonical schedule for faculty
+    if (dayEntries.length === 0 && assignments.subjects.length > 0) {
+      dayEntries = [
+        {
+          id: 'tt-fac-1',
+          dayOfWeek,
+          timeSlot: '09:00 AM - 10:00 AM',
+          subjectId: assignments.subjects[0]?.id || 'sub-dbms',
+          facultyId: assignments.faculty?.id || 'fac-1',
+          divisionId: assignments.divisions[0]?.id || 'div-cse-4a',
+          roomNo: 'Room-301',
+          departmentId: assignments.faculty?.departmentId || 'dept-1',
+          status: 'ACTIVE'
+        },
+        {
+          id: 'tt-fac-2',
+          dayOfWeek,
+          timeSlot: '10:00 AM - 11:00 AM',
+          subjectId: assignments.subjects[1]?.id || assignments.subjects[0]?.id || 'sub-webtech',
+          facultyId: assignments.faculty?.id || 'fac-1',
+          divisionId: assignments.divisions[0]?.id || 'div-cse-4a',
+          roomNo: 'Room-301',
+          departmentId: assignments.faculty?.departmentId || 'dept-1',
+          status: 'ACTIVE'
+        },
+        {
+          id: 'tt-fac-3',
+          dayOfWeek,
+          timeSlot: '01:00 PM - 02:00 PM',
+          subjectId: assignments.subjects[0]?.id || 'sub-dbms',
+          facultyId: assignments.faculty?.id || 'fac-1',
+          divisionId: assignments.divisions[1]?.id || assignments.divisions[0]?.id || 'div-cse-4b',
+          roomNo: 'Room-302',
+          departmentId: assignments.faculty?.departmentId || 'dept-1',
+          status: 'ACTIVE'
+        }
+      ];
+    }
+
+    const items: TeachingLectureItem[] = dayEntries.map((entry, idx) => {
+      const subj = allSubjects.find(s => s.id === entry.subjectId);
+      const div = allDivisions.find(d => d.id === entry.divisionId);
+      const sem = allSemesters.find(s => s.id === subj?.semesterId);
+      const lectureNo = idx + 1;
+
+      // Check if session exists in db
+      const existingSession = allSessions.find(s => 
+        s.subjectId === entry.subjectId &&
+        s.divisionId === entry.divisionId &&
+        s.date === dateStr &&
+        Number(s.lectureNo) === Number(lectureNo)
+      );
+
+      let status: 'SUBMITTED' | 'PENDING' | 'UPCOMING' = 'PENDING';
+      if (existingSession) {
+        status = 'SUBMITTED';
+      }
+
+      const topics = defaultTopics[entry.subjectId] || ['Curriculum Delivery Session'];
+      const topicPlanned = topics[idx % topics.length];
+
+      return {
+        id: `lec-${entry.id}-${dateStr}`,
+        timetableId: entry.id,
+        lectureNo,
+        timeSlot: entry.timeSlot,
+        dayOfWeek,
+        date: dateStr,
+        subjectId: entry.subjectId,
+        subjectName: subj?.name || 'Subject',
+        subjectCode: subj?.code || 'SUB',
+        divisionId: entry.divisionId,
+        divisionName: div?.name || 'Division A',
+        semesterNumber: sem?.number || 4,
+        roomNo: entry.roomNo || 'Room-301',
+        topicPlanned,
+        status,
+        session: existingSession
+      };
+    });
+
+    return items;
+  }
+
+  /**
+   * Get all lectures for which attendance is currently pending submission for the logged-in faculty
+   */
+  public getFacultyPendingAttendance(user?: User | null, role?: UserRole, targetDate?: string): TeachingLectureItem[] {
+    const schedule = this.getFacultyTeachingSchedule(user, role, targetDate);
+    return schedule.filter(item => item.status === 'PENDING');
+  }
+
+  /**
+   * Get all submitted attendance sessions for the logged-in faculty
+   */
+  public getFacultySubmittedAttendance(user?: User | null, role?: UserRole): AttendanceSession[] {
+    const allSessions = db.getAttendanceSessions();
+    if (!user || role !== 'FACULTY') {
+      return allSessions;
+    }
+
+    const fac = this.findFacultyForUser(user);
+    const facId = fac?.id || 'fac-1';
+    const facName = fac?.name || user.name;
+
+    return allSessions.filter(s => 
+      s.facultyId === facId || 
+      s.facultyId === user.id || 
+      s.facultyName === facName ||
+      (s.facultyName && user.name && s.facultyName.toLowerCase().includes(user.name.toLowerCase()))
+    );
+  }
+
+  /**
+   * Get student roster strictly for a specific subject and division (Teaching Assignment Scoped)
+   * NEVER loads mentee students or mentor mappings!
    */
   public getStudentRoster(subjectId?: string, divisionId?: string, actingUser?: User | null, actingRole?: UserRole): Student[] {
     if (actingRole === 'STUDENT' || actingUser?.role === 'STUDENT') {
@@ -145,8 +389,9 @@ class AttendanceService {
     if (user?.role === 'STUDENT') {
       throw new Error('Access Denied: Students are not authorized to mark or submit attendance sessions.');
     }
-    const facultyName = user?.name || 'Demo Faculty 1';
-    const facultyId = user?.id || 'fac-1';
+    const fac = this.findFacultyForUser(user);
+    const facultyName = fac?.name || user?.name || 'Prof. Demo Faculty';
+    const facultyId = fac?.id || user?.id || 'fac-1';
 
     if (payload.id) {
       const existing = db.getAttendanceSessions().find(s => s.id === payload.id);
@@ -190,6 +435,31 @@ class AttendanceService {
     try {
       import('./sessionPlanService').then(({ sessionPlanService }) => {
         sessionPlanService.syncAttendanceWithSessionPlan(saved);
+      });
+    } catch {
+      // safe fallback
+    }
+
+    // Synchronize with Centralized Firebase Firestore in background
+    try {
+      import('../firebase/services/attendanceService').then(({ firebaseAttendanceService }) => {
+        firebaseAttendanceService.submitAttendance({
+          sessionId: saved.id,
+          subjectId: saved.subjectId,
+          divisionId: saved.divisionId,
+          departmentId: (saved as any).departmentId || 'dept-1',
+          programId: (saved as any).programId || 'prog-1',
+          academicYearId: (saved as any).academicYearId || 'ay-2024',
+          semesterId: (saved as any).semesterId || 'sem-cse-4',
+          facultyId: saved.facultyId,
+          facultyName: saved.facultyName,
+          date: saved.date,
+          lectureNumber: Number(saved.lectureNo),
+          timeSlot: payload.timeSlot || '09:00 - 10:00',
+          room: (saved as any).room || 'Room 101',
+          topicTaught: saved.topicTaught,
+          records: payload.records
+        }, user || { id: saved.facultyId, name: saved.facultyName, role: 'FACULTY', email: '' } as User).catch(() => {});
       });
     } catch {
       // safe fallback

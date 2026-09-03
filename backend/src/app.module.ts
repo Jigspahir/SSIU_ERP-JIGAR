@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { RateLimiterGuard } from './common/guards/rate-limiter.guard';
 import { PrismaModule } from './prisma/prisma.module';
+import { FirebaseModule } from './firebase/firebase.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { MasterDataCacheModule } from './common/cache/master-data-cache.module';
@@ -97,6 +98,7 @@ import { StudentCouncilModule } from './student-council/student-council.module';
       envFilePath: ['.env', '.env.example'],
     }),
     PrismaModule,
+    FirebaseModule,
     MasterDataCacheModule,
     HealthModule,
     AuthModule,

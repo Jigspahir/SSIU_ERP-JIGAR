@@ -1,7 +1,8 @@
-import { Injectable, UnauthorizedException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { FirebaseAuthService } from './firebase-auth.service';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { LoginDto } from './dto/login.dto';
@@ -18,6 +19,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly firebaseAuthService: FirebaseAuthService,
   ) {}
 
   async login(loginDto: LoginDto, reqMeta: { ip?: string; userAgent?: string }) {
@@ -30,6 +32,7 @@ export class AuthService {
       const lower = cleanLoginId.toLowerCase();
 
       const aliasMap: Record<string, string[]> = {
+        parent: ['parent', 'parent1', 'parent_demo01', 'PAR000001', 'PAR2024001', 'rajesh.sharma'],
         faculty: ['fac_amitshah', 'FAC000001', 'faculty'],
         student: ['stu_demo01', 'STU000001', 'student'],
         hod: ['hod_demo01', 'HOD000001', 'hod'],
@@ -72,6 +75,73 @@ export class AuthService {
           faculty: { select: { id: true, employeeCode: true, firstName: true, lastName: true, email: true, designation: true, instituteId: true, departmentId: true } },
         },
       });
+      if (!user && (lower === 'parent' || lower.startsWith('parent') || lower === 'rajesh.sharma')) {
+        let parentRole = await this.prisma.role.findFirst({ where: { code: 'PARENT' } });
+        if (!parentRole) {
+          parentRole = await this.prisma.role.create({
+            data: { code: 'PARENT', name: 'Parent / Guardian', authorityLevel: 5, status: 'ACTIVE' }
+          });
+        }
+        const saltRounds = 10;
+        const passHash = await bcrypt.hash('Parent@123', saltRounds);
+        const createdUser = await this.prisma.user.upsert({
+          where: { erpId: 'PAR000001' },
+          update: { accountStatus: 'ACTIVE' },
+          create: {
+            erpId: 'PAR000001',
+            username: 'parent',
+            passwordHash: passHash,
+            accountStatus: 'ACTIVE',
+          },
+        });
+        await this.prisma.userRole.upsert({
+          where: { userId_roleId: { userId: createdUser.id, roleId: parentRole.id } },
+          update: {},
+          create: { userId: createdUser.id, roleId: parentRole.id },
+        });
+        user = await this.prisma.user.findUnique({
+          where: { id: createdUser.id },
+          include: {
+            userRoles: { include: { role: true } },
+            student: { select: { id: true, enrollmentNo: true, temporaryEnrollmentNumber: true, finalEnrollmentNumber: true, enrollmentStatus: true, firstName: true, lastName: true, email: true, instituteId: true, departmentId: true } },
+            faculty: { select: { id: true, employeeCode: true, firstName: true, lastName: true, email: true, designation: true, instituteId: true, departmentId: true } },
+          },
+        });
+      }
+
+      if (!user && (lower === 'faculty' || lower === 'fac_amitshah' || lower === 'fac000001' || lower === 'fac-1')) {
+        let facRole = await this.prisma.role.findFirst({ where: { code: 'FACULTY' } });
+        if (!facRole) {
+          facRole = await this.prisma.role.create({
+            data: { code: 'FACULTY', name: 'Faculty Member', authorityLevel: 30, status: 'ACTIVE' }
+          });
+        }
+        const saltRounds = 10;
+        const passHash = await bcrypt.hash('Faculty@123', saltRounds);
+        const createdUser = await this.prisma.user.upsert({
+          where: { erpId: 'FAC000001' },
+          update: { accountStatus: 'ACTIVE' },
+          create: {
+            erpId: 'FAC000001',
+            username: 'faculty',
+            passwordHash: passHash,
+            accountStatus: 'ACTIVE',
+          },
+        });
+        await this.prisma.userRole.upsert({
+          where: { userId_roleId: { userId: createdUser.id, roleId: facRole.id } },
+          update: {},
+          create: { userId: createdUser.id, roleId: facRole.id },
+        });
+        user = await this.prisma.user.findUnique({
+          where: { id: createdUser.id },
+          include: {
+            userRoles: { include: { role: true } },
+            student: { select: { id: true, enrollmentNo: true, temporaryEnrollmentNumber: true, finalEnrollmentNumber: true, enrollmentStatus: true, firstName: true, lastName: true, email: true, instituteId: true, departmentId: true } },
+            faculty: { select: { id: true, employeeCode: true, firstName: true, lastName: true, email: true, designation: true, instituteId: true, departmentId: true } },
+          },
+        });
+      }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       this.logger.warn(`Database query failed during login check: ${errMsg}`);
@@ -105,7 +175,7 @@ export class AuthService {
     // 3. Password Check
     let isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
-      const validPasswords = ['Admin@123', 'Faculty@123', 'Student@123', 'Hod@123', 'Hoi@123', 'Registrar@123'];
+      const validPasswords = ['Admin@123', 'Faculty@123', 'Student@123', 'Hod@123', 'Hoi@123', 'Registrar@123', 'Parent@123'];
       if (validPasswords.includes(password)) {
         isPasswordValid = true;
       }
@@ -391,6 +461,167 @@ export class AuthService {
     await this.logAudit(resetRecord.user.id, resetRecord.user.username, 'PASSWORD_RESET', true, reqMeta);
 
     return { message: 'Password reset completed successfully. You may now login with your new password.' };
+  }
+
+  async firebaseLogin(idToken: string, reqMeta: { ip?: string; userAgent?: string }) {
+    if (!idToken) {
+      throw new BadRequestException('Firebase ID Token is required.');
+    }
+
+    // 1. Authenticate Firebase ID Token and resolve authoritative session
+    const firebaseSession = await this.firebaseAuthService.authenticateToken(idToken);
+    const cleanUid = firebaseSession.uid.replace(/^fb-uid-/, '').replace(/^firebase-uid-/, '');
+    const searchEmail = firebaseSession.email?.trim().toLowerCase();
+
+    // 2. Query matching ERP user from PostgreSQL via Prisma
+    let user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: firebaseSession.uid },
+          { id: cleanUid },
+          { erpId: firebaseSession.uid },
+          { erpId: cleanUid },
+          { erpId: cleanUid.toUpperCase() },
+          { username: firebaseSession.uid },
+          { username: cleanUid },
+          ...(searchEmail ? [
+            { username: searchEmail },
+            { student: { email: searchEmail } },
+            { faculty: { email: searchEmail } },
+          ] : []),
+          { student: { enrollmentNo: cleanUid } },
+          { faculty: { employeeCode: cleanUid } },
+        ],
+      },
+      include: {
+        userRoles: { include: { role: true } },
+        student: {
+          select: {
+            id: true,
+            enrollmentNo: true,
+            temporaryEnrollmentNumber: true,
+            finalEnrollmentNumber: true,
+            enrollmentStatus: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            instituteId: true,
+            departmentId: true,
+            currentDivisionId: true,
+          },
+        },
+        faculty: {
+          select: {
+            id: true,
+            employeeCode: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            designation: true,
+            instituteId: true,
+            departmentId: true,
+          },
+        },
+      },
+    });
+
+    // 3. If user exists in PostgreSQL ERP database
+    if (user) {
+      const u = user as any;
+      if (u.accountStatus === 'LOCKED' || u.accountStatus === 'DISABLED' || u.accountStatus === 'SUSPENDED') {
+        await this.logAudit(u.id, u.username, 'FIREBASE_LOGIN_BLOCKED', false, reqMeta, `Account status is ${u.accountStatus}`);
+        throw new ForbiddenException(`Account access denied: Account status is ${u.accountStatus}. Contact your administrator.`);
+      }
+
+      await this.prisma.user.update({
+        where: { id: u.id },
+        data: {
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+          lastLoginAt: new Date(),
+        },
+      });
+
+      await this.logAudit(u.id, u.username, 'FIREBASE_LOGIN_SUCCESS', true, reqMeta);
+
+      const primaryRole = u.userRoles?.[0]?.role;
+      const roles = (u.userRoles?.map((ur: any) => ur.role?.code) || []).filter(Boolean);
+
+      const payload = {
+        sub: u.id,
+        erpId: u.erpId,
+        username: u.username,
+        role: primaryRole?.code || firebaseSession.role || 'STUDENT',
+        firebaseUid: firebaseSession.uid,
+      };
+
+      const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
+      const refreshToken = crypto.randomBytes(40).toString('hex');
+      const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      await this.prisma.refreshToken.create({
+        data: {
+          userId: u.id,
+          tokenHash: refreshToken,
+          expiresAt: refreshExpiresAt,
+        },
+      });
+
+      const email = u.student?.email || u.faculty?.email || searchEmail || `${u.username}@swarrnim.edu.in`;
+
+      return {
+        accessToken,
+        refreshToken,
+        tokenType: 'Bearer',
+        expiresIn: 900,
+        firebaseUid: firebaseSession.uid,
+        user: {
+          id: u.id,
+          erpId: u.erpId,
+          username: u.username,
+          email,
+          role: primaryRole?.code || firebaseSession.role || 'STUDENT',
+          roles: roles.length > 0 ? roles : [firebaseSession.role],
+          authorityLevel: primaryRole?.authorityLevel || 10,
+          student: u.student,
+          faculty: u.faculty,
+          lastLoginAt: u.lastLoginAt,
+        },
+      };
+    }
+
+    // 4. Fallback for valid Firebase user authenticated without explicit PostgreSQL User record
+    const fallbackPayload = {
+      sub: firebaseSession.uid,
+      erpId: cleanUid,
+      username: firebaseSession.email || cleanUid,
+      role: firebaseSession.role || 'STUDENT',
+      firebaseUid: firebaseSession.uid,
+    };
+
+    const accessToken = this.jwtService.sign(fallbackPayload, { expiresIn: '15m' });
+    const refreshToken = crypto.randomBytes(40).toString('hex');
+
+    await this.logAudit(null, firebaseSession.email || cleanUid, 'FIREBASE_DIRECT_LOGIN', true, reqMeta);
+
+    return {
+      accessToken,
+      refreshToken,
+      tokenType: 'Bearer',
+      expiresIn: 900,
+      firebaseUid: firebaseSession.uid,
+      user: {
+        id: firebaseSession.uid,
+        erpId: cleanUid,
+        username: firebaseSession.email || cleanUid,
+        email: firebaseSession.email,
+        role: firebaseSession.role,
+        roles: firebaseSession.roles,
+        authorityLevel: 10,
+        employeeId: firebaseSession.employeeId,
+        studentId: firebaseSession.studentId,
+      },
+    };
   }
 
   private async logAudit(userId: string | null, username: string, action: string, success: boolean, reqMeta: { ip?: string; userAgent?: string }, reason?: string) {

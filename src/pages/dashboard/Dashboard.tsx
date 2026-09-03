@@ -26,6 +26,8 @@ import { StudentExcelDashboard } from '../../components/dashboard/StudentExcelDa
 import { registrarOfficeService } from '../../services/registrarOfficeService';
 import { researchService } from '../../services/researchService';
 import { innovationService } from '../../services/innovationService';
+import { ParentDashboardView } from './ParentDashboardView';
+import { BulkUserProvisioningCard } from '../../components/admin/BulkUserProvisioningCard';
 const ManagementAnalyticsDashboard = React.lazy(() => import('../../components/dashboard/ManagementAnalyticsDashboard').then(m => ({ default: m.ManagementAnalyticsDashboard })));
 
 interface DashboardProps {
@@ -3034,6 +3036,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
           />
         </div>
 
+        {/* Central ERP Bulk ID Generation & User Provisioning Desk */}
+        <BulkUserProvisioningCard />
+
         {/* Quick Access Modules Hub */}
         <div className="card" style={{ padding: '1.25rem' }}>
           <h4 style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--brand-navy)', margin: '0 0 1rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -3238,6 +3243,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
     };
     return (r && roleMap[r]) || r?.replace(/_/g, ' ') || 'University Member';
   };
+
+  if (role === 'PARENT') {
+    return <ParentDashboardView onNavigateTab={setActiveTab} />;
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

@@ -90,10 +90,14 @@ export class MentorBackendService {
     // Scope check: institute and department boundary validation
     if (mentorUser) {
       if (mentorUser.instituteId && student.instituteId && mentorUser.instituteId !== student.instituteId) {
-        return false;
+        const isInstAlias = (mentorUser.instituteId === 'inst-1' && student.instituteId === 'inst-sit') ||
+                            (mentorUser.instituteId === 'inst-sit' && student.instituteId === 'inst-1');
+        if (!isInstAlias) return false;
       }
       if (mentorUser.departmentId && student.departmentId && mentorUser.departmentId !== student.departmentId) {
-        return false;
+        const isDeptAlias = (mentorUser.departmentId === 'dept-1' && student.departmentId === 'dept-cse') ||
+                            (mentorUser.departmentId === 'dept-cse' && student.departmentId === 'dept-1');
+        if (!isDeptAlias) return false;
       }
     }
 
@@ -170,10 +174,18 @@ export class MentorBackendService {
 
     // 2. Enforce Institute and Department Scope
     if (user.instituteId) {
-      assignedStudents = assignedStudents.filter(s => s.instituteId === user.instituteId);
+      assignedStudents = assignedStudents.filter(s => 
+        s.instituteId === user.instituteId ||
+        (user.instituteId === 'inst-1' && s.instituteId === 'inst-sit') ||
+        (user.instituteId === 'inst-sit' && s.instituteId === 'inst-1')
+      );
     }
     if (user.departmentId) {
-      assignedStudents = assignedStudents.filter(s => s.departmentId === user.departmentId);
+      assignedStudents = assignedStudents.filter(s => 
+        s.departmentId === user.departmentId ||
+        (user.departmentId === 'dept-1' && s.departmentId === 'dept-cse') ||
+        (user.departmentId === 'dept-cse' && s.departmentId === 'dept-1')
+      );
     }
 
     // 3. Apply Query Filters

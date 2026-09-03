@@ -57,7 +57,7 @@ export const AdminLoginPage: React.FC<{ onAdminLoginSuccess?: () => void }> = ({
 
     try {
       // 1. Authenticate credentials through central auth system
-      const res = login(cleanId, password);
+      const res = await login(cleanId, password);
       if (!res.success) {
         setIsLoading(false);
         setError(res.error || 'Invalid administrator credentials. Access denied.');
@@ -168,14 +168,14 @@ export const AdminLoginPage: React.FC<{ onAdminLoginSuccess?: () => void }> = ({
           <form onSubmit={handleAdminSubmit} className="space-y-4">
             <div>
               <label className="block text-[11px] font-bold uppercase tracking-wider text-blue-200 mb-1.5">
-                Admin Username / Official ID
+                Admin Email / Official Username
               </label>
               <div className="relative">
                 <UserCheck className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   required
-                  placeholder="e.g. demo.admin or superadmin"
+                  placeholder="e.g. jigarahir410@gmail.com or demo.admin"
                   value={identifier}
                   onChange={e => setIdentifier(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-black/40 border border-white/15 text-white placeholder-slate-500 text-xs font-medium focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition"

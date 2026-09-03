@@ -11,9 +11,15 @@ export interface FeedbackPageProps {
 export const FeedbackPage: React.FC<FeedbackPageProps> = ({ activeTab, setActiveTab }) => {
   const { role } = useAuth();
 
+  // Faculty is strictly read-only and always routes to scoped AdminFeedbackDashboardPage
+  if (role === 'FACULTY') {
+    return <AdminFeedbackDashboardPage />;
+  }
+
   // Route sub-tabs (such as anonymous grievance filing, tracking, or feedback submission) to StudentFeedbackPage
   if (
     role === 'STUDENT' || 
+    role === 'PARENT' ||
     activeTab === 'feedback-anonymous-grievance' || 
     activeTab === 'feedback-anonymous' || 
     activeTab === 'feedback-track' || 

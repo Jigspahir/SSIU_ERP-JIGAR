@@ -44,6 +44,24 @@ export class NoticesController {
     return this.noticesService.getNotices(req.user, query);
   }
 
+  @Get('feed/popup')
+  @ApiOperation({ summary: 'Get real-time unread notice popup feed for current user' })
+  getNoticePopupFeed(@Req() req: any) {
+    return this.noticesService.getNoticePopupFeed(req.user);
+  }
+
+  @Post('mark-all-read')
+  @ApiOperation({ summary: 'Mark all eligible notices as read for current user' })
+  markAllNoticesAsRead(@Req() req: any) {
+    return this.noticesService.markAllNoticesAsRead(req.user);
+  }
+
+  @Post(':id/read')
+  @ApiOperation({ summary: 'Mark specific notice as read for current user' })
+  markNoticeAsRead(@Param('id') id: string, @Req() req: any) {
+    return this.noticesService.markNoticeAsRead(id, req.user);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get Notice details by ID with audience authorization' })
   getNoticeById(@Param('id') id: string, @Req() req: any) {

@@ -26,6 +26,7 @@ import { db } from '../../services/db';
 import { useAuth } from '../../context/AuthContext';
 import { Badge } from './Badge';
 import { notificationService } from '../../services/notificationService';
+import { noticeService } from '../../services/noticeService';
 import { useModalScrollLock } from '../../utils/modalScrollLock';
 
 export interface PostLoginUpdateModalProps {
@@ -103,6 +104,7 @@ export const PostLoginUpdateModal: React.FC<PostLoginUpdateModalProps> = ({
   const handleMarkRead = (notifId: string) => {
     if (user?.id) {
       db.markNotificationAsRead(notifId, user.id);
+      noticeService.markNoticeReadServer(notifId).catch(() => {});
     }
     const updated = unreadList.filter(n => n.id !== notifId);
     setUnreadList(updated);
@@ -113,6 +115,7 @@ export const PostLoginUpdateModal: React.FC<PostLoginUpdateModalProps> = ({
 
   const handleMarkAllRead = () => {
     db.markAllNotificationsAsRead(user, role);
+    noticeService.markAllNoticesReadServer().catch(() => {});
     setUnreadList([]);
     onClose();
   };
@@ -120,6 +123,7 @@ export const PostLoginUpdateModal: React.FC<PostLoginUpdateModalProps> = ({
   const handleActionClick = (n: ERPNotification) => {
     if (user?.id) {
       db.markNotificationAsRead(n.id, user.id);
+      noticeService.markNoticeReadServer(n.id).catch(() => {});
     }
     const target = notificationService.resolveNotificationTarget(n, user, role);
     onClose();

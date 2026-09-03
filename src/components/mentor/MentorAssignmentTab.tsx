@@ -6,15 +6,45 @@ import {
   MentorAssignment, MentorAssignmentHistory, MentorBulkUploadRow 
 } from '../../types/mentorAssignment';
 import { Student, Faculty, UserRole } from '../../types';
+import { ExcelDataTable, ExcelColumn, ExcelFilterOption, ExcelBulkAction } from '../common/ExcelDataTable';
 import { Badge } from '../common/Badge';
 import { StatCard } from '../common/StatCard';
-import { Modal } from '../common/Modal';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { 
-  UserCheck, Users, Search, Filter, Download, Upload, Plus, 
-  RotateCcw, History, AlertCircle, CheckCircle2, ShieldCheck, 
-  FileSpreadsheet, ArrowRight, UserX, Clock, Calendar, Check, X
+  UserCheck, Users, Search, Download, Upload, Plus, 
+  RotateCcw, History, AlertCircle, CheckCircle2, 
+  FileSpreadsheet, ArrowRight, UserX, Check, X,
+  GraduationCap, Building2, BookOpen, Layers
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
+
+export interface StudentMentorAllocationRow {
+  id: string;
+  student: Student;
+  studentName: string;
+  enrollmentNo: string;
+  departmentId: string;
+  departmentName: string;
+  programId: string;
+  programName: string;
+  programCode: string;
+  semesterId: string;
+  semesterNumber: number | string;
+  divisionId: string;
+  divisionName: string;
+  currentMentorName: string;
+  mentorEmployeeId: string;
+  mentorRole: string;
+  mentorFacultyId: string;
+  mentorEmail: string;
+  assignedDate: string;
+  assignedDateFormatted: string;
+  assignedByName: string;
+  assignedByRole: string;
+  allocationStatus: 'ASSIGNED' | 'UNASSIGNED';
+  isAssigned: boolean;
+  activeMentor: MentorAssignment | null;
+}
 
 interface MentorAssignmentTabProps {
   initialDeptFilter?: string;
@@ -25,13 +55,15 @@ export const MentorAssignmentTab: React.FC<MentorAssignmentTabProps> = ({
   initialDeptFilter,
   initialInstFilter
 }) => {
-  const { user, role, canMutate } = useAuth();
+  const { user, role } = useAuth();
 
   // Filters State
   const [selectedInstFilter, setSelectedInstFilter] = useState<string>(initialInstFilter || (user?.instituteId || 'ALL'));
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>(initialDeptFilter || (user?.departmentId || 'ALL'));
   const [selectedProgFilter, setSelectedProgFilter] = useState<string>('ALL');
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState<'ALL' | 'ASSIGNED' | 'UNASSIGNED'>('ALL');
+  const [selectedSemFilter, setSelectedSemFilter] = useState<string>('ALL');
+  const [selectedDivFilter, setSelectedDivFilter] = useState<string>('ALL');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modals State
@@ -66,50 +98,104 @@ export const MentorAssignmentTab: React.FC<MentorAssignmentTabProps> = ({
     setTimeout(() => setToastMessage(null), 4500);
   };
 
-  const institutes = db.getInstitutes();
-  const departments = db.getDepartments();
-  const programs = db.getPrograms();
+  const institutes = db.getInstitutes ? db.getInstitutes() : [];
+  const departments = db.getDepartments ? db.getDepartments() : [];
+  const programs = db.getPrograms ? db.getPrograms() : [];
+  const semesters = db.getSemesters ? db.getSemesters() : [];
+  const divisions = db.getDivisions ? db.getDivisions() : [];
+  const allFaculty = db.getFaculty ? db.getFaculty() : [];
 
-  // Scoped assignments & students
+  // Scoped assignments & students from authoritative live data service
   const { assignments, students } = useMemo(() => {
     return mentorAssignmentService.getAssignments({
-      instituteId: role === 'PRINCIPAL' ? (user?.instituteId || undefined) : selectedInstFilter,
-      departmentId: role === 'HOD' ? (user?.departmentId || undefined) : selectedDeptFilter,
-      programId: selectedProgFilter,
+      instituteId: role === 'PRINCIPAL' ? (user?.instituteId || undefined) : (selectedInstFilter !== 'ALL' ? selectedInstFilter : undefined),
+      departmentId: role === 'HOD' ? (user?.departmentId || undefined) : (selectedDeptFilter !== 'ALL' ? selectedDeptFilter : undefined),
+      programId: selectedProgFilter !== 'ALL' ? selectedProgFilter : undefined,
       searchQuery
     }, user);
   }, [user, role, selectedInstFilter, selectedDeptFilter, selectedProgFilter, searchQuery, refreshKey]);
 
-  // Merge each student with their active mentor
-  const studentRows = useMemo(() => {
-    return students.map(student => {
-      const active = assignments.find(
-        a => (a.studentId === student.id || a.studentEnrollmentNo === student.enrollmentNo) && 
-             a.status === 'ACTIVE'
-      );
-      const activeMentor = active || mentorAssignmentService.getActiveMentorForStudent(student.id);
-      return {
-        student,
-        activeMentor,
-        isAssigned: Boolean(activeMentor && activeMentor.status === 'ACTIVE')
-      };
-    }).filter(row => {
-      if (selectedStatusFilter === 'ASSIGNED') return row.isAssigned;
-      if (selectedStatusFilter === 'UNASSIGNED') return !row.isAssigned;
-      return true;
-    });
-  }, [students, assignments, selectedStatusFilter]);
-
-  // Summary Metrics
-  const totalStudents = students.length;
-  const assignedStudents = studentRows.filter(r => r.isAssigned).length;
-  const unassignedStudents = totalStudents - assignedStudents;
+  // Eligible Faculty List in scope
   const eligibleFaculty = useMemo(() => {
     return mentorAssignmentService.getEligibleMentors({
       instituteId: role === 'PRINCIPAL' ? user?.instituteId : (selectedInstFilter !== 'ALL' ? selectedInstFilter : undefined),
       departmentId: role === 'HOD' ? user?.departmentId : (selectedDeptFilter !== 'ALL' ? selectedDeptFilter : undefined)
     });
   }, [role, user, selectedInstFilter, selectedDeptFilter, refreshKey]);
+
+  // Merge student records into flat Excel-like allocation rows
+  const allRows: StudentMentorAllocationRow[] = useMemo(() => {
+    return students.map(student => {
+      const active = assignments.find(
+        a => (a.studentId === student.id || a.studentEnrollmentNo === student.enrollmentNo) && 
+             a.status === 'ACTIVE'
+      );
+      const activeMentor = active || mentorAssignmentService.getActiveMentorForStudent(student.id);
+      const isAssigned = Boolean(activeMentor && activeMentor.status === 'ACTIVE');
+
+      const dept = departments.find(d => d.id === student.departmentId);
+      const prog = programs.find(p => p.id === student.programId);
+      const sem = semesters.find(s => s.id === student.semesterId);
+      const div = divisions.find(d => d.id === student.divisionId);
+      const assignedFac = isAssigned && activeMentor ? allFaculty.find(f => f.id === activeMentor.mentorFacultyId) : null;
+
+      const semNum = sem?.number || (student as any).semester || 4;
+      const divName = div?.name || (student as any).division || (student as any).section || 'Div A';
+
+      return {
+        id: student.id,
+        student,
+        studentName: student.name,
+        enrollmentNo: student.enrollmentNo,
+        departmentId: student.departmentId || '',
+        departmentName: dept?.name || student.branchName || 'Engineering & Technology',
+        programId: student.programId || '',
+        programName: prog?.name || student.programName || 'B.Tech Program',
+        programCode: prog?.code || 'B.TECH',
+        semesterId: student.semesterId || '',
+        semesterNumber: semNum,
+        divisionId: student.divisionId || '',
+        divisionName: divName,
+        currentMentorName: isAssigned && activeMentor ? activeMentor.mentorName : 'UNASSIGNED',
+        mentorEmployeeId: isAssigned && activeMentor ? activeMentor.mentorEmployeeId : '—',
+        mentorRole: assignedFac?.designation || (isAssigned ? 'Faculty Mentor' : '—'),
+        mentorFacultyId: activeMentor?.mentorFacultyId || '',
+        mentorEmail: activeMentor?.mentorEmail || assignedFac?.email || '—',
+        assignedDate: activeMentor?.assignedDate || '',
+        assignedDateFormatted: activeMentor?.assignedDate ? new Date(activeMentor.assignedDate).toLocaleDateString() : '—',
+        assignedByName: activeMentor?.assignedByName || '—',
+        assignedByRole: activeMentor?.assignedByRole || '—',
+        allocationStatus: isAssigned ? 'ASSIGNED' : 'UNASSIGNED',
+        isAssigned,
+        activeMentor: activeMentor || null
+      };
+    });
+  }, [students, assignments, departments, programs, semesters, divisions, allFaculty]);
+
+  // Apply filters
+  const filteredRows = useMemo(() => {
+    return allRows.filter(row => {
+      // Semester filter
+      if (selectedSemFilter !== 'ALL' && String(row.semesterNumber) !== selectedSemFilter) {
+        return false;
+      }
+      // Division filter
+      if (selectedDivFilter !== 'ALL' && row.divisionName !== selectedDivFilter) {
+        return false;
+      }
+      // Status filter
+      if (selectedStatusFilter === 'ASSIGNED' && !row.isAssigned) return false;
+      if (selectedStatusFilter === 'UNASSIGNED' && row.isAssigned) return false;
+
+      return true;
+    });
+  }, [allRows, selectedSemFilter, selectedDivFilter, selectedStatusFilter]);
+
+  // Summary Metrics
+  const totalStudents = allRows.length;
+  const assignedStudents = allRows.filter(r => r.isAssigned).length;
+  const unassignedStudents = totalStudents - assignedStudents;
+  const allocationPercentage = totalStudents > 0 ? Math.round((assignedStudents / totalStudents) * 100) : 0;
 
   // Handle open Single Assign / Change Modal
   const handleOpenAssignModal = (student: Student, isChange = false) => {
@@ -120,7 +206,6 @@ export const MentorAssignmentTab: React.FC<MentorAssignmentTabProps> = ({
 
     const active = mentorAssignmentService.getActiveMentorForStudent(student.id);
     if (active && !isChange) {
-      // Already assigned, switch to change mode
       setIsChangeMode(true);
       setSelectedFacultyId(active.mentorFacultyId);
     } else {
@@ -229,256 +314,570 @@ export const MentorAssignmentTab: React.FC<MentorAssignmentTabProps> = ({
     }
   };
 
+  // Reset Filters
+  const handleResetFilters = () => {
+    setSelectedProgFilter('ALL');
+    setSelectedSemFilter('ALL');
+    setSelectedDivFilter('ALL');
+    setSelectedStatusFilter('ALL');
+    setSearchQuery('');
+  };
+
+  // ─── Filter Options for ExcelDataTable ──────────────────────────────────────
+  const filterOptions: ExcelFilterOption[] = useMemo(() => {
+    const opts: ExcelFilterOption[] = [];
+
+    // Institute Filter (for Super Admin / Univ Admin)
+    if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') {
+      opts.push({
+        key: 'institute',
+        label: 'Institute',
+        value: selectedInstFilter,
+        options: [
+          { label: 'All Institutes', value: 'ALL' },
+          ...institutes.map(i => ({ label: `[${i.code}] ${i.name}`, value: i.id }))
+        ]
+      });
+    }
+
+    // Department Filter (for Super Admin / Univ Admin / HOI)
+    if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'PRINCIPAL') {
+      opts.push({
+        key: 'department',
+        label: 'Department',
+        value: selectedDeptFilter,
+        options: [
+          { label: 'All Departments', value: 'ALL' },
+          ...departments.map(d => ({ label: `[${d.code}] ${d.name}`, value: d.id }))
+        ]
+      });
+    }
+
+    // Program Filter
+    opts.push({
+      key: 'program',
+      label: 'Program',
+      value: selectedProgFilter,
+      options: [
+        { label: 'All Programs', value: 'ALL' },
+        ...programs.map(p => ({ label: `[${p.code}] ${p.name}`, value: p.id }))
+      ]
+    });
+
+    // Semester Filter
+    opts.push({
+      key: 'semester',
+      label: 'Semester',
+      value: selectedSemFilter,
+      options: [
+        { label: 'All Semesters', value: 'ALL' },
+        { label: 'Sem 1', value: '1' },
+        { label: 'Sem 2', value: '2' },
+        { label: 'Sem 3', value: '3' },
+        { label: 'Sem 4', value: '4' },
+        { label: 'Sem 5', value: '5' },
+        { label: 'Sem 6', value: '6' },
+        { label: 'Sem 7', value: '7' },
+        { label: 'Sem 8', value: '8' }
+      ]
+    });
+
+    // Division Filter
+    opts.push({
+      key: 'division',
+      label: 'Division',
+      value: selectedDivFilter,
+      options: [
+        { label: 'All Divisions', value: 'ALL' },
+        { label: 'Div A', value: 'Div A' },
+        { label: 'Div B', value: 'Div B' },
+        { label: 'Div C', value: 'Div C' },
+        { label: 'Div D', value: 'Div D' }
+      ]
+    });
+
+    // Allocation Status Filter
+    opts.push({
+      key: 'status',
+      label: 'Allocation Status',
+      value: selectedStatusFilter,
+      options: [
+        { label: 'All Students', value: 'ALL' },
+        { label: 'Assigned Mentors Only', value: 'ASSIGNED' },
+        { label: 'Unassigned Students Only', value: 'UNASSIGNED' }
+      ]
+    });
+
+    return opts;
+  }, [role, institutes, departments, programs, selectedInstFilter, selectedDeptFilter, selectedProgFilter, selectedSemFilter, selectedDivFilter, selectedStatusFilter]);
+
+  const handleFilterChange = (key: string, value: string) => {
+    switch (key) {
+      case 'institute': setSelectedInstFilter(value); break;
+      case 'department': setSelectedDeptFilter(value); break;
+      case 'program': setSelectedProgFilter(value); break;
+      case 'semester': setSelectedSemFilter(value); break;
+      case 'division': setSelectedDivFilter(value); break;
+      case 'status': setSelectedStatusFilter(value); break;
+    }
+  };
+
+  // ─── Columns Definition for Clean Excel-Like Table ──────────────────────────
+  const columns: ExcelColumn<StudentMentorAllocationRow>[] = useMemo(() => [
+    // 1. Index
+    {
+      key: 'index',
+      header: '#',
+      width: '45px',
+      minWidth: '40px',
+      align: 'center',
+      sortable: false,
+      sticky: 'left',
+      render: (_item, idx) => <span style={{ color: '#64748B', fontWeight: 600, fontSize: '0.75rem' }}>{idx + 1}</span>,
+      getRawValue: item => item.id
+    },
+    // 2. Student Name
+    {
+      key: 'studentName',
+      header: 'STUDENT NAME',
+      width: '180px',
+      minWidth: '160px',
+      sortable: true,
+      sticky: 'left',
+      render: item => (
+        <div style={{ fontWeight: 800, color: 'var(--brand-navy, #0B192C)', fontSize: '0.8125rem' }}>
+          {item.studentName}
+        </div>
+      ),
+      getRawValue: item => item.studentName
+    },
+    // 3. Enrollment No.
+    {
+      key: 'enrollmentNo',
+      header: 'ENROLLMENT NO.',
+      width: '130px',
+      minWidth: '120px',
+      sortable: true,
+      render: item => (
+        <code style={{ 
+          fontSize: '0.75rem', 
+          fontWeight: 800, 
+          color: 'var(--brand-orange, #F37023)',
+          background: 'rgba(243, 112, 35, 0.08)',
+          padding: '2px 6px',
+          borderRadius: '4px'
+        }}>
+          {item.enrollmentNo}
+        </code>
+      ),
+      getRawValue: item => item.enrollmentNo
+    },
+    // 4. Department
+    {
+      key: 'departmentName',
+      header: 'DEPARTMENT',
+      width: '160px',
+      minWidth: '140px',
+      sortable: true,
+      render: item => (
+        <div style={{ fontSize: '0.78125rem', color: '#334155', fontWeight: 600 }} title={item.departmentName}>
+          {item.departmentName}
+        </div>
+      ),
+      getRawValue: item => item.departmentName
+    },
+    // 5. Program
+    {
+      key: 'programName',
+      header: 'PROGRAM',
+      width: '130px',
+      minWidth: '110px',
+      sortable: true,
+      render: item => (
+        <span style={{ 
+          fontSize: '0.725rem', 
+          fontWeight: 800, 
+          color: 'var(--brand-navy, #0B192C)',
+          background: '#F1F5F9',
+          padding: '2px 6px',
+          borderRadius: '4px'
+        }}>
+          {item.programCode || item.programName}
+        </span>
+      ),
+      getRawValue: item => item.programCode || item.programName
+    },
+    // 6. Semester
+    {
+      key: 'semesterNumber',
+      header: 'SEM',
+      width: '70px',
+      align: 'center',
+      sortable: true,
+      render: item => <strong style={{ color: '#1E293B', fontSize: '0.78125rem' }}>Sem {item.semesterNumber}</strong>,
+      getRawValue: item => item.semesterNumber
+    },
+    // 7. Division
+    {
+      key: 'divisionName',
+      header: 'DIV',
+      width: '75px',
+      align: 'center',
+      sortable: true,
+      render: item => (
+        <span style={{ 
+          fontSize: '0.725rem', 
+          fontWeight: 700, 
+          color: '#475569',
+          background: '#F8FAFC',
+          border: '1px solid #E2E8F0',
+          padding: '1px 5px',
+          borderRadius: '3px'
+        }}>
+          {item.divisionName}
+        </span>
+      ),
+      getRawValue: item => item.divisionName
+    },
+    // 8. Current Mentor
+    {
+      key: 'currentMentorName',
+      header: 'CURRENT MENTOR',
+      width: '190px',
+      minWidth: '170px',
+      sortable: true,
+      render: item => (
+        item.isAssigned && item.activeMentor ? (
+          <div>
+            <div style={{ fontWeight: 800, color: 'var(--brand-navy, #0B192C)', display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8125rem' }}>
+              <UserCheck size={13} color="#10B981" /> {item.currentMentorName}
+            </div>
+            <div style={{ fontSize: '0.7rem', color: '#64748B' }}>
+              <code>{item.mentorEmployeeId}</code>
+            </div>
+          </div>
+        ) : (
+          <span style={{ 
+            fontSize: '0.7rem', 
+            fontWeight: 800, 
+            color: '#DC2626', 
+            background: '#FEF2F2', 
+            padding: '2px 6px', 
+            borderRadius: '4px',
+            border: '1px solid #FECACA'
+          }}>
+            UNASSIGNED
+          </span>
+        )
+      ),
+      getRawValue: item => item.currentMentorName
+    },
+    // 9. Mentor Role
+    {
+      key: 'mentorRole',
+      header: 'MENTOR ROLE',
+      width: '140px',
+      minWidth: '120px',
+      sortable: true,
+      render: item => (
+        <span style={{ fontSize: '0.75rem', color: item.isAssigned ? '#334155' : '#94A3B8', fontWeight: 600 }}>
+          {item.mentorRole}
+        </span>
+      ),
+      getRawValue: item => item.mentorRole
+    },
+    // 10. Assigned Date
+    {
+      key: 'assignedDateFormatted',
+      header: 'ASSIGNED DATE',
+      width: '115px',
+      minWidth: '100px',
+      align: 'center',
+      sortable: true,
+      render: item => (
+        <span style={{ fontSize: '0.75rem', color: item.isAssigned ? '#1E293B' : '#94A3B8', fontWeight: 600 }}>
+          {item.assignedDateFormatted}
+        </span>
+      ),
+      getRawValue: item => item.assignedDateFormatted
+    },
+    // 11. Assigned By
+    {
+      key: 'assignedByName',
+      header: 'ASSIGNED BY',
+      width: '150px',
+      minWidth: '130px',
+      sortable: true,
+      render: item => (
+        item.isAssigned && item.assignedByName !== '—' ? (
+          <div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--brand-navy, #0B192C)' }}>
+              {item.assignedByName}
+            </div>
+            <div style={{ fontSize: '0.6875rem', color: '#64748B' }}>
+              ({item.assignedByRole})
+            </div>
+          </div>
+        ) : (
+          <span style={{ color: '#94A3B8', fontSize: '0.75rem' }}>—</span>
+        )
+      ),
+      getRawValue: item => item.assignedByName
+    },
+    // 12. Allocation Status
+    {
+      key: 'allocationStatus',
+      header: 'STATUS',
+      width: '115px',
+      align: 'center',
+      sortable: true,
+      render: item => {
+        return item.isAssigned ? (
+          <Badge variant="active">ASSIGNED</Badge>
+        ) : (
+          <Badge variant="danger">UNASSIGNED</Badge>
+        );
+      },
+      getRawValue: item => item.allocationStatus
+    },
+    // 13. Actions
+    {
+      key: 'actions',
+      header: 'ACTIONS',
+      width: '180px',
+      minWidth: '160px',
+      align: 'center',
+      sortable: false,
+      render: item => (
+        <div style={{ display: 'inline-flex', gap: '0.3rem', alignItems: 'center' }}>
+          {!item.isAssigned ? (
+            <button
+              type="button"
+              className="btn btn-sm btn-primary"
+              onClick={() => handleOpenAssignModal(item.student, false)}
+              style={{ padding: '0.18rem 0.5rem', fontSize: '0.72rem', fontWeight: 700 }}
+              title="Assign Faculty Mentor"
+            >
+              <Plus size={12} /> Assign Mentor
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={() => handleOpenAssignModal(item.student, true)}
+                style={{ padding: '0.18rem 0.45rem', fontSize: '0.7rem', fontWeight: 700 }}
+                title="Change Faculty Mentor"
+              >
+                <RotateCcw size={11} /> Change
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                onClick={() => handleOpenHistory(item.student)}
+                style={{ padding: '0.18rem 0.45rem', fontSize: '0.7rem', fontWeight: 700 }}
+                title="View Assignment History"
+              >
+                <History size={11} /> History
+              </button>
+
+              {item.activeMentor && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-danger"
+                  onClick={() => setDeletingAssignment(item.activeMentor)}
+                  style={{ padding: '0.18rem 0.45rem', fontSize: '0.7rem' }}
+                  title="Remove / Unassign Mentor"
+                >
+                  <UserX size={11} />
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )
+    }
+  ], []);
+
+  // ─── Bulk Actions for ExcelDataTable ────────────────────────────────────────
+  const bulkActions: ExcelBulkAction<StudentMentorAllocationRow>[] = useMemo(() => [
+    {
+      key: 'export_selected',
+      label: 'Export Selected to Excel',
+      icon: <Download size={13} />,
+      variant: 'secondary',
+      onClick: selected => {
+        const rows = selected.map((s, idx) => ({
+          '#': idx + 1,
+          'Student Name': s.studentName,
+          'Enrollment No.': s.enrollmentNo,
+          'Department': s.departmentName,
+          'Program': s.programName,
+          'Semester': `Sem ${s.semesterNumber}`,
+          'Division': s.divisionName,
+          'Current Mentor': s.currentMentorName,
+          'Mentor Role': s.mentorRole,
+          'Assigned Date': s.assignedDateFormatted,
+          'Assigned By': `${s.assignedByName} (${s.assignedByRole})`,
+          'Allocation Status': s.allocationStatus
+        }));
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Selected_Mentee_Allocations');
+        XLSX.writeFile(wb, `Selected_Mentor_Allocations_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        showToast('success', `Exported ${selected.length} selected mentor allocation records.`);
+      }
+    },
+    {
+      key: 'bulk_upload_trigger',
+      label: 'Open Bulk Upload Wizard',
+      icon: <Upload size={13} />,
+      variant: 'primary',
+      onClick: () => {
+        setIsBulkModalOpen(true);
+        setBulkFile(null);
+        setBulkValidationResult(null);
+      }
+    }
+  ], []);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      {/* Toast */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* Toast Notification */}
       {toastMessage && (
         <div style={{
           position: 'fixed', top: '1.5rem', right: '1.5rem', zIndex: 1000,
           backgroundColor: toastMessage.type === 'success' ? '#10B981' : '#EF4444',
           color: '#FFFFFF', padding: '0.85rem 1.25rem', borderRadius: '8px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)', fontWeight: 600
+          boxShadow: '0 8px 24px rgba(0,0,0,0.2)', fontWeight: 600,
+          display: 'flex', alignItems: 'center', gap: '0.5rem'
         }}>
+          {toastMessage.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
           {toastMessage.text}
         </div>
       )}
 
       {/* Header Banner */}
       <div className="card" style={{
-        padding: '1.75rem',
-        background: 'linear-gradient(135deg, var(--brand-navy) 0%, #1a365d 100%)',
+        padding: '1.5rem',
+        background: 'linear-gradient(135deg, var(--brand-navy, #0B192C) 0%, #1a365d 100%)',
         color: '#FFFFFF',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
         flexWrap: 'wrap',
-        gap: '1rem'
+        gap: '1rem',
+        borderRadius: '8px'
       }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Badge variant="gold">
-              {role === 'HOD' ? 'Departmental Authority' : role === 'PRINCIPAL' ? 'Institutional Authority' : 'University Central Office'}
+              {role === 'HOD' ? 'Department Authority' : role === 'PRINCIPAL' ? 'Institute Authority' : 'University Central Master'}
             </Badge>
-            <span style={{ fontSize: '0.8rem', color: '#FEF3C7' }}>Centralized Student Mentor Allocation Engine</span>
+            <span style={{ fontSize: '0.78125rem', color: '#FEF3C7' }}>Student Mentee Allocation Register</span>
           </div>
-          <h2 style={{ fontSize: '1.75rem', fontWeight: 900, color: '#FFFFFF', marginTop: '0.5rem' }}>
-            Student Mentor Assignment &amp; Allocation
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 900, color: '#FFFFFF', marginTop: '0.35rem' }}>
+            Student Mentee &amp; Faculty Mentor Allocation Master
           </h2>
-          <p style={{ fontSize: '0.875rem', color: '#E2E8F0', marginTop: '0.25rem' }}>
+          <p style={{ fontSize: '0.8125rem', color: '#E2E8F0', marginTop: '0.2rem' }}>
             {role === 'HOD' 
-              ? `Manage faculty mentor mappings for authorized students in ${user?.departmentId || 'your Department'}.`
+              ? `Manage student mentee mappings and faculty mentor allocations for ${user?.departmentId || 'your Department'}.`
               : role === 'PRINCIPAL'
-              ? `Manage mentor mappings across all constituent departments in ${user?.instituteId || 'your Institute'}.`
+              ? `Institutional mentor allocation register across all constituent departments in ${user?.instituteId || 'your Institute'}.`
               : 'University-wide faculty mentor allocation and oversight management.'}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" onClick={handleDownloadTemplate} style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.3)' }}>
-            <Download size={16} /> Download .XLSX Template
+        <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+          <button 
+            type="button"
+            className="btn btn-secondary" 
+            onClick={handleDownloadTemplate} 
+            style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#FFFFFF', border: '1px solid rgba(255,255,255,0.3)', padding: '0.45rem 0.9rem', fontSize: '0.8125rem' }}
+          >
+            <Download size={15} /> Download .XLSX Template
           </button>
-          <button className="btn btn-primary" onClick={() => { setIsBulkModalOpen(true); setBulkFile(null); setBulkValidationResult(null); }}>
-            <Upload size={16} /> Bulk Assign (.XLSX)
+          <button 
+            type="button"
+            className="btn btn-primary" 
+            onClick={() => { setIsBulkModalOpen(true); setBulkFile(null); setBulkValidationResult(null); }}
+            style={{ padding: '0.45rem 0.9rem', fontSize: '0.8125rem' }}
+          >
+            <Upload size={15} /> Bulk Assign (.XLSX)
           </button>
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid-4">
-        <StatCard title="Total Students" value={totalStudents} subtitle="In authorized scope" icon={Users} colorScheme="navy" />
-        <StatCard title="Mentors Assigned" value={assignedStudents} subtitle={`${totalStudents > 0 ? Math.round((assignedStudents / totalStudents) * 100) : 0}% Allocated`} icon={CheckCircle2} colorScheme="green" onClick={() => setSelectedStatusFilter('ASSIGNED')} />
-        <StatCard title="Unassigned Students" value={unassignedStudents} subtitle="Requires faculty mentor" icon={AlertCircle} colorScheme={unassignedStudents > 0 ? 'orange' : 'green'} onClick={() => setSelectedStatusFilter('UNASSIGNED')} />
-        <StatCard title="Eligible Mentors" value={eligibleFaculty.length} subtitle="Active faculty in scope" icon={UserCheck} colorScheme="gold" />
+      <div className="grid-4" style={{ gap: '1rem' }}>
+        <StatCard 
+          title="Total Students" 
+          value={totalStudents} 
+          subtitle="Authorized students in scope" 
+          icon={Users} 
+          colorScheme="navy" 
+        />
+        <StatCard 
+          title="Mentors Assigned" 
+          value={assignedStudents} 
+          subtitle={`${allocationPercentage}% Allocation Rate`} 
+          icon={CheckCircle2} 
+          colorScheme="green" 
+          onClick={() => setSelectedStatusFilter('ASSIGNED')} 
+        />
+        <StatCard 
+          title="Unassigned Students" 
+          value={unassignedStudents} 
+          subtitle={unassignedStudents > 0 ? 'Requires mentor allocation' : 'All students allocated'} 
+          icon={AlertCircle} 
+          colorScheme={unassignedStudents > 0 ? 'orange' : 'green'} 
+          onClick={() => setSelectedStatusFilter('UNASSIGNED')} 
+        />
+        <StatCard 
+          title="Eligible Mentors" 
+          value={eligibleFaculty.length} 
+          subtitle="Active faculty in department" 
+          icon={UserCheck} 
+          colorScheme="gold" 
+        />
       </div>
 
-      {/* Filter & Search Bar */}
-      <div className="card" style={{ padding: '1.25rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'flex-end' }}>
-          {/* Institute filter for Super Admin */}
-          {(role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN') && (
-            <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Institute</label>
-              <select className="form-control" value={selectedInstFilter} onChange={e => setSelectedInstFilter(e.target.value)}>
-                <option value="ALL">All Institutes</option>
-                {institutes.map(i => <option key={i.id} value={i.id}>{i.code} - {i.name}</option>)}
-              </select>
-            </div>
-          )}
-
-          {/* Department filter for HOI / Super Admin */}
-          {(role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'PRINCIPAL') && (
-            <div>
-              <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Department</label>
-              <select className="form-control" value={selectedDeptFilter} onChange={e => setSelectedDeptFilter(e.target.value)}>
-                <option value="ALL">All Departments</option>
-                {departments.map(d => <option key={d.id} value={d.id}>{d.code} - {d.name}</option>)}
-              </select>
-            </div>
-          )}
-
-          <div>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Program</label>
-            <select className="form-control" value={selectedProgFilter} onChange={e => setSelectedProgFilter(e.target.value)}>
-              <option value="ALL">All Programs</option>
-              {programs.map(p => <option key={p.id} value={p.id}>{p.code} - {p.name}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Allocation Status</label>
-            <select className="form-control" value={selectedStatusFilter} onChange={e => setSelectedStatusFilter(e.target.value as any)}>
-              <option value="ALL">All Students</option>
-              <option value="ASSIGNED">Assigned Only</option>
-              <option value="UNASSIGNED">Unassigned Only</option>
-            </select>
-          </div>
-
-          <div>
-            <label style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>Search Student</label>
-            <div style={{ position: 'relative' }}>
-              <input 
-                className="form-control" 
-                placeholder="Search name, enrollment..." 
-                value={searchQuery} 
-                onChange={e => setSearchQuery(e.target.value)} 
-                style={{ paddingLeft: '2rem' }}
-              />
-              <Search size={15} style={{ position: 'absolute', left: '0.65rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Student Allocations Table */}
-      <div className="card" style={{ padding: '1.25rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <h3 style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
-            Student Mentee Allocations ({studentRows.length})
-          </h3>
-          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-            Showing authorized student records in current scope
-          </span>
-        </div>
-
-        {studentRows.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
-            <Users size={48} style={{ opacity: 0.3, margin: '0 auto 1rem' }} />
-            <p style={{ fontWeight: 600 }}>No student records found matching current scope/filters.</p>
-          </div>
-        ) : (
-          <div className="table-responsive">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Student</th>
-                  <th>Department / Program</th>
-                  <th>Current Mentor</th>
-                  <th>Assigned Date / By</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {studentRows.map(({ student, activeMentor, isAssigned }) => {
-                  const dept = db.getDepartmentById(student.departmentId);
-                  const prog = db.getProgramById(student.programId);
-
-                  return (
-                    <tr key={student.id}>
-                      <td>
-                        <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>{student.name}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                          Enrollment: <code style={{ fontWeight: 700, color: 'var(--brand-orange)' }}>{student.enrollmentNo}</code>
-                        </div>
-                      </td>
-
-                      <td>
-                        <div style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{prog?.name || 'B.Tech Program'}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{dept?.name || 'Department'}</div>
-                      </td>
-
-                      <td>
-                        {isAssigned && activeMentor ? (
-                          <div>
-                            <div style={{ fontWeight: 800, color: 'var(--brand-navy)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                              <UserCheck size={16} color="#10B981" /> {activeMentor.mentorName}
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                              ID: {activeMentor.mentorEmployeeId} • {activeMentor.mentorEmail || 'email@university.edu'}
-                            </div>
-                          </div>
-                        ) : (
-                          <div style={{ color: '#EF4444', fontWeight: 600, fontSize: '0.8125rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                            <AlertCircle size={15} /> Not Assigned
-                          </div>
-                        )}
-                      </td>
-
-                      <td>
-                        {isAssigned && activeMentor ? (
-                          <div>
-                            <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--brand-navy)' }}>
-                              {new Date(activeMentor.assignedDate).toLocaleDateString()}
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                              By: {activeMentor.assignedByName} ({activeMentor.assignedByRole})
-                            </div>
-                          </div>
-                        ) : (
-                          <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>—</span>
-                        )}
-                      </td>
-
-                      <td>
-                        <Badge variant={isAssigned ? 'active' : 'danger'}>
-                          {isAssigned ? 'ACTIVE MENTOR' : 'UNASSIGNED'}
-                        </Badge>
-                      </td>
-
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.4rem' }}>
-                          {!isAssigned ? (
-                            <button className="btn btn-sm btn-primary" onClick={() => handleOpenAssignModal(student, false)}>
-                              <Plus size={14} /> Assign Mentor
-                            </button>
-                          ) : (
-                            <button className="btn btn-sm btn-secondary" onClick={() => handleOpenAssignModal(student, true)} title="Change current mentor (Requires Reason)">
-                              <RotateCcw size={14} /> Change Mentor
-                            </button>
-                          )}
-
-                          <button className="btn btn-sm btn-secondary" onClick={() => handleOpenHistory(student)} title="View Assignment History">
-                            <History size={14} /> History
-                          </button>
-
-                          {isAssigned && activeMentor && (
-                            <button className="btn btn-sm btn-danger" onClick={() => setDeletingAssignment(activeMentor)} title="Remove mentor">
-                              <UserX size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {/* Main Excel-Style ERP Data Table */}
+      <ExcelDataTable<StudentMentorAllocationRow>
+        data={filteredRows}
+        columns={columns}
+        keyField="id"
+        title="Student Mentee Allocation Master Table"
+        subtitle={`Showing ${filteredRows.length} of ${totalStudents} authorized student records • Scope: ${role === 'HOD' ? (user?.departmentId || 'Department') : 'University Master'}`}
+        storageKey="ssiu_student_mentor_allocation_grid_v1"
+        searchPlaceholder="Search student name, enrollment no, mentor, department..."
+        searchFields={['studentName', 'enrollmentNo', 'currentMentorName', 'mentorEmployeeId', 'departmentName', 'programName', 'divisionName']}
+        filters={filterOptions}
+        onFilterChange={handleFilterChange}
+        onResetFilters={handleResetFilters}
+        bulkActions={bulkActions}
+        enableSelection={true}
+        exportFilename="SSIU_Student_Mentor_Allocation_Master"
+        exportTitle="SWARRNIM STARTUP & INNOVATION UNIVERSITY — STUDENT MENTEE ALLOCATION REGISTER"
+        pageSizeOptions={[10, 25, 50, 100, 200]}
+        defaultPageSize={25}
+        emptyMessage="No student mentee records found matching the selected filters."
+        emptyDescription="Try clearing filters or adjusting your search criteria."
+      />
 
       {/* ─── MODAL: Single Assign / Change Mentor ───────────────────────────── */}
       {assigningStudent && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '1rem' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '540px', padding: '1.75rem' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '540px', padding: '1.75rem', borderRadius: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>
                 {isChangeMode ? 'Change Student Mentor' : 'Assign Faculty Mentor'}
               </h3>
               <button className="btn-icon" onClick={() => setAssigningStudent(null)}><X size={18} /></button>
             </div>
 
-            {/* If mentor is already assigned, show overwrite protection warning */}
+            {/* Overwrite notice if reassigning */}
             {isChangeMode && (
               <div style={{
                 padding: '0.85rem 1rem', borderRadius: '8px',
@@ -494,10 +893,10 @@ export const MentorAssignmentTab: React.FC<MentorAssignmentTabProps> = ({
 
             <form onSubmit={handleSubmitAssignment} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {/* Student Metadata */}
-              <div style={{ padding: '0.85rem 1rem', backgroundColor: 'var(--bg-surface-hover)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                <div style={{ fontWeight: 800, color: 'var(--brand-navy)' }}>{assigningStudent.name}</div>
+              <div style={{ padding: '0.85rem 1rem', backgroundColor: 'var(--bg-surface-hover, #F8FAFC)', borderRadius: '8px', border: '1px solid var(--border-color, #E2E8F0)' }}>
+                <div style={{ fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>{assigningStudent.name}</div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Enrollment: <strong>{assigningStudent.enrollmentNo}</strong> • Department: <strong>{db.getDepartmentById(assigningStudent.departmentId)?.name}</strong>
+                  Enrollment: <strong style={{ color: 'var(--brand-orange, #F37023)' }}>{assigningStudent.enrollmentNo}</strong> • Department: <strong>{departments.find(d => d.id === assigningStudent.departmentId)?.name || assigningStudent.branchName}</strong>
                 </div>
               </div>
 
@@ -561,10 +960,10 @@ export const MentorAssignmentTab: React.FC<MentorAssignmentTabProps> = ({
       {/* ─── MODAL: View Mentor Assignment History ───────────────────────────── */}
       {historyStudent && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '1rem' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '640px', padding: '1.75rem', maxHeight: '80vh', overflowY: 'auto' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '640px', padding: '1.75rem', maxHeight: '80vh', overflowY: 'auto', borderRadius: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>
                   Mentor Assignment History
                 </h3>
                 <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
@@ -584,8 +983,8 @@ export const MentorAssignmentTab: React.FC<MentorAssignmentTabProps> = ({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {historyList.map(item => (
                   <div key={item.id} style={{
-                    padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)',
-                    backgroundColor: 'var(--bg-surface-hover)'
+                    padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color, #E2E8F0)',
+                    backgroundColor: 'var(--bg-surface-hover, #F8FAFC)'
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -598,7 +997,7 @@ export const MentorAssignmentTab: React.FC<MentorAssignmentTabProps> = ({
                       </span>
                     </div>
 
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--brand-navy)', fontWeight: 600, marginTop: '0.35rem' }}>
+                    <div style={{ fontSize: '0.8125rem', color: 'var(--brand-navy, #0B192C)', fontWeight: 600, marginTop: '0.35rem' }}>
                       Reason: <span style={{ fontWeight: 400 }}>{item.changeReason}</span>
                     </div>
 
@@ -620,10 +1019,10 @@ export const MentorAssignmentTab: React.FC<MentorAssignmentTabProps> = ({
       {/* ─── MODAL: Bulk XLSX Assignment ─────────────────────────────────────── */}
       {isBulkModalOpen && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '1rem' }}>
-          <div className="card" style={{ width: '100%', maxWidth: '680px', padding: '1.75rem', maxHeight: '85vh', overflowY: 'auto' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '680px', padding: '1.75rem', maxHeight: '85vh', overflowY: 'auto', borderRadius: '8px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
               <div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy)' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>
                   Bulk Mentor Assignment (.XLSX)
                 </h3>
                 <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
@@ -634,9 +1033,9 @@ export const MentorAssignmentTab: React.FC<MentorAssignmentTabProps> = ({
             </div>
 
             {/* Template Notice */}
-            <div style={{ padding: '0.85rem 1rem', borderRadius: '8px', backgroundColor: 'var(--bg-surface-hover)', border: '1px solid var(--border-color)', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ padding: '0.85rem 1rem', borderRadius: '8px', backgroundColor: 'var(--bg-surface-hover, #F8FAFC)', border: '1px solid var(--border-color, #E2E8F0)', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontWeight: 700, color: 'var(--brand-navy)', fontSize: '0.875rem' }}>Official .XLSX Template</div>
+                <div style={{ fontWeight: 700, color: 'var(--brand-navy, #0B192C)', fontSize: '0.875rem' }}>Official .XLSX Template</div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Format: Student Enrollment, Dept Code, Program Code, Semester, Section, Mentor Employee ID</div>
               </div>
               <button className="btn btn-sm btn-secondary" onClick={handleDownloadTemplate}>
@@ -645,9 +1044,9 @@ export const MentorAssignmentTab: React.FC<MentorAssignmentTabProps> = ({
             </div>
 
             {/* Upload File Input */}
-            <div style={{ border: '2px dashed var(--border-color)', borderRadius: '8px', padding: '2rem', textAlign: 'center', marginBottom: '1rem' }}>
-              <FileSpreadsheet size={40} style={{ color: 'var(--brand-orange)', margin: '0 auto 0.75rem' }} />
-              <div style={{ fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '0.25rem' }}>
+            <div style={{ border: '2px dashed var(--border-color, #CBD5E1)', borderRadius: '8px', padding: '2rem', textAlign: 'center', marginBottom: '1rem' }}>
+              <FileSpreadsheet size={40} style={{ color: 'var(--brand-orange, #F37023)', margin: '0 auto 0.75rem' }} />
+              <div style={{ fontWeight: 700, color: 'var(--brand-navy, #0B192C)', marginBottom: '0.25rem' }}>
                 {bulkFile ? bulkFile.name : 'Select or drop .XLSX file'}
               </div>
               <input type="file" accept=".xlsx" onChange={handleFileChange} style={{ display: 'none' }} id="mentor-xlsx-upload" />
@@ -677,7 +1076,7 @@ export const MentorAssignmentTab: React.FC<MentorAssignmentTabProps> = ({
                 )}
 
                 {bulkValidationResult.validRows.length > 0 && (
-                  <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+                  <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid var(--border-color, #CBD5E1)', borderRadius: '8px' }}>
                     <table className="table" style={{ fontSize: '0.75rem' }}>
                       <thead>
                         <tr>

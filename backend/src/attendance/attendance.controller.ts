@@ -111,12 +111,49 @@ export class AttendanceController {
     return this.attendanceService.getSubjectAttendance(id, divisionId);
   }
 
+  @Get('teaching-assignments')
+  @RequireRole('FACULTY', 'HOD', 'PRINCIPAL', 'SUPER_ADMIN', 'SYSTEM_ADMIN')
+  @RequirePermission('ATTENDANCE', 'VIEW')
+  @ApiOperation({ summary: 'Get teaching assignments (subjects, divisions, classes) for authenticated faculty' })
+  getTeachingAssignments(@Req() req: any) {
+    return this.attendanceService.getFacultyTeachingAssignments(req.user);
+  }
+
+  @Get('teaching-schedule')
+  @RequireRole('FACULTY', 'HOD', 'PRINCIPAL', 'SUPER_ADMIN', 'SYSTEM_ADMIN')
+  @RequirePermission('ATTENDANCE', 'VIEW')
+  @ApiOperation({ summary: 'Get today teaching schedule with lecture attendance completion status' })
+  @ApiQuery({ name: 'date', required: false })
+  getTeachingSchedule(@Query('date') date: string, @Req() req: any) {
+    return this.attendanceService.getFacultyTeachingSchedule(req.user, date);
+  }
+
+  @Get('pending')
+  @RequireRole('FACULTY', 'HOD', 'PRINCIPAL', 'SUPER_ADMIN', 'SYSTEM_ADMIN')
+  @RequirePermission('ATTENDANCE', 'VIEW')
+  @ApiOperation({ summary: 'Get lectures pending attendance submission for authenticated faculty' })
+  @ApiQuery({ name: 'date', required: false })
+  getPendingAttendance(@Query('date') date: string, @Req() req: any) {
+    return this.attendanceService.getFacultyPendingAttendance(req.user, date);
+  }
+
   @Get('faculty/:id?')
   @RequireRole('FACULTY', 'HOD', 'PRINCIPAL', 'SUPER_ADMIN', 'SYSTEM_ADMIN', 'REGISTRAR')
   @RequirePermission('ATTENDANCE', 'VIEW')
   @ApiOperation({ summary: 'Get faculty attendance marking performance' })
   getFacultyAttendance(@Param('id') id: string, @Req() req: any) {
-    const targetId = id || req.user?.id;
+    const roles: string[] = req.user?.roles || (req.user?.role ? [req.user.role] : []);
+    const isFacultyOnly = roles.includes('FACULTY') && !roles.some(r => ['HOD', 'PRINCIPAL', 'SUPER_ADMIN', 'SYSTEM_ADMIN', 'REGISTRAR'].includes(r));
+    
+    // IDOR Protection: Faculty can only query their own attendance
+    if (isFacultyOnly && id) {
+      const userFacultyId = req.user?.facultyId || req.user?.faculty?.id || req.user?.id;
+      if (id !== userFacultyId && id !== req.user?.id && id !== req.user?.username) {
+        throw new ForbiddenException('Access Denied: You are only authorized to access your OWN faculty attendance.');
+      }
+    }
+
+    const targetId = id || req.user?.facultyId || req.user?.id;
     return this.attendanceService.getFacultyAttendance(targetId);
   }
 

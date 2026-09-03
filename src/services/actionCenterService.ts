@@ -63,6 +63,10 @@ class SmartActionCenterService {
         this.populateIQACActions(user, actions);
         break;
 
+      case 'PARENT':
+        this.populateParentActions(user, actions);
+        break;
+
       default:
         this.populateExecutiveAdminActions(user, role, actions);
         break;
@@ -806,6 +810,74 @@ class SmartActionCenterService {
       badgeVariant: 'gold',
       sourceModule: 'IQAC Cell'
     });
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 14. PARENT ACTIONS (STRICTLY WARD-CENTRIC & MINIMAL)
+  // ──────────────────────────────────────────────────────────────────────────
+  private populateParentActions(user: User, actions: SmartActionItem[]): void {
+    const parentId = user.id || 'user-parent-1';
+    const students = db.getStudents();
+    // Resolve linked children (student-1 or mapped students)
+    const linkedStudent = students.find(s => s.id === 'student-1' || s.enrollmentNo === '2026SSIUCE0101') || students[0];
+
+    // 1. PTM Scheduled / Invitation Alert
+    actions.push({
+      id: 'act-parent-ptm-invite',
+      title: 'Parent–Teacher Meeting (PTM) Scheduled',
+      shortDescription: `Upcoming consultation scheduled for ${linkedStudent ? linkedStudent.name : 'your child'} with faculty mentor.`,
+      count: 1,
+      countLabel: '1 Meeting',
+      priority: 'HIGH',
+      category: 'ACADEMIC',
+      targetTab: 'ptm-dashboard',
+      takeActionText: 'Confirm / Reschedule',
+      iconName: 'Clock',
+      badgeVariant: 'active',
+      sourceModule: 'PTM Portal'
+    });
+
+    // 2. Child Attendance Tracking
+    if (linkedStudent) {
+      const stats = db.getStudentAttendanceStats(linkedStudent.id);
+      if (stats && stats.percentage < 75) {
+        actions.push({
+          id: 'act-parent-attendance-alert',
+          title: 'Ward Academic Attendance Alert',
+          shortDescription: `${linkedStudent.name}'s attendance is at ${stats.percentage}%, which is below the mandatory 75% threshold.`,
+          count: stats.percentage,
+          countLabel: `${stats.percentage}%`,
+          priority: 'CRITICAL',
+          category: 'ATTENDANCE',
+          targetTab: 'parent-children',
+          takeActionText: 'View Subject Attendance',
+          iconName: 'AlertTriangle',
+          badgeVariant: 'orange',
+          sourceModule: 'Academic Portal'
+        });
+      }
+    }
+
+    // 3. Outstanding Fee Dues
+    const allFees = db.getStudentFeeRecords();
+    const childFee = allFees.find(f => linkedStudent && (f.studentId === linkedStudent.id || f.enrollmentNo === linkedStudent.enrollmentNo));
+    if (childFee && childFee.pendingAmount > 0) {
+      actions.push({
+        id: 'act-parent-fee-dues',
+        title: 'Ward Semester Fee Balance',
+        shortDescription: `Outstanding tuition fee balance of ₹${childFee.pendingAmount.toLocaleString('en-IN')} for ${linkedStudent ? linkedStudent.name : 'your child'}.`,
+        count: childFee.pendingAmount,
+        countLabel: `₹${childFee.pendingAmount.toLocaleString('en-IN')}`,
+        priority: childFee.pendingAmount >= 30000 ? 'CRITICAL' : 'HIGH',
+        dueDate: childFee.dueDate,
+        category: 'FEE',
+        targetTab: 'parent-children',
+        takeActionText: 'View Fee Breakdown',
+        iconName: 'IndianRupee',
+        badgeVariant: 'orange',
+        sourceModule: 'Finance Cell'
+      });
+    }
   }
 }
 

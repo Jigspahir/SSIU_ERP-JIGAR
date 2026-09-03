@@ -51,25 +51,34 @@ export const LoginPage: React.FC = () => {
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Loosened identifier validation: accepts standard email addresses (e.g. jigarahir410@gmail.com), custom admin emails, usernames, and enrollment numbers
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
     const cleanId = identifier.trim();
-    if (!cleanId || !password) {
-      setError('Please enter your university email or username and password.');
+    if (!cleanId) {
+      setError('Please enter your email address, username, or enrollment ID.');
+      return;
+    }
+
+    if (!password) {
+      setError('Please enter your password.');
       return;
     }
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      const res = login(cleanId, password);
+    try {
+      const res = await login(cleanId, password);
       setIsLoading(false);
       if (!res.success) {
-        setError(res.error || 'Invalid username or password. Please check your credentials and try again.');
+        setError(res.error || 'Invalid credentials. Please check your email/username and password.');
       }
-    }, 300);
+    } catch (err: any) {
+      setIsLoading(false);
+      setError(err?.message || 'Login failed. Please check your credentials.');
+    }
   };
 
   const demoAccounts: DemoRoleAccount[] = [
@@ -192,17 +201,17 @@ export const LoginPage: React.FC = () => {
     }
   ];
 
-  const handleDemoLogin = (userId: string, pass: string) => {
+  const handleDemoLogin = async (userId: string, pass: string) => {
     setIdentifier(userId);
     setPassword(pass);
     setError('');
     setIsDemoModalOpen(false);
     setIsLoading(true);
 
-    setTimeout(() => {
-      login(userId, pass);
-      setIsLoading(false);
-    }, 200);
+    try {
+      await login(userId, pass);
+    } catch {}
+    setIsLoading(false);
   };
 
   const universityInstitutes: InstituteShowcase[] = [
@@ -1402,7 +1411,7 @@ export const LoginPage: React.FC = () => {
                     {/* Username / Email */}
                     <div className="swarrnim-form-group">
                       <label className="swarrnim-label" htmlFor="swarrnim-identifier">
-                        University Email / Username
+                        Email Address / Username / Enrollment No.
                       </label>
                       <div className="swarrnim-input-container">
                         <Mail size={17} className="swarrnim-input-icon" />
@@ -1410,7 +1419,7 @@ export const LoginPage: React.FC = () => {
                           id="swarrnim-identifier"
                           type="text"
                           className="swarrnim-input"
-                          placeholder="Enter university email or username"
+                          placeholder="e.g. name@gmail.com, student, or admin"
                           value={identifier}
                           onChange={(e) => {
                             setIdentifier(e.target.value);
