@@ -1,22 +1,22 @@
-/**
- * SSIU ERP — Staff & Faculty Management Hub Page
- * File: src/modules/staff/pages/StaffGovernanceHubPage.tsx
- */
-
 import React, { useState } from 'react';
-import { Briefcase, Network, Award, BookOpen, BarChart3, Search, Sparkles } from 'lucide-react';
+import { Briefcase, Network, Award, BookOpen, BarChart3, Search, Sparkles, Plus, ShieldCheck } from 'lucide-react';
 import { staffGovernanceService } from '../services/staffGovernanceService';
 import { FacultyWorkloadAllocationCard } from '../components/FacultyWorkloadAllocationCard';
 import { StaffReportingTreeViewer } from '../components/StaffReportingTreeViewer';
+import { StaffFacultyAccountModal, TargetFacultyAccountInfo } from '../components/StaffFacultyAccountModal';
 import { Badge } from '../../../components/common/Badge';
+import { db } from '../../../services/db';
 
 export const StaffGovernanceHubPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'WORKLOAD' | 'REPORTING_TREE' | 'RESEARCH_PORTFOLIO'>('WORKLOAD');
   const [search, setSearch] = useState('');
+  const [selectedTargetForAccount, setSelectedTargetForAccount] = useState<TargetFacultyAccountInfo | null>(null);
+  const [refreshCount, setRefreshCount] = useState(0);
 
   const metrics = staffGovernanceService.getStaffGovernanceMetrics();
   const hierarchy = staffGovernanceService.getSupervisorReportingHierarchy();
   const researchPortfolios = staffGovernanceService.getFacultyResearchPortfolios();
+  const allUsers = db.getUsers();
 
   const filteredResearch = researchPortfolios.filter(r =>
     r.facultyName.toLowerCase().includes(search.toLowerCase()) ||
@@ -71,12 +71,18 @@ export const StaffGovernanceHubPage: React.FC = () => {
 
       {/* Tab 1: Workload & SFR */}
       {activeTab === 'WORKLOAD' && (
-        <FacultyWorkloadAllocationCard metrics={metrics} />
+        <FacultyWorkloadAllocationCard
+          metrics={metrics}
+          onManageAccount={target => setSelectedTargetForAccount(target)}
+        />
       )}
 
       {/* Tab 2: Reporting Tree */}
       {activeTab === 'REPORTING_TREE' && (
-        <StaffReportingTreeViewer hierarchy={hierarchy} />
+        <StaffReportingTreeViewer
+          hierarchy={hierarchy}
+          onManageAccount={target => setSelectedTargetForAccount(target)}
+        />
       )}
 
       {/* Tab 3: Research Portfolio */}
@@ -117,39 +123,125 @@ export const StaffGovernanceHubPage: React.FC = () => {
                   <th>Patents</th>
                   <th>Funded Grants</th>
                   <th>h-Index</th>
+                  <th style={{ textAlign: 'right' }}>ERP Login</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredResearch.map(item => (
-                  <tr key={item.facultyId}>
-                    <td style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{item.facultyName}</td>
-                    <td style={{ color: 'var(--text-muted)' }}>{item.designation}</td>
-                    <td>{item.departmentName}</td>
-                    <td style={{ fontWeight: 600, color: 'var(--brand-navy)' }}>{item.journalPapersCount} Papers</td>
-                    <td>{item.conferencePapersCount} Conf.</td>
-                    <td>
-                      {item.patentsCount > 0 ? (
-                        <Badge variant="gold">{item.patentsCount} Patent</Badge>
-                      ) : (
-                        <span style={{ color: 'var(--text-muted)' }}>0</span>
-                      )}
-                    </td>
-                    <td>
-                      {item.fundedGrantsAmountLakhs > 0 ? (
-                        <span style={{ color: '#10B981', fontWeight: 600 }}>&amp;#8377; {item.fundedGrantsAmountLakhs} L</span>
-                      ) : (
-                        <span style={{ color: 'var(--text-muted)' }}>-</span>
-                      )}
-                    </td>
-                    <td>
-                      <Badge variant="navy">h-{item.hIndex}</Badge>
-                    </td>
-                  </tr>
-                ))}
+                {filteredResearch.map(item => {
+                  const empCode = item.employeeId || `EMP-${item.facultyId.slice(-4)}`;
+                  const userAccount = allUsers.find(
+                    u => (item.employeeId && (u.employeeId === item.employeeId || u.username === item.employeeId)) ||
+                         (item.email && u.email?.toLowerCase() === item.email.toLowerCase()) ||
+                         u.id === item.facultyId
+                  );
+
+                  return (
+                    <tr key={item.facultyId}>
+                      <td style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{item.facultyName}</td>
+                      <td style={{ color: 'var(--text-muted)' }}>{item.designation}</td>
+                      <td>{item.departmentName}</td>
+                      <td style={{ fontWeight: 600, color: 'var(--brand-navy)' }}>{item.journalPapersCount} Papers</td>
+                      <td>{item.conferencePapersCount} Conf.</td>
+                      <td>
+                        {item.patentsCount > 0 ? (
+                          <Badge variant="gold">{item.patentsCount} Patent</Badge>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>0</span>
+                        )}
+                      </td>
+                      <td>
+                        {item.fundedGrantsAmountLakhs > 0 ? (
+                          <span style={{ color: '#10B981', fontWeight: 600 }}>&#8377; {item.fundedGrantsAmountLakhs} L</span>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>-</span>
+                        )}
+                      </td>
+                      <td>
+                        <Badge variant="navy">h-{item.hIndex}</Badge>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {userAccount ? (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTargetForAccount({
+                              facultyId: item.facultyId,
+                              name: item.facultyName,
+                              employeeId: empCode,
+                              email: item.email,
+                              designation: item.designation,
+                              departmentName: item.departmentName,
+                              departmentId: item.departmentId,
+                              instituteId: item.instituteId,
+                              role: item.designation?.toUpperCase().includes('HOD') ? 'HOD' : 'FACULTY',
+                            })}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.6875rem',
+                              fontWeight: 700,
+                              background: '#ECFDF5',
+                              color: '#065F46',
+                              border: '1px solid #A7F3D0',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <ShieldCheck size={12} color="#059669" />
+                            <span>{userAccount.accountStatus || 'ACTIVE'}</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTargetForAccount({
+                              facultyId: item.facultyId,
+                              name: item.facultyName,
+                              employeeId: empCode,
+                              email: item.email,
+                              designation: item.designation,
+                              departmentName: item.departmentName,
+                              departmentId: item.departmentId,
+                              instituteId: item.instituteId,
+                              role: item.designation?.toUpperCase().includes('HOD') ? 'HOD' : 'FACULTY',
+                            })}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              fontSize: '0.6875rem',
+                              fontWeight: 800,
+                              background: '#FFF7ED',
+                              color: '#C2410C',
+                              border: '1px solid #FDBA74',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <Plus size={12} />
+                            <span>Login</span>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
+      )}
+
+      {/* Account Provisioning & Status Modal */}
+      {selectedTargetForAccount && (
+        <StaffFacultyAccountModal
+          target={selectedTargetForAccount}
+          onClose={() => setSelectedTargetForAccount(null)}
+          onAccountUpdated={() => {
+            setRefreshCount(prev => prev + 1);
+          }}
+        />
       )}
     </div>
   );

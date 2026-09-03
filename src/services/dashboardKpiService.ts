@@ -291,6 +291,165 @@ class DashboardKpiService {
       quickActions
     };
   }
+
+  /**
+   * 24-25. TOP MANAGEMENT ANALYTICS: Pending Notesheets by Department
+   */
+  public getPendingNotesheetsByDepartment(context: UserAuthorizationContext): {
+    department: string;
+    departmentCode: string;
+    pendingCount: number;
+    financialPendingCount: number;
+    avgPendingDays: number;
+  }[] {
+    const role = String(context.activeRole);
+    // Student and plain Faculty have no management analytics access
+    if (role === 'STUDENT' || role === 'FACULTY' || role === 'PARENT') {
+      return [];
+    }
+
+    const allNotes = moduleQueryEngineService.getNotesheetsForUser(context).records;
+    const pendingNotes = allNotes.filter(n => ['PENDING', 'SUBMITTED', 'FORWARDED', 'IN_REVIEW'].includes(n.status));
+
+    const depts = db.getDepartments();
+    const deptMap: Record<string, { department: string; departmentCode: string; pendingCount: number; financialPendingCount: number; daysAccum: number }> = {};
+
+    depts.forEach(d => {
+      // Scope filtering
+      if (context.instituteId && d.instituteId !== context.instituteId && (role === 'PRINCIPAL' || role === 'HOD')) {
+        return;
+      }
+      if (context.departmentId && d.id !== context.departmentId && role === 'HOD') {
+        return;
+      }
+
+      deptMap[d.name] = {
+        department: d.name,
+        departmentCode: d.code,
+        pendingCount: 0,
+        financialPendingCount: 0,
+        daysAccum: 0
+      };
+    });
+
+    pendingNotes.forEach(n => {
+      const deptName = n.department || 'General Administration';
+      if (!deptMap[deptName]) {
+        deptMap[deptName] = {
+          department: deptName,
+          departmentCode: deptName.slice(0, 4).toUpperCase(),
+          pendingCount: 0,
+          financialPendingCount: 0,
+          daysAccum: 0
+        };
+      }
+      deptMap[deptName].pendingCount += 1;
+      const amt = n.finalApprovedAmount || n.approvedAmount || n.requestedAmount || n.estimatedCost || 0;
+      if (n.financialRequirement && amt > 0) {
+        deptMap[deptName].financialPendingCount += 1;
+      }
+      const days = Math.max(1, Math.floor((Date.now() - new Date(n.createdAt || n.date).getTime()) / (1000 * 3600 * 24)));
+      deptMap[deptName].daysAccum += days;
+    });
+
+    return Object.values(deptMap).map(d => ({
+      department: d.department,
+      departmentCode: d.departmentCode,
+      pendingCount: d.pendingCount,
+      financialPendingCount: d.financialPendingCount,
+      avgPendingDays: d.pendingCount > 0 ? Math.round(d.daysAccum / d.pendingCount) : 0
+    }));
+  }
+
+  /**
+   * 26. TOP MANAGEMENT ANALYTICS: Monthly Notesheet Expenditure (Sanctioned/Approved Amount)
+   */
+  public getMonthlyNotesheetExpenditure(context: UserAuthorizationContext): {
+    month: string;
+    year: number;
+    sanctionedAmount: number;
+    approvedNotesheetsCount: number;
+    formattedAmount: string;
+  }[] {
+    const role = String(context.activeRole);
+    if (role === 'STUDENT' || role === 'FACULTY' || role === 'PARENT') {
+      return [];
+    }
+
+    const allNotes = moduleQueryEngineService.getNotesheetsForUser(context).records;
+    const approvedNotes = allNotes.filter(n => n.status === 'APPROVED' && ((n.finalApprovedAmount || n.approvedAmount || n.estimatedCost || 0) > 0));
+
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const currentYear = new Date().getFullYear();
+
+    const monthlyData: Record<number, { sanctioned: number; count: number }> = {};
+    for (let m = 0; m < 12; m++) {
+      monthlyData[m] = { sanctioned: 0, count: 0 };
+    }
+
+    approvedNotes.forEach(n => {
+      const d = new Date(n.decisionDate || n.updatedAt || n.createdAt || n.date);
+      if (d.getFullYear() === currentYear) {
+        const m = d.getMonth();
+        const amt = Number(n.finalApprovedAmount || n.approvedAmount || n.estimatedCost || 0);
+        monthlyData[m].sanctioned += amt;
+        monthlyData[m].count += 1;
+      }
+    });
+
+    return monthNames.map((month, idx) => ({
+      month,
+      year: currentYear,
+      sanctionedAmount: monthlyData[idx].sanctioned,
+      approvedNotesheetsCount: monthlyData[idx].count,
+      formattedAmount: `₹${monthlyData[idx].sanctioned.toLocaleString('en-IN')}`
+    }));
+  }
+
+  /**
+   * 27. TOP MANAGEMENT ANALYTICS: Daily Hostel Gate Pass / Outing Metrics
+   */
+  public getHostelDailyOutingAnalytics(context: UserAuthorizationContext): {
+    date: string;
+    checkedOutCount: number;
+    checkedInCount: number;
+    currentlyOutsideCount: number;
+  }[] {
+    const role = String(context.activeRole);
+    if (role === 'STUDENT' || role === 'FACULTY' || role === 'PARENT') {
+      return [];
+    }
+
+    const state = db.getState();
+    const allPasses = (state.studentGatePasses || []) as any[];
+
+    // Aggregate by outing date
+    const dateMap: Record<string, { checkedOut: number; checkedIn: number; outside: number }> = {};
+
+    allPasses.forEach(p => {
+      const d = p.outingDate || p.leavingDate || p.createdAt?.split('T')[0] || '2026-08-24';
+      if (!dateMap[d]) {
+        dateMap[d] = { checkedOut: 0, checkedIn: 0, outside: 0 };
+      }
+
+      if (p.actualOutTime || p.status === 'CHECKED_OUT' || p.status === 'COMPLETED' || p.status === 'APPROVED') {
+        dateMap[d].checkedOut += 1;
+      }
+      if (p.actualInTime || p.status === 'COMPLETED' || p.status === 'CHECKED_IN') {
+        dateMap[d].checkedIn += 1;
+      }
+      if (p.status === 'CHECKED_OUT' || (p.actualOutTime && !p.actualInTime)) {
+        dateMap[d].outside += 1;
+      }
+    });
+
+    return Object.entries(dateMap).map(([date, val]) => ({
+      date,
+      checkedOutCount: val.checkedOut,
+      checkedInCount: val.checkedIn,
+      currentlyOutsideCount: val.outside
+    })).sort((a, b) => a.date.localeCompare(b.date));
+  }
 }
 
 export const dashboardKpiService = DashboardKpiService.getInstance();

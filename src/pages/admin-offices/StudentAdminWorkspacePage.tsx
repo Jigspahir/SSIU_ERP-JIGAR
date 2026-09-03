@@ -768,7 +768,6 @@ export const StudentAdminWorkspacePage: React.FC<StudentAdminWorkspacePageProps>
                     <th style={{ padding: '0.65rem 0.75rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>Document Status</th>
                     <th style={{ padding: '0.65rem 0.75rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>Fee Status</th>
                     <th style={{ padding: '0.65rem 0.75rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>Mentor</th>
-                    <th style={{ padding: '0.65rem 0.75rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>Student ID</th>
                     <th style={{ padding: '0.65rem 0.75rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>Enrollment No.</th>
                     <th style={{ padding: '0.65rem 0.75rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>Login Status</th>
                     <th style={{ padding: '0.65rem 0.75rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>Onboarding Status</th>
@@ -778,7 +777,7 @@ export const StudentAdminWorkspacePage: React.FC<StudentAdminWorkspacePageProps>
                 <tbody>
                   {applications.length === 0 ? (
                     <tr>
-                      <td colSpan={13} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted, #64748B)' }}>
+                      <td colSpan={12} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted, #64748B)' }}>
                         No admission applications match current filter criteria.
                       </td>
                     </tr>
@@ -827,9 +826,6 @@ export const StudentAdminWorkspacePage: React.FC<StudentAdminWorkspacePageProps>
                             <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>
                               {mentor?.name || (st?.mentorId ? 'Assigned' : 'Unassigned')}
                             </span>
-                          </td>
-                          <td style={{ padding: '0.65rem 0.75rem' }}>
-                            {app.studentId ? <code>{app.studentId}</code> : <span style={{ color: '#94A3B8' }}>—</span>}
                           </td>
                           <td style={{ padding: '0.65rem 0.75rem' }}>
                             {app.enrollmentNo ? <code style={{ color: 'var(--brand-orange, #F37023)', fontWeight: 800 }}>{app.enrollmentNo}</code> : <span style={{ color: '#94A3B8' }}>—</span>}

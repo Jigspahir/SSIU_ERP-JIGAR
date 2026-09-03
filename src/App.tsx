@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
+import { PageSkeletonFallback } from './components/common/PageSkeletonFallback';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Sidebar } from './components/layout/Sidebar';
 import { Topbar } from './components/layout/Topbar';
@@ -25,6 +26,7 @@ import { getPlugin } from './modules/moduleRegistry';
 
 // Academic Module Pages
 import { AttendancePage } from './pages/academic/AttendancePage';
+import { StudentAttendancePage } from './pages/academic/StudentAttendancePage';
 import { TimetablePage } from './pages/academic/TimetablePage';
 import { SessionPlanPage } from './pages/academic/SessionPlanPage';
 import { UnitMaterialPage } from './pages/academic/UnitMaterialPage';
@@ -34,7 +36,6 @@ import { QuizPage } from './pages/academic/QuizPage';
 import { FeedbackPage } from './pages/feedback/FeedbackPage';
 import { AdminFeedbackDashboardPage } from './pages/feedback/AdminFeedbackDashboardPage';
 import { FeedbackEscalationsDashboardPage } from './pages/feedback/FeedbackEscalationsDashboardPage';
-import { SupportTicketsPage } from './pages/support/SupportTicketsPage';
 
 // Campus & Support Pages
 import { CertificatesPage } from './pages/campus/CertificatesPage';
@@ -51,7 +52,6 @@ import { NotificationsPage } from './pages/campus/NotificationsPage';
 import { RequestsPage } from './pages/campus/RequestsPage';
 import { EdpDutyPage } from './pages/campus/EdpDutyPage';
 import { WorkTransferManagementPage } from './pages/faculty/WorkTransferManagementPage';
-import { WorkTransferAuditCenterPage } from './pages/admin-offices/WorkTransferAuditCenterPage';
 import { MyWorkPage } from './pages/work-transfer/MyWorkPage';
 import { TransferWorkPage } from './pages/work-transfer/TransferWorkPage';
 import { ReceivedWorkPage } from './pages/work-transfer/ReceivedWorkPage';
@@ -65,36 +65,37 @@ import { StudentPTMView } from './components/ptm/StudentPTMView';
 // Fees & Finance Module Page
 import { FeesFinancePage } from './pages/finance/FeesFinancePage';
 import { HRManagementPage } from './pages/hr/HRManagementPage';
-import { UniversityHRMSPage } from './pages/hr/UniversityHRMSPage';
 
-// CRM & Admissions Module Page
-import { CRMPage } from './pages/crm/CRMPage';
-
-// Reports & Analytics Module Page
-import { ReportsPage } from './pages/reports/ReportsPage';
-
-// Administrative Offices Workspaces
-import { RegistrarWorkspacePage } from './pages/admin-offices/RegistrarWorkspacePage';
-import { IQACWorkspacePage } from './pages/admin-offices/IQACWorkspacePage';
-import { ExamCellWorkspacePage } from './pages/admin-offices/ExamCellWorkspacePage';
-import { StudentSectionWorkspacePage } from './pages/admin-offices/StudentSectionWorkspacePage';
-import { HostelWorkspacePage } from './pages/admin-offices/HostelWorkspacePage';
-import { LibraryWorkspacePage } from './pages/admin-offices/LibraryWorkspacePage';
-import { TransportWorkspacePage } from './pages/admin-offices/TransportWorkspacePage';
-import { MaintenanceWorkspacePage } from './pages/admin-offices/MaintenanceWorkspacePage';
-import { AccountsWorkspacePage } from './pages/admin-offices/AccountsWorkspacePage';
-import { StudentAdminWorkspacePage } from './pages/admin-offices/StudentAdminWorkspacePage';
-
-// System Settings Module Page
-import { SystemSettingsPage } from './pages/settings/SystemSettingsPage';
-import { SecurityAuditCenterPage } from './pages/admin-offices/SecurityAuditCenterPage';
-import { NoteSheetPage } from './pages/admin-offices/NoteSheetPage';
+// Auth & Base Pages
+import { AdminLoginPage } from './pages/auth/AdminLoginPage';
 import { NoteSheetVerificationPage } from './pages/public/NoteSheetVerificationPage';
 import { InwardOutwardRegisterPage } from './pages/admin-offices/InwardOutwardRegisterPage';
 import { WorkDiaryPage } from './pages/campus/WorkDiaryPage';
 import { InventoryAssetPage } from './pages/campus/InventoryAssetPage';
-import { UniversityAssetManagementPage } from './pages/assets/UniversityAssetManagementPage';
-import { BulkImportPage } from './pages/admin/BulkImportPage';
+
+// Lazy-Loaded Administrative, Specialty & Reporting Modules (Phase 9 Code-Splitting)
+const SupportTicketsPage = React.lazy(() => import('./pages/support/SupportTicketsPage').then(m => ({ default: m.SupportTicketsPage })));
+const StudentCouncilDeskPage = React.lazy(() => import('./pages/campus/StudentCouncilDeskPage').then(m => ({ default: m.StudentCouncilDeskPage })));
+const WorkTransferAuditCenterPage = React.lazy(() => import('./pages/admin-offices/WorkTransferAuditCenterPage').then(m => ({ default: m.WorkTransferAuditCenterPage })));
+const UniversityHRMSPage = React.lazy(() => import('./pages/hr/UniversityHRMSPage').then(m => ({ default: m.UniversityHRMSPage })));
+const CRMPage = React.lazy(() => import('./pages/crm/CRMPage').then(m => ({ default: m.CRMPage })));
+const ReportsPage = React.lazy(() => import('./pages/reports/ReportsPage').then(m => ({ default: m.ReportsPage })));
+const RegistrarWorkspacePage = React.lazy(() => import('./pages/admin-offices/RegistrarWorkspacePage').then(m => ({ default: m.RegistrarWorkspacePage })));
+const IQACWorkspacePage = React.lazy(() => import('./pages/admin-offices/IQACWorkspacePage').then(m => ({ default: m.IQACWorkspacePage })));
+const ExamCellWorkspacePage = React.lazy(() => import('./pages/admin-offices/ExamCellWorkspacePage').then(m => ({ default: m.ExamCellWorkspacePage })));
+const StudentSectionWorkspacePage = React.lazy(() => import('./pages/admin-offices/StudentSectionWorkspacePage').then(m => ({ default: m.StudentSectionWorkspacePage })));
+const HostelWorkspacePage = React.lazy(() => import('./pages/admin-offices/HostelWorkspacePage').then(m => ({ default: m.HostelWorkspacePage })));
+const LibraryWorkspacePage = React.lazy(() => import('./pages/admin-offices/LibraryWorkspacePage').then(m => ({ default: m.LibraryWorkspacePage })));
+const TransportWorkspacePage = React.lazy(() => import('./pages/admin-offices/TransportWorkspacePage').then(m => ({ default: m.TransportWorkspacePage })));
+const MaintenanceWorkspacePage = React.lazy(() => import('./pages/admin-offices/MaintenanceWorkspacePage').then(m => ({ default: m.MaintenanceWorkspacePage })));
+const AccountsWorkspacePage = React.lazy(() => import('./pages/admin-offices/AccountsWorkspacePage').then(m => ({ default: m.AccountsWorkspacePage })));
+const StudentAdminWorkspacePage = React.lazy(() => import('./pages/admin-offices/StudentAdminWorkspacePage').then(m => ({ default: m.StudentAdminWorkspacePage })));
+const SystemSettingsPage = React.lazy(() => import('./pages/settings/SystemSettingsPage').then(m => ({ default: m.SystemSettingsPage })));
+const AdminPortalPage = React.lazy(() => import('./pages/admin/AdminPortalPage').then(m => ({ default: m.AdminPortalPage })));
+const SecurityAuditCenterPage = React.lazy(() => import('./pages/admin-offices/SecurityAuditCenterPage').then(m => ({ default: m.SecurityAuditCenterPage })));
+const NoteSheetPage = React.lazy(() => import('./pages/admin-offices/NoteSheetPage').then(m => ({ default: m.NoteSheetPage })));
+const UniversityAssetManagementPage = React.lazy(() => import('./pages/assets/UniversityAssetManagementPage').then(m => ({ default: m.UniversityAssetManagementPage })));
+const BulkImportPage = React.lazy(() => import('./pages/admin/BulkImportPage').then(m => ({ default: m.BulkImportPage })));
 
 // Examination Management Module Pages
 import { ExamDashboardPage } from './pages/exams/ExamDashboardPage';
@@ -141,6 +142,11 @@ import './styles/index.css';
 export const ROUTE_PATH_MAP: Record<string, string> = {
   '': 'dashboard',
   'dashboard': 'dashboard',
+  'erp-admin': 'erp-admin-dashboard',
+  'erp-admin/dashboard': 'erp-admin-dashboard',
+  'erp-admin-dashboard': 'erp-admin-dashboard',
+  'erp-admin/login': 'erp-admin-login',
+  'erp-admin-login': 'erp-admin-login',
   'settings': 'settings',
   'inventory-assets': 'inventory-assets',
   'feedback': 'feedback',
@@ -171,6 +177,8 @@ export const ROUTE_PATH_MAP: Record<string, string> = {
   'deputy-registrar/dashboard': 'dashboard',
   'academic': 'subjects',
   'subjects': 'subjects',
+  'my-attendance': 'my-attendance',
+  'student-attendance': 'my-attendance',
   'attendance': 'attendance',
   'attendance-history': 'attendance-history',
   'subject-attendance': 'subject-attendance',
@@ -342,6 +350,7 @@ export const ROUTE_PATH_MAP: Record<string, string> = {
 
 export const TAB_TO_CANONICAL_PATH: Record<string, string> = {
   'dashboard': '/dashboard',
+  'my-attendance': '/my-attendance',
   'settings': '/settings',
   'inventory-assets': '/inventory-assets',
   'faculty-assets': '/faculty/assets',
@@ -478,8 +487,38 @@ const MainAppContent: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // If not logged in, enforce login page screen
+  // If not logged in, allow public verification pages (QR Code scans), else enforce login screen
   if (!user) {
+    if (typeof window !== 'undefined') {
+      const pathname = window.location.pathname.toLowerCase();
+      const searchParams = new URLSearchParams(window.location.search);
+      const isPublicVerification = 
+        pathname.startsWith('/verify/notesheet') ||
+        pathname.startsWith('/notesheet-verify') ||
+        searchParams.get('tab') === 'notesheet-verify' ||
+        activeTab === 'notesheet-verify' ||
+        activeTab === 'verify-notesheet';
+
+      if (isPublicVerification) {
+        return (
+          <div className="min-h-screen bg-slate-50 dark:bg-slate-900 p-4 md:p-8 flex items-center justify-center">
+            <div className="w-full max-w-4xl">
+              <NoteSheetVerificationPage />
+            </div>
+          </div>
+        );
+      }
+
+      // Dedicated ERP Admin Login Route
+      if (
+        pathname.startsWith('/erp-admin') ||
+        pathname.startsWith('/admin-login') ||
+        searchParams.get('tab') === 'erp-admin-login' ||
+        activeTab === 'erp-admin-login'
+      ) {
+        return <AdminLoginPage onAdminLoginSuccess={() => setActiveTab('erp-admin-dashboard')} />;
+      }
+    }
     return <LoginPage />;
   }
 
@@ -518,6 +557,9 @@ const MainAppContent: React.FC = () => {
 
     switch (activeTab) {
       case 'dashboard':
+      case 'analytics':
+      case 'management-analytics':
+      case 'kpi-dashboard':
         return <Dashboard setActiveTab={setActiveTab} />;
 
       // ─── 2. Academic Section ───
@@ -526,27 +568,52 @@ const MainAppContent: React.FC = () => {
       case 'academic-subjects':
       case 'faculty-subjects':
         return <SubjectsPage />;
+      case 'my-attendance':
+      case 'academic-my-attendance':
+      case 'student-attendance':
+        return <StudentAttendancePage />;
       case 'attendance':
       case 'academic-attendance':
       case 'faculty-mark-attendance':
+        if (role === 'STUDENT') {
+          return <StudentAttendancePage />;
+        }
         return <AttendancePage initialTab="ATTENDANCE" />;
       case 'attendance-history':
       case 'faculty-attendance-history':
+        if (role === 'STUDENT') {
+          return <StudentAttendancePage />;
+        }
         return <AttendancePage initialTab="HISTORY" />;
       case 'subject-attendance':
       case 'faculty-subject-attendance':
+        if (role === 'STUDENT') {
+          return <StudentAttendancePage />;
+        }
         return <AttendancePage initialTab="SUBJECT_STATS" />;
       case 'attendance-reports':
       case 'faculty-attendance-reports':
+        if (role === 'STUDENT') {
+          return <StudentAttendancePage />;
+        }
         return <AttendancePage initialTab="REPORTS" />;
       case 'attendance-import':
       case 'faculty-attendance-import':
+        if (role === 'STUDENT') {
+          return <StudentAttendancePage />;
+        }
         return <AttendancePage initialTab="IMPORT_STUDENTS" />;
       case 'attendance-templates':
       case 'faculty-attendance-templates':
+        if (role === 'STUDENT') {
+          return <StudentAttendancePage />;
+        }
         return <AttendancePage initialTab="TEMPLATES" />;
       case 'attendance-applications':
       case 'faculty-attendance-apps':
+        if (role === 'STUDENT') {
+          return <StudentAttendancePage />;
+        }
         return <AttendancePage initialTab="APPLICATIONS" />;
       case 'materials':
       case 'study-material':
@@ -1220,7 +1287,16 @@ const MainAppContent: React.FC = () => {
       case 'reports':
         return <ReportsPage />;
       case 'settings':
+      case 'user-management':
+      case 'users-management':
+      case 'rbac-matrix':
+      case 'access-control':
         return <SystemSettingsPage />;
+      case 'erp-admin':
+      case 'erp-admin-dashboard':
+      case 'erp-admin/dashboard':
+      case 'admin-portal':
+        return <AdminPortalPage />;
       case 'ai-control-center':
       case 'ai-agents':
       case 'ai-activity':
@@ -1367,6 +1443,10 @@ const MainAppContent: React.FC = () => {
         return <NoticesPage />;
       case 'events':
         return <EventsPage />;
+      case 'student-council':
+      case 'student-council-desk':
+      case 'council-desk':
+        return <StudentCouncilDeskPage />;
       case 'library':
         return <LibraryPage />;
       case 'edp-duties':
@@ -1605,7 +1685,9 @@ const MainAppContent: React.FC = () => {
         />
         <main style={{ flex: 1, padding: '1.5rem', overflowY: 'auto', overflowX: 'hidden', minHeight: 0, minWidth: 0, display: 'flex', flexDirection: 'column', WebkitOverflowScrolling: 'touch' }}>
           <div key={activeTab} className="erp-page-transition" style={{ flex: '1 0 auto', width: '100%', minHeight: 'min-content' }}>
-            {renderActivePage()}
+            <Suspense fallback={<PageSkeletonFallback />}>
+              {renderActivePage()}
+            </Suspense>
           </div>
           <footer style={{ marginTop: '2.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', fontSize: '0.78125rem', color: 'var(--text-muted)', flexShrink: 0 }}>
             <div>

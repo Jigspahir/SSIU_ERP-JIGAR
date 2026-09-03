@@ -1,20 +1,30 @@
-/**
- * SSIU ERP — Supervisor & Reporting Hierarchy Tree Component
- * File: src/modules/staff/components/StaffReportingTreeViewer.tsx
- */
-
 import React, { useState } from 'react';
-import { Network, ChevronRight, ChevronDown, User, Award, Users, BookOpen } from 'lucide-react';
+import { Network, ChevronRight, ChevronDown, User, Award, Users, BookOpen, ShieldCheck, Plus, Key } from 'lucide-react';
 import { SupervisorHierarchyNodeDTO } from '../types';
 import { Badge } from '../../../components/common/Badge';
+import { db } from '../../../services/db';
+import { TargetFacultyAccountInfo } from './StaffFacultyAccountModal';
 
 interface StaffReportingTreeViewerProps {
   hierarchy: SupervisorHierarchyNodeDTO[];
+  onManageAccount?: (target: TargetFacultyAccountInfo) => void;
 }
 
-const TreeNodeItem: React.FC<{ node: SupervisorHierarchyNodeDTO; depth?: number }> = ({ node, depth = 0 }) => {
+const TreeNodeItem: React.FC<{
+  node: SupervisorHierarchyNodeDTO;
+  depth?: number;
+  onManageAccount?: (target: TargetFacultyAccountInfo) => void;
+}> = ({ node, depth = 0, onManageAccount }) => {
   const [expanded, setExpanded] = useState<boolean>(depth < 2);
   const hasChildren = Boolean(node.children && node.children.length > 0);
+
+  // Check if this node has an existing login account
+  const allUsers = db.getUsers();
+  const existingUser = allUsers.find(
+    u => (node.employeeId && (u.employeeId === node.employeeId || u.username === node.employeeId)) ||
+         (node.email && u.email?.toLowerCase() === node.email.toLowerCase()) ||
+         u.id === node.id
+  );
 
   return (
     <div style={{ marginLeft: depth > 0 ? '1.5rem' : 0, borderLeft: depth > 0 ? '2px dashed var(--border-color)' : 'none', paddingLeft: depth > 0 ? '1rem' : 0, marginTop: '0.5rem' }}>
@@ -54,7 +64,14 @@ const TreeNodeItem: React.FC<{ node: SupervisorHierarchyNodeDTO; depth?: number 
           </div>
 
           <div>
-            <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--brand-navy)' }}>{node.name}</div>
+            <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--brand-navy)' }}>
+              {node.name}
+              {node.employeeId && (
+                <span style={{ marginLeft: '6px', fontSize: '0.75rem', fontFamily: 'monospace', color: '#64748B' }}>
+                  ({node.employeeId})
+                </span>
+              )}
+            </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
               {node.designation} &bull; {node.department}
             </div>
@@ -73,13 +90,80 @@ const TreeNodeItem: React.FC<{ node: SupervisorHierarchyNodeDTO; depth?: number 
           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <BookOpen size={12} /> {node.weeklyWorkloadHours} hrs/wk
           </span>
+
+          {/* Login Account Action Button */}
+          {existingUser ? (
+            <button
+              type="button"
+              onClick={() => onManageAccount?.({
+                facultyId: node.id,
+                name: node.name,
+                employeeId: node.employeeId,
+                email: node.email,
+                designation: node.designation,
+                departmentName: node.department,
+                departmentId: node.departmentId,
+                instituteId: node.instituteId,
+                role: node.role,
+              })}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 8px',
+                borderRadius: '6px',
+                fontSize: '0.6875rem',
+                fontWeight: 700,
+                background: '#ECFDF5',
+                color: '#065F46',
+                border: '1px solid #A7F3D0',
+                cursor: 'pointer',
+              }}
+              title={`Manage Login Account (${existingUser.username})`}
+            >
+              <ShieldCheck size={12} color="#059669" />
+              <span>{existingUser.accountStatus || 'ACTIVE'}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onManageAccount?.({
+                facultyId: node.id,
+                name: node.name,
+                employeeId: node.employeeId,
+                email: node.email,
+                designation: node.designation,
+                departmentName: node.department,
+                departmentId: node.departmentId,
+                instituteId: node.instituteId,
+                role: node.role,
+              })}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 8px',
+                borderRadius: '6px',
+                fontSize: '0.6875rem',
+                fontWeight: 800,
+                background: '#FFF7ED',
+                color: '#C2410C',
+                border: '1px solid #FDBA74',
+                cursor: 'pointer',
+              }}
+              title="Provision ERP Login Account"
+            >
+              <Plus size={12} />
+              <span>Login Account</span>
+            </button>
+          )}
         </div>
       </div>
 
       {hasChildren && expanded && (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {node.children!.map(child => (
-            <TreeNodeItem key={child.id} node={child} depth={depth + 1} />
+            <TreeNodeItem key={child.id} node={child} depth={depth + 1} onManageAccount={onManageAccount} />
           ))}
         </div>
       )}
@@ -87,7 +171,7 @@ const TreeNodeItem: React.FC<{ node: SupervisorHierarchyNodeDTO; depth?: number 
   );
 };
 
-export const StaffReportingTreeViewer: React.FC<StaffReportingTreeViewerProps> = ({ hierarchy }) => {
+export const StaffReportingTreeViewer: React.FC<StaffReportingTreeViewerProps> = ({ hierarchy, onManageAccount }) => {
   return (
     <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -104,7 +188,7 @@ export const StaffReportingTreeViewer: React.FC<StaffReportingTreeViewerProps> =
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
         {hierarchy.map(rootNode => (
-          <TreeNodeItem key={rootNode.id} node={rootNode} />
+          <TreeNodeItem key={rootNode.id} node={rootNode} onManageAccount={onManageAccount} />
         ))}
       </div>
     </div>

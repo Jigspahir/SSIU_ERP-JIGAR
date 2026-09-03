@@ -6,6 +6,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { RateLimit } from '../common/decorators/rate-limit.decorator';
 import { Request } from 'express';
 
 @Controller('api/v1/auth')
@@ -13,6 +14,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
+  @RateLimit({ limit: 10, ttlSeconds: 60, keyPrefix: 'auth:login', compositeWithBodyField: 'loginId' })
   @HttpCode(HttpStatus.OK)
   async login(@Body() loginDto: LoginDto, @Req() req: Request) {
     const meta = {
@@ -20,6 +22,17 @@ export class AuthController {
       userAgent: req.headers['user-agent'],
     };
     return this.authService.login(loginDto, meta);
+  }
+
+  @Post('admin-login')
+  @RateLimit({ limit: 10, ttlSeconds: 60, keyPrefix: 'auth:admin-login', compositeWithBodyField: 'loginId' })
+  @HttpCode(HttpStatus.OK)
+  async adminLogin(@Body() loginDto: LoginDto, @Req() req: Request) {
+    const meta = {
+      ip: req.ip || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'],
+    };
+    return this.authService.adminLogin(loginDto, meta);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -57,6 +70,7 @@ export class AuthController {
   }
 
   @Post('forgot-password')
+  @RateLimit({ limit: 5, ttlSeconds: 60, keyPrefix: 'auth:forgot-password' })
   @HttpCode(HttpStatus.OK)
   async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto, @Req() req: Request) {
     const meta = {
@@ -67,6 +81,7 @@ export class AuthController {
   }
 
   @Post('reset-password')
+  @RateLimit({ limit: 5, ttlSeconds: 60, keyPrefix: 'auth:reset-password' })
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto, @Req() req: Request) {
     const meta = {

@@ -121,8 +121,8 @@ export const FinalEnrollmentAssignModal: React.FC<FinalEnrollmentAssignModalProp
             <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>{student.name}</div>
           </div>
           <div>
-            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted, #64748B)' }}>STUDENT ID</span>
-            <div style={{ fontSize: '0.875rem', fontWeight: 800, fontFamily: 'monospace' }}>{student.id}</div>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted, #64748B)' }}>ENROLLMENT NO.</span>
+            <div style={{ fontSize: '0.875rem', fontWeight: 800, fontFamily: 'monospace', color: 'var(--brand-orange, #F37023)' }}>{student.enrollmentNo || student.temporaryEnrollmentNumber || '—'}</div>
           </div>
           <div>
             <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-muted, #64748B)' }}>TEMPORARY ENROLLMENT NO</span>

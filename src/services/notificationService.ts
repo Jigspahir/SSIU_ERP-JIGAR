@@ -938,6 +938,32 @@ class NotificationService {
   }
 
   /**
+   * 6.1 NOTESHEET AUTO-REMINDER (3+ DAYS PENDING)
+   */
+  public notifyNotesheetPendingReminder(params: {
+    noteSheetNumber: string;
+    subject: string;
+    currentOfficerUserId: string;
+    currentOfficerName?: string;
+    pendingDays: number;
+    pendingSinceDate?: string;
+    instituteId?: string;
+    departmentId?: string;
+  }) {
+    this.createNotification({
+      type: 'ACTION_REQUIRED',
+      title: `⚡ Action Required: Notesheet Pending ${params.pendingDays} Days (${params.noteSheetNumber})`,
+      message: `Notesheet "${params.subject}" has been awaiting your action for ${params.pendingDays} days (since ${params.pendingSinceDate || 'past 3+ days'}). Please review and endorse at the earliest.`,
+      module: 'NOTESHEET',
+      targetUserId: params.currentOfficerUserId,
+      referenceId: params.noteSheetNumber,
+      referenceType: 'NOTESHEET',
+      linkTab: 'notesheet',
+      priority: 'URGENT'
+    });
+  }
+
+  /**
    * 7. STUDENT DOCUMENT VERIFICATION
    */
   public notifyDocumentVerification(params: {

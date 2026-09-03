@@ -352,6 +352,95 @@ export class StudentProfileAccessService {
     };
   }
 
+  /**
+   * 2B. SERVER-SIDE PAGINATED SEARCH
+   * Queries real NestJS Backend API /api/v1/students with fallback to local mock database.
+   */
+  public async searchStudentsServer(
+    user: User,
+    role: UserRole,
+    searchQuery: string = '',
+    filters?: {
+      instituteId?: string;
+      departmentId?: string;
+      programId?: string;
+      semesterId?: string;
+      status?: string;
+      studentType?: string;
+    },
+    page: number = 1,
+    limit: number = 20
+  ): Promise<{ records: StudentIdentitySummary[]; total: number; page: number; totalPages: number }> {
+    try {
+      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+      const params = new URLSearchParams();
+      params.set('page', String(page));
+      params.set('limit', String(Math.min(limit, 100)));
+      if (searchQuery.trim()) params.set('search', searchQuery.trim());
+      if (filters?.instituteId && filters.instituteId !== 'ALL') params.set('instituteId', filters.instituteId);
+      if (filters?.departmentId && filters.departmentId !== 'ALL') params.set('departmentId', filters.departmentId);
+      if (filters?.programId && filters.programId !== 'ALL') params.set('programId', filters.programId);
+      if (filters?.status && filters.status !== 'ALL') params.set('status', filters.status);
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`/api/v1/students?${params.toString()}`, {
+        headers,
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        const payload = json.data || json;
+        const data = Array.isArray(payload) ? payload : (payload.data || []);
+        const total = typeof payload.total === 'number' ? payload.total : data.length;
+        const totalPages = typeof payload.totalPages === 'number' ? payload.totalPages : Math.ceil(total / limit) || 1;
+
+        if (total > 0) {
+          const records: StudentIdentitySummary[] = data.map((s: any) => ({
+            id: s.id,
+            name: `${s.firstName || ''} ${s.lastName || ''}`.trim() || s.name || 'Student',
+            enrollmentNo: s.enrollmentNo,
+            photo: s.photo || '',
+            gender: s.gender || 'OTHER',
+            email: s.email || '',
+            phone: s.phone || '',
+            instituteId: s.instituteId || '',
+            instituteName: s.institute?.name || 'Swarrnim Institute',
+            departmentId: s.departmentId || '',
+            departmentName: s.department?.name || 'Academic Department',
+            programId: s.batch?.program?.id || '',
+            programName: s.batch?.program?.name || 'Degree Program',
+            semesterId: s.semesterId || '',
+            semesterNumber: s.semesterNumber || 1,
+            divisionName: s.divisionName || 'Division A',
+            batchName: s.batch?.code || 'Current Batch',
+            academicYearName: '2026-2027',
+            studentType: s.studentType || 'DOMESTIC',
+            status: s.status || 'ACTIVE',
+            abcId: s.abcId,
+            abcIdStatus: s.abcIdStatus,
+          }));
+
+          return {
+            records,
+            total,
+            page,
+            totalPages,
+          };
+        }
+      }
+    } catch (e) {
+      // Fallback to local memory
+    }
+
+    return this.searchStudents(user, role, searchQuery, filters, page, limit);
+  }
+
   // ============================================================================
   // 3. GET STUDENT PROFILE (CENTRAL AUTHORIZED GATEWAY)
   // ============================================================================

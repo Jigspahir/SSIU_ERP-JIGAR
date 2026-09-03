@@ -5,6 +5,7 @@ import { UpdateRoleDto } from './dto/update-role.dto';
 import { AssignPermissionsDto } from './dto/assign-permissions.dto';
 import { AssignUserRoleDto } from './dto/assign-user-role.dto';
 import { CheckPermissionDto } from './dto/check-permission.dto';
+import { SetUserOverrideDto } from './dto/set-user-override.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RbacGuard } from './rbac.guard';
 import { RequirePermission } from './require-permission.decorator';
@@ -66,6 +67,30 @@ export class RbacController {
   @RequirePermission('RBAC', 'VIEW')
   async getUserPermissions(@Param('id') id: string) {
     return this.rbacService.getUserEffectivePermissions(id);
+  }
+
+  // ── User-Specific Overrides ──
+  @Get('users/:id/overrides')
+  @RequirePermission('RBAC', 'VIEW')
+  async getUserOverrides(@Param('id') id: string) {
+    return this.rbacService.getUserPermissionOverrides(id);
+  }
+
+  @Post('users/:id/overrides')
+  @RequirePermission('RBAC', 'ASSIGN')
+  async setUserOverride(@Param('id') id: string, @Body() dto: SetUserOverrideDto, @Req() req: any) {
+    return this.rbacService.setUserPermissionOverride(id, dto.module, dto.action, dto.granted, req.user.id);
+  }
+
+  @Delete('users/:id/overrides/:module/:action')
+  @RequirePermission('RBAC', 'ASSIGN')
+  async removeUserOverride(
+    @Param('id') id: string,
+    @Param('module') module: string,
+    @Param('action') action: string,
+    @Req() req: any,
+  ) {
+    return this.rbacService.removeUserPermissionOverride(id, module, action, req.user.id);
   }
 
   @Post('rbac/check-permission')

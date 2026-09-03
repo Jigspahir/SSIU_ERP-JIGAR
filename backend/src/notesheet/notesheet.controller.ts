@@ -81,6 +81,27 @@ export class NoteSheetController {
   }
 
   /**
+   * GET /api/v1/notesheets/dashboard/stats
+   * Get role-scoped KPI summary statistics for the Notesheet module
+   */
+  @Get('dashboard/stats')
+  @RequirePermission('NOTESHEET', 'VIEW')
+  @ApiOperation({ summary: 'Get department and role-scoped Notesheet KPI summary statistics' })
+  getDashboardStats(@Req() req: any) {
+    return this.noteSheetService.getDashboardStats(req.user);
+  }
+
+  /**
+   * GET /api/v1/notesheets/verify/:tokenOrId
+   * Public QR code verification endpoint (no sensitive internal information exposed)
+   */
+  @Get('verify/:tokenOrId')
+  @ApiOperation({ summary: 'Verify authentic Notesheet by unique QR token or number' })
+  verifyNotesheet(@Param('tokenOrId') tokenOrId: string) {
+    return this.noteSheetService.verifyNotesheet(tokenOrId);
+  }
+
+  /**
    * GET /api/v1/notesheets/:id
    * Get single Notesheet by ID (with department access security check)
    */

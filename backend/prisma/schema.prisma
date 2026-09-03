@@ -2903,6 +2903,85 @@ model HostelAttendance {
   @@index([attendanceDate])
 }
 
+model HostelGatePass {
+  id                     String   @id @default(uuid())
+  requestNo              String   @unique
+  gatePassNo             String?  @unique
+  studentId              String
+  enrollmentNo           String
+  studentName            String
+  studentPhoto           String?
+  programName            String?
+  departmentName         String?
+  semester               Int?     @default(1)
+  hostelId               String
+  hostelName             String
+  block                  String?
+  roomNo                 String
+  bedNo                  String?
+  passType               String   @default("DAY_OUT")
+  reason                 String
+  leavingDate            DateTime @db.Date
+  leavingTime            String
+  expectedReturnDate     DateTime @db.Date
+  expectedReturnTime     String
+  destination            String
+  destinationAddress     String?
+  travelMode             String?  @default("PUBLIC_TRANSPORT")
+  travelingWith          String?  @default("ALONE")
+  emergencyContact       String
+  attachment             String?
+  declarationAccepted    Boolean  @default(true)
+  isEmergency            Boolean  @default(false)
+  status                 String   @default("SUBMITTED")
+  qrToken                String?  @unique
+  qrCodeData             String?
+  approvedBy             String?
+  approvedByName         String?
+  approvedAt             DateTime?
+  wardenRemarks          String?
+  rejectedBy             String?
+  rejectedByName         String?
+  rejectedAt             DateTime?
+  rejectionReason        String?
+  actualCheckOutTime     DateTime?
+  actualCheckOutStaff    String?
+  actualCheckInTime      DateTime?
+  actualCheckInStaff     String?
+  isLateReturn           Boolean  @default(false)
+  cancellationReason     String?
+  cancelledAt            DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  auditLogs              HostelGatePassAuditLog[]
+
+  @@index([studentId])
+  @@index([enrollmentNo])
+  @@index([hostelId])
+  @@index([status])
+  @@index([leavingDate])
+  @@index([expectedReturnDate])
+}
+
+model HostelGatePassAuditLog {
+  id          String         @id @default(uuid())
+  gatePassId  String
+  action      String
+  userId      String?
+  userName    String?
+  userRole    String?
+  timestamp   DateTime       @default(now())
+  remarks     String?
+  metadata    String?
+
+  gatePass    HostelGatePass @relation(fields: [gatePassId], references: [id], onDelete: Cascade)
+
+  @@index([gatePassId])
+  @@index([action])
+  @@index([timestamp])
+}
+
 model OutpassRequest {
   id               String    @id @default(uuid())
   outpassNo        String    @unique // OUT-2026-000001

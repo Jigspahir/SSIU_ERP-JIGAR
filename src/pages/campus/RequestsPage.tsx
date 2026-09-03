@@ -297,43 +297,45 @@ export const RequestsPage: React.FC<RequestsPageProps> = ({
         </div>
       </div>
 
-      {/* KPI Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-        <StatCard
-          title="Total Requests"
-          value={stats.total}
-          icon={FileText}
-          colorScheme="navy"
-          subtitle="All scoped student requests"
-        />
-        <StatCard
-          title={isStudent ? "Awaiting Your Confirmation" : "Pending My Action"}
-          value={stats.pendingMyAction}
-          icon={Clock}
-          colorScheme="gold"
-          subtitle={isStudent ? "Requests marked completed" : "Action required on your desk"}
-        />
-        <StatCard
-          title="With Mentor"
-          value={stats.withMentor}
-          icon={UserCheck}
-          colorScheme="orange"
-          subtitle="Initial routing / review"
-        />
-        <StatCard
-          title="Completed & Verified"
-          value={stats.completed}
-          icon={CheckCircle2}
-          colorScheme="green"
-          subtitle="Closed by Mentor / Student"
-        />
-        <StatCard
-          title="Reopened Requests"
-          value={stats.reopened}
-          icon={RotateCcw}
-          colorScheme="blue"
-          subtitle="Unresolved / Returned"
-        />
+      {/* KPI Stat Cards (Single Horizontal Row) */}
+      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%', paddingBottom: '2px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(180px, 1fr))', gap: '0.75rem', minWidth: '950px' }}>
+          <StatCard
+            title="Total Requests"
+            value={stats.total}
+            icon={FileText}
+            colorScheme="navy"
+            subtitle="All scoped student requests"
+          />
+          <StatCard
+            title={isStudent ? "Awaiting Your Confirmation" : "Pending My Action"}
+            value={stats.pendingMyAction}
+            icon={Clock}
+            colorScheme="gold"
+            subtitle={isStudent ? "Requests marked completed" : "Action required on your desk"}
+          />
+          <StatCard
+            title="With Mentor"
+            value={stats.withMentor}
+            icon={UserCheck}
+            colorScheme="orange"
+            subtitle="Initial routing / review"
+          />
+          <StatCard
+            title="Completed & Verified"
+            value={stats.completed}
+            icon={CheckCircle2}
+            colorScheme="green"
+            subtitle="Closed by Mentor / Student"
+          />
+          <StatCard
+            title="Reopened Requests"
+            value={stats.reopened}
+            icon={RotateCcw}
+            colorScheme="blue"
+            subtitle="Unresolved / Returned"
+          />
+        </div>
       </div>
 
       {/* Queue Tabs */}

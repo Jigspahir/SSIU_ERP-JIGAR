@@ -106,7 +106,7 @@ class StudentAdmissionRecordPdfService {
       headStyles: { fillColor: [11, 25, 44], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5 },
       bodyStyles: { fontSize: 7, cellPadding: 1.5, textColor: [30, 41, 59] },
       columns: [
-        { header: 'Student ID', dataKey: 'studentId' },
+        { header: 'Enrollment No.', dataKey: 'enrollmentNo' },
         { header: 'Temp Enrollment No.', dataKey: 'tempEnroll' },
         { header: 'Final Enrollment No.', dataKey: 'finalEnroll' },
         { header: 'Application No.', dataKey: 'appNo' },
@@ -116,7 +116,7 @@ class StudentAdmissionRecordPdfService {
       ],
       body: [
         {
-          studentId: student.id || 'N/A',
+          enrollmentNo: student.enrollmentNo || student.temporaryEnrollmentNumber || 'N/A',
           tempEnroll: student.temporaryEnrollmentNumber || student.enrollmentNo || 'PENDING',
           finalEnroll: student.finalEnrollmentNumber || 'Pending University Exam Cell',
           appNo: student.applicationNumber || 'Manual Entry',

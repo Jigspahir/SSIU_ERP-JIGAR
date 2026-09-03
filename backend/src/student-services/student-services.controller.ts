@@ -24,6 +24,9 @@ import {
 } from './dto/service-request.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RbacGuard } from '../rbac/rbac.guard';
+import { RequirePermission } from '../rbac/require-permission.decorator';
+import { RequireRole } from '../rbac/require-role.decorator';
+import { RequireScope } from '../rbac/require-scope.decorator';
 
 @ApiTags('Digital Student Services & Campus Requests')
 @Controller('api/v1/student-services')
@@ -74,6 +77,8 @@ export class StudentServicesController {
   @Patch('requests/:id/assign')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RbacGuard)
+  @RequireRole('STAFF', 'HOD', 'PRINCIPAL', 'SUPER_ADMIN', 'UNIVERSITY_ADMIN')
+  @RequirePermission('STUDENT_SERVICES', 'ASSIGN')
   @ApiOperation({ summary: 'Assign Service Request to Staff / Department' })
   assignServiceRequest(@Param('id') id: string, @Req() req: any, @Body() dto: AssignServiceRequestDto) {
     return this.servicesService.assignServiceRequest(id, req.user, dto);
@@ -82,6 +87,7 @@ export class StudentServicesController {
   @Patch('requests/:id/status')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RbacGuard)
+  @RequirePermission('STUDENT_SERVICES', 'EDIT')
   @ApiOperation({ summary: 'Update Service Request status' })
   updateServiceRequestStatus(@Param('id') id: string, @Req() req: any, @Body() dto: UpdateServiceRequestStatusDto) {
     return this.servicesService.updateServiceRequestStatus(id, req.user, dto);
@@ -90,6 +96,8 @@ export class StudentServicesController {
   @Patch('requests/:id/resolve')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RbacGuard)
+  @RequireRole('STAFF', 'HOD', 'PRINCIPAL', 'SUPER_ADMIN', 'UNIVERSITY_ADMIN')
+  @RequirePermission('STUDENT_SERVICES', 'APPROVE')
   @ApiOperation({ summary: 'Resolve Service Request with completion details' })
   resolveServiceRequest(@Param('id') id: string, @Req() req: any, @Body() dto: ResolveServiceRequestDto) {
     return this.servicesService.resolveServiceRequest(id, req.user, dto);
@@ -98,6 +106,8 @@ export class StudentServicesController {
   @Patch('requests/:id/reject')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RbacGuard)
+  @RequireRole('STAFF', 'HOD', 'PRINCIPAL', 'SUPER_ADMIN', 'UNIVERSITY_ADMIN')
+  @RequirePermission('STUDENT_SERVICES', 'REJECT')
   @ApiOperation({ summary: 'Reject Service Request with mandatory reason' })
   rejectServiceRequest(@Param('id') id: string, @Req() req: any, @Body() dto: RejectServiceRequestDto) {
     return this.servicesService.rejectServiceRequest(id, req.user, dto);
@@ -106,6 +116,7 @@ export class StudentServicesController {
   @Post('requests/:id/cancel')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RbacGuard)
+  @RequireScope('OWN')
   @ApiOperation({ summary: 'Cancel Service Request (Student only, if unapproved)' })
   cancelRequest(@Param('id') id: string, @Req() req: any) {
     return this.servicesService.cancelRequest(id, req.user);
@@ -135,6 +146,8 @@ export class StudentServicesController {
   @Post('requests/:id/generate-certificate')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard, RbacGuard)
+  @RequireRole('STAFF', 'HOD', 'PRINCIPAL', 'SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR')
+  @RequirePermission('STUDENT_SERVICES', 'APPROVE')
   @ApiOperation({ summary: 'Generate Digital Certificate upon Request Approval' })
   generateCertificate(@Param('id') id: string, @Body('signatoryTitle') signatoryTitle?: string) {
     return this.servicesService.generateCertificate(id, signatoryTitle);

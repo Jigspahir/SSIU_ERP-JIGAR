@@ -79,7 +79,7 @@ export const TransferWorkPage: React.FC<TransferWorkPageProps> = ({ setActiveTab
         const moduleName = w.type ? w.type.replace(/_/g, ' ') : (w.module || 'GENERAL');
         const studentRef = w.studentName 
           ? `${w.studentName} (${w.enrollmentNo || w.studentEnrollment || w.studentId || ''})`
-          : (w.studentEnrollment ? `Student ID: ${w.studentEnrollment}` : 'General Task');
+          : (w.studentEnrollment ? `Enrollment No: ${w.studentEnrollment}` : 'General Task');
 
         enrichedList.push({
           ...w,

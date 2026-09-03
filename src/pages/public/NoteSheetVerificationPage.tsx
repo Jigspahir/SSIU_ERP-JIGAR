@@ -24,14 +24,32 @@ export const NoteSheetVerificationPage: React.FC<NoteSheetVerificationPageProps>
   initialQuery,
   onNavigateToNotesheet
 }) => {
-  const [searchQuery, setSearchQuery] = useState(initialQuery || '');
+  const [searchQuery, setSearchQuery] = useState(() => {
+    if (initialQuery) return initialQuery;
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const idParam = searchParams.get('id') || searchParams.get('token') || searchParams.get('ref');
+      if (idParam) return idParam;
+
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      const verifyIdx = pathParts.findIndex(p => p === 'verify' || p === 'notesheet-verify');
+      if (verifyIdx !== -1 && pathParts[verifyIdx + 1] === 'notesheet' && pathParts[verifyIdx + 2]) {
+        return decodeURIComponent(pathParts[verifyIdx + 2]);
+      }
+      if (pathParts[0] === 'notesheet-verify' && pathParts[1]) {
+        return decodeURIComponent(pathParts[1]);
+      }
+    }
+    return '';
+  });
   const [result, setResult] = useState<NoteSheetVerificationResult | null>(null);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (initialQuery) {
-      handleVerify(initialQuery);
+    const queryToUse = initialQuery || searchQuery;
+    if (queryToUse) {
+      handleVerify(queryToUse);
     }
   }, [initialQuery]);
 

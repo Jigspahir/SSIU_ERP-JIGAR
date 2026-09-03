@@ -14,6 +14,7 @@ import {
   BulkImportFilterDto,
 } from './dto/bulk-import.dto';
 import * as XLSX from 'xlsx';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class BulkImportService {
@@ -34,7 +35,7 @@ export class BulkImportService {
       throw new ForbiddenException('Students are strictly prohibited from performing bulk data imports.');
     }
 
-    if (role === 'SUPER_ADMIN' || role === 'SYSTEM_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'ADMIN') {
+    if (role === 'SUPER_ADMIN' || role === 'SYSTEM_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'ADMIN' || role === 'ERP_COORDINATOR') {
       return true; // Full access across all datasets
     }
 
@@ -46,7 +47,12 @@ export class BulkImportService {
       FINANCE: ['FEE_ASSIGNMENT'],
       HOSTEL_ADMIN: ['HOSTEL_STUDENT', 'HOSTEL_ROOM'],
       TRANSPORT_ADMIN: ['TRANSPORT_VEHICLE', 'TRANSPORT_DRIVER', 'TRANSPORT_ROUTE'],
-      HOD: ['STUDENT', 'FACULTY', 'SUBJECT', 'MARKS'],
+      HOD: ['STUDENT', 'FACULTY', 'STAFF', 'SUBJECT', 'MARKS'],
+      HR: ['FACULTY', 'STAFF'],
+      HR_ADMIN: ['FACULTY', 'STAFF'],
+      HR_OFFICER: ['FACULTY', 'STAFF'],
+      REGISTRAR: ['STUDENT', 'FACULTY', 'STAFF', 'SUBJECT', 'EXAM_FORM', 'MARKS', 'HOSTEL_STUDENT', 'HOSTEL_ROOM', 'FEE_ASSIGNMENT', 'TRANSPORT_VEHICLE', 'TRANSPORT_DRIVER', 'TRANSPORT_ROUTE'],
+      DEPUTY_REGISTRAR: ['STUDENT', 'FACULTY', 'STAFF', 'SUBJECT', 'EXAM_FORM', 'MARKS', 'HOSTEL_STUDENT', 'HOSTEL_ROOM', 'FEE_ASSIGNMENT', 'TRANSPORT_VEHICLE', 'TRANSPORT_DRIVER', 'TRANSPORT_ROUTE'],
       FACULTY: ['MARKS'],
     };
 
@@ -127,8 +133,13 @@ export class BulkImportService {
       throw new BadRequestException('The uploaded file contains no data rows.');
     }
 
-    const count = await this.prisma.bulkImport.count();
-    const importNo = `IMP-${new Date().getFullYear()}-${String(count + 1).padStart(6, '0')}`;
+    const year = new Date().getFullYear();
+    let seq = (await this.prisma.bulkImport.count()) + 1;
+    let importNo = `IMP-${year}-${String(seq).padStart(6, '0')}`;
+    while (await this.prisma.bulkImport.findUnique({ where: { importNo } })) {
+      seq++;
+      importNo = `IMP-${year}-${String(seq).padStart(6, '0')}`;
+    }
 
     // Create BulkImport record
     const bulkImport = await this.prisma.bulkImport.create({
@@ -147,16 +158,18 @@ export class BulkImportService {
       },
     });
 
-    // Create Staging Rows
-    for (let i = 0; i < rows.length; i++) {
-      await this.prisma.bulkImportRow.create({
-        data: {
-          importId: bulkImport.id,
-          rowNumber: i + 1,
-          rawData: JSON.stringify(rows[i]),
-          status: 'PENDING',
-        },
-      });
+    // Create Staging Rows using high-performance batch insert
+    const stagingData = rows.map((r, i) => ({
+      importId: bulkImport.id,
+      rowNumber: i + 1,
+      rawData: JSON.stringify(r),
+      status: 'PENDING',
+    }));
+
+    const BATCH_SIZE = 500;
+    for (let i = 0; i < stagingData.length; i += BATCH_SIZE) {
+      const chunk = stagingData.slice(i, i + BATCH_SIZE);
+      await this.prisma.bulkImportRow.createMany({ data: chunk });
     }
 
     // Record History / Audit
@@ -189,9 +202,19 @@ export class BulkImportService {
     let invalidCount = 0;
     let duplicateCount = 0;
 
-    // Load in-memory caches of existing DB records for fast validation
+    // Load in-memory caches of existing DB records for ultra-fast validation
     const type = bulkImport.importType;
     const inMemorySeenKeys = new Set<string>();
+    const context = await this.buildValidationContext(type, bulkImport.rows);
+
+    const rowUpdates: {
+      id: string;
+      status: string;
+      parsedData: string;
+      errorMessage?: string | null;
+      errorField?: string | null;
+      warningMessage?: string | null;
+    }[] = [];
 
     for (const row of bulkImport.rows) {
       let raw: any = {};
@@ -201,23 +224,41 @@ export class BulkImportService {
         raw = {};
       }
 
-      // Execute specific validator
-      const result = await this.validateRowByType(type, raw, importMode, inMemorySeenKeys, bulkImport);
+      // Execute specific validator in-memory
+      const result = await this.validateRowByType(type, raw, importMode, inMemorySeenKeys, bulkImport, context);
 
       if (result.status === 'VALID') validCount++;
       else if (result.status === 'DUPLICATE') duplicateCount++;
       else invalidCount++;
 
-      await this.prisma.bulkImportRow.update({
-        where: { id: row.id },
-        data: {
-          status: result.status,
-          parsedData: JSON.stringify(result.parsedData || raw),
-          errorMessage: result.errorMessage,
-          errorField: result.errorField,
-          warningMessage: result.warningMessage,
-        },
+      rowUpdates.push({
+        id: row.id,
+        status: result.status,
+        parsedData: JSON.stringify(result.parsedData || raw),
+        errorMessage: result.errorMessage || null,
+        errorField: result.errorField || null,
+        warningMessage: result.warningMessage || null,
       });
+    }
+
+    // Batch update staging rows in transactions of 100 rows
+    const CHUNK_SIZE = 100;
+    for (let i = 0; i < rowUpdates.length; i += CHUNK_SIZE) {
+      const chunk = rowUpdates.slice(i, i + CHUNK_SIZE);
+      await this.prisma.$transaction(
+        chunk.map(u =>
+          this.prisma.bulkImportRow.update({
+            where: { id: u.id },
+            data: {
+              status: u.status,
+              parsedData: u.parsedData,
+              errorMessage: u.errorMessage,
+              errorField: u.errorField,
+              warningMessage: u.warningMessage,
+            },
+          })
+        )
+      );
     }
 
     const newStatus = validCount > 0 ? 'READY' : 'FAILED';
@@ -253,6 +294,136 @@ export class BulkImportService {
     return updated;
   }
 
+  // ── Helper: Pre-fetch master data in batch for in-memory O(1) validation ──
+
+  private async buildValidationContext(type: string, rows: any[]): Promise<any> {
+    const [instList, deptList, progList, ayList, semList, batchList] = await Promise.all([
+      this.prisma.institute.findMany({ select: { id: true, code: true, name: true } }),
+      this.prisma.department.findMany({ select: { id: true, code: true, name: true, instituteId: true } }),
+      this.prisma.program.findMany({ select: { id: true, code: true, name: true, departmentId: true } }),
+      this.prisma.academicYear.findMany({ select: { id: true, code: true } }),
+      this.prisma.semester.findMany({ select: { id: true, semesterNumber: true, name: true } }),
+      this.prisma.batch.findMany({ select: { id: true, code: true } }),
+    ]);
+
+    const institutes = new Map<string, any>();
+    instList.forEach(i => {
+      institutes.set(i.id.toLowerCase(), i);
+      if (i.code) institutes.set(i.code.toLowerCase(), i);
+      if (i.name) institutes.set(i.name.toLowerCase(), i);
+    });
+
+    const departments = new Map<string, any>();
+    deptList.forEach(d => {
+      departments.set(d.id.toLowerCase(), d);
+      if (d.code) departments.set(d.code.toLowerCase(), d);
+      if (d.name) departments.set(d.name.toLowerCase(), d);
+    });
+
+    const programs = new Map<string, any>();
+    progList.forEach(p => {
+      programs.set(p.id.toLowerCase(), p);
+      if (p.code) programs.set(p.code.toLowerCase(), p);
+      if (p.name) programs.set(p.name.toLowerCase(), p);
+    });
+
+    const existingStudents = new Map<string, any>();
+    const existingFaculty = new Map<string, any>();
+    const existingStaff = new Map<string, any>();
+
+    if (type === 'STUDENT') {
+      const enrollments: string[] = [];
+      const emails: string[] = [];
+      for (const r of rows) {
+        let raw: any = {};
+        try { raw = JSON.parse(r.rawData); } catch {}
+        const en = raw['Enrollment Number'] || raw.enrollmentNo || raw.EnrollmentNo || raw['Roll Number'];
+        if (en) enrollments.push(String(en).trim());
+        const em = raw['Email'] || raw.email || raw['Email Address'];
+        if (em) emails.push(String(em).trim());
+      }
+
+      if (enrollments.length > 0 || emails.length > 0) {
+        const found = await this.prisma.student.findMany({
+          where: {
+            OR: [
+              ...(enrollments.length > 0 ? [{ enrollmentNo: { in: enrollments } }] : []),
+              ...(emails.length > 0 ? [{ email: { in: emails } }] : []),
+            ],
+          },
+          select: { id: true, enrollmentNo: true, email: true, phone: true },
+        });
+        found.forEach(s => {
+          if (s.enrollmentNo) existingStudents.set(s.enrollmentNo.toLowerCase(), s);
+          if (s.email) existingStudents.set(s.email.toLowerCase(), s);
+        });
+      }
+    } else if (type === 'FACULTY') {
+      const empCodes: string[] = [];
+      const emails: string[] = [];
+      for (const r of rows) {
+        let raw: any = {};
+        try { raw = JSON.parse(r.rawData); } catch {}
+        const ec = raw['Employee ID'] || raw.employeeId || raw.EmployeeCode || raw['Emp ID'];
+        if (ec) empCodes.push(String(ec).trim());
+        const em = raw['Email'] || raw.email;
+        if (em) emails.push(String(em).trim());
+      }
+
+      if (empCodes.length > 0 || emails.length > 0) {
+        const found = await this.prisma.faculty.findMany({
+          where: {
+            OR: [
+              ...(empCodes.length > 0 ? [{ employeeCode: { in: empCodes } }] : []),
+              ...(emails.length > 0 ? [{ email: { in: emails } }] : []),
+            ],
+          },
+          select: { id: true, employeeCode: true, email: true },
+        });
+        found.forEach(f => {
+          if (f.employeeCode) existingFaculty.set(f.employeeCode.toLowerCase(), f);
+          if (f.email) existingFaculty.set(f.email.toLowerCase(), f);
+        });
+      }
+    } else if (type === 'STAFF') {
+      const empCodes: string[] = [];
+      const emails: string[] = [];
+      for (const r of rows) {
+        let raw: any = {};
+        try { raw = JSON.parse(r.rawData); } catch {}
+        const ec = raw['Employee Code'] || raw.employeeCode || raw.EmployeeID || raw.employeeId || raw['Emp Code'];
+        if (ec) empCodes.push(String(ec).trim());
+        const em = raw['Email'] || raw.email;
+        if (em) emails.push(String(em).trim());
+      }
+
+      if (empCodes.length > 0 || emails.length > 0) {
+        const found = await this.prisma.employee.findMany({
+          where: {
+            OR: [
+              ...(empCodes.length > 0 ? [{ employeeCode: { in: empCodes } }] : []),
+              ...(emails.length > 0 ? [{ email: { in: emails } }] : []),
+            ],
+          },
+          select: { id: true, employeeCode: true, email: true },
+        });
+        found.forEach(e => {
+          if (e.employeeCode) existingStaff.set(e.employeeCode.toLowerCase(), e);
+          if (e.email) existingStaff.set(e.email.toLowerCase(), e);
+        });
+      }
+    }
+
+    return {
+      institutes,
+      departments,
+      programs,
+      existingStudents,
+      existingFaculty,
+      existingStaff,
+    };
+  }
+
   // ── Row-Level Validation Logic per Dataset ──
 
   private async validateRowByType(
@@ -261,6 +432,7 @@ export class BulkImportService {
     mode: string,
     seenKeys: Set<string>,
     session: any,
+    context?: any,
   ): Promise<{ status: string; parsedData?: any; errorMessage?: string; errorField?: string; warningMessage?: string }> {
     const getVal = (fieldNames: string[]) => {
       for (const f of fieldNames) {
@@ -301,25 +473,32 @@ export class BulkImportService {
         }
         seenKeys.add(enrollmentNo);
 
-        // Database checks
-        const existing = await this.prisma.student.findUnique({ where: { enrollmentNo } });
-        if (existing) {
-          if (mode === 'INSERT_ONLY') {
-            return { status: 'DUPLICATE', errorField: 'Enrollment Number', errorMessage: `Student with enrollment "${enrollmentNo}" already exists in database.` };
-          }
+        // Database checks (via context cache or DB fallback)
+        let existing: any = context?.existingStudents?.get(enrollmentNo.toLowerCase()) || (email && context?.existingStudents?.get(email.toLowerCase()));
+        if (!existing && !context) {
+          existing = await this.prisma.student.findUnique({ where: { enrollmentNo } });
+        }
+        if (existing && mode === 'INSERT_ONLY') {
+          return { status: 'DUPLICATE', errorField: 'Enrollment Number', errorMessage: `Student with enrollment "${enrollmentNo}" already exists in database.` };
         }
 
         // Validate Institute & Department
-        const institute = await this.prisma.institute.findFirst({
-          where: { OR: [{ id: instituteCode }, { code: instituteCode }, { name: instituteCode }] },
-        });
+        let institute: any = context?.institutes?.get(instituteCode.toLowerCase());
+        if (!institute && !context) {
+          institute = await this.prisma.institute.findFirst({
+            where: { OR: [{ id: instituteCode }, { code: instituteCode }, { name: instituteCode }] },
+          });
+        }
         if (!institute) {
           return { status: 'INVALID', errorField: 'Institute Code', errorMessage: `Institute "${instituteCode}" does not exist in ERP.` };
         }
 
-        const dept = await this.prisma.department.findFirst({
-          where: { OR: [{ id: departmentCode }, { code: departmentCode }, { name: departmentCode }] },
-        });
+        let dept: any = context?.departments?.get(departmentCode.toLowerCase());
+        if (!dept && !context) {
+          dept = await this.prisma.department.findFirst({
+            where: { OR: [{ id: departmentCode }, { code: departmentCode }, { name: departmentCode }] },
+          });
+        }
         if (!dept) {
           return { status: 'INVALID', errorField: 'Department Code', errorMessage: `Department "${departmentCode}" does not exist in ERP.` };
         }
@@ -367,19 +546,27 @@ export class BulkImportService {
         }
         seenKeys.add(employeeId);
 
-        const existing = await this.prisma.faculty.findFirst({
-          where: { OR: [{ employeeCode: employeeId }, { email }] },
-        });
+        let existing: any = context?.existingFaculty?.get(employeeId.toLowerCase()) || (email && context?.existingFaculty?.get(email.toLowerCase()));
+        if (!existing && !context) {
+          existing = await this.prisma.faculty.findFirst({
+            where: { OR: [{ employeeCode: employeeId }, { email }] },
+          });
+        }
         if (existing && mode === 'INSERT_ONLY') {
           return { status: 'DUPLICATE', errorField: 'Employee ID', errorMessage: `Faculty with ID/Email "${employeeId}" already exists in database.` };
         }
 
-        const dept = await this.prisma.department.findFirst({
-          where: { OR: [{ id: departmentCode }, { code: departmentCode }, { name: departmentCode }] },
-        });
+        let dept: any = context?.departments?.get(departmentCode.toLowerCase());
+        if (!dept && !context) {
+          dept = await this.prisma.department.findFirst({
+            where: { OR: [{ id: departmentCode }, { code: departmentCode }, { name: departmentCode }] },
+          });
+        }
         if (!dept) {
           return { status: 'INVALID', errorField: 'Department Code', errorMessage: `Department "${departmentCode}" does not exist in ERP.` };
         }
+
+        let institute: any = context && instituteCode ? context.institutes.get(instituteCode.toLowerCase()) : null;
 
         return {
           status: 'VALID',
@@ -389,8 +576,70 @@ export class BulkImportService {
             email,
             mobile,
             departmentId: dept.id,
+            instituteId: institute?.id || dept.instituteId || 'inst-01',
             designation,
             instituteCode,
+            joiningDate,
+            isExisting: !!existing,
+          },
+        };
+      }
+
+      // ── STAFF (NON-TEACHING) ──
+      case 'STAFF': {
+        const employeeCode = getVal(['Employee Code', 'employeeCode', 'EmployeeID', 'employeeId', 'Emp Code']);
+        const name = getVal(['Staff Name', 'name', 'Name', 'FullName']);
+        const email = getVal(['Email', 'email']);
+        const mobile = getVal(['Mobile', 'mobile', 'Phone']);
+        const departmentCode = getVal(['Department Code', 'departmentCode', 'Department']);
+        const designation = getVal(['Designation', 'designation']) || 'Staff';
+        const instituteCode = getVal(['Institute Code', 'instituteCode', 'Institute']);
+        const employmentType = (getVal(['Employment Type', 'employmentType']) || 'FULL_TIME').toUpperCase();
+        const joiningDate = getVal(['Joining Date (YYYY-MM-DD)', 'joiningDate', 'Joining Date']);
+
+        if (!employeeCode) return { status: 'INVALID', errorField: 'Employee Code', errorMessage: 'Employee Code is required.' };
+        if (!name) return { status: 'INVALID', errorField: 'Staff Name', errorMessage: 'Staff Name is required.' };
+        if (!email || !email.includes('@')) return { status: 'INVALID', errorField: 'Email', errorMessage: 'Valid Email is required.' };
+        if (!departmentCode) return { status: 'INVALID', errorField: 'Department Code', errorMessage: 'Department Code is required.' };
+
+        if (seenKeys.has(employeeCode)) {
+          return { status: 'DUPLICATE', errorField: 'Employee Code', errorMessage: `Duplicate Employee Code "${employeeCode}" within uploaded file.` };
+        }
+        seenKeys.add(employeeCode);
+
+        let existing: any = context?.existingStaff?.get(employeeCode.toLowerCase()) || (email && context?.existingStaff?.get(email.toLowerCase()));
+        if (!existing && !context) {
+          existing = await this.prisma.employee.findFirst({
+            where: { OR: [{ employeeCode }, { email }] },
+          });
+        }
+        if (existing && mode === 'INSERT_ONLY') {
+          return { status: 'DUPLICATE', errorField: 'Employee Code', errorMessage: `Staff with Employee Code "${employeeCode}" already exists in database.` };
+        }
+
+        let dept: any = context?.departments?.get(departmentCode.toLowerCase());
+        if (!dept && !context) {
+          dept = await this.prisma.department.findFirst({
+            where: { OR: [{ id: departmentCode }, { code: departmentCode }, { name: departmentCode }] },
+          });
+        }
+        if (!dept) {
+          return { status: 'INVALID', errorField: 'Department Code', errorMessage: `Department "${departmentCode}" does not exist in ERP.` };
+        }
+
+        let institute: any = context && instituteCode ? context.institutes.get(instituteCode.toLowerCase()) : null;
+
+        return {
+          status: 'VALID',
+          parsedData: {
+            employeeCode,
+            name,
+            email,
+            mobile,
+            departmentId: dept.id,
+            instituteId: institute?.id || dept.instituteId || 'inst-01',
+            designation,
+            employmentType,
             joiningDate,
             isExisting: !!existing,
           },
@@ -893,32 +1142,39 @@ export class BulkImportService {
     let importedCount = 0;
     let failedCount = 0;
 
-    // Process valid rows
-    for (const row of validRows) {
-      let data: any = {};
-      try {
-        data = JSON.parse(row.parsedData || row.rawData);
-      } catch {
-        continue;
-      }
+    // Process valid rows in controlled chunks of 100 records per transaction
+    const CHUNK_SIZE = 100;
+    for (let i = 0; i < validRows.length; i += CHUNK_SIZE) {
+      const chunk = validRows.slice(i, i + CHUNK_SIZE);
 
-      try {
-        const targetId = await this.commitRowRecord(bulkImport.importType, data, bulkImport.importMode, user);
-        await this.prisma.bulkImportRow.update({
-          where: { id: row.id },
-          data: { status: 'IMPORTED', targetId },
-        });
-        importedCount++;
-      } catch (err: any) {
-        failedCount++;
-        await this.prisma.bulkImportRow.update({
-          where: { id: row.id },
-          data: {
-            status: 'FAILED',
-            errorMessage: `Insertion error: ${err.message}`,
-          },
-        });
-      }
+      await this.prisma.$transaction(async (tx) => {
+        for (const row of chunk) {
+          let data: any = {};
+          try {
+            data = JSON.parse(row.parsedData || row.rawData);
+          } catch {
+            continue;
+          }
+
+          try {
+            const targetId = await this.commitRowRecord(bulkImport.importType, data, bulkImport.importMode, user, tx);
+            await tx.bulkImportRow.update({
+              where: { id: row.id },
+              data: { status: 'IMPORTED', targetId },
+            });
+            importedCount++;
+          } catch (err: any) {
+            failedCount++;
+            await tx.bulkImportRow.update({
+              where: { id: row.id },
+              data: {
+                status: 'FAILED',
+                errorMessage: `Insertion error: ${err.message}`,
+              },
+            });
+          }
+        }
+      });
     }
 
     const finalStatus = importedCount === validRows.length ? 'IMPORTED' : 'PARTIALLY_IMPORTED';
@@ -947,12 +1203,18 @@ export class BulkImportService {
       success: true,
       message: `Bulk import completed: ${importedCount} record(s) imported successfully.`,
       import: updated,
+      summary: {
+        totalRows: bulkImport.totalRows,
+        validRows: validRows.length,
+        importedRows: importedCount,
+        failedRows: failedCount,
+      },
     };
   }
 
   // ── Database Insertion Logic per Record ──
 
-  private async commitRowRecord(type: string, data: any, mode: string, user: any): Promise<string> {
+  private async commitRowRecord(type: string, data: any, mode: string, user: any, client: any = this.prisma): Promise<string> {
     switch (type) {
       case 'STUDENT': {
         const names = (data.name || '').split(' ');
@@ -960,7 +1222,7 @@ export class BulkImportService {
         const lastName = names.slice(1).join(' ') || 'Candidate';
 
         if (data.isExisting && mode === 'UPSERT') {
-          const updated = await this.prisma.student.update({
+          const updated = await client.student.update({
             where: { enrollmentNo: data.enrollmentNo },
             data: {
               firstName,
@@ -975,15 +1237,15 @@ export class BulkImportService {
           return updated.id;
         }
 
-        const count = await this.prisma.student.count();
+        const count = await client.student.count();
         const erpId = `STU-${new Date().getFullYear()}-${String(count + 1).padStart(5, '0')}`;
 
         // Find or create default batch
-        let batch = await this.prisma.batch.findFirst();
+        let batch = await client.batch.findFirst();
         if (!batch) {
-          const prog = await this.prisma.program.findFirst();
-          const ay = await this.prisma.academicYear.findFirst();
-          batch = await this.prisma.batch.create({
+          const prog = await client.program.findFirst();
+          const ay = await client.academicYear.findFirst();
+          batch = await client.batch.create({
             data: {
               code: 'CSE-2026',
               programId: prog?.id || 'prog-cse',
@@ -994,7 +1256,7 @@ export class BulkImportService {
           });
         }
 
-        const created = await this.prisma.student.create({
+        const created = await client.student.create({
           data: {
             erpId,
             enrollmentNo: data.enrollmentNo,
@@ -1010,6 +1272,37 @@ export class BulkImportService {
             status: 'ACTIVE',
           },
         });
+
+        // Official User account creation: Enrollment Number -> Login ID
+        const tempPassword = `Ssiu@${(data.enrollmentNo || '2026').replace(/[^a-zA-Z0-9]/g, '').slice(-4)}!`;
+        const passwordHash = await bcrypt.hash(tempPassword, 10);
+        const studentRole = await client.role.findUnique({ where: { code: 'STUDENT' } });
+
+        const existingUser = await client.user.findFirst({
+          where: { OR: [{ username: data.enrollmentNo }, { studentId: created.id }] },
+        });
+
+        if (!existingUser) {
+          await client.user.create({
+            data: {
+              erpId,
+              username: data.enrollmentNo,
+              passwordHash,
+              accountStatus: 'ACTIVE',
+              isFirstLogin: true,
+              studentId: created.id,
+              userRoles: studentRole
+                ? {
+                    create: {
+                      roleId: studentRole.id,
+                      scopeType: 'OWN',
+                    },
+                  }
+                : undefined,
+            },
+          });
+        }
+
         return created.id;
       }
 
@@ -1019,7 +1312,7 @@ export class BulkImportService {
         const lastName = names.slice(1).join(' ') || 'Member';
 
         if (data.isExisting && mode === 'UPSERT') {
-          await this.prisma.faculty.updateMany({
+          await client.faculty.updateMany({
             where: { employeeCode: data.employeeId },
             data: {
               firstName,
@@ -1033,12 +1326,12 @@ export class BulkImportService {
           return data.employeeId;
         }
 
-        const count = await this.prisma.faculty.count();
+        const count = await client.faculty.count();
         const erpId = `FAC-${new Date().getFullYear()}-${String(count + 1).padStart(5, '0')}`;
 
-        const inst = await this.prisma.institute.findFirst();
+        const inst = await client.institute.findFirst();
 
-        const faculty = await this.prisma.faculty.create({
+        const faculty = await client.faculty.create({
           data: {
             erpId,
             employeeCode: data.employeeId,
@@ -1053,28 +1346,120 @@ export class BulkImportService {
           },
         });
 
-        // Ensure user account exists
-        await this.prisma.user.upsert({
-          where: { erpId },
-          create: {
-            erpId,
-            username: data.email,
-            passwordHash: '$2a$10$abcdefghijklmnopqrstuvwxyz123456', // dummy hashed pass
-            facultyId: faculty.id,
-            accountStatus: 'ACTIVE',
-          },
-          update: {
-            facultyId: faculty.id,
-          },
+        // Official User account creation: Employee Code -> Login ID
+        const tempPassword = `Ssiu@${(data.employeeId || '2026').replace(/[^a-zA-Z0-9]/g, '').slice(-4)}!`;
+        const passwordHash = await bcrypt.hash(tempPassword, 10);
+        const facultyRole = await client.role.findUnique({ where: { code: 'FACULTY' } });
+
+        const existingUser = await client.user.findFirst({
+          where: { OR: [{ username: data.employeeId }, { facultyId: faculty.id }] },
         });
+
+        if (!existingUser) {
+          await client.user.create({
+            data: {
+              erpId,
+              username: data.employeeId,
+              passwordHash,
+              accountStatus: 'ACTIVE',
+              isFirstLogin: true,
+              facultyId: faculty.id,
+              userRoles: facultyRole
+                ? {
+                    create: {
+                      roleId: facultyRole.id,
+                      scopeType: 'DEPARTMENT',
+                      scopeId: data.departmentId,
+                    },
+                  }
+                : undefined,
+            },
+          });
+        }
 
         return faculty.id;
       }
 
+      case 'STAFF': {
+        const names = (data.name || '').split(' ');
+        const firstName = names[0] || 'Staff';
+        const lastName = names.slice(1).join(' ') || 'Member';
+
+        if (data.isExisting && mode === 'UPSERT') {
+          const updated = await client.employee.update({
+            where: { employeeCode: data.employeeCode },
+            data: {
+              firstName,
+              lastName,
+              email: data.email,
+              phone: data.mobile,
+              designation: data.designation,
+              departmentId: data.departmentId,
+              employmentType: data.employmentType || 'FULL_TIME',
+            },
+          });
+          return updated.id;
+        }
+
+        const count = await client.employee.count();
+        const erpId = `STF-${new Date().getFullYear()}-${String(count + 1).padStart(5, '0')}`;
+
+        const employee = await client.employee.create({
+          data: {
+            erpId,
+            employeeCode: data.employeeCode,
+            firstName,
+            lastName,
+            email: data.email,
+            phone: data.mobile,
+            designation: data.designation || 'Staff',
+            employmentType: data.employmentType || 'FULL_TIME',
+            employmentStatus: 'ACTIVE',
+            instituteId: data.instituteId,
+            departmentId: data.departmentId,
+          },
+        });
+
+        // Official User account creation: Employee Code -> Login ID
+        const tempPassword = `Ssiu@${(data.employeeCode || '2026').replace(/[^a-zA-Z0-9]/g, '').slice(-4)}!`;
+        const passwordHash = await bcrypt.hash(tempPassword, 10);
+        const staffRole = await client.role.findFirst({
+          where: { code: { in: ['HR', 'SYSTEM_ADMIN', 'ADMIN', 'STORE_MANAGER', 'LIBRARIAN'] } },
+        });
+
+        const existingUser = await client.user.findFirst({
+          where: { OR: [{ username: data.employeeCode }, { employee: { id: employee.id } }] },
+        });
+
+        if (!existingUser) {
+          await client.user.create({
+            data: {
+              erpId,
+              username: data.employeeCode,
+              passwordHash,
+              accountStatus: 'ACTIVE',
+              isFirstLogin: true,
+              employee: { connect: { id: employee.id } },
+              userRoles: staffRole
+                ? {
+                    create: {
+                      roleId: staffRole.id,
+                      scopeType: 'DEPARTMENT',
+                      scopeId: data.departmentId,
+                    },
+                  }
+                : undefined,
+            },
+          });
+        }
+
+        return employee.id;
+      }
+
       case 'SUBJECT': {
-        let prog = await this.prisma.program.findFirst();
+        let prog = await client.program.findFirst();
         if (!prog) {
-          prog = await this.prisma.program.create({
+          prog = await client.program.create({
             data: {
               code: 'PROG-CSE',
               name: 'Computer Science and Engineering',
@@ -1084,7 +1469,7 @@ export class BulkImportService {
         }
 
         if (data.isExisting && mode === 'UPSERT') {
-          await this.prisma.subject.updateMany({
+          await client.subject.updateMany({
             where: { code: data.code },
             data: {
               name: data.name,
@@ -1094,7 +1479,7 @@ export class BulkImportService {
           return data.code;
         }
 
-        const created = await this.prisma.subject.create({
+        const created = await client.subject.create({
           data: {
             code: data.code,
             name: data.name,
@@ -1108,7 +1493,7 @@ export class BulkImportService {
 
       case 'EXAM_FORM': {
         const formNumber = `EF-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
-        const form = await this.prisma.examForm.create({
+        const form = await client.examForm.create({
           data: {
             formNumber,
             examId: data.examId,
@@ -1126,11 +1511,11 @@ export class BulkImportService {
         const total = (data.internalMarks || 0) + (data.externalMarks || 0);
 
         // Find or create exam form
-        let examForm = await this.prisma.examForm.findFirst({
+        let examForm = await client.examForm.findFirst({
           where: { examId: data.examId, studentId: data.studentId },
         });
         if (!examForm) {
-          examForm = await this.prisma.examForm.create({
+          examForm = await client.examForm.create({
             data: {
               formNumber: `EF-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`,
               examId: data.examId,
@@ -1143,7 +1528,7 @@ export class BulkImportService {
           });
         }
 
-        const existingResult = await this.prisma.examResult.findFirst({
+        const existingResult = await client.examResult.findFirst({
           where: {
             examFormId: examForm.id,
             subjectId: data.subjectId,
@@ -1151,7 +1536,7 @@ export class BulkImportService {
         });
 
         if (existingResult) {
-          const updated = await this.prisma.examResult.update({
+          const updated = await client.examResult.update({
             where: { id: existingResult.id },
             data: {
               internalMarks: data.internalMarks,
@@ -1168,7 +1553,7 @@ export class BulkImportService {
           return updated.id;
         }
 
-        const result = await this.prisma.examResult.create({
+        const result = await client.examResult.create({
           data: {
             examFormId: examForm.id,
             studentId: data.studentId,
@@ -1190,7 +1575,7 @@ export class BulkImportService {
 
       case 'HOSTEL_STUDENT': {
         const allotmentNo = `HST-ALL-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
-        const allotment = await this.prisma.hostelAllotment.create({
+        const allotment = await client.hostelAllotment.create({
           data: {
             allotmentNo,
             studentId: data.studentId,
@@ -1206,11 +1591,11 @@ export class BulkImportService {
       }
 
       case 'HOSTEL_ROOM': {
-        let hostel = await this.prisma.hostel.findFirst({
+        let hostel = await client.hostel.findFirst({
           where: { OR: [{ id: data.hostelCode }, { code: data.hostelCode }, { name: data.hostelCode }] },
         });
         if (!hostel) {
-          hostel = await this.prisma.hostel.create({
+          hostel = await client.hostel.create({
             data: {
               code: data.hostelCode,
               name: `Hostel ${data.hostelCode}`,
@@ -1219,7 +1604,7 @@ export class BulkImportService {
             },
           });
         }
-        const room = await this.prisma.hostelRoom.create({
+        const room = await client.hostelRoom.create({
           data: {
             hostelId: hostel.id,
             roomNumber: data.roomNumber,
@@ -1234,12 +1619,12 @@ export class BulkImportService {
       }
 
       case 'FEE_ASSIGNMENT': {
-        let feeStruct = await this.prisma.feeStructure.findFirst();
+        let feeStruct = await client.feeStructure.findFirst();
         if (!feeStruct) {
-          const inst = await this.prisma.institute.findFirst();
-          const prog = await this.prisma.program.findFirst();
-          const sem = await this.prisma.semester.findFirst();
-          feeStruct = await this.prisma.feeStructure.create({
+          const inst = await client.institute.findFirst();
+          const prog = await client.program.findFirst();
+          const sem = await client.semester.findFirst();
+          feeStruct = await client.feeStructure.create({
             data: {
               name: 'General Academic Fee Structure',
               structureCode: 'FS-GEN-2026',
@@ -1252,7 +1637,7 @@ export class BulkImportService {
           });
         }
 
-        const feeAccount = await this.prisma.studentFeeAccount.upsert({
+        const feeAccount = await client.studentFeeAccount.upsert({
           where: {
             studentId_feeStructureId: {
               studentId: data.studentId,
@@ -1277,7 +1662,7 @@ export class BulkImportService {
       }
 
       case 'TRANSPORT_VEHICLE': {
-        const vehicle = await this.prisma.vehicle.create({
+        const vehicle = await client.vehicle.create({
           data: {
             registrationNumber: data.registrationNumber,
             vehicleType: data.vehicleType,
@@ -1290,7 +1675,7 @@ export class BulkImportService {
       }
 
       case 'TRANSPORT_DRIVER': {
-        const driver = await this.prisma.driverProfile.create({
+        const driver = await client.driverProfile.create({
           data: {
             driverName: data.driverName,
             contactNumber: data.contactNumber,
@@ -1302,7 +1687,7 @@ export class BulkImportService {
       }
 
       case 'TRANSPORT_ROUTE': {
-        const route = await this.prisma.transportRoute.create({
+        const route = await client.transportRoute.create({
           data: {
             routeNumber: data.routeNumber,
             routeName: data.routeName,

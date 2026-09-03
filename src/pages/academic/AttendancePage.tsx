@@ -17,10 +17,17 @@ export interface AttendancePageProps {
   initialTab?: 'ATTENDANCE' | 'HISTORY' | 'SUBJECT_STATS' | 'REPORTS' | 'IMPORT_STUDENTS' | 'IMPORT_ATTENDANCE' | 'TEMPLATES' | 'APPLICATIONS' | 'MY_APPLICATIONS';
 }
 
+import { StudentAttendancePage } from './StudentAttendancePage';
+
 type TabType = 'ATTENDANCE' | 'HISTORY' | 'SUBJECT_STATS' | 'REPORTS' | 'IMPORT_STUDENTS' | 'IMPORT_ATTENDANCE' | 'TEMPLATES';
 
 export const AttendancePage: React.FC<AttendancePageProps> = ({ initialTab = 'ATTENDANCE' }) => {
   const { user, role } = useAuth();
+
+  // Defense-in-depth guard: Students MUST NOT access faculty attendance marking interface
+  if (role === 'STUDENT') {
+    return <StudentAttendancePage />;
+  }
 
   // Active Tab state
   const [activeTab, setActiveTab] = useState<TabType>(() => {

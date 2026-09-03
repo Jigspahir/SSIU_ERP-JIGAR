@@ -19,6 +19,8 @@ export type UserRole =
   | 'EXAM_CELL'
   | 'STUDENT_SECTION'
   | 'HOSTEL_ADMIN'
+  | 'HOSTEL_WARDEN'
+  | 'SECURITY'
   | 'LIBRARY_ADMIN'
   | 'TRANSPORT_ADMIN'
   | 'MAINTENANCE_ADMIN'
@@ -27,6 +29,7 @@ export type UserRole =
   | 'HR_OFFICER';
 
 export * from './ptm';
+export * from './userAdmin';
 
 
 export type AccountStatus = 'ACTIVE' | 'INACTIVE' | 'LOCKED' | 'DISABLED' | 'SUSPENDED' | 'PENDING';
@@ -90,21 +93,38 @@ export interface User {
   enrollmentStatus?: 'TEMPORARY' | 'FINAL';
   studentAccessCode?: string;
   isFirstLogin?: boolean;
+  studentId?: string;
+  facultyId?: string;
   employeeId?: string;
   status: 'ACTIVE' | 'INACTIVE';
+  is_active?: boolean;
   accountStatus?: AccountStatus;
   accessStatus?: AccessStatusType;
   lockedAt?: string;
   lockedBy?: string;
   lockReason?: string;
+  lockedUntil?: string;
   lastLoginAt?: string;
   lastLoginIp?: string;
   failedLoginAttempts?: number;
+  lastFailedLoginAt?: string;
   twoFactorEnabled?: boolean;
   forcePasswordReset?: boolean;
   accountExpiresAt?: string;
   customPermissions?: Record<string, Record<string, boolean>>;
+  permissionOverrides?: any[];
   userScopes?: Record<string, DataScopeType>;
+  userScopeAssignments?: any[];
+  dateOfBirth?: string;
+  gender?: 'MALE' | 'FEMALE' | 'OTHER' | string;
+  joiningDate?: string;
+  academicYear?: string;
+  programName?: string;
+  mentorId?: string;
+  assignedMentorId?: string;
+  assignedStudentIds?: string[];
+  assignedInstituteIds?: string[];
+  assignedDepartmentIds?: string[];
   signatureFile?: string;
   signatureStatus?: 'ACTIVE' | 'INACTIVE' | 'PENDING';
   signatureVersion?: number;
@@ -112,6 +132,21 @@ export interface User {
   reportingToUserId?: string;
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface UserHistoryRecord {
+  id: string;
+  userId: string;
+  version: number;
+  action: string;
+  changedBy: string;
+  changedByUserId?: string;
+  changedByRole?: string;
+  changedAt: string;
+  changedFields: string[];
+  oldData: Partial<User>;
+  newData: Partial<User>;
+  reason?: string;
 }
 
 export interface University {
@@ -4053,6 +4088,8 @@ export const ROLE_NOTESHEET_PERMISSIONS: Record<UserRole, NoteSheetPermission[]>
   STUDENT_ADMIN: [],
   ERP_COORDINATOR: ['NOTESHEET_VIEW', 'NOTESHEET_REPORT'],
   STAFF: ['NOTESHEET_VIEW'],
+  HOSTEL_WARDEN: ['NOTESHEET_VIEW', 'NOTESHEET_CREATE', 'NOTESHEET_SUBMIT'],
+  SECURITY: ['NOTESHEET_VIEW'],
   STUDENT: [],
   PARENT: [],
 };
@@ -4200,6 +4237,8 @@ export interface NoteSheet {
   amendedDate?: string;
   versionHistory?: NoteSheetVersionRecord[];
   version: number | string;
+  lastReminderSentAt?: string;
+  officerPendingSince?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -4825,39 +4864,88 @@ export interface HostelVisitorDashboardStats {
 // ─── STUDENT GATE PASS & HOSTEL OUTPASS TYPES ─────────────────────────────
 
 export type GatePassStatus = 
+  | 'DRAFT'
+  | 'SUBMITTED'
+  | 'UNDER_REVIEW'
   | 'PENDING' 
   | 'APPROVED' 
   | 'REJECTED' 
-  | 'CANCELLED' 
   | 'ACTIVE' 
   | 'OUT' 
+  | 'CHECKED_OUT'
+  | 'CHECKED_IN'
   | 'RETURNED' 
+  | 'COMPLETED'
+  | 'OVERDUE'
+  | 'CANCELLED' 
   | 'EXPIRED';
 
-export type GatePassPurpose = 
-  | 'Personal'
+export type GatePassType = 
+  | 'Day Out'
+  | 'Night Out'
+  | 'Home Visit'
   | 'Medical'
+  | 'Emergency'
+  | 'Personal'
+  | 'Other';
+
+export type GatePassPurpose = 
+  | 'Day Out'
+  | 'Night Out'
+  | 'Home Visit'
+  | 'Medical'
+  | 'Emergency'
+  | 'Personal'
   | 'Family Visit'
   | 'Academic'
-  | 'Emergency'
+  | 'Other';
+
+export type GatePassTravelMode = 
+  | 'Walking'
+  | 'Two Wheeler'
+  | 'Four Wheeler'
+  | 'Public Transport'
+  | 'Other';
+
+export type GatePassTravelingWith = 
+  | 'Alone'
+  | 'Parent / Guardian'
+  | 'Friend'
   | 'Other';
 
 export interface GatePassAuditEntry {
   id: string;
-  action: 'CREATED' | 'SUBMITTED' | 'VIEWED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'OUT_RECORDED' | 'IN_RECORDED';
+  action: 
+    | 'CREATED'
+    | 'SUBMITTED' 
+    | 'VIEWED' 
+    | 'UNDER_REVIEW'
+    | 'APPROVED' 
+    | 'REJECTED' 
+    | 'CANCELLED' 
+    | 'QR_GENERATED'
+    | 'QR_SCANNED'
+    | 'OUT_RECORDED' 
+    | 'CHECKED_OUT'
+    | 'IN_RECORDED'
+    | 'CHECKED_IN'
+    | 'COMPLETED'
+    | 'MARKED_OVERDUE';
   userId: string;
   userName: string;
   userRole: string;
   timestamp: string;
   remarks?: string;
+  metadata?: string;
 }
 
 export interface StudentGatePass {
   id: string;
-  gatePassNo: string; // e.g. "GP/2026/0001"
+  requestNo: string; // e.g. "GP/2026/000001"
+  gatePassNo: string; // Alias or same as requestNo e.g. "GP/2026/000001"
   studentId: string;
   studentName: string;
-  enrollmentNo: string;
+  enrollmentNo: string; // Primary Official University Student Identity
   studentPhoto?: string;
   instituteId?: string;
   instituteName?: string;
@@ -4868,42 +4956,73 @@ export interface StudentGatePass {
   semester?: string | number;
   hostelId: string;
   hostelName: string;
+  block?: string;
   roomNo: string;
   bedNo: string;
   
   parentGuardianName: string;
   parentGuardianMobile: string;
   
-  purpose: GatePassPurpose;
+  passType: GatePassType;
+  purpose: GatePassPurpose | string;
+  reason: string;
   destination: string;
+  destinationAddress?: string;
+  
+  leavingDate: string; // YYYY-MM-DD
+  leavingTime: string; // HH:mm
+  expectedReturnDate: string; // YYYY-MM-DD
+  expectedReturnTime: string; // HH:mm
+  
+  // Legacy / convenience date mapping
   outingDate: string; // YYYY-MM-DD
   expectedOutTime: string; // HH:mm
-  expectedReturnTime: string; // HH:mm
+  
+  travelMode?: GatePassTravelMode | string;
   modeOfTravel?: string;
+  travelingWith?: GatePassTravelingWith | string;
   emergencyContact: string;
+  
   studentRemarks?: string;
+  attachment?: string;
   supportingDocument?: string;
+  declarationAccepted: boolean;
+  isEmergency?: boolean;
+  priority?: 'NORMAL' | 'HIGH' | 'EMERGENCY';
   
   status: GatePassStatus;
+  qrToken?: string;
+  qrCodeData?: string;
   
-  // Warden Approval
+  // Warden Approval Details
   approvedBy?: string;
   approvedByName?: string;
   approvedAt?: string;
   wardenRemarks?: string;
+  
+  rejectedBy?: string;
+  rejectedByName?: string;
+  rejectedAt?: string;
   rejectedReason?: string;
   
-  // Security / Gate Entry
+  // Security / Gate Check-Out Details
   actualOutDateTime?: string;
+  actualCheckOutTime?: string;
   actualOutRecordedBy?: string;
   actualOutRecordedByName?: string;
+  actualCheckOutStaff?: string;
   
+  // Security / Gate Check-In Details
   actualInDateTime?: string;
+  actualCheckInTime?: string;
   actualInRecordedBy?: string;
   actualInRecordedByName?: string;
+  actualCheckInStaff?: string;
   isLateReturn?: boolean;
   
-  qrCodeData?: string;
+  // Cancellation details
+  cancellationReason?: string;
+  cancelledAt?: string;
   
   createdAt: string;
   updatedAt: string;
@@ -5224,6 +5343,7 @@ export interface CampusServiceDashboardStats {
 export type BulkImportType =
   | 'STUDENT'
   | 'FACULTY'
+  | 'STAFF'
   | 'INSTITUTE'
   | 'DEPARTMENT'
   | 'PROGRAM'
@@ -5293,6 +5413,7 @@ export type BulkImportPermission =
   | 'INSTITUTE_IMPORT'
   | 'STUDENT_IMPORT'
   | 'FACULTY_IMPORT'
+  | 'STAFF_IMPORT'
   | 'DEPARTMENT_IMPORT'
   | 'PROGRAM_IMPORT'
   | 'ACADEMIC_IMPORT'
@@ -5325,21 +5446,23 @@ export const ROLE_BULK_IMPORT_PERMISSIONS: Record<UserRole, BulkImportPermission
     'FINANCE_IMPORT', 'TRANSPORT_IMPORT'
   ],
   UNIVERSITY_ADMIN: [
-    'INSTITUTE_IMPORT', 'STUDENT_IMPORT', 'FACULTY_IMPORT', 'DEPARTMENT_IMPORT', 'PROGRAM_IMPORT',
+    'INSTITUTE_IMPORT', 'STUDENT_IMPORT', 'FACULTY_IMPORT', 'STAFF_IMPORT', 'DEPARTMENT_IMPORT', 'PROGRAM_IMPORT',
     'ACADEMIC_IMPORT', 'SUBJECT_IMPORT', 'INVENTORY_IMPORT', 'HOSTEL_IMPORT', 'EXAM_IMPORT',
     'FINANCE_IMPORT', 'TRANSPORT_IMPORT'
   ],
   REGISTRAR: [
-    'INSTITUTE_IMPORT', 'STUDENT_IMPORT', 'FACULTY_IMPORT', 'DEPARTMENT_IMPORT', 'PROGRAM_IMPORT',
+    'INSTITUTE_IMPORT', 'STUDENT_IMPORT', 'FACULTY_IMPORT', 'STAFF_IMPORT', 'DEPARTMENT_IMPORT', 'PROGRAM_IMPORT',
     'ACADEMIC_IMPORT', 'SUBJECT_IMPORT', 'INVENTORY_IMPORT'
   ],
-  DEPUTY_REGISTRAR: [],
+  DEPUTY_REGISTRAR: [
+    'STUDENT_IMPORT', 'FACULTY_IMPORT', 'STAFF_IMPORT'
+  ],
   PRINCIPAL: [
-    'STUDENT_IMPORT', 'FACULTY_IMPORT', 'DEPARTMENT_IMPORT', 'PROGRAM_IMPORT',
+    'STUDENT_IMPORT', 'FACULTY_IMPORT', 'STAFF_IMPORT', 'DEPARTMENT_IMPORT', 'PROGRAM_IMPORT',
     'ACADEMIC_IMPORT', 'SUBJECT_IMPORT', 'INVENTORY_IMPORT'
   ],
   HOD: [
-    'STUDENT_IMPORT', 'FACULTY_IMPORT', 'SUBJECT_IMPORT', 'INVENTORY_IMPORT'
+    'STUDENT_IMPORT', 'FACULTY_IMPORT', 'STAFF_IMPORT', 'SUBJECT_IMPORT', 'INVENTORY_IMPORT'
   ],
   STUDENT_SECTION: [
     'STUDENT_IMPORT'
@@ -5369,17 +5492,22 @@ export const ROLE_BULK_IMPORT_PERMISSIONS: Record<UserRole, BulkImportPermission
     'STUDENT_IMPORT'
   ],
   HR_ADMIN: [
-    'FACULTY_IMPORT'
+    'FACULTY_IMPORT',
+    'STAFF_IMPORT'
   ],
   HR_OFFICER: [
-    'FACULTY_IMPORT'
+    'FACULTY_IMPORT',
+    'STAFF_IMPORT'
   ],
   ERP_COORDINATOR: [
     'STUDENT_IMPORT',
     'FACULTY_IMPORT',
+    'STAFF_IMPORT',
     'INVENTORY_IMPORT'
   ],
   STAFF: [],
+  HOSTEL_WARDEN: ['HOSTEL_IMPORT', 'INVENTORY_IMPORT'],
+  SECURITY: [],
   FACULTY: [],
   MENTOR: [],
   STUDENT: [],
@@ -5390,6 +5518,7 @@ export const MODULE_TO_BULK_PERMISSION: Record<BulkImportType, BulkImportPermiss
   INSTITUTE: 'INSTITUTE_IMPORT',
   STUDENT: 'STUDENT_IMPORT',
   FACULTY: 'FACULTY_IMPORT',
+  STAFF: 'STAFF_IMPORT',
   DEPARTMENT: 'DEPARTMENT_IMPORT',
   PROGRAM: 'PROGRAM_IMPORT',
   ACADEMIC_YEAR: 'ACADEMIC_IMPORT',

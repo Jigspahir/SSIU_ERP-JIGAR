@@ -5,7 +5,7 @@ import { ExcelTableContainer, ExcelTable, ExcelTh, ExcelTd } from '../../compone
 import { Modal } from '../../components/common/Modal';
 import { 
   Calendar, MapPin, Users, Plus, CheckCircle, Clock, 
-  Building, Sparkles, Trophy, Eye, Check, ExternalLink, FileText
+  Building, Sparkles, Trophy, Eye, Check, ExternalLink, FileText, Shield
 } from 'lucide-react';
 import { openEventCircularPDF } from '../../services/eventPdfService';
 
@@ -187,16 +187,29 @@ export const EventsPage: React.FC = () => {
           </p>
         </div>
 
-        {(role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'PRINCIPAL') && (
+        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
           <button 
             type="button"
-            onClick={() => setShowCreateModal(true)} 
-            className="btn btn-primary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, background: 'var(--brand-orange, #F37023)', borderColor: 'var(--brand-orange, #F37023)' }}
+            onClick={() => {
+              window.dispatchEvent(new CustomEvent('NAVIGATE_TAB', { detail: 'student-council' }));
+            }} 
+            className="btn"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600, background: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe' }}
           >
-            <Plus size={15} /> Add New Event
+            <Shield size={15} /> Student Council Desk
           </button>
-        )}
+
+          {(role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'PRINCIPAL') && (
+            <button 
+              type="button"
+              onClick={() => setShowCreateModal(true)} 
+              className="btn btn-primary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700, background: 'var(--brand-orange, #F37023)', borderColor: 'var(--brand-orange, #F37023)' }}
+            >
+              <Plus size={15} /> Add New Event
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Excel-Style Events Table */}

@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { MasterDataCacheService } from '../common/cache/master-data-cache.service';
 import { CreateUniversityDto } from './dto/create-university.dto';
 import { CreateInstituteDto } from './dto/create-institute.dto';
 import { CreateDepartmentDto } from './dto/create-department.dto';
@@ -13,23 +14,28 @@ import { PaginationQueryDto } from '../common/dto/pagination.dto';
 
 @Injectable()
 export class CoreMastersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cache: MasterDataCacheService,
+  ) {}
 
   // 1. University Master
   async getUniversities() {
-    return this.prisma.university.findMany({
-      include: {
-        institutes: { select: { id: true, code: true, name: true, status: true } },
-      },
-      orderBy: { code: 'asc' },
-    });
+    return this.cache.getOrSet('university:master', () =>
+      this.prisma.university.findMany({
+        include: {
+          institutes: { select: { id: true, code: true, name: true, status: true } },
+        },
+        orderBy: { code: 'asc' },
+      }),
+    );
   }
 
   async createUniversity(dto: CreateUniversityDto) {
     const existing = await this.prisma.university.findUnique({ where: { code: dto.code.trim().toUpperCase() } });
     if (existing) throw new BadRequestException(`University with code '${dto.code}' already exists.`);
 
-    return this.prisma.university.create({
+    const created = await this.prisma.university.create({
       data: {
         code: dto.code.trim().toUpperCase(),
         name: dto.name.trim(),
@@ -41,13 +47,16 @@ export class CoreMastersService {
         status: 'ACTIVE',
       },
     });
+
+    this.cache.invalidate('university');
+    return created;
   }
 
   async updateUniversity(id: string, dto: Partial<CreateUniversityDto>) {
     const uni = await this.prisma.university.findUnique({ where: { id } });
     if (!uni) throw new NotFoundException('University not found.');
 
-    return this.prisma.university.update({
+    const updated = await this.prisma.university.update({
       where: { id },
       data: {
         name: dto.name ? dto.name.trim() : uni.name,
@@ -58,25 +67,30 @@ export class CoreMastersService {
         phone: dto.phone !== undefined ? dto.phone : uni.phone,
       },
     });
+
+    this.cache.invalidate('university');
+    return updated;
   }
 
   // 2. Institutes
   async getInstitutes() {
-    return this.prisma.institute.findMany({
-      include: {
-        university: { select: { code: true, name: true } },
-        departments: { select: { id: true, code: true, name: true, status: true } },
-        _count: { select: { students: true, faculty: true } },
-      },
-      orderBy: { code: 'asc' },
-    });
+    return this.cache.getOrSet('institutes', () =>
+      this.prisma.institute.findMany({
+        include: {
+          university: { select: { code: true, name: true } },
+          departments: { select: { id: true, code: true, name: true, status: true } },
+          _count: { select: { students: true, faculty: true } },
+        },
+        orderBy: { code: 'asc' },
+      }),
+    );
   }
 
   async createInstitute(dto: CreateInstituteDto) {
     const existing = await this.prisma.institute.findUnique({ where: { code: dto.code.trim().toUpperCase() } });
     if (existing) throw new BadRequestException(`Institute with code '${dto.code}' already exists.`);
 
-    return this.prisma.institute.create({
+    const created = await this.prisma.institute.create({
       data: {
         code: dto.code.trim().toUpperCase(),
         name: dto.name.trim(),
@@ -85,34 +99,43 @@ export class CoreMastersService {
         status: 'ACTIVE',
       },
     });
+
+    this.cache.invalidate('institutes');
+    return created;
   }
 
   async updateInstitute(id: string, dto: Partial<CreateInstituteDto>) {
     const inst = await this.prisma.institute.findUnique({ where: { id } });
     if (!inst) throw new NotFoundException('Institute not found.');
 
-    return this.prisma.institute.update({
+    const updated = await this.prisma.institute.update({
       where: { id },
       data: {
         name: dto.name ? dto.name.trim() : inst.name,
         shortName: dto.shortName !== undefined ? dto.shortName : inst.shortName,
       },
     });
+
+    this.cache.invalidate('institutes');
+    return updated;
   }
 
   // 3. Departments
   async getDepartments(instituteId?: string) {
-    const where: any = {};
-    if (instituteId) where.instituteId = instituteId;
+    const cacheKey = `departments:${instituteId || 'all'}`;
+    return this.cache.getOrSet(cacheKey, () => {
+      const where: any = {};
+      if (instituteId) where.instituteId = instituteId;
 
-    return this.prisma.department.findMany({
-      where,
-      include: {
-        institute: { select: { code: true, name: true } },
-        programs: true,
-        _count: { select: { students: true, faculty: true } },
-      },
-      orderBy: { code: 'asc' },
+      return this.prisma.department.findMany({
+        where,
+        include: {
+          institute: { select: { code: true, name: true } },
+          programs: true,
+          _count: { select: { students: true, faculty: true } },
+        },
+        orderBy: { code: 'asc' },
+      });
     });
   }
 
@@ -120,7 +143,7 @@ export class CoreMastersService {
     const existing = await this.prisma.department.findUnique({ where: { code: dto.code.trim().toUpperCase() } });
     if (existing) throw new BadRequestException(`Department with code '${dto.code}' already exists.`);
 
-    return this.prisma.department.create({
+    const created = await this.prisma.department.create({
       data: {
         code: dto.code.trim().toUpperCase(),
         name: dto.name.trim(),
@@ -128,31 +151,39 @@ export class CoreMastersService {
         status: 'ACTIVE',
       },
     });
+
+    this.cache.invalidate('departments');
+    return created;
   }
 
   async updateDepartment(id: string, dto: Partial<CreateDepartmentDto>) {
     const department = await this.prisma.department.findUnique({ where: { id } });
     if (!department) throw new NotFoundException('Department not found.');
 
-    return this.prisma.department.update({
+    const updated = await this.prisma.department.update({
       where: { id },
       data: { name: dto.name ? dto.name.trim() : department.name },
     });
-  }
 
+    this.cache.invalidate('departments');
+    return updated;
+  }
   // 4. Programs
   async getPrograms(departmentId?: string) {
-    const where: any = {};
-    if (departmentId) where.departmentId = departmentId;
+    const cacheKey = `programs:${departmentId || 'all'}`;
+    return this.cache.getOrSet(cacheKey, () => {
+      const where: any = {};
+      if (departmentId) where.departmentId = departmentId;
 
-    return this.prisma.program.findMany({
-      where,
-      include: {
-        department: { select: { code: true, name: true, instituteId: true } },
-        subjects: true,
-        _count: { select: { batches: true, subjects: true } },
-      },
-      orderBy: { code: 'asc' },
+      return this.prisma.program.findMany({
+        where,
+        include: {
+          department: { select: { code: true, name: true, instituteId: true } },
+          subjects: true,
+          _count: { select: { batches: true, subjects: true } },
+        },
+        orderBy: { code: 'asc' },
+      });
     });
   }
 
@@ -160,7 +191,7 @@ export class CoreMastersService {
     const existing = await this.prisma.program.findUnique({ where: { code: dto.code.trim().toUpperCase() } });
     if (existing) throw new BadRequestException(`Program with code '${dto.code}' already exists.`);
 
-    return this.prisma.program.create({
+    const created = await this.prisma.program.create({
       data: {
         code: dto.code.trim().toUpperCase(),
         name: dto.name.trim(),
@@ -170,13 +201,16 @@ export class CoreMastersService {
         status: 'ACTIVE',
       },
     });
+
+    this.cache.invalidate('programs');
+    return created;
   }
 
   async updateProgram(id: string, dto: Partial<CreateProgramDto>) {
     const program = await this.prisma.program.findUnique({ where: { id } });
     if (!program) throw new NotFoundException('Program not found.');
 
-    return this.prisma.program.update({
+    const updated = await this.prisma.program.update({
       where: { id },
       data: {
         name: dto.name ? dto.name.trim() : program.name,
@@ -184,17 +218,22 @@ export class CoreMastersService {
         durationYears: dto.durationYears || program.durationYears,
       },
     });
+
+    this.cache.invalidate('programs');
+    return updated;
   }
 
   // 5. Academic Years
   async getAcademicYears() {
-    return this.prisma.academicYear.findMany({
-      include: {
-        batches: true,
-        _count: { select: { batches: true } },
-      },
-      orderBy: { startYear: 'desc' },
-    });
+    return this.cache.getOrSet('academic-years', () =>
+      this.prisma.academicYear.findMany({
+        include: {
+          batches: true,
+          _count: { select: { batches: true } },
+        },
+        orderBy: { startYear: 'desc' },
+      }),
+    );
   }
 
   async createAcademicYear(dto: CreateAcademicYearDto) {
@@ -202,7 +241,7 @@ export class CoreMastersService {
     const existing = await this.prisma.academicYear.findUnique({ where: { code } });
     if (existing) throw new BadRequestException(`Academic year '${code}' already exists.`);
 
-    return this.prisma.academicYear.create({
+    const created = await this.prisma.academicYear.create({
       data: {
         code,
         startYear: dto.startYear || Number(code.split('-')[0]),
@@ -211,32 +250,41 @@ export class CoreMastersService {
         status: 'ACTIVE',
       },
     });
+
+    this.cache.invalidate('academic-years');
+    return created;
   }
 
   async updateAcademicYear(id: string, dto: Partial<CreateAcademicYearDto>) {
     const ay = await this.prisma.academicYear.findUnique({ where: { id } });
     if (!ay) throw new NotFoundException('Academic year not found.');
 
-    return this.prisma.academicYear.update({
+    const updated = await this.prisma.academicYear.update({
       where: { id },
       data: {
         isCurrent: dto.isCurrent !== undefined ? dto.isCurrent : ay.isCurrent,
       },
     });
+
+    this.cache.invalidate('academic-years');
+    return updated;
   }
 
   // 6. Subjects / Courses Master
   async getSubjects(departmentId?: string, programId?: string, semesterNumber?: number) {
-    const where: any = {};
-    if (programId) where.programId = programId;
+    const cacheKey = `subjects:${departmentId || 'all'}:${programId || 'all'}:${semesterNumber || 'all'}`;
+    return this.cache.getOrSet(cacheKey, () => {
+      const where: any = {};
+      if (programId) where.programId = programId;
 
-    return this.prisma.subject.findMany({
-      where,
-      include: {
-        program: { select: { code: true, name: true } },
-        semester: { select: { name: true } },
-      },
-      orderBy: { code: 'asc' },
+      return this.prisma.subject.findMany({
+        where,
+        include: {
+          program: { select: { code: true, name: true } },
+          semester: { select: { name: true } },
+        },
+        orderBy: { code: 'asc' },
+      });
     });
   }
 
@@ -244,7 +292,7 @@ export class CoreMastersService {
     const existing = await this.prisma.subject.findUnique({ where: { code: dto.code.trim().toUpperCase() } });
     if (existing) throw new BadRequestException(`Subject code '${dto.code}' already exists.`);
 
-    return this.prisma.subject.create({
+    const created = await this.prisma.subject.create({
       data: {
         code: dto.code.trim().toUpperCase(),
         name: dto.name.trim(),
@@ -255,13 +303,16 @@ export class CoreMastersService {
         status: 'ACTIVE',
       },
     });
+
+    this.cache.invalidate('subjects');
+    return created;
   }
 
   async updateSubject(id: string, dto: Partial<CreateSubjectDto>) {
     const subject = await this.prisma.subject.findUnique({ where: { id } });
     if (!subject) throw new NotFoundException('Subject not found.');
 
-    return this.prisma.subject.update({
+    const updated = await this.prisma.subject.update({
       where: { id },
       data: {
         name: dto.name ? dto.name.trim() : subject.name,
@@ -269,28 +320,41 @@ export class CoreMastersService {
         subjectType: dto.type || dto.subjectType || subject.subjectType,
       },
     });
+
+    this.cache.invalidate('subjects');
+    return updated;
   }
 
   // 7. Students Directory, Creation & Profile
   async getStudents(query: PaginationQueryDto) {
-    const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 20;
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.max(1, Math.min(Number(query.limit) || 20, 100)); // Capped at 100 records max
     const skip = (page - 1) * limit;
 
     const where: any = {};
-    if (query.status) where.status = query.status;
-    if (query.instituteId) where.instituteId = query.instituteId;
-    if (query.departmentId) where.departmentId = query.departmentId;
+    if (query.status && query.status !== 'ALL') where.status = query.status;
+    if (query.instituteId && query.instituteId !== 'ALL') where.instituteId = query.instituteId;
+    if (query.departmentId && query.departmentId !== 'ALL') where.departmentId = query.departmentId;
+    if (query.programId && query.programId !== 'ALL') {
+      where.batch = { programId: query.programId };
+    }
+    if (query.batchId && query.batchId !== 'ALL') where.batchId = query.batchId;
 
     if (query.search) {
       const term = query.search.trim();
-      where.OR = [
-        { firstName: { contains: term, mode: 'insensitive' } },
-        { lastName: { contains: term, mode: 'insensitive' } },
-        { enrollmentNo: { contains: term, mode: 'insensitive' } },
-        { email: { contains: term, mode: 'insensitive' } },
-      ];
+      if (term) {
+        where.OR = [
+          { firstName: { contains: term, mode: 'insensitive' } },
+          { lastName: { contains: term, mode: 'insensitive' } },
+          { enrollmentNo: { contains: term, mode: 'insensitive' } },
+          { email: { contains: term, mode: 'insensitive' } },
+        ];
+      }
     }
+
+    const allowedSortFields = ['enrollmentNo', 'firstName', 'lastName', 'createdAt', 'updatedAt', 'status'];
+    const sortBy = allowedSortFields.includes(query.sortBy || '') ? query.sortBy! : 'enrollmentNo';
+    const sortOrder = query.sortOrder === 'desc' ? 'desc' : 'asc';
 
     const [total, data] = await Promise.all([
       this.prisma.student.count({ where }),
@@ -298,14 +362,241 @@ export class CoreMastersService {
         where,
         skip,
         take: limit,
-        include: {
-          institute: { select: { code: true, name: true } },
-          department: { select: { code: true, name: true } },
-          batch: { select: { code: true } },
+        select: {
+          id: true,
+          erpId: true,
+          enrollmentNo: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+          gender: true,
+          status: true,
+          dateOfBirth: true,
+          instituteId: true,
+          departmentId: true,
+          batchId: true,
+          createdAt: true,
+          institute: { select: { id: true, code: true, name: true } },
+          department: { select: { id: true, code: true, name: true } },
+          batch: {
+            select: {
+              id: true,
+              code: true,
+              program: { select: { id: true, code: true, name: true } },
+            },
+          },
         },
-        orderBy: { enrollmentNo: 'asc' },
+        orderBy: { [sortBy]: sortOrder },
       }),
     ]);
+
+    return {
+      data,
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit) || 1,
+    };
+  }
+
+  // ── Central User Management Pagination & Filtering ──
+  async getUsers(query: PaginationQueryDto, currentUser: any) {
+    const allowedRoles = ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'UNIVERSITY_ADMIN', 'ADMIN', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'HOI', 'PRINCIPAL', 'HOD', 'HR', 'HR_ADMIN', 'ERP_COORDINATOR'];
+    const userRoles = currentUser?.roles || (currentUser?.role ? [currentUser.role] : []);
+    const hasAccess = userRoles.some((r: string) => allowedRoles.includes(r));
+    if (!hasAccess) {
+      throw new ForbiddenException('403 Forbidden: You do not have permission to access Central User Management.');
+    }
+
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.max(1, Math.min(Number(query.limit) || 20, 100)); // Max 100 records
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+
+    // Scope Enforcement for HOD / HOI
+    if (userRoles.includes('HOD') && !userRoles.some((r: string) => ['SUPER_ADMIN', 'SYSTEM_ADMIN', 'UNIVERSITY_ADMIN', 'ADMIN'].includes(r))) {
+      if (currentUser.departmentId) {
+        where.OR = [
+          { faculty: { departmentId: currentUser.departmentId } },
+          { student: { departmentId: currentUser.departmentId } },
+          { employee: { departmentId: currentUser.departmentId } },
+        ];
+      }
+    } else if (userRoles.includes('HOI') || userRoles.includes('PRINCIPAL')) {
+      if (currentUser.instituteId) {
+        where.OR = [
+          { faculty: { instituteId: currentUser.instituteId } },
+          { student: { instituteId: currentUser.instituteId } },
+          { employee: { instituteId: currentUser.instituteId } },
+        ];
+      }
+    }
+
+    if (query.instituteId && query.instituteId !== 'ALL') {
+      where.AND = [
+        ...(where.AND || []),
+        {
+          OR: [
+            { faculty: { instituteId: query.instituteId } },
+            { student: { instituteId: query.instituteId } },
+            { employee: { instituteId: query.instituteId } },
+          ],
+        },
+      ];
+    }
+
+    if (query.departmentId && query.departmentId !== 'ALL') {
+      where.AND = [
+        ...(where.AND || []),
+        {
+          OR: [
+            { faculty: { departmentId: query.departmentId } },
+            { student: { departmentId: query.departmentId } },
+            { employee: { departmentId: query.departmentId } },
+          ],
+        },
+      ];
+    }
+
+    if (query.status && query.status !== 'ALL') {
+      where.accountStatus = query.status;
+    }
+
+    if (query.role && query.role !== 'ALL') {
+      where.userRoles = {
+        some: { role: { code: query.role } },
+      };
+    }
+
+    if (query.search) {
+      const term = query.search.trim();
+      if (term) {
+        const searchConditions = [
+          { username: { contains: term, mode: 'insensitive' } },
+          { erpId: { contains: term, mode: 'insensitive' } },
+          { student: { OR: [
+            { firstName: { contains: term, mode: 'insensitive' } },
+            { lastName: { contains: term, mode: 'insensitive' } },
+            { enrollmentNo: { contains: term, mode: 'insensitive' } },
+            { email: { contains: term, mode: 'insensitive' } },
+          ] } },
+          { faculty: { OR: [
+            { firstName: { contains: term, mode: 'insensitive' } },
+            { lastName: { contains: term, mode: 'insensitive' } },
+            { employeeCode: { contains: term, mode: 'insensitive' } },
+            { email: { contains: term, mode: 'insensitive' } },
+          ] } },
+          { employee: { OR: [
+            { firstName: { contains: term, mode: 'insensitive' } },
+            { lastName: { contains: term, mode: 'insensitive' } },
+            { employeeCode: { contains: term, mode: 'insensitive' } },
+            { email: { contains: term, mode: 'insensitive' } },
+          ] } },
+        ];
+
+        if (where.OR) {
+          where.AND = [...(where.AND || []), { OR: searchConditions }];
+        } else {
+          where.OR = searchConditions;
+        }
+      }
+    }
+
+    const [total, rawData] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          erpId: true,
+          username: true,
+          accountStatus: true,
+          isFirstLogin: true,
+          createdAt: true,
+          updatedAt: true,
+          userRoles: {
+            select: {
+              role: { select: { code: true, name: true } },
+              scopeType: true,
+              scopeId: true,
+            },
+          },
+          student: {
+            select: {
+              id: true,
+              enrollmentNo: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+              instituteId: true,
+              departmentId: true,
+            },
+          },
+          faculty: {
+            select: {
+              id: true,
+              employeeCode: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+              designation: true,
+              instituteId: true,
+              departmentId: true,
+            },
+          },
+          employee: {
+            select: {
+              id: true,
+              employeeCode: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+              designation: true,
+              instituteId: true,
+              departmentId: true,
+            },
+          },
+        },
+        orderBy: { username: 'asc' },
+      }),
+    ]);
+
+    // Strip any sensitive hashes and format clean DTO
+    const data = rawData.map(u => {
+      const primaryRole = u.userRoles?.[0]?.role?.code || 'USER';
+      const name = u.student
+        ? `${u.student.firstName} ${u.student.lastName}`
+        : u.faculty
+        ? `${u.faculty.firstName} ${u.faculty.lastName}`
+        : u.employee
+        ? `${u.employee.firstName} ${u.employee.lastName}`
+        : u.username;
+
+      const email = u.student?.email || u.faculty?.email || u.employee?.email || `${u.username}@swarrnim.edu.in`;
+      const identifier = u.student?.enrollmentNo || u.faculty?.employeeCode || u.employee?.employeeCode || u.erpId || u.username;
+
+      return {
+        id: u.id,
+        erpId: u.erpId,
+        username: u.username,
+        name,
+        email,
+        identifier,
+        role: primaryRole,
+        accountStatus: u.accountStatus,
+        isFirstLogin: u.isFirstLogin,
+        instituteId: u.student?.instituteId || u.faculty?.instituteId || u.employee?.instituteId,
+        departmentId: u.student?.departmentId || u.faculty?.departmentId || u.employee?.departmentId,
+        createdAt: u.createdAt,
+      };
+    });
 
     return {
       data,

@@ -309,7 +309,6 @@ export const exportToWord = (
  */
 export const downloadStudentImportTemplateExcel = () => {
   const headers = [
-    'Student ID',
     'Enrollment No',
     'Student Name',
     'Institute',
@@ -323,7 +322,6 @@ export const downloadStudentImportTemplateExcel = () => {
 
   const sampleRows = [
     [
-      'STU-2026-001',
       '2026SITCE001',
       'Aarav Sharma',
       'Swarrnim Institute of Technology',
@@ -335,7 +333,6 @@ export const downloadStudentImportTemplateExcel = () => {
       '+91 98765 43210'
     ],
     [
-      'STU-2026-002',
       '2026AIN001',
       'Priya Patel',
       'Arihant Institute of Nursing',
@@ -347,7 +344,6 @@ export const downloadStudentImportTemplateExcel = () => {
       '+91 98765 43211'
     ],
     [
-      'STU-2026-003',
       '2026SSMCLA001',
       'Rohan Mehta',
       'Swarrnim School of Management, Commerce & Liberal Arts',

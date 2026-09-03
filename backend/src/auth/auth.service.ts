@@ -37,8 +37,9 @@ export class AuthService {
         hoi: ['hoi_demo01', 'HOI000001', 'hoi'],
         registrar: ['reg_demo01', 'REG000001', 'registrar'],
         deputyregistrar: ['reg_demo01', 'REG000001', 'deputyregistrar'],
-        admin: ['superadmin', 'ADM000001', 'admin'],
-        superadmin: ['superadmin', 'ADM000001'],
+        admin: ['superadmin', 'ADM000001', 'admin', 'demo.admin'],
+        superadmin: ['superadmin', 'ADM000001', 'demo.admin'],
+        'demo.admin': ['demo.admin', 'superadmin', 'ADM000001'],
         iqac: ['superadmin', 'ADM000001', 'iqac'],
         vp: ['vp_demo01', 'VP000001', 'vp'],
         vicepresident: ['vp_demo01', 'VP000001'],
@@ -61,6 +62,7 @@ export class AuthService {
             { student: { temporaryEnrollmentNumber: cleanLoginId } },
             { student: { finalEnrollmentNumber: cleanLoginId } },
             { student: { email: cleanLoginId } },
+            { faculty: { employeeCode: cleanLoginId } },
             { faculty: { email: cleanLoginId } },
           ],
         },
@@ -112,10 +114,10 @@ export class AuthService {
       const attempts = user.failedLoginAttempts + 1;
       const dataToUpdate: any = { failedLoginAttempts: attempts };
 
-      if (attempts >= 5) {
+      if (attempts >= 3) {
         dataToUpdate.accountStatus = 'LOCKED';
-        dataToUpdate.lockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 min lock
-        this.logger.warn(`Account ${user.erpId} locked due to 5 consecutive failed login attempts.`);
+        dataToUpdate.lockedUntil = new Date(Date.now() + 30 * 60 * 1000); // 30 min lock
+        this.logger.warn(`Account ${user.erpId} locked due to 3 consecutive failed login attempts.`);
       }
 
       await this.prisma.user.update({
@@ -180,6 +182,33 @@ export class AuthService {
         lastLoginAt: user.lastLoginAt,
       },
     };
+  }
+
+  async adminLogin(loginDto: LoginDto, reqMeta: { ip?: string; userAgent?: string }) {
+    const res = await this.login(loginDto, reqMeta);
+    const roleCode = res.user?.role || '';
+    const adminRoles = [
+      'SUPER_ADMIN',
+      'SYSTEM_ADMIN',
+      'UNIVERSITY_ADMIN',
+      'ERP_COORDINATOR',
+      'ERP_ADMIN',
+      'REGISTRAR',
+      'DEPUTY_REGISTRAR',
+      'VICE_PRESIDENT',
+      'PRESIDENT',
+      'PROVOST',
+      'PRINCIPAL',
+      'HOD'
+    ];
+
+    if (!adminRoles.includes(roleCode)) {
+      await this.logAudit(res.user.id, res.user.username, 'ADMIN_LOGIN_DENIED', false, reqMeta, `Non-admin role ${roleCode} attempted admin login`);
+      throw new UnauthorizedException('Access Denied — Administrative privileges required.');
+    }
+
+    await this.logAudit(res.user.id, res.user.username, 'ADMIN_LOGIN_SUCCESS', true, reqMeta);
+    return res;
   }
 
   async logout(userId: string, refreshToken?: string, reqMeta?: { ip?: string; userAgent?: string }) {

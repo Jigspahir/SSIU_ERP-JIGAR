@@ -86,7 +86,10 @@ class AttendanceService {
   /**
    * Get student roster for a specific subject and division
    */
-  public getStudentRoster(subjectId?: string, divisionId?: string): Student[] {
+  public getStudentRoster(subjectId?: string, divisionId?: string, actingUser?: User | null, actingRole?: UserRole): Student[] {
+    if (actingRole === 'STUDENT' || actingUser?.role === 'STUDENT') {
+      throw new Error('Access Denied: Students are not authorized to view the class attendance roster.');
+    }
     const allStudents = db.getStudents();
     if (!divisionId && !subjectId) {
       return allStudents;
@@ -139,6 +142,9 @@ class AttendanceService {
     },
     user?: User | null
   ): AttendanceSession {
+    if (user?.role === 'STUDENT') {
+      throw new Error('Access Denied: Students are not authorized to mark or submit attendance sessions.');
+    }
     const facultyName = user?.name || 'Demo Faculty 1';
     const facultyId = user?.id || 'fac-1';
 
@@ -196,6 +202,9 @@ class AttendanceService {
    * Delete attendance session with audit logging
    */
   public deleteAttendanceSession(sessionId: string, actingUser?: User | null): boolean {
+    if (actingUser?.role === 'STUDENT') {
+      throw new Error('Access Denied: Students are not authorized to delete attendance sessions.');
+    }
     const existing = db.getAttendanceSessions().find(s => s.id === sessionId);
     if (!existing) return false;
 
@@ -821,6 +830,9 @@ class AttendanceService {
     classContext?: { programId?: string; departmentId?: string; semesterId?: string; divisionId?: string; academicYearId?: string; batch?: string },
     _user?: User | null
   ): number {
+    if (_user?.role === 'STUDENT') {
+      throw new Error('Access Denied: Students are not authorized to import students.');
+    }
     const programs = db.getPrograms();
     const departments = db.getDepartments();
     const semesters = db.getSemesters();
@@ -945,6 +957,9 @@ class AttendanceService {
    * Commit Valid Attendance Rows to Sessions & Records
    */
   public commitAttendanceImport(validRows: AttendanceImportRow[], user?: User | null): number {
+    if (user?.role === 'STUDENT') {
+      throw new Error('Access Denied: Students are not authorized to import attendance.');
+    }
     const students = db.getStudents();
     const subjects = db.getSubjects();
     const divisions = db.getDivisions();

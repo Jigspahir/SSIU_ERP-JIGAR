@@ -32,6 +32,10 @@ export interface SupervisorHierarchyNodeDTO {
   department: string;
   assignedMenteesCount: number;
   weeklyWorkloadHours: number;
+  employeeId?: string;
+  email?: string;
+  departmentId?: string;
+  instituteId?: string;
   children?: SupervisorHierarchyNodeDTO[];
 }
 
@@ -45,4 +49,8 @@ export interface FacultyResearchSummaryDTO {
   patentsCount: number;
   fundedGrantsAmountLakhs: number;
   hIndex: number;
+  employeeId?: string;
+  email?: string;
+  departmentId?: string;
+  instituteId?: string;
 }

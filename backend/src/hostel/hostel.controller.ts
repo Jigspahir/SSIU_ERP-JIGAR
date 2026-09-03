@@ -33,6 +33,9 @@ import {
 } from './dto/maintenance.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RbacGuard } from '../rbac/rbac.guard';
+import { RequirePermission } from '../rbac/require-permission.decorator';
+import { RequireRole } from '../rbac/require-role.decorator';
+import { RequireScope } from '../rbac/require-scope.decorator';
 
 @ApiTags('University Hostel & Accommodation Management')
 @ApiBearerAuth()
@@ -171,13 +174,24 @@ export class HostelController {
   }
 
   @Patch('outpass/:id/approve')
+  @RequireRole('HOSTEL_WARDEN', 'HOSTEL_ADMIN', 'SUPER_ADMIN', 'UNIVERSITY_ADMIN')
+  @RequirePermission('HOSTEL', 'APPROVE')
   @ApiOperation({ summary: 'Warden approves Outpass' })
   approveOutpass(@Param('id') id: string, @Req() req: any) {
     return this.hostelService.approveOutpass(id, req.user?.id);
   }
 
+  @Post('outpass/batch-checkout')
+  @RequireRole('HOSTEL_WARDEN', 'HOSTEL_ADMIN', 'SECURITY', 'SUPER_ADMIN', 'UNIVERSITY_ADMIN')
+  @RequirePermission('HOSTEL', 'CHECK_OUT')
+  @ApiOperation({ summary: 'Warden or Gate Security records batch checkout for multiple students' })
+  batchCheckoutOutpasses(@Body('outpassIds') outpassIds: string[], @Req() req: any) {
+    return this.hostelService.batchCheckoutOutpasses(outpassIds, req.user?.id);
+  }
+
   // ── Visitors Management ───────────────────────────────────────────────────
   @Get('visitors/dashboard')
+  @RequirePermission('HOSTEL', 'VIEW')
   @ApiOperation({ summary: 'Get Visitor KPI metrics and current in-hostel status' })
   getVisitorDashboardMetrics(@Req() req: any) {
     return this.hostelService.getVisitorDashboardMetrics(req.user);
@@ -185,48 +199,60 @@ export class HostelController {
 
   @Post('visitors')
   @HttpCode(HttpStatus.CREATED)
+  @RequirePermission('HOSTEL', 'CREATE')
   @ApiOperation({ summary: 'Register Hostel Visitor Request (Student or Gate Security Entry)' })
   registerVisitor(@Req() req: any, @Body() dto: CreateVisitorRequestDto) {
     return this.hostelService.registerVisitor(req.user, dto);
   }
 
   @Get('visitors')
+  @RequirePermission('HOSTEL', 'VIEW')
   @ApiOperation({ summary: 'List Hostel Visitors with filters' })
   getVisitors(@Req() req: any, @Query() query: VisitorQueryDto) {
     return this.hostelService.getVisitors(req.user, query);
   }
 
   @Get('visitors/:id')
+  @RequirePermission('HOSTEL', 'VIEW')
   @ApiOperation({ summary: 'Get Visitor details and chronological audit logs' })
   getVisitorById(@Req() req: any, @Param('id') id: string) {
     return this.hostelService.getVisitorById(id, req.user);
   }
 
   @Patch('visitors/:id')
+  @RequirePermission('HOSTEL', 'EDIT')
   @ApiOperation({ summary: 'Update Visitor details' })
   updateVisitor(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateVisitorDto) {
     return this.hostelService.updateVisitor(id, req.user, dto);
   }
 
   @Patch('visitors/:id/approve')
+  @RequireRole('HOSTEL_WARDEN', 'HOSTEL_ADMIN', 'SUPER_ADMIN', 'UNIVERSITY_ADMIN')
+  @RequirePermission('HOSTEL', 'APPROVE')
   @ApiOperation({ summary: 'Warden approves Visitor Request' })
   approveVisitor(@Req() req: any, @Param('id') id: string, @Body() dto?: ApproveVisitorDto) {
     return this.hostelService.approveVisitor(id, req.user, dto);
   }
 
   @Patch('visitors/:id/reject')
+  @RequireRole('HOSTEL_WARDEN', 'HOSTEL_ADMIN', 'SUPER_ADMIN', 'UNIVERSITY_ADMIN')
+  @RequirePermission('HOSTEL', 'REJECT')
   @ApiOperation({ summary: 'Warden rejects Visitor Request with mandatory reason' })
   rejectVisitor(@Req() req: any, @Param('id') id: string, @Body() dto: RejectVisitorDto) {
     return this.hostelService.rejectVisitor(id, req.user, dto);
   }
 
   @Patch('visitors/:id/checkin')
+  @RequireRole('SECURITY', 'HOSTEL_WARDEN', 'HOSTEL_ADMIN', 'SUPER_ADMIN')
+  @RequirePermission('HOSTEL', 'CHECK_IN')
   @ApiOperation({ summary: 'Hostel gate security records Visitor Check-in' })
   checkInVisitor(@Req() req: any, @Param('id') id: string, @Body() dto?: CheckInVisitorDto) {
     return this.hostelService.checkInVisitor(id, req.user, dto);
   }
 
   @Patch('visitors/:id/checkout')
+  @RequireRole('SECURITY', 'HOSTEL_WARDEN', 'HOSTEL_ADMIN', 'SUPER_ADMIN')
+  @RequirePermission('HOSTEL', 'CHECK_OUT')
   @ApiOperation({ summary: 'Hostel gate security records Visitor Check-out' })
   checkOutVisitor(@Req() req: any, @Param('id') id: string, @Body() dto?: CheckOutVisitorDto) {
     return this.hostelService.checkOutVisitor(id, req.user, dto);

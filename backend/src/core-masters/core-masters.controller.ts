@@ -138,6 +138,14 @@ export class CoreMastersController {
     return this.coreMastersService.updateSubject(id, dto);
   }
 
+  // ── Central User Management ──
+  @ApiOperation({ summary: 'Get Central User Directory with pagination and filtering' })
+  @Get('users')
+  @RequirePermission('SETTINGS', 'VIEW')
+  async getUsers(@Query() query: PaginationQueryDto, @Req() req: any) {
+    return this.coreMastersService.getUsers(query, req.user);
+  }
+
   // 7. Student Management APIs
   @ApiOperation({ summary: 'Get Student Directory with pagination and filtering' })
   @Get('students')

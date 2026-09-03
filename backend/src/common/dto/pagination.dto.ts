@@ -38,4 +38,33 @@ export class PaginationQueryDto {
   @IsOptional()
   @IsString()
   academicYearId?: string;
+
+  @IsOptional()
+  @IsString()
+  role?: string;
+
+  @IsOptional()
+  @IsString()
+  batchId?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  semesterNumber?: number;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @IsOptional()
+  @IsString()
+  priority?: string;
+
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @IsOptional()
+  @IsString()
+  sortOrder?: 'asc' | 'desc' = 'asc';
 }

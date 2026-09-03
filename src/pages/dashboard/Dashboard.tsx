@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, Suspense } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
 import { db } from '../../services/db';
@@ -8,6 +8,7 @@ import { Badge } from '../../components/common/Badge';
 import { PieChart } from '../../components/common/Charts';
 import { DashboardReportModal } from '../../components/reports/DashboardReportModal';
 import { SmartActionCenter } from '../../components/dashboard/SmartActionCenter';
+import { PageSkeletonFallback } from '../../components/common/PageSkeletonFallback';
 import { 
   Building2, GitFork, GraduationCap, Users as Users2, UserCheck, 
   BookOpen, Calendar, ArrowRight, ShieldCheck, 
@@ -25,6 +26,7 @@ import { StudentExcelDashboard } from '../../components/dashboard/StudentExcelDa
 import { registrarOfficeService } from '../../services/registrarOfficeService';
 import { researchService } from '../../services/researchService';
 import { innovationService } from '../../services/innovationService';
+const ManagementAnalyticsDashboard = React.lazy(() => import('../../components/dashboard/ManagementAnalyticsDashboard').then(m => ({ default: m.ManagementAnalyticsDashboard })));
 
 interface DashboardProps {
   setActiveTab: (tab: string, params?: any) => void;
@@ -35,8 +37,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [showTempWelcomeModal, setShowTempWelcomeModal] = useState(Boolean(user?.role === 'STUDENT' && (user?.isFirstLogin || user?.enrollmentStatus === 'TEMPORARY')));
 
+  // Leadership View Mode State (Phase 7 Management Analytics & KPI Suite)
+  const [leadershipViewMode, setLeadershipViewMode] = useState<'OVERVIEW' | 'MANAGEMENT_ANALYTICS'>('OVERVIEW');
+
   // Executive Vice President Workspaces State
-  const [vpWorkspaceTab, setVpWorkspaceTab] = useState<'OVERVIEW' | 'GOVERNANCE' | 'STUDENTS' | 'FINANCE' | 'OPERATIONS' | 'AUDIT'>('OVERVIEW');
+  const [vpWorkspaceTab, setVpWorkspaceTab] = useState<'OVERVIEW' | 'ANALYTICS' | 'GOVERNANCE' | 'STUDENTS' | 'FINANCE' | 'OPERATIONS' | 'AUDIT'>('OVERVIEW');
   const [globalSearchTerm, setGlobalSearchTerm] = useState<string>('');
   const [vpInstFilter, setVpInstFilter] = useState<string>('ALL');
   const [vpDeptFilter, setVpDeptFilter] = useState<string>('ALL');
@@ -913,6 +918,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
         <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '2px solid #E2E8F0', paddingBottom: '0.5rem', overflowX: 'auto' }}>
           {[
             { id: 'OVERVIEW', label: 'Priority Sanctions & Overview', icon: CheckSquare, badge: pendingNotesheets.length },
+            { id: 'ANALYTICS', label: 'Management Analytics & KPIs', icon: BarChart3 },
             { id: 'GOVERNANCE', label: 'Institute & Dept Governance', icon: Building2, count: allInstitutes.length },
             { id: 'STUDENTS', label: 'Students & Academics', icon: GraduationCap, count: allStudents.length },
             { id: 'FINANCE', label: 'Financial & Budget Oversight', icon: IndianRupee },
@@ -951,6 +957,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
             );
           })}
         </div>
+
+        {/* 5. TAB 0: MANAGEMENT ANALYTICS & KPIS */}
+        {vpWorkspaceTab === 'ANALYTICS' && (
+          <Suspense fallback={<PageSkeletonFallback />}>
+            <ManagementAnalyticsDashboard onNavigateTab={setActiveTab} />
+          </Suspense>
+        )}
 
         {/* 5. TAB 1: PRIORITY SANCTIONS & OVERVIEW */}
         {vpWorkspaceTab === 'OVERVIEW' && (
@@ -3257,8 +3270,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
       {/* ─── PHASE 3: SMART ACTION CENTER ("WHAT NEEDS MY ATTENTION?") ─── */}
       <SmartActionCenter setActiveTab={setActiveTab} />
 
-      {/* Role-Specific Dashboard Content (Preserved Intact) */}
-      {renderCurrentView()}
+      {/* ─── PHASE 7: LEADERSHIP DASHBOARD VIEW SWITCHER ─── */}
+      {['SUPER_ADMIN', 'SYSTEM_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 'REGISTRAR', 'PRINCIPAL', 'HOD', 'DEPUTY_REGISTRAR'].includes(role || '') && (
+        <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '2px solid #E2E8F0', paddingBottom: '0.5rem' }}>
+          <button
+            type="button"
+            onClick={() => setLeadershipViewMode('OVERVIEW')}
+            className={`btn btn-sm ${leadershipViewMode === 'OVERVIEW' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontWeight: leadershipViewMode === 'OVERVIEW' ? 800 : 600, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+          >
+            <Layers size={14} /> Operational Workspace
+          </button>
+          <button
+            type="button"
+            onClick={() => setLeadershipViewMode('MANAGEMENT_ANALYTICS')}
+            className={`btn btn-sm ${leadershipViewMode === 'MANAGEMENT_ANALYTICS' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ fontWeight: leadershipViewMode === 'MANAGEMENT_ANALYTICS' ? 800 : 600, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+          >
+            <BarChart3 size={14} /> Management Analytics &amp; KPI Dashboard
+          </button>
+        </div>
+      )}
+
+      {/* Role-Specific Dashboard Content or Management Analytics */}
+      {leadershipViewMode === 'MANAGEMENT_ANALYTICS' ? (
+        <Suspense fallback={<PageSkeletonFallback />}>
+          <ManagementAnalyticsDashboard onNavigateTab={setActiveTab} />
+        </Suspense>
+      ) : (
+        renderCurrentView()
+      )}
 
       <DashboardReportModal
         isOpen={isReportModalOpen}

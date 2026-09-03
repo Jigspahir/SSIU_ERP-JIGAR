@@ -483,7 +483,7 @@ export const StaffServiceQueueView: React.FC<StaffServiceQueueViewProps> = ({
                         {new Date(req.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </td>
 
-                      {/* Student ID / Enrollment */}
+                      {/* Enrollment No. */}
                       <td style={{ padding: '8px 10px', borderRight: '1px solid #E2E8F0', fontFamily: 'monospace', fontSize: '0.75rem', color: '#334155' }}>
                         {req.enrollmentNo}
                       </td>

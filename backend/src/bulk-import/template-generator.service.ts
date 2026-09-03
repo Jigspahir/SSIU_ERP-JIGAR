@@ -85,6 +85,39 @@ export class TemplateGeneratorService {
       ],
     },
 
+    STAFF: {
+      type: 'STAFF',
+      name: 'Non-Teaching Staff Master',
+      fileName: 'Staff_Import_Template.xlsx',
+      description: 'Template for bulk registering non-teaching administrative, technical, and support staff.',
+      headers: [
+        'Employee Code',
+        'Staff Name',
+        'Email',
+        'Mobile',
+        'Department Code',
+        'Designation',
+        'Institute Code',
+        'Employment Type',
+        'Joining Date (YYYY-MM-DD)',
+        'Status',
+      ],
+      sampleRows: [
+        ['STF-1001', 'Ramesh Patel', 'ramesh.patel@swarrnim.edu.in', '9898011223', 'DEP-ADMIN', 'Office Superintendent', 'INST-ENG', 'FULL_TIME', '2023-04-01', 'ACTIVE'],
+        ['STF-1002', 'Bhavna Dave', 'bhavna.dave@swarrnim.edu.in', '9898022334', 'DEP-CSE', 'Senior Lab Technician', 'INST-ENG', 'FULL_TIME', '2023-06-15', 'ACTIVE'],
+        ['STF-1003', 'Kishore Joshi', 'kishore.joshi@swarrnim.edu.in', '9898033445', 'DEP-ACCOUNTS', 'Accountant', 'INST-ENG', 'FULL_TIME', '2024-01-10', 'ACTIVE'],
+      ],
+      instructions: [
+        { field: 'Employee Code', required: 'YES', description: 'Unique non-teaching staff identifier (Official ERP Login ID)', example: 'STF-1001' },
+        { field: 'Staff Name', required: 'YES', description: 'Full legal name of staff member', example: 'Ramesh Patel' },
+        { field: 'Email', required: 'YES', description: 'Official or personal email address', example: 'ramesh.patel@swarrnim.edu.in' },
+        { field: 'Department Code', required: 'YES', description: 'Valid Department Code (e.g. DEP-ADMIN, DEP-CSE)', example: 'DEP-ADMIN' },
+        { field: 'Designation', required: 'YES', description: 'Job title / cadre designation', example: 'Office Superintendent' },
+        { field: 'Institute Code', required: 'YES', description: 'Valid Institute Code (e.g. INST-ENG)', example: 'INST-ENG' },
+        { field: 'Employment Type', required: 'NO', description: 'FULL_TIME | PART_TIME | CONTRACT | ADHOC', example: 'FULL_TIME' },
+      ],
+    },
+
     SUBJECT: {
       type: 'SUBJECT',
       name: 'Academic Subject Curriculum Master',

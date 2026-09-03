@@ -17,11 +17,22 @@ import {
   Building2, Sparkles, RefreshCw, Copy, CheckSquare, Square, UserCog, Sliders, Globe, Workflow
 } from 'lucide-react';
 
-export const SystemSettingsPage: React.FC = () => {
+export interface SystemSettingsPageProps {
+  initialAdminTab?: 'USERS' | 'ROLES' | 'AUDIT' | 'MASTER';
+}
+
+export const SystemSettingsPage: React.FC<SystemSettingsPageProps> = ({ initialAdminTab = 'USERS' }) => {
   const { user: currentUser, role: currentRole } = useAuth();
-  const isAuthorizedSettingsUser = ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'ERP_COORDINATOR', 'REGISTRAR'].includes(currentRole || '');
+  const isAuthorizedSettingsUser = ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'ERP_COORDINATOR', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'VICE_PRESIDENT', 'PRESIDENT', 'PROVOST', 'PRINCIPAL', 'HOD'].includes(currentRole || '');
   const isERPCoordinator = currentRole === 'ERP_COORDINATOR';
   const isSuperOrUnivAdmin = ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'REGISTRAR'].includes(currentRole || '');
+
+  // Sorting & Pagination
+  const [sortColumn, setSortColumn] = useState<keyof User | 'departmentName'>('username');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [rowsPerPage, setRowsPerPage] = useState<number>(25);
+  const [refreshKey, setRefreshKey] = useState<number>(0);
 
   // Master Database Lookups
   const departments = useMemo(() => db.getDepartments(), []);
@@ -30,9 +41,11 @@ export const SystemSettingsPage: React.FC = () => {
   const divisions = useMemo(() => db.getDivisions(), []);
   const academicYears = useMemo(() => db.getAcademicYears(), []);
   const institutes = useMemo(() => db.getInstitutes(), []);
+  const studentsList = useMemo(() => db.getStudents(), [refreshKey]);
+  const facultyList = useMemo(() => db.getFaculty(), [refreshKey]);
 
   // Main Tab State
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'USERS' | 'ROLES' | 'AUDIT' | 'MASTER'>('USERS');
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'USERS' | 'ROLES' | 'AUDIT' | 'MASTER'>(initialAdminTab);
   const [masterSubTab, setMasterSubTab] = useState<'DEPT' | 'PROG' | 'SEM' | 'DIV' | 'AY'>('DEPT');
 
   // Role Template Subtab State
@@ -47,13 +60,6 @@ export const SystemSettingsPage: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
-
-  // Sorting & Pagination
-  const [sortColumn, setSortColumn] = useState<keyof User | 'departmentName'>('username');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [rowsPerPage, setRowsPerPage] = useState<number>(25);
-  const [refreshKey, setRefreshKey] = useState<number>(0);
 
   // Modals & Action Drawers State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -83,7 +89,28 @@ export const SystemSettingsPage: React.FC = () => {
     setTimeout(() => setFeedbackMsg(null), 5000);
   };
 
-  // Form State: Create User (Sections A to F)
+  // Credential Success Modal State (Post-Creation Confirmation & Slip)
+  const [createdCredentialSlip, setCreatedCredentialSlip] = useState<{
+    loginId: string;
+    temporaryPassword?: string;
+    fullName: string;
+    role: string;
+    userType: string;
+    instituteName: string;
+    departmentName: string;
+    scope: string;
+    status: string;
+  } | null>(null);
+
+  // Form State: Create User (Enhanced for Student/Staff Master Linking & Generation)
+  const [formUserType, setFormUserType] = useState<
+    'STUDENT' | 'FACULTY' | 'STAFF' | 'HOD' | 'HOI' | 'DEPUTY_REGISTRAR' | 'REGISTRAR' | 'VICE_PRESIDENT' | 'OTHER_STAFF'
+  >('STUDENT');
+  const [masterSearchQuery, setMasterSearchQuery] = useState('');
+  const [selectedStudentId, setSelectedStudentId] = useState<string>('');
+  const [selectedFacultyId, setSelectedFacultyId] = useState<string>('');
+  const [isExistingAccountError, setIsExistingAccountError] = useState<string | null>(null);
+
   const [formUsername, setFormUsername] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formPassword, setFormPassword] = useState('');
@@ -91,14 +118,18 @@ export const SystemSettingsPage: React.FC = () => {
   const [formFullName, setFormFullName] = useState('');
   const [formEmpOrStudentId, setFormEmpOrStudentId] = useState('');
   const [formMobile, setFormMobile] = useState('');
+  const [formProgramName, setFormProgramName] = useState('');
+  const [formSemester, setFormSemester] = useState('');
   const [formInstId, setFormInstId] = useState(institutes[0]?.id || '');
   const [formDeptId, setFormDeptId] = useState(departments[0]?.id || '');
   const [formDesignation, setFormDesignation] = useState('');
-  const [formRole, setFormRole] = useState<UserRole>('FACULTY');
+  const [formRole, setFormRole] = useState<UserRole>('STUDENT');
+  const [formScope, setFormScope] = useState<DataScopeType>('SELF');
   const [formAccountStatus, setFormAccountStatus] = useState<AccountStatus>('ACTIVE');
   const [formForcePasswordReset, setFormForcePasswordReset] = useState(true);
   const [formTwoFactorEnabled, setFormTwoFactorEnabled] = useState(false);
   const [formAccountExpiresAt, setFormAccountExpiresAt] = useState('');
+  const [showConfirmSummary, setShowConfirmSummary] = useState(false);
 
   // Form State: Edit User
   const [editFullName, setEditFullName] = useState('');
@@ -176,41 +207,194 @@ export const SystemSettingsPage: React.FC = () => {
   };
 
   // ─── USER CREATION WORKFLOW ────────────────────────────────────────────────
+  const generateRandomPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*';
+    let res = '';
+    // ensure at least 1 uppercase, 1 lowercase, 1 number, 1 symbol
+    res += 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random() * 24)];
+    res += 'abcdefghijkmnopqrstuvwxyz'[Math.floor(Math.random() * 24)];
+    res += '23456789'[Math.floor(Math.random() * 8)];
+    res += '!@#$%&*'[Math.floor(Math.random() * 7)];
+    for (let i = 0; i < 6; i++) {
+      res += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return res;
+  };
+
+  const handleGeneratePassword = () => {
+    const pwd = generateRandomPassword();
+    setFormPassword(pwd);
+    setFormConfirmPassword(pwd);
+    showNotification('Secure temporary password generated.');
+  };
+
   const handleOpenCreateModal = () => {
+    setFormUserType('STUDENT');
+    setMasterSearchQuery('');
+    setSelectedStudentId('');
+    setSelectedFacultyId('');
+    setIsExistingAccountError(null);
     setFormUsername('');
     setFormEmail('');
-    setFormPassword('User@123');
-    setFormConfirmPassword('User@123');
+    const defaultPwd = generateRandomPassword();
+    setFormPassword(defaultPwd);
+    setFormConfirmPassword(defaultPwd);
     setFormFullName('');
     setFormEmpOrStudentId('');
     setFormMobile('');
+    setFormProgramName('');
+    setFormSemester('');
     setFormInstId(institutes[0]?.id || '');
     setFormDeptId(departments[0]?.id || '');
-    setFormDesignation('Assistant Professor');
-    setFormRole('FACULTY');
+    setFormDesignation('Student');
+    setFormRole('STUDENT');
+    setFormScope('SELF');
     setFormAccountStatus('ACTIVE');
     setFormForcePasswordReset(true);
     setFormTwoFactorEnabled(false);
     setFormAccountExpiresAt('');
+    setShowConfirmSummary(false);
     setIsCreateModalOpen(true);
+  };
+
+  // When User Type changes, update default role, scope, and reset selections
+  const handleUserTypeChange = (type: typeof formUserType) => {
+    setFormUserType(type);
+    setSelectedStudentId('');
+    setSelectedFacultyId('');
+    setIsExistingAccountError(null);
+    setMasterSearchQuery('');
+
+    if (type === 'STUDENT') {
+      setFormRole('STUDENT');
+      setFormScope('SELF');
+      setFormDesignation('Student');
+    } else if (type === 'FACULTY') {
+      setFormRole('FACULTY');
+      setFormScope('DEPARTMENT');
+      setFormDesignation('Assistant Professor');
+    } else if (type === 'HOD') {
+      setFormRole('HOD');
+      setFormScope('DEPARTMENT');
+      setFormDesignation('Head of Department');
+    } else if (type === 'HOI') {
+      setFormRole('PRINCIPAL');
+      setFormScope('INSTITUTION');
+      setFormDesignation('Principal / HOI');
+    } else if (type === 'DEPUTY_REGISTRAR') {
+      setFormRole('DEPUTY_REGISTRAR');
+      setFormScope('INSTITUTION');
+      setFormDesignation('Deputy Registrar');
+    } else if (type === 'REGISTRAR') {
+      setFormRole('REGISTRAR');
+      setFormScope('ALL_UNIVERSITY');
+      setFormDesignation('Registrar');
+    } else if (type === 'VICE_PRESIDENT') {
+      setFormRole('VICE_PRESIDENT');
+      setFormScope('ALL_UNIVERSITY');
+      setFormDesignation('Vice President');
+    } else {
+      setFormRole('STAFF');
+      setFormScope('DEPARTMENT');
+      setFormDesignation('Administrative Staff');
+    }
+  };
+
+  // Student Selection: Auto-populate Login ID = Enrollment No
+  const handleSelectStudent = (studentId: string) => {
+    const student = studentsList.find(s => s.id === studentId);
+    if (!student) return;
+
+    setSelectedStudentId(studentId);
+    const enroll = student.enrollmentNo || student.temporaryEnrollmentNumber || student.finalEnrollmentNumber || '';
+    setFormFullName(`${student.firstName} ${student.lastName}`.trim());
+    setFormEmpOrStudentId(enroll);
+    setFormUsername(enroll); // LOGIN ID = ENROLLMENT NUMBER
+    setFormEmail(student.email || `${enroll.toLowerCase()}@swarrnim.edu.in`);
+    setFormMobile(student.mobile || student.phone || '');
+    setFormProgramName(student.programName || '');
+    setFormSemester(student.semesterId || '');
+    setFormInstId(student.instituteId || institutes[0]?.id || '');
+    setFormDeptId(student.departmentId || departments[0]?.id || '');
+    setFormRole('STUDENT');
+    setFormScope('SELF');
+    setFormDesignation('Student');
+
+    // Check if account already exists
+    const allUsers = db.getUsers();
+    const existing = allUsers.find(u => 
+      (u.enrollmentNo && u.enrollmentNo.toLowerCase() === enroll.toLowerCase()) ||
+      (u.username && u.username.toLowerCase() === enroll.toLowerCase())
+    );
+    if (existing) {
+      setIsExistingAccountError(`ERP Login account already exists for this student (Username/Login ID: ${existing.username}, Role: ${existing.role}, Status: ${existing.accountStatus || existing.status}).`);
+    } else {
+      setIsExistingAccountError(null);
+    }
+  };
+
+  // Faculty / Staff Selection: Auto-populate Login ID = Employee Code
+  const handleSelectFaculty = (facultyId: string) => {
+    const fac = facultyList.find(f => f.id === facultyId);
+    if (!fac) return;
+
+    setSelectedFacultyId(facultyId);
+    const empCode = fac.employeeId || '';
+    setFormFullName(fac.name);
+    setFormEmpOrStudentId(empCode);
+    setFormUsername(empCode); // LOGIN ID = EMPLOYEE CODE
+    setFormEmail(fac.email);
+    setFormMobile(fac.phone || '');
+    setFormInstId(fac.instituteId || institutes[0]?.id || '');
+    setFormDeptId(fac.departmentId || departments[0]?.id || '');
+    setFormDesignation(fac.designation || 'Faculty Member');
+
+    // Check if account already exists
+    const allUsers = db.getUsers();
+    const existing = allUsers.find(u => 
+      (u.employeeId && u.employeeId.toLowerCase() === empCode.toLowerCase()) ||
+      (u.username && u.username.toLowerCase() === empCode.toLowerCase())
+    );
+    if (existing) {
+      setIsExistingAccountError(`ERP Login account already exists for this staff/faculty member (Username/Login ID: ${existing.username}, Role: ${existing.role}, Status: ${existing.accountStatus || existing.status}).`);
+    } else {
+      setIsExistingAccountError(null);
+    }
   };
 
   const handleSaveCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isExistingAccountError) {
+      showNotification(isExistingAccountError, 'error');
+      return;
+    }
+
+    if (!formUsername || formUsername.trim().length < 3) {
+      showNotification('Valid Login ID is required (must match Enrollment Number or Employee Code).', 'error');
+      return;
+    }
+
     if (formPassword !== formConfirmPassword) {
       showNotification('Passwords do not match. Please verify.', 'error');
       return;
     }
 
+    // Privilege Escalation Guard
+    if (formRole === 'SUPER_ADMIN' && currentUser?.role !== 'SUPER_ADMIN') {
+      showNotification('Privilege escalation denied: Only Super Administrators can assign the SUPER_ADMIN role.', 'error');
+      return;
+    }
+
     try {
       const created = userAccountManagementService.createUser({
-        username: formUsername,
-        email: formEmail,
-        name: formFullName,
+        username: formUsername.trim(),
+        email: formEmail.trim(),
+        name: formFullName.trim(),
         password: formPassword,
         role: formRole,
-        employeeId: formEmpOrStudentId,
-        phone: formMobile,
+        employeeId: formUserType === 'STUDENT' ? undefined : formEmpOrStudentId.trim(),
+        enrollmentNo: formUserType === 'STUDENT' ? formEmpOrStudentId.trim() : undefined,
+        phone: formMobile.trim(),
         instituteId: formInstId,
         departmentId: formDeptId,
         designation: formDesignation,
@@ -220,9 +404,33 @@ export const SystemSettingsPage: React.FC = () => {
         accountExpiresAt: formAccountExpiresAt
       }, currentUser);
 
+      // Save custom scope if specified
+      if (formScope) {
+        userAccountManagementService.setUserScopes(created.id, {
+          [formRole === 'STUDENT' ? 'STUDENT' : 'ACADEMIC']: formScope
+        }, currentUser);
+      }
+
       setIsCreateModalOpen(false);
+      setShowConfirmSummary(false);
       setRefreshKey(prev => prev + 1);
-      showNotification(`User account "${created.username}" successfully provisioned with role ${created.role}.`);
+
+      // Display Credential Slip modal for Admin to copy/print
+      const instObj = institutes.find(i => i.id === formInstId);
+      const deptObj = departments.find(d => d.id === formDeptId);
+      setCreatedCredentialSlip({
+        loginId: created.username || formUsername,
+        temporaryPassword: formPassword,
+        fullName: created.name || formFullName,
+        role: created.role,
+        userType: formUserType,
+        instituteName: instObj?.name || 'Swarrnim University',
+        departmentName: deptObj?.name || created.departmentName || 'General',
+        scope: formScope,
+        status: created.accountStatus || 'ACTIVE'
+      });
+
+      showNotification(`ERP Login account "${created.username}" successfully provisioned for ${created.name}.`);
     } catch (err: any) {
       showNotification(err.message || 'Failed to create user account.', 'error');
     }
@@ -249,17 +457,14 @@ export const SystemSettingsPage: React.FC = () => {
   const handleSaveEditUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
-
     try {
-      const selectedDept = departments.find(d => d.id === editDeptId);
-      userAccountManagementService.updateUser(selectedUser.id, {
+      const updated = userAccountManagementService.updateUser(selectedUser.id, {
         name: editFullName,
         email: editEmail,
         employeeId: editEmpId,
         phone: editMobile,
         instituteId: editInstId,
         departmentId: editDeptId,
-        departmentName: selectedDept?.name || selectedUser.departmentName,
         designation: editDesignation,
         role: editRole,
         accountStatus: editAccountStatus,
@@ -270,9 +475,9 @@ export const SystemSettingsPage: React.FC = () => {
 
       setIsEditModalOpen(false);
       setRefreshKey(prev => prev + 1);
-      showNotification(`User account "${selectedUser.username}" profile successfully updated.`);
+      showNotification(`User account "${updated.username}" updated successfully.`);
     } catch (err: any) {
-      showNotification(err.message || 'Failed to update user account.', 'error');
+      showNotification(err.message || 'Failed to update user profile.', 'error');
     }
   };
 
@@ -289,26 +494,26 @@ export const SystemSettingsPage: React.FC = () => {
     }
   };
 
+  // ─── USER LOCK & UNLOCK WORKFLOW ───────────────────────────────────────────
   const handleOpenLockModal = (u: User) => {
-    const isLocked = u.accountStatus === 'LOCKED';
-    if (isLocked) {
+    if (u.accountStatus === 'LOCKED' || (u.status as any) === 'LOCKED') {
       try {
         userAccountManagementService.unlockUser(u.id, currentUser);
         setRefreshKey(prev => prev + 1);
-        showNotification(`User account "${u.username}" successfully unlocked and restored to Active status.`);
+        showNotification(`User account "${u.username}" unlocked successfully.`);
       } catch (err: any) {
         showNotification(err.message || 'Failed to unlock user.', 'error');
       }
     } else {
       setLockTargetUser(u);
-      setLockReasonInput('Administrative security hold pending policy compliance review');
+      setLockReasonInput('');
       setIsLockModalOpen(true);
     }
   };
 
   const handleConfirmLockUser = () => {
     if (!lockTargetUser) return;
-    if (!lockReasonInput || lockReasonInput.trim().length < 3) {
+    if (!lockReasonInput.trim()) {
       showNotification('Please enter a valid lock reason before locking this account.', 'error');
       return;
     }
@@ -318,7 +523,7 @@ export const SystemSettingsPage: React.FC = () => {
       setLockTargetUser(null);
       setLockReasonInput('');
       setRefreshKey(prev => prev + 1);
-      showNotification(`User account "${lockTargetUser.username}" is now LOCKED. Sessions invalidated.`, 'error');
+      showNotification(`User account "${lockTargetUser.username}" is now LOCKED.`, 'error');
     } catch (err: any) {
       showNotification(err.message || 'Failed to lock user account.', 'error');
     }
@@ -333,7 +538,7 @@ export const SystemSettingsPage: React.FC = () => {
     setIsResetPasswordModalOpen(true);
   };
 
-  const handleGeneratePassword = () => {
+  const handleGenerateResetPassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*';
     let gen = '';
     for (let i = 0; i < 10; i++) {
@@ -712,6 +917,16 @@ export const SystemSettingsPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3 relative z-10">
+          {isAuthorizedSettingsUser && (
+            <button
+              onClick={handleOpenCreateModal}
+              className="px-4 py-2.5 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Create Login Account</span>
+            </button>
+          )}
+
           <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl border border-white/15 text-right">
             <div className="text-[10px] text-blue-200 uppercase font-black tracking-wider">Total Active Users</div>
             <div className="text-xl font-mono font-black text-amber-300">
@@ -888,14 +1103,29 @@ export const SystemSettingsPage: React.FC = () => {
               )}
             </div>
 
-            {!isERPCoordinator && (
-              <button
-                onClick={handleOpenCreateModal}
-                className="px-4 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white font-black text-xs flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"
-              >
-                <Plus className="w-4 h-4" />
-                <span>+ Create User Account</span>
-              </button>
+            {isAuthorizedSettingsUser && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.location.href = '/bulk-import';
+                    }
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm hover:shadow-md transition-all"
+                  title="Bulk Import Users from Excel / CSV"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                  <span>Bulk Import (Excel / CSV)</span>
+                </button>
+
+                <button
+                  onClick={handleOpenCreateModal}
+                  className="px-4 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white font-black text-xs flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Create Login Account</span>
+                </button>
+              </div>
             )}
           </div>
 
@@ -1022,7 +1252,7 @@ export const SystemSettingsPage: React.FC = () => {
                       Email Address
                     </th>
                     <th onClick={() => handleSort('employeeId')} className="p-3 cursor-pointer select-none hover:bg-blue-950 transition">
-                      Employee / Student ID
+                      Emp ID / Enrollment No.
                     </th>
                     <th onClick={() => handleSort('departmentName')} className="p-3 cursor-pointer select-none hover:bg-blue-950 transition">
                       Department
@@ -1536,104 +1766,253 @@ export const SystemSettingsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─── MODAL 1: CREATE USER ACCOUNT (SECTIONS A TO F) ──────────────────── */}
+      {/* ─── MODAL 1: CREATE USER ACCOUNT (COMPLETE MASTER LINKING & GENERATION) ──────────────────── */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-3xl w-full border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]">
-            <div className="p-4 bg-[#001F3F] text-white flex justify-between items-center">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-3xl w-full border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]">
+            <div className="p-4 bg-gradient-to-r from-[#001F3F] to-[#0A3663] text-white flex justify-between items-center">
               <div>
                 <h3 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
-                  <Plus className="w-4 h-4 text-amber-400" />
-                  <span>Provision New User Account</span>
+                  <UserCog className="w-4 h-4 text-amber-400" />
+                  <span>Provision ERP Login Account</span>
                 </h3>
-                <p className="text-[11px] text-blue-200">Fill in identity, credentials, organization scope, and authorization</p>
+                <p className="text-[11px] text-blue-200">
+                  Select existing Student or Staff/Faculty master record, generate credentials &amp; assign security governance
+                </p>
               </div>
               <button onClick={() => setIsCreateModalOpen(false)} className="text-white hover:text-amber-400">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveCreateUser} className="p-6 space-y-6 overflow-y-auto text-xs">
-              {/* Section A: Account Information */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-black text-blue-900 dark:text-blue-300 uppercase tracking-wider border-b pb-1">
-                  A. Account &amp; Authentication Information
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Username Account ID *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. jigar.ahir"
-                      value={formUsername}
-                      onChange={e => setFormUsername(e.target.value)}
-                      className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono font-bold"
-                    />
+            <form onSubmit={handleSaveCreateUser} className="p-6 space-y-5 overflow-y-auto text-xs">
+              {/* Existing Account Conflict Banner */}
+              {isExistingAccountError && (
+                <div className="p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800/60 text-rose-800 dark:text-rose-300 flex items-start gap-2.5">
+                  <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <div className="font-bold text-xs">Existing Account Detected</div>
+                    <div className="text-[11px] leading-relaxed">{isExistingAccountError}</div>
                   </div>
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Official University Email *</label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="e.g. jigar.ahir@swarrnim.edu.in"
-                      value={formEmail}
-                      onChange={e => setFormEmail(e.target.value)}
-                      className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Temporary Password *</label>
-                    <input
-                      type="password"
-                      required
-                      value={formPassword}
-                      onChange={e => setFormPassword(e.target.value)}
-                      className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Confirm Password *</label>
-                    <input
-                      type="password"
-                      required
-                      value={formConfirmPassword}
-                      onChange={e => setFormConfirmPassword(e.target.value)}
-                      className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono"
-                    />
-                  </div>
+                </div>
+              )}
+
+              {/* 1. USER TYPE SELECTION */}
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 space-y-2.5">
+                <label className="block font-black text-slate-800 dark:text-slate-200 text-xs uppercase tracking-wider">
+                  1. Select User Type *
+                </label>
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                  {[
+                    { id: 'STUDENT', label: 'Student', icon: Users },
+                    { id: 'FACULTY', label: 'Faculty', icon: UserCheck },
+                    { id: 'HOD', label: 'HOD', icon: Building2 },
+                    { id: 'HOI', label: 'HOI / Principal', icon: ShieldCheck },
+                    { id: 'DEPUTY_REGISTRAR', label: 'Deputy Registrar', icon: Shield },
+                    { id: 'REGISTRAR', label: 'Registrar', icon: ShieldCheck },
+                    { id: 'VICE_PRESIDENT', label: 'Vice President', icon: Sparkles },
+                    { id: 'STAFF', label: 'Staff / Admin', icon: UserCog },
+                    { id: 'OTHER_STAFF', label: 'Other Staff', icon: Users }
+                  ].map(item => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleUserTypeChange(item.id as any)}
+                      className={`p-2.5 rounded-xl border text-center font-bold text-xs transition flex flex-col items-center gap-1.5 ${
+                        formUserType === item.id
+                          ? 'bg-[#001F3F] text-amber-300 border-[#001F3F] shadow-sm ring-2 ring-orange-500/50'
+                          : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300'
+                      }`}
+                    >
+                      <item.icon className="w-4 h-4" />
+                      <span className="text-[10px] leading-tight">{item.label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* Section B: User Identity */}
+              {/* 2. MASTER RECORD LINKING & SEARCH */}
+              {formUserType === 'STUDENT' ? (
+                <div className="p-4 rounded-2xl bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="font-black text-blue-900 dark:text-blue-300 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      <Search className="w-3.5 h-3.5" />
+                      <span>2. Search &amp; Select Existing Student Master Record *</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-blue-700 dark:text-blue-400">
+                      Login ID will automatically become Enrollment No
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Filter student by Name, Enrollment No, Program..."
+                      value={masterSearchQuery}
+                      onChange={e => setMasterSearchQuery(e.target.value)}
+                      className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 text-xs"
+                    />
+
+                    <select
+                      value={selectedStudentId}
+                      onChange={e => handleSelectStudent(e.target.value)}
+                      className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 font-bold text-xs"
+                      required
+                    >
+                      <option value="">-- Choose Student Master Record ({studentsList.length} total) --</option>
+                      {studentsList
+                        .filter(s => {
+                          if (!masterSearchQuery.trim()) return true;
+                          const q = masterSearchQuery.toLowerCase();
+                          return (
+                            (s.firstName && s.firstName.toLowerCase().includes(q)) ||
+                            (s.lastName && s.lastName.toLowerCase().includes(q)) ||
+                            (s.enrollmentNo && s.enrollmentNo.toLowerCase().includes(q)) ||
+                            (s.temporaryEnrollmentNumber && s.temporaryEnrollmentNumber.toLowerCase().includes(q)) ||
+                            (s.programName && s.programName.toLowerCase().includes(q))
+                          );
+                        })
+                        .map(s => (
+                          <option key={s.id} value={s.id}>
+                            {s.enrollmentNo || s.temporaryEnrollmentNumber || 'ENR-TBD'} — {s.firstName} {s.lastName} ({s.programName || 'Degree'})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-900/40 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="font-black text-indigo-900 dark:text-indigo-300 text-xs uppercase tracking-wider flex items-center gap-1.5">
+                      <Search className="w-3.5 h-3.5" />
+                      <span>2. Search &amp; Select Existing Faculty/Staff Record</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-400">
+                      Login ID will automatically become Employee Code
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Filter staff by Name, Emp Code, Dept..."
+                      value={masterSearchQuery}
+                      onChange={e => setMasterSearchQuery(e.target.value)}
+                      className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 text-xs"
+                    />
+
+                    <select
+                      value={selectedFacultyId}
+                      onChange={e => handleSelectFaculty(e.target.value)}
+                      className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-800 font-bold text-xs"
+                    >
+                      <option value="">-- Choose Faculty Master (or enter details manually) --</option>
+                      {facultyList
+                        .filter(f => {
+                          if (!masterSearchQuery.trim()) return true;
+                          const q = masterSearchQuery.toLowerCase();
+                          return (
+                            (f.name && f.name.toLowerCase().includes(q)) ||
+                            (f.employeeId && f.employeeId.toLowerCase().includes(q)) ||
+                            (f.email && f.email.toLowerCase().includes(q))
+                          );
+                        })
+                        .map(f => (
+                          <option key={f.id} value={f.id}>
+                            {f.employeeId} — {f.name} ({f.designation})
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. IDENTITY & CREDENTIAL DETAILS */}
               <div className="space-y-3">
                 <h4 className="text-xs font-black text-blue-900 dark:text-blue-300 uppercase tracking-wider border-b pb-1">
-                  B. User Identity &amp; Profile Details
+                  3. Account Credentials &amp; Identity Link
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="sm:col-span-2">
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      {formUserType === 'STUDENT' ? 'Login ID (Enrollment No) *' : 'Login ID (Employee Code) *'}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      readOnly={Boolean(selectedStudentId || selectedFacultyId)}
+                      placeholder={formUserType === 'STUDENT' ? 'e.g. 23CE00125' : 'e.g. EMP1025'}
+                      value={formUsername}
+                      onChange={e => {
+                        setFormUsername(e.target.value);
+                        setFormEmpOrStudentId(e.target.value);
+                      }}
+                      className="w-full p-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono font-black text-[#001F3F] dark:text-amber-300"
+                    />
+                  </div>
+
+                  <div>
                     <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Full Legal Name *</label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Dr. Jigar Ahir"
+                      placeholder="e.g. Dr. Amit Shah"
                       value={formFullName}
                       onChange={e => setFormFullName(e.target.value)}
                       className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-bold"
                     />
                   </div>
+
                   <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Employee / Student ID</label>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Official University Email *</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="e.g. user@swarrnim.edu.in"
+                      value={formEmail}
+                      onChange={e => setFormEmail(e.target.value)}
+                      className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="font-bold text-slate-700 dark:text-slate-300">Temporary Password *</label>
+                      <button
+                        type="button"
+                        onClick={handleGeneratePassword}
+                        className="text-[10px] text-orange-600 dark:text-orange-400 font-black hover:underline flex items-center gap-1"
+                      >
+                        <Sparkles className="w-3 h-3" /> Generate
+                      </button>
+                    </div>
                     <input
                       type="text"
-                      placeholder="e.g. EMP-CE-042"
-                      value={formEmpOrStudentId}
-                      onChange={e => setFormEmpOrStudentId(e.target.value)}
+                      required
+                      value={formPassword}
+                      onChange={e => {
+                        setFormPassword(e.target.value);
+                        setFormConfirmPassword(e.target.value);
+                      }}
                       className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono font-bold"
                     />
                   </div>
+
                   <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Mobile Phone Number</label>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Confirm Password *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formConfirmPassword}
+                      onChange={e => setFormConfirmPassword(e.target.value)}
+                      className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-mono font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Mobile Contact No.</label>
                     <input
                       type="text"
                       placeholder="+91 98765 43210"
@@ -1645,14 +2024,52 @@ export const SystemSettingsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Section C & D: Organization & Role */}
+              {/* 4. ROLE & SCOPE ASSIGNMENT */}
               <div className="space-y-3">
                 <h4 className="text-xs font-black text-blue-900 dark:text-blue-300 uppercase tracking-wider border-b pb-1">
-                  C. Organization &amp; Assigned Security Role
+                  4. Role, Hierarchy Scope &amp; Organization
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                   <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Institution Scope</label>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Assigned Role *</label>
+                    <select
+                      value={formRole}
+                      onChange={e => setFormRole(e.target.value as any)}
+                      className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-black text-blue-700 dark:text-blue-300"
+                    >
+                      <option value="STUDENT">STUDENT</option>
+                      <option value="FACULTY">FACULTY</option>
+                      <option value="MENTOR">MENTOR</option>
+                      <option value="HOD">HOD</option>
+                      <option value="PRINCIPAL">HOI / PRINCIPAL</option>
+                      <option value="DEPUTY_REGISTRAR">DEPUTY REGISTRAR</option>
+                      <option value="REGISTRAR">REGISTRAR</option>
+                      <option value="VICE_PRESIDENT">VICE PRESIDENT</option>
+                      <option value="STAFF">STAFF</option>
+                      <option value="STUDENT_ADMIN">STUDENT ADMIN</option>
+                      <option value="EXAM_CELL">EXAM CELL</option>
+                      <option value="STUDENT_SECTION">STUDENT SECTION</option>
+                      <option value="ACCOUNTS_ADMIN">ACCOUNTS ADMIN</option>
+                      {currentUser?.role === 'SUPER_ADMIN' && <option value="SUPER_ADMIN">SUPER ADMIN</option>}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Hierarchy Data Scope *</label>
+                    <select
+                      value={formScope}
+                      onChange={e => setFormScope(e.target.value as any)}
+                      className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-bold"
+                    >
+                      <option value="SELF">Own (Student / Individual)</option>
+                      <option value="DEPARTMENT">Department Scope (Faculty / HOD)</option>
+                      <option value="INSTITUTION">Institute Scope (Principal / HOI)</option>
+                      <option value="ALL_UNIVERSITY">University Global Scope (Registrar / VP / Admin)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Institution</label>
                     <select
                       value={formInstId}
                       onChange={e => setFormInstId(e.target.value)}
@@ -1661,6 +2078,7 @@ export const SystemSettingsPage: React.FC = () => {
                       {institutes.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
                     </select>
                   </div>
+
                   <div>
                     <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Department</label>
                     <select
@@ -1671,65 +2089,31 @@ export const SystemSettingsPage: React.FC = () => {
                       {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                   </div>
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Assigned Security Role *</label>
-                    <select
-                      value={formRole}
-                      onChange={e => setFormRole(e.target.value as any)}
-                      className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-black text-blue-700 dark:text-blue-300"
-                    >
-                      <option value="SUPER_ADMIN">SUPER ADMIN</option>
-                      <option value="UNIVERSITY_ADMIN">UNIVERSITY ADMIN</option>
-                      <option value="VICE_PRESIDENT">VICE PRESIDENT</option>
-                      <option value="PRINCIPAL">PRINCIPAL</option>
-                      <option value="HOD">HOD</option>
-                      <option value="FACULTY">FACULTY</option>
-                      <option value="STUDENT_ADMIN">STUDENT ADMIN</option>
-                      <option value="STUDENT">STUDENT</option>
-                      <option value="REGISTRAR">REGISTRAR</option>
-                      <option value="DEPUTY_REGISTRAR">DEPUTY REGISTRAR</option>
-                      <option value="IQAC">IQAC</option>
-                      <option value="EXAM_CELL">EXAM CELL</option>
-                      <option value="STUDENT_SECTION">STUDENT SECTION</option>
-                      <option value="HOSTEL_ADMIN">HOSTEL ADMIN</option>
-                      <option value="LIBRARY_ADMIN">LIBRARY ADMIN</option>
-                      <option value="TRANSPORT_ADMIN">TRANSPORT ADMIN</option>
-                      <option value="MAINTENANCE_ADMIN">MAINTENANCE ADMIN</option>
-                      <option value="ACCOUNTS_ADMIN">ACCOUNTS ADMIN</option>
-                      <option value="PARENT">PARENT</option>
-                    </select>
-                  </div>
                 </div>
               </div>
 
-              {/* Section E & F: Account Status & Security */}
+              {/* 5. ACCOUNT STATUS & SECURITY CONTROLS */}
               <div className="space-y-3">
                 <h4 className="text-xs font-black text-blue-900 dark:text-blue-300 uppercase tracking-wider border-b pb-1">
-                  D. Account Status &amp; Security Governance
+                  5. Account Status &amp; Policy Enforcement
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Account Status</label>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Initial Status</label>
                     <select
                       value={formAccountStatus}
                       onChange={e => setFormAccountStatus(e.target.value as any)}
                       className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 font-bold"
                     >
-                      <option value="ACTIVE">🟢 Active</option>
+                      <option value="ACTIVE">🟢 Active (Ready for Login)</option>
                       <option value="PENDING">🟡 Pending Activation</option>
                       <option value="INACTIVE">⚪ Inactive</option>
+                      <option value="SUSPENDED">🔴 Suspended</option>
+                      <option value="LOCKED">🔒 Locked</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Account Expiry Date</label>
-                    <input
-                      type="date"
-                      value={formAccountExpiresAt}
-                      onChange={e => setFormAccountExpiresAt(e.target.value)}
-                      className="w-full p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700"
-                    />
-                  </div>
-                  <div className="flex flex-col justify-center space-y-2 pt-4">
+
+                  <div className="flex flex-col justify-center space-y-2 pt-2 sm:col-span-2">
                     <label className="flex items-center gap-2 cursor-pointer font-bold">
                       <input
                         type="checkbox"
@@ -1737,7 +2121,7 @@ export const SystemSettingsPage: React.FC = () => {
                         onChange={e => setFormForcePasswordReset(e.target.checked)}
                         className="rounded text-orange-600 focus:ring-orange-500"
                       />
-                      <span>Require password change on first login</span>
+                      <span>Force Password Change on First Login (Recommended)</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer font-bold">
                       <input
@@ -1752,23 +2136,148 @@ export const SystemSettingsPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-3">
+              {/* Confirmation Summary Overlay */}
+              {showConfirmSummary && (
+                <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 space-y-3 animate-fadeIn">
+                  <div className="font-black text-amber-900 dark:text-amber-200 text-xs uppercase tracking-wider flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-amber-600" />
+                    <span>Confirm ERP Account Provisioning Summary</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                    <div><span className="text-slate-500">User Type:</span> <strong className="block">{formUserType}</strong></div>
+                    <div><span className="text-slate-500">Legal Name:</span> <strong className="block">{formFullName}</strong></div>
+                    <div><span className="text-slate-500">Login ID:</span> <strong className="block font-mono text-blue-600 dark:text-blue-400">{formUsername}</strong></div>
+                    <div><span className="text-slate-500">Assigned Role:</span> <strong className="block text-orange-600">{formRole}</strong></div>
+                    <div><span className="text-slate-500">Scope:</span> <strong className="block">{formScope}</strong></div>
+                    <div><span className="text-slate-500">Account Status:</span> <strong className="block">{formAccountStatus}</strong></div>
+                    <div><span className="text-slate-500">Password Reset:</span> <strong className="block">{formForcePasswordReset ? 'Required on First Login' : 'No'}</strong></div>
+                    <div><span className="text-slate-500">Temp Password:</span> <strong className="block font-mono">{formPassword}</strong></div>
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
                 <button
                   type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold"
+                  onClick={() => setShowConfirmSummary(!showConfirmSummary)}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-200"
                 >
-                  Cancel
+                  {showConfirmSummary ? 'Hide Summary' : 'Review Summary'}
                 </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] text-white font-black shadow-md flex items-center gap-2"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>Create User</span>
-                </button>
+
+                <div className="flex gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsCreateModalOpen(false)}
+                    className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={Boolean(isExistingAccountError)}
+                    className="px-6 py-2 rounded-xl bg-[#FF6B00] hover:bg-[#e05e00] disabled:opacity-50 text-white font-black shadow-md flex items-center gap-2"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>CREATE ERP LOGIN ACCOUNT</span>
+                  </button>
+                </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── CREDENTIAL SUCCESS & PRINT SLIP MODAL ──────────────────────────── */}
+      {createdCredentialSlip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-lg w-full border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="p-4 bg-gradient-to-r from-emerald-700 to-teal-800 text-white flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-300" />
+                <h3 className="font-black text-sm uppercase tracking-wider">ERP Login Account Created</h3>
+              </div>
+              <button onClick={() => setCreatedCredentialSlip(null)} className="text-white hover:text-emerald-200">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs">
+              <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 text-emerald-900 dark:text-emerald-200 space-y-1">
+                <div className="font-black text-sm">{createdCredentialSlip.fullName}</div>
+                <div className="text-[11px] text-emerald-700 dark:text-emerald-400">
+                  {createdCredentialSlip.userType} • {createdCredentialSlip.departmentName} ({createdCredentialSlip.instituteName})
+                </div>
+              </div>
+
+              <div className="space-y-3 bg-slate-50 dark:bg-slate-800/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-700">
+                  <span className="text-slate-500 font-bold">Official Login ID:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-black text-sm text-[#001F3F] dark:text-blue-300">
+                      {createdCredentialSlip.loginId}
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(createdCredentialSlip.loginId);
+                        showNotification('Login ID copied to clipboard.');
+                      }}
+                      className="p-1 rounded bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-700 dark:text-slate-200"
+                      title="Copy Login ID"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-700">
+                  <span className="text-slate-500 font-bold">Temporary Password:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-black text-sm text-orange-600 dark:text-orange-400">
+                      {createdCredentialSlip.temporaryPassword}
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(createdCredentialSlip.temporaryPassword || '');
+                        showNotification('Temporary Password copied to clipboard.');
+                      }}
+                      className="p-1 rounded bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-700 dark:text-slate-200"
+                      title="Copy Temporary Password"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-slate-500">Assigned Role &amp; Scope:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">
+                    {createdCredentialSlip.role} ({createdCredentialSlip.scope})
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed bg-amber-50/50 dark:bg-amber-950/20 p-3 rounded-xl border border-amber-200 dark:border-amber-900/40">
+                ℹ️ The user can immediately log into the ERP via the central login page using their <strong>Login ID</strong> ({createdCredentialSlip.loginId}) and temporary password. They will be required to change their password on first sign in.
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold flex items-center gap-1.5"
+                >
+                  <Printer className="w-3.5 h-3.5" /> Print Credential Slip
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCreatedCredentialSlip(null)}
+                  className="px-5 py-2 rounded-xl bg-[#001F3F] text-white font-black hover:bg-slate-800"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1822,7 +2331,7 @@ export const SystemSettingsPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Employee / Student ID</label>
+                  <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">Emp ID / Enrollment No.</label>
                   <input
                     type="text"
                     value={editEmpId}
@@ -2624,7 +3133,7 @@ export const SystemSettingsPage: React.FC = () => {
                     <span className="font-mono text-slate-800 dark:text-slate-200">{selectedUser.email}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Employee/Student ID</span>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Emp ID / Enrollment No.</span>
                     <span className="font-mono text-slate-800 dark:text-slate-200">{selectedUser.employeeId || selectedUser.enrollmentNo || 'N/A'}</span>
                   </div>
                   <div>
@@ -2711,7 +3220,7 @@ export const SystemSettingsPage: React.FC = () => {
         </div>
       )}
 
-      {/* ─── MODAL 5: USER AUDIT LOG TRAIL ───────────────────────────────────── */}
+      {/* ─── MODAL 5: USER AUDIT & DATA VERSION HISTORY ───────────────────── */}
       {isUserAuditModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
           <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-4xl w-full border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[85vh]">
@@ -2719,7 +3228,7 @@ export const SystemSettingsPage: React.FC = () => {
               <div>
                 <h3 className="font-black text-sm uppercase tracking-wider flex items-center gap-2">
                   <History className="w-4 h-4 text-amber-400" />
-                  <span>Security Audit History for {selectedUser.name}</span>
+                  <span>Account Dossier &amp; Version History: {selectedUser.name}</span>
                 </h3>
                 <p className="text-[11px] text-blue-200">Account: @{selectedUser.username} | Role: {selectedUser.role}</p>
               </div>
@@ -2728,39 +3237,92 @@ export const SystemSettingsPage: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-4 overflow-y-auto max-h-[60vh]">
-              {userAccountManagementService.getUserAuditLogs(selectedUser).length === 0 ? (
-                <div className="p-8 text-center text-slate-500 font-bold">
-                  No security audit records logged for this account yet.
-                </div>
-              ) : (
-                <table className="w-full text-xs text-left border-collapse">
-                  <thead className="bg-[#001F3F] text-white font-bold">
-                    <tr>
-                      <th className="p-2.5">Date &amp; Time</th>
-                      <th className="p-2.5">Actor</th>
-                      <th className="p-2.5">Action</th>
-                      <th className="p-2.5">Details</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                    {userAccountManagementService.getUserAuditLogs(selectedUser).map(l => (
-                      <tr key={l.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                        <td className="p-2.5 font-mono text-slate-500 whitespace-nowrap">
-                          {l.timestamp ? new Date(l.timestamp).toLocaleString('en-IN') : '2026-08-25'}
-                        </td>
-                        <td className="p-2.5 font-bold text-slate-800 dark:text-slate-200">{l.userName}</td>
-                        <td className="p-2.5">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-black bg-blue-100 text-blue-900 border border-blue-200">
-                            {l.action}
-                          </span>
-                        </td>
-                        <td className="p-2.5 text-slate-600 dark:text-slate-300">{l.details}</td>
-                      </tr>
+            {/* Subtabs: Version History vs Security Audit */}
+            <div className="p-4 overflow-y-auto max-h-[60vh] space-y-4">
+              <div className="space-y-3">
+                <h4 className="font-black text-xs uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+                  <Workflow className="w-4 h-4 text-orange-600" />
+                  <span>Versioned Field Change History (Chronological Changelog)</span>
+                </h4>
+
+                {userAccountManagementService.getUserHistory(selectedUser.id).length === 0 ? (
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 text-center text-slate-500 font-medium text-xs">
+                    No field-level revisions recorded for this profile yet.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {userAccountManagementService.getUserHistory(selectedUser.id).map(vh => (
+                      <div key={vh.id} className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs space-y-2">
+                        <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-700 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-orange-100 text-orange-900 border border-orange-200">
+                              Version {vh.version}
+                            </span>
+                            <span className="font-bold text-slate-900 dark:text-white">{vh.action}</span>
+                          </div>
+                          <span className="font-mono text-slate-500 text-[11px]">{new Date(vh.changedAt).toLocaleString('en-IN')}</span>
+                        </div>
+
+                        <div className="text-[11px] text-slate-600 dark:text-slate-400 flex items-center gap-4">
+                          <span>Changed by: <strong className="text-slate-800 dark:text-slate-200">{vh.changedBy}</strong></span>
+                          <span>Fields modified: <strong className="text-orange-600 font-mono">{vh.changedFields.join(', ')}</strong></span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 font-mono text-[11px]">
+                          <div className="p-2 rounded bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-rose-900 dark:text-rose-300">
+                            <span className="block font-bold text-[9px] uppercase tracking-wider text-rose-700">Previous Value</span>
+                            <pre className="whitespace-pre-wrap font-sans text-[10px]">{JSON.stringify(vh.oldData, null, 2)}</pre>
+                          </div>
+                          <div className="p-2 rounded bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 text-emerald-900 dark:text-emerald-300">
+                            <span className="block font-bold text-[9px] uppercase tracking-wider text-emerald-700">New Value</span>
+                            <pre className="whitespace-pre-wrap font-sans text-[10px]">{JSON.stringify(vh.newData, null, 2)}</pre>
+                          </div>
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              )}
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
+                <h4 className="font-black text-xs uppercase tracking-wider text-slate-900 dark:text-white flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-blue-600" />
+                  <span>Security Audit Log Events</span>
+                </h4>
+
+                {userAccountManagementService.getUserAuditLogs(selectedUser).length === 0 ? (
+                  <div className="p-4 text-center text-slate-500 font-medium">
+                    No security audit events logged for this account.
+                  </div>
+                ) : (
+                  <table className="w-full text-xs text-left border-collapse">
+                    <thead className="bg-[#001F3F] text-white font-bold">
+                      <tr>
+                        <th className="p-2.5">Date &amp; Time</th>
+                        <th className="p-2.5">Actor</th>
+                        <th className="p-2.5">Action</th>
+                        <th className="p-2.5">Details</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                      {userAccountManagementService.getUserAuditLogs(selectedUser).map(l => (
+                        <tr key={l.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                          <td className="p-2.5 font-mono text-slate-500 whitespace-nowrap">
+                            {l.timestamp ? new Date(l.timestamp).toLocaleString('en-IN') : '2026-08-25'}
+                          </td>
+                          <td className="p-2.5 font-bold text-slate-800 dark:text-slate-200">{l.userName}</td>
+                          <td className="p-2.5">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-blue-100 text-blue-900 border border-blue-200">
+                              {l.action}
+                            </span>
+                          </td>
+                          <td className="p-2.5 text-slate-600 dark:text-slate-300">{l.details}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
             </div>
 
             <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-end">
@@ -2769,7 +3331,7 @@ export const SystemSettingsPage: React.FC = () => {
                 onClick={() => setIsUserAuditModalOpen(false)}
                 className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs"
               >
-                Close Log
+                Close History &amp; Log
               </button>
             </div>
           </div>

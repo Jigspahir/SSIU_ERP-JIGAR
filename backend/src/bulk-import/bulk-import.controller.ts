@@ -21,11 +21,15 @@ import {
 } from './dto/bulk-import.dto';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RbacGuard } from '../rbac/rbac.guard';
+import { RequireRole } from '../rbac/require-role.decorator';
+import { RateLimit } from '../common/decorators/rate-limit.decorator';
 
 @ApiTags('Centralized Bulk Excel Import')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
-@Controller('bulk-import')
+@UseGuards(JwtAuthGuard, RbacGuard)
+@RequireRole('SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'ERP_COORDINATOR', 'REGISTRAR', 'DEPUTY_REGISTRAR')
+@Controller(['api/v1/bulk-import', 'bulk-import'])
 export class BulkImportController {
   constructor(private readonly bulkImportService: BulkImportService) {}
 
@@ -49,6 +53,7 @@ export class BulkImportController {
   }
 
   @Post('upload')
+  @RateLimit({ limit: 10, ttlSeconds: 60, keyPrefix: 'bulk:upload' })
   @ApiOperation({ summary: 'Upload spreadsheet / raw rows for staging and validation' })
   uploadFile(@Body() dto: UploadBulkImportDto, @Req() req: any) {
     return this.bulkImportService.uploadFile(dto, req.user);
@@ -76,6 +81,7 @@ export class BulkImportController {
   }
 
   @Post(':id/confirm')
+  @RateLimit({ limit: 10, ttlSeconds: 60, keyPrefix: 'bulk:confirm' })
   @ApiOperation({ summary: 'Confirm and execute transactional commit of valid rows' })
   confirmImport(
     @Param('id') id: string,

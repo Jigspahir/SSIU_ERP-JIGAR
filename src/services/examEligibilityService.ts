@@ -618,7 +618,7 @@ class ExamEligibilityService {
     const exportData = records.map((r, idx) => ({
       'Sr No.': idx + 1,
       'Student Name': r.studentName,
-      'Student ID / Enrollment': r.enrollmentNo,
+      'Enrollment No.': r.enrollmentNo,
       'Program': r.programCode,
       'Department': r.departmentName,
       'Semester': `Semester ${r.semesterNumber}`,

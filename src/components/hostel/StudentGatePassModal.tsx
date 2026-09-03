@@ -285,7 +285,7 @@ export const StudentGatePassModal: React.FC<StudentGatePassModalProps> = ({
                   style={{ width: '105px', height: '125px', objectFit: 'cover', border: '1px solid #CBD5E1', borderRadius: '4px' }}
                 />
                 <div style={{ fontSize: '0.6875rem', color: '#64748B', marginTop: '4px', fontWeight: 600 }}>
-                  STUDENT ID
+                  ENROLLMENT NO.
                 </div>
               </div>
 

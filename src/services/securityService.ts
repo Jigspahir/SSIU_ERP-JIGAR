@@ -94,6 +94,8 @@ export const PERMITTED_CAMPUS_SERVICES: Record<UserRole, CampusServiceType[]> = 
   HR_OFFICER: ['IT Support', 'Maintenance', 'Furniture', 'Cleaning'],
   ERP_COORDINATOR: ['IT Support', 'Maintenance', 'Electrical', 'Cleaning', 'Furniture', 'Other'],
   STAFF: ['IT Support', 'Maintenance', 'Electrical', 'Cleaning', 'Furniture', 'Other'],
+  HOSTEL_WARDEN: ['Hostel', 'Plumbing', 'Electrical', 'Cleaning', 'Maintenance', 'Security', 'Other'],
+  SECURITY: ['Security', 'Maintenance', 'IT Support', 'Other'],
   PARENT: []
 };
 
@@ -187,6 +189,8 @@ export const PERMITTED_APPROVAL_CATEGORIES: Record<UserRole, ApprovalRequestCate
   HR_ADMIN: ['LEAVE_APPLICATION', 'GENERAL_ADMINISTRATIVE'],
   HR_OFFICER: ['LEAVE_APPLICATION', 'GENERAL_ADMINISTRATIVE'],
   ERP_COORDINATOR: ['GENERAL_ADMINISTRATIVE', 'INFRASTRUCTURE_MAINTENANCE'],
+  HOSTEL_WARDEN: ['LEAVE_APPLICATION', 'HOSTEL_NO_DUES', 'INFRASTRUCTURE_MAINTENANCE', 'GENERAL_ADMINISTRATIVE'],
+  SECURITY: ['LEAVE_APPLICATION', 'INFRASTRUCTURE_MAINTENANCE', 'GENERAL_ADMINISTRATIVE'],
   PARENT: []
 };
 
@@ -579,6 +583,16 @@ export const ROLE_ERP_PERMISSIONS: Record<UserRole, ErpPermission[]> = {
     'INVENTORY_MANAGE',
     'NOTESHEET_VIEW',
     'APPROVAL_SUBMIT',
+    'APPROVAL_VIEW'
+  ],
+  HOSTEL_WARDEN: [
+    'HOSTEL_MANAGE',
+    'NOTESHEET_VIEW',
+    'APPROVAL_SUBMIT',
+    'APPROVAL_VIEW'
+  ],
+  SECURITY: [
+    'CAMPUS_SERVICE_MANAGE',
     'APPROVAL_VIEW'
   ],
   PARENT: []

@@ -434,7 +434,6 @@ export const StudentOnboardingFormModal: React.FC<StudentOnboardingFormModalProp
       if (!semesterId) { errs.semesterId = 'Semester is required'; missing.push('Semester'); }
       if (!academicYearId) { errs.academicYearId = 'Academic Year is required'; missing.push('Academic Year'); }
     } else if (step === 2) {
-      if (!studentId?.trim()) { errs.studentId = 'Student ID is required'; missing.push('Student ID'); }
       if (!enrollmentNumber?.trim()) { errs.enrollmentNumber = 'Enrollment Number is required'; missing.push('Enrollment Number'); }
       if (!firstName?.trim()) { errs.firstName = 'First Name is required'; missing.push('First Name'); }
       if (!lastName?.trim()) { errs.lastName = 'Last Name is required'; missing.push('Last Name'); }
@@ -1120,11 +1119,7 @@ export const StudentOnboardingFormModal: React.FC<StudentOnboardingFormModalProp
               textAlign: 'left'
             }}>
               <div>
-                <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#64748B' }}>STUDENT ID</span>
-                <div style={{ fontSize: '0.9375rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)' }}>{onboardedResult.student.id}</div>
-              </div>
-              <div>
-                <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#64748B' }}>ENROLLMENT NUMBER</span>
+                <span style={{ fontSize: '0.6875rem', fontWeight: 800, color: '#64748B' }}>ENROLLMENT NO.</span>
                 <div style={{ fontSize: '1rem', fontWeight: 900, color: '#059669' }}>{onboardedResult.student.enrollmentNo}</div>
               </div>
               <div>
@@ -1613,10 +1608,6 @@ export const StudentOnboardingFormModal: React.FC<StudentOnboardingFormModalProp
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem' }}>
-                  <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 700 }}>Student ID *</label>
-                    <input type="text" className="form-control" value={studentId} onChange={e => setStudentId(e.target.value)} style={{ fontSize: '0.8125rem' }} />
-                  </div>
                   <div>
                     <label style={{ fontSize: '0.75rem', fontWeight: 700 }}>Enrollment Number *</label>
                     <input type="text" className="form-control" value={enrollmentNumber} onChange={e => setEnrollmentNumber(e.target.value)} style={{ fontSize: '0.8125rem', fontWeight: 800, color: '#047857' }} />
@@ -2483,6 +2474,7 @@ export const StudentOnboardingFormModal: React.FC<StudentOnboardingFormModalProp
                       { label: 'Semester', value: semesters.find(s => s.id === semesterId) ? `Semester ${semesters.find(s => s.id === semesterId)!.number}` : semesterId },
                       { label: 'Division', value: divisions.find(d => d.id === divisionId)?.name || divisionId },
                       { label: 'Batch', value: batches.find(b => b.id === batchId)?.name || batchId },
+                      { label: 'Enrollment No.', value: enrollmentNumber },
                       { label: 'Status', value: admissionStatus },
                     ]
                   },

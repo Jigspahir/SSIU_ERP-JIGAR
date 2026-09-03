@@ -991,7 +991,6 @@ export const ExamFormsPage: React.FC = () => {
                         </th>
                         <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Application No.</th>
                         <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Student Name</th>
-                        <th style={{ padding: '0.625rem 0.5rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Student ID</th>
                         <th style={{ padding: '0.625rem 0.75rem', textAlign: 'center', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Enrollment No.</th>
                         <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Department</th>
                         <th style={{ padding: '0.625rem 0.75rem', fontWeight: 800, borderRight: '1px solid rgba(255,255,255,0.15)' }}>Program</th>
@@ -1006,7 +1005,7 @@ export const ExamFormsPage: React.FC = () => {
                     <tbody>
                       {filteredForms.length === 0 ? (
                         <tr>
-                          <td colSpan={13} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                          <td colSpan={12} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                             No examination applications found matching the selected filter criteria.
                           </td>
                         </tr>
@@ -1038,9 +1037,6 @@ export const ExamFormsPage: React.FC = () => {
                               </td>
                               <td style={{ padding: '0.5rem 0.75rem', borderRight: '1px solid #E2E8F0', fontWeight: 700, color: '#0F2C59' }}>
                                 {form.studentName || studentObj?.name || 'Student'}
-                              </td>
-                              <td style={{ padding: '0.5rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontFamily: 'monospace', fontSize: '0.75rem', color: '#475569' }}>
-                                {form.studentId || studentObj?.id || 'N/A'}
                               </td>
                               <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', fontFamily: 'monospace', fontWeight: 700, color: '#0F2C59' }}>
                                 {form.enrollmentNo || studentObj?.enrollmentNo || 'N/A'}
@@ -1572,12 +1568,8 @@ export const ExamFormsPage: React.FC = () => {
                     <div style={{ fontWeight: 800, color: '#0F2C59' }}>{currentStudent?.name || user?.name || 'Student Name'}</div>
                   </div>
                   <div>
-                    <span style={{ color: '#64748B' }}>Student ID:</span>
-                    <div style={{ fontFamily: 'monospace', fontWeight: 700 }}>{currentStudent?.id || user?.id || 'stu-1'}</div>
-                  </div>
-                  <div>
-                    <span style={{ color: '#64748B' }}>Enrollment Number:</span>
-                    <div style={{ fontFamily: 'monospace', fontWeight: 800, color: '#F37023' }}>{currentStudent?.enrollmentNo || user?.enrollmentNo || 'EN2024CSE001'}</div>
+                    <span style={{ color: '#64748B' }}>Enrollment No:</span>
+                    <div style={{ fontFamily: 'monospace', fontWeight: 700, color: '#F37023' }}>{currentStudent?.enrollmentNo || user?.enrollmentNo || '—'}</div>
                   </div>
                   <div>
                     <span style={{ color: '#64748B' }}>Program:</span>

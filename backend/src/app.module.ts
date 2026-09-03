@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { RateLimiterGuard } from './common/guards/rate-limiter.guard';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
+import { MasterDataCacheModule } from './common/cache/master-data-cache.module';
 import { RbacModule } from './rbac/rbac.module';
 import { CoreMastersModule } from './core-masters/core-masters.module';
 import { WorkflowModule } from './workflow/workflow.module';
@@ -82,6 +85,10 @@ import { GrievanceModule } from './grievance/grievance.module';
 import { StartupGrantModule } from './startup-grant/startup-grant.module';
 // Stage 7.8: ABC + DigiLocker + Government Integration Foundation
 import { GovernmentIntegrationModule } from './government-integration/government-integration.module';
+// Phase 6: Official Notice Board & Targeted Announcements
+import { NoticesModule } from './notices/notices.module';
+// Phase 8: Student Council Desk
+import { StudentCouncilModule } from './student-council/student-council.module';
 
 @Module({
   imports: [
@@ -90,6 +97,7 @@ import { GovernmentIntegrationModule } from './government-integration/government
       envFilePath: ['.env', '.env.example'],
     }),
     PrismaModule,
+    MasterDataCacheModule,
     HealthModule,
     AuthModule,
     RbacModule,
@@ -167,10 +175,18 @@ import { GovernmentIntegrationModule } from './government-integration/government
     OBEModule,
     // Stage 7.5: UGC Grievance, Anti-Ragging & ICC Management
     GrievanceModule,
-    // Stage 7.7: Startup, SSIP & Grant/Fund Management
-    StartupGrantModule,
     // Stage 7.8: ABC + DigiLocker + Government Integration Foundation
     GovernmentIntegrationModule,
+    // Phase 6: Official Notice Board & Targeted Announcements
+    NoticesModule,
+    // Phase 8: Student Council Desk
+    StudentCouncilModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: RateLimiterGuard,
+    },
   ],
 })
 export class AppModule {}

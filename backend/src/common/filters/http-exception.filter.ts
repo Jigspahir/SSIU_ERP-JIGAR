@@ -33,7 +33,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
       }
     } else if (exception instanceof Error) {
       this.logger.error(`Unhandled Exception: ${exception.message}`, exception.stack);
-      message = exception.message || message;
+      if (process.env.NODE_ENV === 'production') {
+        message = 'An unexpected internal server error occurred. Please contact university IT support.';
+      } else {
+        message = exception.message || message;
+      }
+    }
+
+    // Additional defense-in-depth: scrub database and driver leaks in production
+    if (process.env.NODE_ENV === 'production' && status >= 500) {
+      message = 'An unexpected server error occurred. Please contact system support.';
+      details = null;
     }
 
     response.status(status).json({

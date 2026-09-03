@@ -103,14 +103,25 @@ export const StudentDirectorySearchPage: React.FC<StudentDirectorySearchPageProp
   }, [filterInstitute, filterDepartment]);
   const semesters = useMemo(() => db.getSemesters(), []);
 
-  // Execute Search via Central Authorized Service
-  const searchResults = useMemo(() => {
+  // Execute Server-Side Search via Central Authorized Service
+  const [searchResults, setSearchResults] = useState<{
+    records: StudentIdentitySummary[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }>({ records: [], total: 0, page: 1, totalPages: 1 });
+  const [isSearching, setIsSearching] = useState(false);
+
+  useEffect(() => {
+    let isCurrent = true;
     if (isStudent || !user || !role) {
-      return { records: [], total: 0, page: 1, totalPages: 1 };
+      setSearchResults({ records: [], total: 0, page: 1, totalPages: 1 });
+      return;
     }
 
-    try {
-      return studentProfileAccessService.searchStudents(
+    setIsSearching(true);
+    studentProfileAccessService
+      .searchStudentsServer(
         user,
         role,
         searchQuery,
@@ -120,14 +131,26 @@ export const StudentDirectorySearchPage: React.FC<StudentDirectorySearchPageProp
           programId: filterProgram,
           semesterId: filterSemester,
           status: filterStatus,
-          studentType: filterStudentType
+          studentType: filterStudentType,
         },
         page,
-        limit
-      );
-    } catch (err) {
-      return { records: [], total: 0, page: 1, totalPages: 1 };
-    }
+        limit,
+      )
+      .then(res => {
+        if (isCurrent) {
+          setSearchResults(res);
+          setIsSearching(false);
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setIsSearching(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
   }, [user, role, isStudent, searchQuery, filterInstitute, filterDepartment, filterProgram, filterSemester, filterStatus, filterStudentType, page, limit, refreshKey]);
 
   // Total Students Scoped

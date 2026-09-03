@@ -22,12 +22,15 @@ export const DEMO_ACCOUNTS = {
   studentadmin: { identifier: 'studentadmin', password: 'Admin@123', displayName: 'Onboarding Officer', email: 'onboarding.officer@swarrnim.edu.in' },
   deputyregistrar: { identifier: 'deputyregistrar', password: 'Admin@123', displayName: 'Demo Deputy Registrar 1', email: 'demo.deputyregistrar1@ssiu-demo.ac.in' },
   faculty: { identifier: 'faculty', password: 'Faculty@123', displayName: 'Prof. Demo Faculty', email: 'demo.faculty@university.edu' },
-  student: { identifier: 'student', password: 'Student@123', displayName: 'Demo Student', email: 'demo.student@university.edu' },
+  student: { identifier: 'student', password: 'Student@123', displayName: 'Jigar Patel', email: 'jigar.patel@swarrnim.edu.in' },
 } as const;
 
 // ─── Session Timeout ──────────────────────────────────────────────────────────
 /** Inactivity duration in milliseconds before the session is automatically logged out. */
 export const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
+
+/** Warning duration before timeout in milliseconds. */
+export const SESSION_WARNING_MS = 2 * 60 * 1000; // 2 minutes warning
 
 // ─── Inactivity Events ────────────────────────────────────────────────────────
 export const INACTIVITY_EVENTS = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'click'] as const;

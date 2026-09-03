@@ -174,7 +174,7 @@ export const AnonymousComplaintForm: React.FC<AnonymousComplaintFormProps> = ({
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                    When active, your name, student ID, and personal profile are strictly excluded from the ticket record.
+                    When active, your name, enrollment number, and personal profile are strictly excluded from the ticket record.
                   </p>
                   {isAnonymous && (
                     <div className="flex items-center gap-1.5 mt-2 text-emerald-700 font-bold text-[11px]">

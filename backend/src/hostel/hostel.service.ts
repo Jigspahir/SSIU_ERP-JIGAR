@@ -550,6 +550,26 @@ export class HostelService {
     });
   }
 
+  async batchCheckoutOutpasses(outpassIds: string[], staffId?: string) {
+    if (!outpassIds || !outpassIds.length) {
+      throw new BadRequestException('At least one outpass ID must be provided.');
+    }
+    const updated = await this.prisma.outpassRequest.updateMany({
+      where: {
+        id: { in: outpassIds },
+        status: 'APPROVED',
+      },
+      data: {
+        status: 'CHECKED_OUT',
+      },
+    });
+    return {
+      success: true,
+      count: updated.count,
+      message: `Successfully checked out ${updated.count} students.`,
+    };
+  }
+
   // ── Hostel Visitors ───────────────────────────────────────────────────────
 
   async registerVisitor(user: any, dto: CreateVisitorRequestDto) {

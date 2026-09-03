@@ -147,6 +147,15 @@ export const LoginPage: React.FC = () => {
     },
     {
       role: 'SUPER_ADMIN',
+      title: 'Demo ERP Administrator',
+      userId: 'demo.admin',
+      pass: 'Admin@123',
+      badge: 'Admin Control Center',
+      icon: KeyRound,
+      accentColor: '#F58220'
+    },
+    {
+      role: 'SUPER_ADMIN',
       title: 'Super Admin',
       userId: 'admin',
       pass: 'Admin@123',
@@ -1499,8 +1508,8 @@ export const LoginPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Quick Demo Login Trigger */}
-                  <div className="swarrnim-demo-trigger-box">
+                  {/* Quick Demo Login Trigger & Admin Portal Link */}
+                  <div className="swarrnim-demo-trigger-box" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <button
                       type="button"
                       className="swarrnim-demo-trigger-btn"
@@ -1509,6 +1518,27 @@ export const LoginPage: React.FC = () => {
                       <KeyRound size={13} color="var(--swarrnim-orange)" />
                       <span>Quick Demo Login (Faculty, Student, HOD...)</span>
                     </button>
+                    <a
+                      href="/erp-admin/login"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.4rem',
+                        padding: '0.45rem',
+                        borderRadius: '8px',
+                        background: 'linear-gradient(135deg, #001F3F 0%, #001122 100%)',
+                        color: '#FDBA74',
+                        border: '1px solid rgba(251, 146, 60, 0.3)',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        textDecoration: 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <ShieldCheck size={14} color="#F58220" />
+                      <span>ERP Admin Portal Login →</span>
+                    </a>
                   </div>
                 </div>
               </div>

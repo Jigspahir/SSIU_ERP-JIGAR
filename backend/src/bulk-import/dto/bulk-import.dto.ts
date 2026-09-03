@@ -4,6 +4,7 @@ import { IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber, IsArray } from 'cla
 export enum BulkImportTypeEnum {
   STUDENT = 'STUDENT',
   FACULTY = 'FACULTY',
+  STAFF = 'STAFF',
   SUBJECT = 'SUBJECT',
   EXAM_FORM = 'EXAM_FORM',
   MARKS = 'MARKS',

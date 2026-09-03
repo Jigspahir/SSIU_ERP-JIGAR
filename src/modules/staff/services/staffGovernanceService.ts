@@ -109,6 +109,9 @@ export class StaffGovernanceService {
         department: inst.name,
         assignedMenteesCount: 0,
         weeklyWorkloadHours: 6,
+        instituteId: inst.id,
+        employeeId: instFaculty[0]?.employeeId || `PRIN-${inst.code}`,
+        email: instFaculty[0]?.email || `principal.${inst.code.toLowerCase()}@swarrnim.edu.in`,
         children: instDepts.map(dept => {
           const deptFaculty = instFaculty.filter(f => f.departmentId === dept.id);
           const hod = deptFaculty.find(f => (f.designation || '').toUpperCase().includes('HOD') || (f.designation || '').toUpperCase().includes('HEAD')) || deptFaculty[0];
@@ -119,6 +122,10 @@ export class StaffGovernanceService {
             designation: 'Professor & Head of Department',
             role: 'HOD',
             department: dept.name,
+            departmentId: dept.id,
+            instituteId: inst.id,
+            employeeId: hod?.employeeId || `HOD-${dept.code}`,
+            email: hod?.email || `hod.${dept.code.toLowerCase()}@swarrnim.edu.in`,
             assignedMenteesCount: 8,
             weeklyWorkloadHours: 12,
             children: deptFaculty.filter(f => !hod || f.id !== hod.id).map(f => ({
@@ -127,6 +134,10 @@ export class StaffGovernanceService {
               designation: f.designation || 'Assistant Professor',
               role: 'FACULTY',
               department: dept.name,
+              departmentId: dept.id,
+              instituteId: inst.id,
+              employeeId: f.employeeId || `EMP-${f.id}`,
+              email: f.email || `${(f.name || 'faculty').toLowerCase().replace(/\s+/g, '.')}@swarrnim.edu.in`,
               assignedMenteesCount: 15,
               weeklyWorkloadHours: 18,
             })),
@@ -160,6 +171,10 @@ export class StaffGovernanceService {
         facultyName: f.name || `${(f as any).firstName || 'Dr.'} ${(f as any).lastName || 'Faculty'}`.trim(),
         designation: f.designation || 'Associate Professor',
         departmentName: dept ? dept.name : 'Engineering Sciences',
+        departmentId: f.departmentId,
+        instituteId: f.instituteId,
+        employeeId: f.employeeId,
+        email: f.email,
         journalPapersCount: journals,
         conferencePapersCount: conf,
         patentsCount: patents,

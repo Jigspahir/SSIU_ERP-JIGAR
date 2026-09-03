@@ -355,7 +355,7 @@ export const StudentStartupPortal: React.FC = () => {
           </div>
 
           <div style={{ padding: '0.75rem 1rem', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 'var(--radius-md)', marginBottom: '1rem', fontSize: '0.8125rem', color: '#1E40AF' }}>
-            <strong>Auto-connected to:</strong> {institute?.name || 'Institute'} · {dept?.name || 'Department'} · {program?.name || 'Program'} · Student ID: {user?.enrollmentNo || user?.id}
+            <strong>Auto-connected to:</strong> {institute?.name || 'Institute'} · {dept?.name || 'Department'} · {program?.name || 'Program'} · Enrollment No: {user?.enrollmentNo || '—'}
           </div>
 
           <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -573,7 +573,7 @@ export const StudentStartupPortal: React.FC = () => {
                 <InfoRow label="Institute" value={institute?.name} />
                 <InfoRow label="Department" value={dept?.name} />
                 <InfoRow label="Program" value={program?.name} />
-                <InfoRow label="Student ID" value={user?.enrollmentNo || user?.id} />
+                <InfoRow label="Enrollment No." value={user?.enrollmentNo || '—'} />
               </div>
             </Section>
 

@@ -273,6 +273,7 @@ export const BulkImportPage: React.FC = () => {
     switch (type) {
       case 'STUDENT': return <GraduationCap className="w-5 h-5 text-blue-600 dark:text-blue-400" />;
       case 'FACULTY': return <UserCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />;
+      case 'STAFF': return <UserCheck className="w-5 h-5 text-teal-600 dark:text-teal-400" />;
       case 'SUBJECT': return <BookOpen className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />;
       case 'EXAM_FORM': return <FileText className="w-5 h-5 text-amber-600 dark:text-amber-400" />;
       case 'MARKS': return <ShieldCheck className="w-5 h-5 text-purple-600 dark:text-purple-400" />;

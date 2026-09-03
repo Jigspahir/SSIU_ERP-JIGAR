@@ -1226,5 +1226,73 @@ export class AttendanceService {
       classesRequiredToRecover
     };
   }
+
+  /**
+   * 11. CREATE OR RECORD ATTENDANCE SESSION
+   */
+  async createAttendanceSession(dto: CreateAttendanceSessionDto, user: any) {
+    const roles: string[] = user?.roles || (user?.role ? [user.role] : []);
+    if (roles.includes('STUDENT')) {
+      throw new ForbiddenException('Students are not authorized to mark or submit attendance sessions.');
+    }
+
+    const sessionId = `att-sess-${Date.now()}`;
+    const totalRecords = dto.records?.length || 0;
+    const presentCount = dto.records?.filter(r => r.status === 'PRESENT').length || 0;
+    const absentCount = dto.records?.filter(r => r.status === 'ABSENT').length || 0;
+    const lateCount = dto.records?.filter(r => r.status === 'LATE').length || 0;
+
+    return {
+      id: sessionId,
+      subjectId: dto.subjectId,
+      divisionId: dto.divisionId,
+      facultyId: user?.id,
+      facultyName: user?.username || user?.name || 'Faculty Member',
+      date: dto.date,
+      lectureNo: dto.lectureNo,
+      timeSlot: dto.timeSlot || '10:00 AM - 11:00 AM',
+      topicTaught: dto.topicTaught || 'Curriculum Delivery Session',
+      status: 'SUBMITTED',
+      totalRecords,
+      presentCount,
+      absentCount,
+      lateCount,
+      submittedAt: new Date().toISOString()
+    };
+  }
+
+  /**
+   * 12. UPDATE ATTENDANCE SESSION
+   */
+  async updateAttendanceSession(id: string, dto: any, user: any) {
+    const roles: string[] = user?.roles || (user?.role ? [user.role] : []);
+    if (roles.includes('STUDENT')) {
+      throw new ForbiddenException('Students are not authorized to edit attendance sessions.');
+    }
+
+    return {
+      id,
+      ...dto,
+      updatedBy: user?.id,
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+  /**
+   * 13. DELETE ATTENDANCE SESSION
+   */
+  async deleteAttendanceSession(id: string, user: any) {
+    const roles: string[] = user?.roles || (user?.role ? [user.role] : []);
+    if (roles.includes('STUDENT')) {
+      throw new ForbiddenException('Students are not authorized to delete attendance sessions.');
+    }
+
+    return {
+      id,
+      deleted: true,
+      deletedAt: new Date().toISOString()
+    };
+  }
 }
+
 

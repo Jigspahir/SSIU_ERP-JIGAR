@@ -294,8 +294,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   <InfoRow label="Full Name" value={student.name} />
-                  <InfoRow label="Enrollment Number" value={student.enrollmentNo} isCode />
-                  <InfoRow label="Student ID" value={student.id} isCode />
+                  <InfoRow label="Enrollment No." value={student.enrollmentNo} isCode />
                   <InfoRow label="Program" value={program?.name || 'B.Tech Computer Science & Engineering'} />
                   <InfoRow label="Department" value={department?.name || 'Computer Engineering'} />
                   <InfoRow label="Institute" value={institute?.name || 'Swarrnim Institute of Technology'} />
@@ -1104,7 +1103,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                     Final: {student.finalEnrollmentNumber || 'PENDING'}
                   </span>
                   <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.8125rem' }}>
-                    ID: <code>{student.id}</code>
+                    Enrollment No: <code>{student.enrollmentNo || student.finalEnrollmentNumber || student.temporaryEnrollmentNumber}</code>
                   </span>
                 </div>
 

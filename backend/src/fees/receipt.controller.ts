@@ -13,6 +13,7 @@ import { PaymentReceiptQueryDto } from './dto/receipts.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RbacGuard } from '../rbac/rbac.guard';
 import { RequirePermission } from '../rbac/require-permission.decorator';
+import { RequireScope } from '../rbac/require-scope.decorator';
 
 @ApiTags('Payment Receipts & History')
 @Controller('api/v1')
@@ -86,6 +87,7 @@ export class ReceiptController {
   @Get('students/:studentId/payment-history')
   @UseGuards(JwtAuthGuard, RbacGuard)
   @RequirePermission('FEES', 'VIEW')
+  @RequireScope('OWN')
   @ApiOperation({ summary: 'Get payment history and receipts for a specific student' })
   async getStudentPaymentHistory(@Param('studentId') studentId: string, @Req() req: any) {
     return this.receiptService.getStudentPaymentHistory(studentId, req.user);

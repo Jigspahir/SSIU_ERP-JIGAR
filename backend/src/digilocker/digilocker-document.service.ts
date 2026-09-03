@@ -289,12 +289,17 @@ export class DigiLockerDocumentService {
     const correlationId = `retry-${Date.now()}`;
 
     if (dto.syncLogId) {
-      await this.prisma.digiLockerSyncLog.update({
+      const existing = await this.prisma.digiLockerSyncLog.findUnique({
         where: { id: dto.syncLogId },
-        data: {
-          attempt: { increment: 1 },
-        },
       });
+      if (existing) {
+        await this.prisma.digiLockerSyncLog.update({
+          where: { id: dto.syncLogId },
+          data: {
+            attempt: { increment: 1 },
+          },
+        });
+      }
     }
 
     return {

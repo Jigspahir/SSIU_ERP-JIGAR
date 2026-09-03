@@ -725,6 +725,7 @@ export class NoteSheetService {
           fileType: fileTypeNorm,
           fileSize: dto.fileSize || 0,
           fileUrl: dto.fileUrl.trim(),
+          documentCategory: dto.documentCategory ? dto.documentCategory.trim() : null,
           uploadedByUserId: user.id,
           uploadedByName: user.username || user.name || 'User',
         },
@@ -745,5 +746,120 @@ export class NoteSheetService {
 
       return attachment;
     });
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 14. DASHBOARD STATISTICS & ROLE-BASED PENDING COUNTS
+  // ──────────────────────────────────────────────────────────────────────────
+
+  async getDashboardStats(user: any) {
+    const roles: string[] = user?.roles || (user?.role ? [user.role] : []);
+    const isGlobal = this.hasUniversityWideAccess(user);
+    const userDept = this.resolveUserDepartment(user);
+
+    // Department base filter
+    const baseWhere: Prisma.NoteSheetWhereInput = isGlobal ? {} : { department: userDept };
+
+    const [total, approved, rejected, returned, pendingWithMe, financial, overdue] = await Promise.all([
+      this.prisma.noteSheet.count({ where: baseWhere }),
+      this.prisma.noteSheet.count({ where: { ...baseWhere, status: 'APPROVED' } }),
+      this.prisma.noteSheet.count({ where: { ...baseWhere, status: 'REJECTED' } }),
+      this.prisma.noteSheet.count({ where: { ...baseWhere, status: 'RETURNED' } }),
+      this.prisma.noteSheet.count({
+        where: {
+          ...baseWhere,
+          status: { in: ['SUBMITTED', 'PENDING_APPROVAL', 'UNDER_REVIEW', 'FORWARDED'] },
+          OR: [
+            { currentHandlerId: user.id },
+            { currentOffice: { in: roles } },
+          ],
+        },
+      }),
+      this.prisma.noteSheet.count({
+        where: {
+          ...baseWhere,
+          requestedAmount: { gt: 0 },
+        },
+      }),
+      this.prisma.noteSheet.count({
+        where: {
+          ...baseWhere,
+          isOverdue: true,
+        },
+      }),
+    ]);
+
+    return {
+      total,
+      approved,
+      rejected,
+      returned,
+      pendingWithMe,
+      financial,
+      overdue,
+      department: isGlobal ? 'ALL' : userDept,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 15. PUBLIC QR CODE VERIFICATION
+  // ──────────────────────────────────────────────────────────────────────────
+
+  async verifyNotesheet(tokenOrId: string) {
+    const trimmed = (tokenOrId || '').trim();
+    if (!trimmed) {
+      throw new BadRequestException('Verification token or Notesheet number is required.');
+    }
+
+    const notesheet = await this.prisma.noteSheet.findFirst({
+      where: {
+        OR: [
+          { id: trimmed },
+          { notesheetNumber: trimmed },
+        ],
+      },
+      select: {
+        id: true,
+        notesheetNumber: true,
+        date: true,
+        subject: true,
+        department: true,
+        departmentName: true,
+        status: true,
+        currentOffice: true,
+        decision: true,
+        decisionDate: true,
+        approvedByName: true,
+        approvedAt: true,
+        approvedAmount: true,
+        version: true,
+      },
+    });
+
+    if (!notesheet) {
+      return {
+        verified: false,
+        status: 'INVALID_DOCUMENT',
+        message: 'No official university notesheet record matches the provided verification token.',
+      };
+    }
+
+    return {
+      verified: true,
+      status: 'VERIFIED_AUTHENTIC',
+      notesheetNumber: notesheet.notesheetNumber,
+      subject: notesheet.subject,
+      department: notesheet.departmentName || notesheet.department,
+      notesheetStatus: notesheet.status,
+      decision: notesheet.decision || (notesheet.status === 'APPROVED' ? 'APPROVED' : notesheet.status),
+      decisionDate: notesheet.decisionDate || notesheet.approvedAt || notesheet.date,
+      approvedByName: notesheet.approvedByName || (notesheet.status === 'APPROVED' ? 'Competent Authority' : null),
+      approvedAmount: notesheet.approvedAmount,
+      version: notesheet.version,
+      verifiedAt: new Date().toISOString(),
+      institution: 'Swarrnim Startup & Innovation University',
+      message: 'Authentic and verified official electronic administrative record of Swarrnim University.',
+    };
   }
 }

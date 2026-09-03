@@ -1,8 +1,10 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { User, UserRole } from '../types';
 import { db } from '../services/db';
 import { securityAuditService } from '../services/securityAuditService';
-import { AUTH_STORAGE_KEY, SESSION_TIMEOUT_MS, INACTIVITY_EVENTS, DEMO_ACCOUNTS } from '../constants';
+import { inputSanitizer } from '../services/inputSanitizer';
+import { AUTH_STORAGE_KEY, SESSION_TIMEOUT_MS, SESSION_WARNING_MS, INACTIVITY_EVENTS, DEMO_ACCOUNTS } from '../constants';
+import { SessionTimeoutWarningModal } from '../components/common/SessionTimeoutWarningModal';
 
 interface AuthContextType {
   user: User | null;
@@ -17,6 +19,7 @@ interface AuthContextType {
   hasAccess: (allowedRoles: UserRole[]) => boolean;
   canMutate: () => boolean;
   resetSystemDatabase: () => void;
+  recordUserActivity: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -99,6 +102,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const [showInactivityWarning, setShowInactivityWarning] = useState(false);
+  const [remainingSeconds, setRemainingSeconds] = useState(120);
+  const lastActivityRef = useRef<number>(Date.now());
+  const lastRecordedThrottleRef = useRef<number>(0);
+
+  const recordUserActivity = useCallback(() => {
+    const now = Date.now();
+    if (now - lastRecordedThrottleRef.current >= 1000) {
+      lastRecordedThrottleRef.current = now;
+      lastActivityRef.current = now;
+      try {
+        localStorage.setItem('sscit_last_activity', String(now));
+      } catch (e) { }
+      setShowInactivityWarning(false);
+    }
+  }, []);
+
+  const handleContinueSession = useCallback(() => {
+    const now = Date.now();
+    lastRecordedThrottleRef.current = now;
+    lastActivityRef.current = now;
+    try {
+      localStorage.setItem('sscit_last_activity', String(now));
+    } catch (e) { }
+    setShowInactivityWarning(false);
+  }, []);
+
+  const logout = useCallback(() => {
+    if (user) {
+      securityAuditService.trackLogout(user);
+      try {
+        localStorage.removeItem(`sscit_active_workspace_${user.id}`);
+      } catch (e) { }
+    }
+    try {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      localStorage.removeItem('token');
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('jwt');
+      localStorage.removeItem('sscit_auth_token');
+      localStorage.removeItem('sscit_last_activity');
+      localStorage.setItem('sscit_session_logged_out', String(Date.now()));
+    } catch (e) { }
+    setShowInactivityWarning(false);
+    setUser(null);
+    setActiveRoleState(null);
+  }, [user]);
+
   useEffect(() => {
     if (user) {
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
@@ -133,40 +184,89 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       syncBackendSession();
 
-      let timeoutId: number;
+      lastActivityRef.current = Date.now();
+      try {
+        localStorage.setItem('sscit_last_activity', String(Date.now()));
+      } catch (e) { }
 
-      const resetTimer = () => {
-        if (timeoutId) clearTimeout(timeoutId);
-        timeoutId = window.setTimeout(() => {
+      // Multi-tab synchronization
+      const handleStorage = (e: StorageEvent) => {
+        if (e.key === 'sscit_last_activity' && e.newValue) {
+          const tabActivity = Number(e.newValue);
+          if (!isNaN(tabActivity) && tabActivity > lastActivityRef.current) {
+            lastActivityRef.current = tabActivity;
+            setShowInactivityWarning(false);
+          }
+        } else if (e.key === 'sscit_session_logged_out') {
           logout();
-          alert('Your session has timed out due to inactivity. Please log in again.');
-        }, SESSION_TIMEOUT_MS);
+        }
+      };
+      window.addEventListener('storage', handleStorage);
+
+      // Throttled activity event listeners
+      const onUserActivity = () => {
+        recordUserActivity();
       };
 
-      INACTIVITY_EVENTS.forEach(event => window.addEventListener(event, resetTimer));
-      resetTimer();
+      const eventOptions = { passive: true };
+      INACTIVITY_EVENTS.forEach((event) => window.addEventListener(event, onUserActivity, eventOptions));
+      window.addEventListener('pointerdown', onUserActivity, eventOptions);
+
+      // 1-second precision heartbeat for countdown & timeout
+      const intervalId = window.setInterval(() => {
+        const now = Date.now();
+        try {
+          const stored = localStorage.getItem('sscit_last_activity');
+          if (stored) {
+            const storedTime = Number(stored);
+            if (!isNaN(storedTime) && storedTime > lastActivityRef.current) {
+              lastActivityRef.current = storedTime;
+            }
+          }
+        } catch (e) { }
+
+        const idle = now - lastActivityRef.current;
+        if (idle >= SESSION_TIMEOUT_MS) {
+          clearInterval(intervalId);
+          logout();
+          alert('Your session has timed out due to 15 minutes of inactivity. Please log in again.');
+        } else if (idle >= (SESSION_TIMEOUT_MS - SESSION_WARNING_MS)) {
+          const remaining = Math.max(0, Math.ceil((SESSION_TIMEOUT_MS - idle) / 1000));
+          setRemainingSeconds(remaining);
+          setShowInactivityWarning(true);
+        } else {
+          setShowInactivityWarning(false);
+        }
+      }, 1000);
 
       return () => {
-        if (timeoutId) clearTimeout(timeoutId);
-        INACTIVITY_EVENTS.forEach(event => window.removeEventListener(event, resetTimer));
+        clearInterval(intervalId);
+        window.removeEventListener('storage', handleStorage);
+        INACTIVITY_EVENTS.forEach((event) => window.removeEventListener(event, onUserActivity));
+        window.removeEventListener('pointerdown', onUserActivity);
       };
     } else {
       localStorage.removeItem(AUTH_STORAGE_KEY);
       localStorage.removeItem('token');
       localStorage.removeItem('accessToken');
       localStorage.removeItem('jwt');
+      localStorage.removeItem('sscit_auth_token');
+      setShowInactivityWarning(false);
     }
-  }, [user]);
+  }, [user, logout, recordUserActivity]);
 
   const login = (identifier: string, password?: string) => {
     const users = db.getUsers();
     const students = db.getStudents();
-    const cleanId = identifier.trim().toLowerCase();
+    // Sanitize identifier
+    const sanitizedId = inputSanitizer.sanitizePlainText(identifier, 100);
+    const cleanId = sanitizedId.trim().toLowerCase();
 
-    // 1. Match by username, email, temporaryEnrollmentNumber, or finalEnrollmentNumber
+    // 1. Match by username, email, employeeId, temporaryEnrollmentNumber, or finalEnrollmentNumber
     let foundUser = users.find(u =>
       (u.username && u.username.toLowerCase() === cleanId) ||
       (u.email && u.email.toLowerCase() === cleanId) ||
+      (u.employeeId && u.employeeId.toLowerCase() === cleanId) ||
       (u.temporaryEnrollmentNumber && u.temporaryEnrollmentNumber.toLowerCase() === cleanId) ||
       (u.finalEnrollmentNumber && u.finalEnrollmentNumber.toLowerCase() === cleanId) ||
       (u.enrollmentNo && u.enrollmentNo.toLowerCase() === cleanId)
@@ -224,7 +324,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, error: 'Invalid User ID, Temporary Enrollment Number or Email. Please enter a valid account ID.' };
     }
 
-    // 4. Validate Password & Student Access Code
+    // 4. Check & Enforce Lock State (Lazy Expiration)
+    const now = new Date();
+    if (foundUser.lockedUntil) {
+      const lockExpiry = new Date(foundUser.lockedUntil);
+      if (now.getTime() < lockExpiry.getTime()) {
+        const remainingMinutes = Math.max(1, Math.ceil((lockExpiry.getTime() - now.getTime()) / (60 * 1000)));
+        securityAuditService.trackLoginFailure(identifier, `Attempted login on locked account: ${foundUser.username}`);
+        return {
+          success: false,
+          error: `Your account is temporarily locked due to multiple failed login attempts. Please try again after ${remainingMinutes} minute${remainingMinutes > 1 ? 's' : ''}.`
+        };
+      } else {
+        // Lock has expired -> Lazy Auto-Unlock (restore to ACTIVE if not administratively inactive)
+        const prevStatus = foundUser.status === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE';
+        foundUser.accountStatus = prevStatus;
+        foundUser.status = prevStatus;
+        foundUser.failedLoginAttempts = 0;
+        foundUser.lockedUntil = undefined;
+        foundUser.lockReason = undefined;
+        db.updateEntity<User>('users', foundUser.id, {
+          accountStatus: prevStatus,
+          status: prevStatus,
+          failedLoginAttempts: 0,
+          lockedUntil: undefined,
+          lockReason: undefined
+        });
+        securityAuditService.logSecurityEvent(
+          'ACCOUNT_UNLOCKED',
+          'AUTH',
+          'users',
+          `Lock expired automatically for user account ${foundUser.username}. Restored to ${prevStatus}.`,
+          foundUser,
+          foundUser.role
+        );
+      }
+    }
+
+    // 5. Validate Account Status (Active vs Locked vs Disabled vs Suspended vs Pending)
+    const currentStatus = foundUser.accountStatus || (foundUser.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE');
+    if (currentStatus === 'LOCKED' || (foundUser as any).status === 'LOCKED') {
+      const lockMsg = foundUser.lockReason
+        ? `Your account is LOCKED. Reason: ${foundUser.lockReason}. Please contact the Central ERP Coordinator.`
+        : 'Your account is temporarily locked due to multiple failed login attempts. Please try again after the lock period expires.';
+      securityAuditService.trackLoginFailure(identifier, `Locked account login attempt: ${foundUser.username}`);
+      return { success: false, error: lockMsg };
+    }
+
+    if (currentStatus === 'SUSPENDED') {
+      securityAuditService.trackLoginFailure(identifier, `Suspended account login attempt: ${foundUser.username}`);
+      return { success: false, error: 'Your account has been SUSPENDED by University Administration. Please contact the Registrar Office.' };
+    }
+
+    if (currentStatus === 'PENDING') {
+      securityAuditService.trackLoginFailure(identifier, `Pending account login attempt: ${foundUser.username}`);
+      return { success: false, error: 'Your account is currently PENDING administrative activation. Please contact the ERP Administrator.' };
+    }
+
+    if (currentStatus === 'DISABLED' || currentStatus === 'INACTIVE' || (foundUser.status === 'INACTIVE' && currentStatus !== 'ACTIVE')) {
+      securityAuditService.trackLoginFailure(identifier, `Inactive/Disabled account login attempt: ${foundUser.username}`);
+      return { success: false, error: 'Your account has been DEACTIVATED/DISABLED. Please contact the Central ERP Coordinator or System Administrator.' };
+    }
+
+    // 6. Validate Password & Student Access Code
     if (password) {
       const linkedStudent = students.find(s =>
         (foundUser?.id && s.id === foundUser.id.replace('user-', '')) ||
@@ -242,24 +404,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password === 'Parent@123';
 
       if (!isDirectMatch && !isAccessCodeMatch && !isDemoPassMatch) {
-        securityAuditService.trackLoginFailure(identifier, 'Invalid password credentials or access code');
-        return { success: false, error: 'Incorrect Password or Student Access Code. Please check your credentials.' };
+        const attempts = (foundUser.failedLoginAttempts || 0) + 1;
+        const updates: Partial<User> = {
+          failedLoginAttempts: attempts,
+          lastFailedLoginAt: new Date().toISOString()
+        };
+
+        if (attempts >= 3) {
+          const lockDurationMs = 30 * 60 * 1000; // 30 minutes
+          const lockUntil = new Date(Date.now() + lockDurationMs).toISOString();
+          updates.accountStatus = 'LOCKED';
+          updates.status = 'INACTIVE';
+          updates.lockedUntil = lockUntil;
+          updates.lockedAt = new Date().toISOString();
+          updates.lockReason = 'Exceeded maximum failed login attempts (3 consecutive failures).';
+
+          db.updateEntity<User>('users', foundUser.id, updates);
+          securityAuditService.trackLoginFailure(identifier, 'Account locked: 3 consecutive failed login attempts');
+          securityAuditService.logSecurityEvent(
+            'ACCOUNT_LOCKED',
+            'AUTH',
+            'users',
+            `Account ${foundUser.username} automatically locked for 30 minutes due to 3 consecutive failed attempts.`,
+            foundUser,
+            foundUser.role,
+            { status: 'BLOCKED', severity: 'CRITICAL' }
+          );
+
+          return {
+            success: false,
+            error: 'Your account is temporarily locked due to multiple failed login attempts. Please try again after 30 minutes.'
+          };
+        } else {
+          db.updateEntity<User>('users', foundUser.id, updates);
+          securityAuditService.trackLoginFailure(identifier, `Invalid password credentials (Attempt ${attempts}/3)`);
+          return {
+            success: false,
+            error: `Incorrect Password or Student Access Code. Failed attempt ${attempts} of 3 before temporary account lockout.`
+          };
+        }
       }
     }
 
-    // 5. Validate Account Status (Active vs Locked vs Disabled)
-    if (foundUser.accountStatus === 'LOCKED' || (foundUser as any).status === 'LOCKED') {
-      const lockMsg = foundUser.lockReason
-        ? `Your account is LOCKED. Reason: ${foundUser.lockReason}. Please contact the Central ERP Coordinator.`
-        : 'Your account is LOCKED for security reasons. Please contact the Central ERP Coordinator.';
-      securityAuditService.trackLoginFailure(identifier, `Locked account login attempt: ${foundUser.username}`);
-      return { success: false, error: lockMsg };
-    }
-
-    if (foundUser.accountStatus === 'DISABLED' || foundUser.accountStatus === 'INACTIVE' || (foundUser.status === 'INACTIVE' && foundUser.accountStatus !== 'ACTIVE')) {
-      securityAuditService.trackLoginFailure(identifier, `Inactive/Disabled account login attempt: ${foundUser.username}`);
-      return { success: false, error: 'Your account has been DEACTIVATED/DISABLED. Please contact the Central ERP Coordinator or System Administrator.' };
-    }
+    // 7. Successful Authentication - Reset failed attempts & clear lock state
+    db.updateEntity<User>('users', foundUser.id, {
+      failedLoginAttempts: 0,
+      lockedUntil: undefined,
+      lastLoginAt: new Date().toISOString()
+    });
+    foundUser.failedLoginAttempts = 0;
+    foundUser.lockedUntil = undefined;
+    foundUser.lastLoginAt = new Date().toISOString();
 
     setUser(foundUser);
 
@@ -284,20 +479,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     securityAuditService.trackLoginSuccess(foundUser);
     return { success: true };
-  };
-
-  const logout = () => {
-    if (user) {
-      securityAuditService.trackLogout(user);
-      try {
-        localStorage.removeItem(`sscit_active_workspace_${user.id}`);
-      } catch (e) { }
-    }
-    try {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-    } catch (e) { }
-    setUser(null);
-    setActiveRoleState(null);
   };
 
   const updateProfile = (updates: Partial<User>) => {
@@ -347,10 +528,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateProfile,
         hasAccess,
         canMutate,
-        resetSystemDatabase
+        resetSystemDatabase,
+        recordUserActivity,
       }}
     >
       {children}
+      {user && (
+        <SessionTimeoutWarningModal
+          isOpen={showInactivityWarning}
+          remainingSeconds={remainingSeconds}
+          onContinue={handleContinueSession}
+          onLogout={logout}
+        />
+      )}
     </AuthContext.Provider>
   );
 };

@@ -50,7 +50,8 @@ import type {
   AllocationConflict, ManualTestRecord,
   StudentGatePass,
   StudentEnrollmentMapping,
-  StudentMappingHistoryRecord
+  StudentMappingHistoryRecord,
+  UserHistoryRecord
 } from '../types';
 import { INITIAL_MANUAL_TEST_RECORDS } from './qaTestingService';
 import type { MentoringSessionRecord } from '../types/mentorAssignment';
@@ -58,6 +59,7 @@ import type {
   DocumentMasterItem, StudentAcademicDocumentItem, StudentDocumentVersionItem, DocumentVerificationLogItem
 } from '../types/documentMaster';
 import { INITIAL_DOCUMENT_MASTER_DATA } from '../data/initialDocumentMaster';
+import { inputSanitizer } from './inputSanitizer';
 import * as XLSX from 'xlsx';
 import { 
   initialUniversity, initialInstitutes, initialDepartments, initialPrograms, initialAcademicYears, 
@@ -290,6 +292,7 @@ export interface DatabaseState {
   approvalWorkflows?: any[];
   assetTransferHistory?: any[];
   allocationHistoryRecords?: any[];
+  userHistories?: UserHistoryRecord[];
 }
 
 export const ORGANOGRAM_BRANCH_WORKFLOWS: Record<string, { name: string; steps: string[]; finalAuthority: string }> = {
@@ -788,6 +791,47 @@ class ERPDatabaseService {
   public getFaculty(): Faculty[] { return this.state.faculty; }
   public getStudents(): Student[] { return this.state.students; }
   public getStudentById(id: string): Student | undefined { return this.state.students.find(s => s.id === id); }
+  public getStudentForUser(user: any): Student | undefined {
+    if (!user) return undefined;
+    const students = this.state.students || [];
+    if (students.length === 0) return undefined;
+
+    const cleanUserId = typeof user === 'string' ? user : (user.id || '');
+    const cleanEnroll = typeof user === 'string' ? user : (user.enrollmentNo || user.username || user.temporaryEnrollmentNumber || user.finalEnrollmentNumber || '');
+    const cleanEmail = typeof user === 'string' ? undefined : (user.email || '');
+
+    // 1. Match by primary ID / user-ID mapping
+    const byId = students.find(s => 
+      s.id === cleanUserId || 
+      `user-${s.id}` === cleanUserId || 
+      s.id === cleanUserId.replace('user-', '') ||
+      (typeof user === 'object' && user.studentId && s.id === user.studentId)
+    );
+    if (byId) return byId;
+
+    // 2. Match by official Enrollment Number (primary official identifier)
+    if (cleanEnroll) {
+      const byEnroll = students.find(s => 
+        s.enrollmentNo && s.enrollmentNo.toLowerCase() === cleanEnroll.toLowerCase()
+      );
+      if (byEnroll) return byEnroll;
+    }
+
+    // 3. Match by Institutional Email
+    if (cleanEmail) {
+      const byEmail = students.find(s => 
+        s.email && s.email.toLowerCase() === cleanEmail.toLowerCase()
+      );
+      if (byEmail) return byEmail;
+    }
+
+    // 4. Default for authenticated student user
+    if (typeof user === 'object' && user.role === 'STUDENT') {
+      return students[0];
+    }
+
+    return undefined;
+  }
   public getUsers(): User[] { return this.state.users; }
   public getAuditLogs(): AuditLog[] { return this.state.auditLogs; }
 
@@ -4174,16 +4218,20 @@ class ERPDatabaseService {
     const officialNumber = isDraft ? 'DRAFT' : noteSheetNumber;
     const assignee = !isDraft ? this.resolveActualAssignee(firstStep, instId, noteData.departmentId || dept, dept) : undefined;
 
+    const sanitizedSubject = inputSanitizer.sanitizePlainText(noteData.subject || 'Administrative Note Sheet', 200);
+    const sanitizedProposal = inputSanitizer.sanitizePlainText(noteData.proposal || '', 5000);
+    const sanitizedJustification = inputSanitizer.sanitizePlainText(noteData.purposeJustification || '', 3000);
+
     const newNote: NoteSheet = {
       id: noteData.id || `ns-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       notesheetNumber: officialNumber,
       noteSheetNumber: officialNumber,
       notesheetType: noteData.notesheetType || (isFin ? 'Financial Sanction' : 'Administrative'),
       visibility: noteData.visibility || 'NORMAL',
-      subject: noteData.subject || 'Administrative Note Sheet',
-      title: noteData.subject || 'Administrative Note Sheet',
-      proposal: noteData.proposal || '',
-      purposeJustification: noteData.purposeJustification || '',
+      subject: sanitizedSubject,
+      title: sanitizedSubject,
+      proposal: sanitizedProposal,
+      purposeJustification: sanitizedJustification,
       referenceNumber: noteData.referenceNumber,
       section: noteData.section,
       instituteId: instId,
@@ -4459,6 +4507,9 @@ class ERPDatabaseService {
       reopenedReason?: string;
     }
   ): void {
+    const sanitizedRemarks = inputSanitizer.sanitizePlainText(remarks || '', 3000);
+    remarks = sanitizedRemarks;
+
     if (!this.state.noteSheets) this.state.noteSheets = [];
     const ns = this.state.noteSheets.find(n => n.id === noteSheetId);
     if (!ns) return;
@@ -9879,6 +9930,123 @@ class ERPDatabaseService {
     return { successCount, failedCount, results };
   }
 
+  /**
+   * ──────────────────────────────────────────────────────────────────────────
+   * AUTO REMINDER SYSTEM FOR NOTESHEETS PENDING > 3 DAYS
+   * Calculates pending days based on when the notesheet entered the current
+   * officer's pending queue (from latest movement or officerPendingSince).
+   * ──────────────────────────────────────────────────────────────────────────
+   */
+  public checkAndSendPendingNotesheetReminders(): { remindersSent: number; details: { notesheetNumber: string; officerRole: string; pendingDays: number }[] } {
+    const activeNotes = this.getNoteSheets().filter(n => 
+      !['DRAFT', 'APPROVED', 'CLOSED', 'REJECTED', 'CANCELLED'].includes(n.status) &&
+      n.currentOffice &&
+      n.currentOffice !== 'COMPLETED' &&
+      n.currentOffice !== 'CREATOR'
+    );
+
+    const now = Date.now();
+    const details: { notesheetNumber: string; officerRole: string; pendingDays: number }[] = [];
+    let remindersSent = 0;
+
+    activeNotes.forEach(note => {
+      // Determine when the Notesheet entered the current officer's queue
+      let enteredQueueTimestamp: number | null = null;
+      let pendingSinceDateStr: string = '';
+
+      if (note.officerPendingSince) {
+        enteredQueueTimestamp = new Date(note.officerPendingSince).getTime();
+        pendingSinceDateStr = note.officerPendingSince.split('T')[0];
+      } else if (note.movements && note.movements.length > 0) {
+        // Look for the latest movement where the notesheet was assigned/forwarded to currentOffice
+        const matchingMovements = [...note.movements].reverse();
+        const latestMvt = matchingMovements.find(m => 
+          m.toOffice === note.currentOffice || 
+          ['SUBMIT', 'FORWARD', 'TRANSFER', 'RESUBMIT'].includes(m.action)
+        ) || matchingMovements[0];
+
+        if (latestMvt) {
+          const rawDate = latestMvt.timestamp || latestMvt.date;
+          if (rawDate) {
+            const parsed = new Date(rawDate).getTime();
+            if (!isNaN(parsed)) {
+              enteredQueueTimestamp = parsed;
+              pendingSinceDateStr = latestMvt.date || new Date(parsed).toISOString().split('T')[0];
+            }
+          }
+        }
+      }
+
+      if (!enteredQueueTimestamp) {
+        // Fallback to createdAt or date
+        const fallback = new Date(note.createdAt || note.date).getTime();
+        enteredQueueTimestamp = isNaN(fallback) ? now : fallback;
+        pendingSinceDateStr = note.date;
+      }
+
+      const diffMs = now - enteredQueueTimestamp;
+      const pendingDays = Math.floor(diffMs / 86400000);
+
+      // Check if pending >= 3 days
+      if (pendingDays >= 3) {
+        // Check if reminder was already sent within the last 24 hours to prevent duplicate spamming
+        if (note.lastReminderSentAt) {
+          const lastSentTime = new Date(note.lastReminderSentAt).getTime();
+          if (!isNaN(lastSentTime) && (now - lastSentTime) < 86400000) {
+            return; // Already sent within 24 hours
+          }
+        }
+
+        // Find target officer user
+        let targetUserId = note.currentAssigneeUserId || note.currentHandlerId;
+        let targetOfficerName = note.currentAssigneeName;
+
+        if (!targetUserId) {
+          const matchingOfficer = this.getUsers().find(u => 
+            (u.role === note.currentOffice || (u.role as string) === note.currentAuthorityRole) && 
+            u.status === 'ACTIVE'
+          );
+          if (matchingOfficer) {
+            targetUserId = matchingOfficer.id;
+            targetOfficerName = matchingOfficer.name;
+          }
+        }
+
+        if (targetUserId) {
+          try {
+            this.addNotification({
+              type: 'ACTION_REQUIRED',
+              targetUserId,
+              title: `⚡ Action Required: Notesheet Pending ${pendingDays} Days (${note.noteSheetNumber})`,
+              message: `Notesheet "${note.subject}" has been awaiting your action for ${pendingDays} days (since ${pendingSinceDateStr}). Please review and endorse.`,
+              module: 'NOTESHEET',
+              referenceId: note.noteSheetNumber,
+              referenceType: 'NOTESHEET',
+              linkTab: 'notesheet',
+              priority: 'URGENT'
+            });
+
+            note.lastReminderSentAt = new Date().toISOString();
+            remindersSent++;
+            details.push({
+              notesheetNumber: note.noteSheetNumber,
+              officerRole: note.currentOffice,
+              pendingDays
+            });
+          } catch {
+            // Non-blocking
+          }
+        }
+      }
+    });
+
+    if (remindersSent > 0) {
+      this.saveState();
+    }
+
+    return { remindersSent, details };
+  }
+
   public getInwardOutwardRecords(
     filter?: {
       type?: 'ALL' | 'INWARD' | 'OUTWARD';
@@ -14407,6 +14575,26 @@ class ERPDatabaseService {
         { field: 'Employee ID', required: 'YES', description: 'Unique faculty code', example: 'EMP-1001' },
         { field: 'Faculty Name', required: 'YES', description: 'Full staff name', example: 'Dr. Rajesh Kumar' },
         { field: 'Email', required: 'YES', description: 'Official email', example: 'rajesh@swarrnim.edu.in' }
+      ]
+    },
+    STAFF: {
+      type: 'STAFF',
+      name: 'Non-Teaching Staff Master',
+      fileName: 'Staff_Import_Template.xlsx',
+      description: 'Bulk register administrative, technical, and operational staff profiles.',
+      headers: [
+        'Employee Code', 'Staff Name', 'Email', 'Mobile', 'Department Code',
+        'Designation', 'Institute Code', 'Employment Type', 'Joining Date (YYYY-MM-DD)', 'Status'
+      ],
+      sampleRows: [
+        ['STF-1001', 'Ramesh Patel', 'ramesh.patel@swarrnim.edu.in', '9898011223', 'DEP-ADMIN', 'Office Superintendent', 'INST-ENG', 'FULL_TIME', '2023-04-01', 'ACTIVE'],
+        ['STF-1002', 'Bhavna Dave', 'bhavna.dave@swarrnim.edu.in', '9898022334', 'DEP-CSE', 'Senior Lab Technician', 'INST-ENG', 'FULL_TIME', '2023-06-15', 'ACTIVE']
+      ],
+      instructions: [
+        { field: 'Employee Code', required: 'YES', description: 'Unique staff employee code (Official ERP Login ID)', example: 'STF-1001' },
+        { field: 'Staff Name', required: 'YES', description: 'Full name of staff member', example: 'Ramesh Patel' },
+        { field: 'Email', required: 'YES', description: 'Official email address', example: 'ramesh.patel@swarrnim.edu.in' },
+        { field: 'Department Code', required: 'YES', description: 'Valid Department Code', example: 'DEP-ADMIN' }
       ]
     },
     SUBJECT: {

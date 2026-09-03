@@ -117,7 +117,6 @@ export const StudentOnboardingTab: React.FC = () => {
       const data = historyList.map(h => ({
         'Student Name': h.studentName,
         'Enrollment No': h.enrollmentNo,
-        'Student ID': h.studentId,
         'Application No': h.applicationNumber,
         'Program': h.programName,
         'Department': h.departmentName,

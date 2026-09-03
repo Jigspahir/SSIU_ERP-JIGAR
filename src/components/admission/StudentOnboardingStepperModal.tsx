@@ -102,7 +102,7 @@ export const StudentOnboardingStepperModal: React.FC<StudentOnboardingStepperMod
     { num: 2, label: 'Documents', status: areDocsVerified ? 'COMPLETED' : isAdmissionApproved ? 'PENDING' : 'LOCKED' },
     { num: 3, label: 'Fee Verification', status: isFeeVerified ? 'COMPLETED' : areDocsVerified ? 'PENDING' : 'LOCKED' },
     { num: 4, label: 'Student Master', status: currentStep >= 4 ? 'IN_PROGRESS' : 'PENDING' },
-    { num: 5, label: 'Student ID / Enrollment', status: currentStep >= 5 ? 'IN_PROGRESS' : 'PENDING' },
+    { num: 5, label: 'Enrollment Number', status: currentStep >= 5 ? 'IN_PROGRESS' : 'PENDING' },
     { num: 6, label: 'Mentor Assignment', status: selectedMentorId ? 'COMPLETED' : currentStep >= 6 ? 'IN_PROGRESS' : 'PENDING' },
     { num: 7, label: 'ERP Account', status: currentStep >= 7 ? 'COMPLETED' : 'PENDING' },
     { num: 8, label: 'Final Onboarding', status: application.status === 'CONVERTED' ? 'COMPLETED' : 'PENDING' }
@@ -510,7 +510,7 @@ export const StudentOnboardingStepperModal: React.FC<StudentOnboardingStepperMod
                 <ArrowLeft size={14} /> Back
               </button>
               <button type="button" className="btn btn-primary btn-sm" onClick={() => setCurrentStep(5)}>
-                Next: Enrollment / Student ID <ArrowRight size={14} />
+                Next: Enrollment Number <ArrowRight size={14} />
               </button>
             </div>
           </div>
@@ -521,27 +521,13 @@ export const StudentOnboardingStepperModal: React.FC<StudentOnboardingStepperMod
           <div className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <h4 style={{ margin: 0, fontSize: '0.9375rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <KeyRound size={18} color="var(--brand-orange, #F37023)" /> Step 5: Student ID &amp; Enrollment Number Generation
+                <KeyRound size={18} color="var(--brand-orange, #F37023)" /> Step 5: Enrollment Number Generation
               </h4>
               <Badge variant="navy">Auto-Generated Unique Sequence</Badge>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-              <div>
-                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', display: 'block', marginBottom: '4px' }}>
-                  Student Master ID
-                </label>
-                <input
-                  type="text"
-                  className="form-control"
-                  value={studentId}
-                  onChange={e => setStudentId(e.target.value)}
-                  style={{ fontSize: '0.875rem', fontWeight: 700 }}
-                />
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted, #64748B)' }}>Internal university master entity identifier</span>
-              </div>
-
-              <div>
+<div>
                 <label style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--brand-navy, #0B192C)', display: 'block', marginBottom: '4px' }}>
                   Official University Enrollment Number
                 </label>

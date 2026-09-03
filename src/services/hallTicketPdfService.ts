@@ -1,8 +1,7 @@
 /**
  * Centralized SSIU ERP-Wide Examination Hall Ticket PDF Generator Service
  * Generates an official University Examination Hall Ticket / Admit Card on A4 PORTRAIT (1 Page, 210mm x 297mm).
- * Print-ready with passport photo container, barcode, schedule table, candidate instructions, and official authorization seals.
- * Opens directly in a new browser tab via native browser PDF viewer.
+ * Matches the official university physical Hall Ticket reference layout.
  */
 
 import { jsPDF } from 'jspdf';
@@ -28,7 +27,7 @@ export async function generateHallTicketPDF(ticket: HallTicketData): Promise<Blo
 }
 
 /**
- * 2. Multi-Student Bulk Hall Tickets PDF Generator (Each student on EXACTLY ONE A4 Portrait page)
+ * 2. Multi-Student Bulk Hall Tickets PDF Generator
  */
 export async function generateBulkHallTicketsPDF(tickets: HallTicketData[]): Promise<Blob> {
   const doc = new jsPDF({
@@ -50,91 +49,94 @@ export async function generateBulkHallTicketsPDF(tickets: HallTicketData[]): Pro
 }
 
 /**
+ * Draw Official University Circular Exam Section Seal Stamp
+ */
+function drawOfficialExamSeal(doc: jsPDF, centerX: number, centerY: number): void {
+  const sealBlue: [number, number, number] = [30, 58, 138]; // #1E3A8A
+
+  doc.setDrawColor(sealBlue[0], sealBlue[1], sealBlue[2]);
+  doc.setTextColor(sealBlue[0], sealBlue[1], sealBlue[2]);
+  doc.setLineWidth(0.35);
+
+  // Outer circle
+  doc.circle(centerX, centerY, 12.5, 'S');
+
+  // Inner dashed circle
+  doc.setLineDashPattern([0.8, 0.8], 0);
+  doc.circle(centerX, centerY, 11, 'S');
+  doc.setLineDashPattern([], 0);
+
+  // Center text
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(4.2);
+  doc.text('SWARRNIM STARTUP &', centerX, centerY - 6, { align: 'center' });
+  doc.text('INNOVATION UNIVERSITY', centerX, centerY - 3.8, { align: 'center' });
+
+  // Center banner
+  doc.setLineWidth(0.2);
+  doc.line(centerX - 9, centerY - 2.2, centerX + 9, centerY - 2.2);
+  doc.setFontSize(6);
+  doc.text('EXAM SECTION', centerX, centerY + 0.8, { align: 'center' });
+  doc.line(centerX - 9, centerY + 2.5, centerX + 9, centerY + 2.5);
+
+  doc.setFontSize(4.5);
+  doc.text('GANDHINAGAR', centerX, centerY + 5.5, { align: 'center' });
+}
+
+/**
  * Core Renderer: Draws one complete official Hall Ticket on the current jsPDF page (210mm x 297mm)
  */
 export function renderSingleHallTicketPage(doc: jsPDF, ticket: HallTicketData): void {
   const pageWidth = 210;
-  const marginX = 8;
-  const contentWidth = pageWidth - (marginX * 2); // 194mm
+  const marginX = 10;
+  const contentWidth = pageWidth - (marginX * 2); // 190mm
   const startX = marginX;
-  const startY = 8;
-
-  const brandNavy: [number, number, number] = [15, 44, 89]; // #0F2C59
-  const brandOrange: [number, number, number] = [243, 112, 35]; // #F37023
-  const textDark: [number, number, number] = [15, 23, 42]; // #0F172A
-  const textMuted: [number, number, number] = [100, 116, 139]; // #64748B
-  const borderCol: [number, number, number] = [148, 163, 184]; // #94A3B8
+  const startY = 10;
 
   let curY = startY;
 
-  // ─── 1. HEADER SECTION (Logo + University Name + Subtitle) ────────────
+  // ─── 1. HEADER (LOGO + UNIVERSITY NAME + SESSION + HALL TICKET) ─────
   try {
     if (SWARRNIM_LOGO_PNG_BASE64) {
-      doc.addImage(SWARRNIM_LOGO_PNG_BASE64, 'PNG', startX + 2, curY + 1, 20, 10);
+      doc.addImage(SWARRNIM_LOGO_PNG_BASE64, 'PNG', startX + 2, curY + 1, 20, 12);
     }
   } catch {
-    // Fallback if logo fails
+    // Fallback
   }
 
-  // University Header Texts
-  doc.setTextColor(brandNavy[0], brandNavy[1], brandNavy[2]);
+  // Header Titles Centered
+  doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
-  doc.text('SWARRNIM STARTUP & INNOVATION UNIVERSITY', startX + 25, curY + 4);
+  doc.setFontSize(11);
+  doc.text('SWARRNIM STARTUP & INNOVATION UNIVERSITY', startX + (contentWidth / 2) + 6, curY + 4, { align: 'center' });
 
-  doc.setTextColor(brandOrange[0], brandOrange[1], brandOrange[2]);
-  doc.setFontSize(7.5);
-  doc.text('EXAMINATION SECTION • CONTROLLER OF EXAMINATIONS', startX + 25, curY + 7.8);
+  doc.setFontSize(9);
+  doc.text(`END SEM EXAM ${ticket.examSession?.toUpperCase() || 'SUMMER- 2026'}`, startX + (contentWidth / 2) + 6, curY + 8, { align: 'center' });
 
-  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(5.5);
-  doc.text('Bhoyan Rathod, Opp. IFFCO, Gandhinagar–382420, Gujarat, India • www.swarrnim.edu.in', startX + 25, curY + 11);
+  doc.setFontSize(10);
+  doc.text('HALL TICKET', startX + (contentWidth / 2) + 6, curY + 12.2, { align: 'center' });
 
-  // Far Right: Academic Session Badge
-  doc.setFillColor(239, 246, 255); // #EFF6FF
-  doc.setDrawColor(59, 130, 246); // #3B82F6
-  doc.setLineWidth(0.3);
-  doc.roundedRect(startX + contentWidth - 42, curY + 1, 40, 9.5, 0.8, 0.8, 'FD');
+  curY += 14.5;
 
-  doc.setTextColor(29, 78, 216); // #1D4ED8
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6.5);
-  doc.text(ticket.examSession || 'Summer 2026', startX + contentWidth - 22, curY + 4.8, { align: 'center' });
-
-  doc.setTextColor(15, 23, 42);
-  doc.setFontSize(5.5);
-  doc.text(`AY: ${ticket.academicYear || '2025-2026'}`, startX + contentWidth - 22, curY + 8.5, { align: 'center' });
-
-  curY += 13.5;
-
-  // Thin Header Divider
-  doc.setDrawColor(brandNavy[0], brandNavy[1], brandNavy[2]);
+  // Header bottom dividing line
+  doc.setDrawColor(0, 0, 0);
   doc.setLineWidth(0.35);
   doc.line(startX, curY, startX + contentWidth, curY);
+
   curY += 1.5;
 
-  // ─── 2. DOCUMENT TITLE BANNER ──────────────────────────────────────────
-  doc.setFillColor(brandNavy[0], brandNavy[1], brandNavy[2]);
-  doc.roundedRect(startX, curY, contentWidth, 5.5, 0.6, 0.6, 'F');
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.text('EXAMINATION HALL TICKET / ADMIT CARD', startX + (contentWidth / 2), curY + 3.8, { align: 'center' });
-
-  curY += 7;
-
-  // ─── 3. STUDENT MASTER DETAILS + PASSPORT PHOTO BOX ───────────────────
-  const photoBoxWidth = 26;
-  const photoBoxHeight = 32;
-  const infoTableWidth = contentWidth - photoBoxWidth - 3; // 194 - 26 - 3 = 165mm
+  // ─── 2. STUDENT INFORMATION & PHOTO / SIGNATURE COLUMN ──────────────
+  const photoColWidth = 32;
+  const infoTableWidth = contentWidth - photoColWidth; // 190 - 32 = 158mm
 
   const studentRows = [
-    ['Candidate Name:', ticket.studentName || '-', 'Enrollment No:', ticket.enrollmentNo || '-'],
-    ['Program & Branch:', `${ticket.programName || '-'}${ticket.departmentName ? ` (${ticket.departmentName})` : ''}`, 'Admission / GR No:', ticket.admissionNo || ticket.grNo || '-'],
-    ['Institute Name:', ticket.instituteName || 'Swarrnim Institute of Technology', 'Semester / Term:', ticket.semesterName || 'Semester 4'],
-    ['Division / Batch:', `${ticket.division || 'Div-A'} • ${ticket.batch || 'Batch 2024-28'}`, 'Gender / Category:', `${ticket.gender || 'Male'} • Regular`]
+    ['STUDENT NAME', (ticket.studentName || '—').toUpperCase()],
+    ['ENROLLMENT NO', ticket.enrollmentNo || '—'],
+    ['BRANCH NAME', (ticket.programName || '—').toUpperCase()],
+    ['SEMESTER', ticket.semesterName?.replace(/Semester\s*/i, '') || '2'],
+    ['HALL TICKET NO', ticket.hallTicketNo || '—'],
+    ['EXAM CENTRE', `${(ticket.centreName || 'SSIU MAIN CAMPUS').toUpperCase()} (CODE: ${ticket.centreCode || '01'})`],
+    ['ROOM & SEAT NO', `ROOM: ${ticket.subjects[0]?.roomNo || '101'}   |   SEAT: ${ticket.examSeatNo || '—'}`]
   ];
 
   autoTable(doc, {
@@ -143,36 +145,38 @@ export function renderSingleHallTicketPage(doc: jsPDF, ticket: HallTicketData): 
     tableWidth: infoTableWidth,
     theme: 'grid',
     styles: {
-      fontSize: 6.2,
-      cellPadding: 1.2,
-      lineColor: borderCol,
-      lineWidth: 0.18,
-      textColor: textDark,
+      fontSize: 6.8,
+      cellPadding: 1.6,
+      lineColor: [0, 0, 0],
+      lineWidth: 0.25,
+      textColor: [0, 0, 0],
       font: 'helvetica'
     },
     columnStyles: {
-      0: { cellWidth: 26, textColor: textMuted },
-      1: { cellWidth: 60, fontStyle: 'bold', textColor: brandNavy },
-      2: { cellWidth: 26, textColor: textMuted },
-      3: { cellWidth: 53, fontStyle: 'bold' }
+      0: { cellWidth: 38, fontStyle: 'bold' },
+      1: { cellWidth: infoTableWidth - 38, fontStyle: 'bold' }
     },
     body: studentRows
   });
 
-  // Render Passport Photo Container on Far Right
-  const photoX = startX + infoTableWidth + 3;
-  const photoY = curY;
+  const infoTableFinalY = (doc as any).lastAutoTable?.finalY ?? curY + 36;
+  const photoColHeight = infoTableFinalY - curY;
 
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(brandNavy[0], brandNavy[1], brandNavy[2]);
-  doc.setLineWidth(0.3);
-  doc.rect(photoX, photoY, photoBoxWidth, photoBoxHeight, 'FD');
+  // Render Right Column: Photo Box + Student Signature Box
+  const photoX = startX + infoTableWidth;
+  const photoY = curY;
+  const photoH = photoColHeight - 11;
+
+  // Photo outer box
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.25);
+  doc.rect(photoX, photoY, photoColWidth, photoH);
 
   let photoRendered = false;
   if (ticket.photoUrl && ticket.photoUrl.startsWith('data:image')) {
     try {
       const format = ticket.photoUrl.includes('image/png') ? 'PNG' : 'JPEG';
-      doc.addImage(ticket.photoUrl, format, photoX + 0.5, photoY + 0.5, photoBoxWidth - 1, photoBoxHeight - 1);
+      doc.addImage(ticket.photoUrl, format, photoX + 0.5, photoY + 0.5, photoColWidth - 1, photoH - 1);
       photoRendered = true;
     } catch {
       photoRendered = false;
@@ -180,83 +184,34 @@ export function renderSingleHallTicketPage(doc: jsPDF, ticket: HallTicketData): 
   }
 
   if (!photoRendered) {
-    // Clean Official Passport Photo Placeholder
-    doc.setDrawColor(borderCol[0], borderCol[1], borderCol[2]);
-    doc.setLineDashPattern([1.5, 1.5], 0);
-    doc.rect(photoX + 1.5, photoY + 1.5, photoBoxWidth - 3, photoBoxHeight - 3);
-    doc.setLineDashPattern([], 0);
-
-    doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+    doc.setTextColor(100, 116, 139);
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(6.5);
-    doc.text('AFFIX', photoX + (photoBoxWidth / 2), photoY + 12, { align: 'center' });
-    doc.text('PASSPORT', photoX + (photoBoxWidth / 2), photoY + 16, { align: 'center' });
-    doc.text('PHOTO', photoX + (photoBoxWidth / 2), photoY + 20, { align: 'center' });
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(4.5);
-    doc.text('(Duly Verified)', photoX + (photoBoxWidth / 2), photoY + 26, { align: 'center' });
+    doc.setFontSize(7);
+    doc.text('PHOTO', photoX + (photoColWidth / 2), photoY + (photoH / 2), { align: 'center' });
   }
 
-  curY = Math.max((doc as any).lastAutoTable?.finalY ?? curY + 30, photoY + photoBoxHeight) + 2;
+  // Signature Box directly under Photo (Matching Reference Design)
+  const signBoxY = photoY + photoH;
+  doc.rect(photoX, signBoxY, photoColWidth, 11);
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.text('SIGN', photoX + (photoColWidth / 2), signBoxY + 8.5, { align: 'center' });
 
-  // ─── 4. EXAMINATION EVENT & CENTRE DETAILS GRID ───────────────────────
-  const examDetailsRows = [
-    [
-      'Exam Event:', ticket.examName || 'End Semester Examination Summer 2026',
-      'Hall Ticket No:', ticket.hallTicketNo || 'HT-2026-001'
-    ],
-    [
-      'Exam Centre:', `${ticket.centreName || 'Swarrnim Central Examination Centre'} (Code: ${ticket.centreCode || 'SSIU-EX-01'})`,
-      'Seat / Exam No:', ticket.examSeatNo || 'SEAT-001'
-    ],
-    [
-      'Reporting Time:', ticket.reportingTime || '09:45 AM (Morning) / 01:45 PM (Afternoon)',
-      'Exam Timing:', `${ticket.examStartTime || '10:30 AM'} to ${ticket.examEndTime || '01:30 PM'}`
-    ]
-  ];
+  curY = infoTableFinalY + 3;
 
-  autoTable(doc, {
-    startY: curY,
-    margin: { left: startX },
-    tableWidth: contentWidth,
-    theme: 'grid',
-    styles: {
-      fontSize: 6.2,
-      cellPadding: 1.1,
-      lineColor: borderCol,
-      lineWidth: 0.18,
-      textColor: textDark,
-      font: 'helvetica'
-    },
-    columnStyles: {
-      0: { cellWidth: 26, textColor: textMuted },
-      1: { cellWidth: 88, fontStyle: 'bold' },
-      2: { cellWidth: 26, textColor: textMuted },
-      3: { cellWidth: 54, fontStyle: 'bold', textColor: brandOrange }
-    },
-    didParseCell: (data) => {
-      // Highlight Seat No cell
-      if (data.row.index === 1 && data.column.index === 3) {
-        data.cell.styles.fillColor = [255, 247, 237]; // #FFF7ED
-      }
-    },
-    body: examDetailsRows
-  });
+  // ─── 3. CIRCULAR UNIVERSITY EXAM SECTION SEAL STAMP ──────────────────
+  drawOfficialExamSeal(doc, startX + (contentWidth / 2), curY + 11);
+  curY += 24;
 
-  curY = ((doc as any).lastAutoTable?.finalY ?? curY + 22) + 2.5;
-
-  // ─── 5. SUBJECT / EXAMINATION SCHEDULE TABLE ─────────────────────────
-  const scheduleTableBody = (ticket.subjects || []).map((sub, idx) => [
-    String(sub.sr || idx + 1),
-    sub.subjectCode || '-',
-    sub.subjectName || 'Theory Subject',
-    sub.examDate || '-',
-    sub.examDay || '-',
+  // ─── 4. EXAMINATION SCHEDULE TABLE (REFERENCE DESIGN) ────────────────
+  const scheduleTableBody = (ticket.subjects || []).map((sub) => [
+    sub.examDate || '—',
+    sub.subjectCode || '—',
+    sub.subjectName || 'Theory Paper',
     sub.examTime || `${ticket.examStartTime} - ${ticket.examEndTime}`,
-    sub.roomNo || 'Room 101',
-    sub.seatNo || ticket.examSeatNo,
-    '' // Space for Invigilator's Initial
+    `${sub.roomNo || '101'} / ${sub.seatNo || ticket.examSeatNo}`,
+    '' // Space for Invigilator's Signature
   ]);
 
   autoTable(doc, {
@@ -264,178 +219,127 @@ export function renderSingleHallTicketPage(doc: jsPDF, ticket: HallTicketData): 
     margin: { left: startX },
     tableWidth: contentWidth,
     theme: 'grid',
-    head: [['Sr.', 'Code', 'Subject / Paper Title', 'Exam Date', 'Day', 'Timing', 'Room / Block', 'Seat No.', 'Invigilator Sign']],
+    head: [['DATE', 'SUB. CODE', 'SUBJECT / PAPER TITLE', 'TIME', 'ROOM & SEAT', 'SIGN']],
     headStyles: {
-      fillColor: [30, 58, 95], // #1E3A5F
-      textColor: [255, 255, 255],
-      fontSize: 6.2,
+      fillColor: [255, 255, 255],
+      textColor: [0, 0, 0],
+      fontSize: 6.8,
       fontStyle: 'bold',
       halign: 'center',
-      cellPadding: 1.2
+      cellPadding: 1.6,
+      lineColor: [0, 0, 0],
+      lineWidth: 0.25
     },
     columnStyles: {
-      0: { cellWidth: 8, halign: 'center' },
-      1: { cellWidth: 16, halign: 'center', fontStyle: 'bold', textColor: brandNavy },
-      2: { cellWidth: 58, halign: 'left', fontStyle: 'bold' },
-      3: { cellWidth: 18, halign: 'center' },
-      4: { cellWidth: 16, halign: 'center' },
-      5: { cellWidth: 26, halign: 'center' },
-      6: { cellWidth: 18, halign: 'center' },
-      7: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
-      8: { cellWidth: 18, halign: 'center' }
+      0: { cellWidth: 24, halign: 'center', fontStyle: 'bold' },
+      1: { cellWidth: 24, halign: 'center', fontStyle: 'bold' },
+      2: { cellWidth: 70, halign: 'left', fontStyle: 'bold' },
+      3: { cellWidth: 26, halign: 'center' },
+      4: { cellWidth: 24, halign: 'center', fontStyle: 'bold' },
+      5: { cellWidth: 22, halign: 'center' }
     },
     styles: {
-      fontSize: 6,
-      cellPadding: 1.1,
-      lineColor: borderCol,
-      lineWidth: 0.18,
-      textColor: textDark,
+      fontSize: 6.2,
+      cellPadding: 1.5,
+      lineColor: [0, 0, 0],
+      lineWidth: 0.25,
+      textColor: [0, 0, 0],
       font: 'helvetica'
     },
     body: scheduleTableBody
   });
 
-  curY = ((doc as any).lastAutoTable?.finalY ?? curY + 35) + 2.5;
+  curY = ((doc as any).lastAutoTable?.finalY ?? curY + 30) + 3;
 
-  // ─── 6. IMPORTANT INSTRUCTIONS FOR CANDIDATES ────────────────────────
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(borderCol[0], borderCol[1], borderCol[2]);
-  doc.setLineWidth(0.2);
-  doc.rect(startX, curY, contentWidth, 24, 'FD');
+  // ─── 5. IMPORTANT CANDIDATE INSTRUCTIONS ─────────────────────────────
+  const instBoxH = 22;
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.25);
+  doc.rect(startX, curY, contentWidth, instBoxH);
 
-  doc.setTextColor(brandNavy[0], brandNavy[1], brandNavy[2]);
+  doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6.2);
-  doc.text('IMPORTANT INSTRUCTIONS FOR CANDIDATES (EXAMINATION REGULATIONS):', startX + 3, curY + 3.2);
+  doc.setFontSize(6);
+  doc.text('IMPORTANT CANDIDATE INSTRUCTIONS:', startX + 2, curY + 3);
 
-  const instructions = ticket.instructions || [
-    '1. Carry this printed Hall Ticket along with your Valid University Student ID Card to every examination session.',
-    '2. Report at the examination centre at least 30 minutes prior to exam commencement. No entry allowed after 30 mins from start.',
-    '3. Mobile phones, smart watches, programmable calculators, Bluetooth devices, and unauthorized papers are strictly prohibited.',
-    '4. Verify question paper code and fill roll number, subject code & barcode accurately on answer booklet before writing.',
-    '5. Maintain silence and discipline. Any candidate found adopting unfair means (UFM) will face immediate disciplinary action.',
-    '6. Candidates are not allowed to leave the examination hall before half time duration has elapsed.'
+  const instructions = [
+    '1. Candidate must carry this Hall Ticket to the examination centre for every examination session.',
+    '2. Candidate must carry a valid University Enrollment Card / Photo ID along with this Hall Ticket.',
+    '3. Candidate must report to the allocated examination centre at least 30 minutes before the scheduled commencement.',
+    '4. Electronic gadgets, mobile phones, smart watches, and programmable calculators are strictly prohibited inside the hall.',
+    '5. Follow all instructions issued by the examination authorities and invigilators. Verify question paper code before writing.',
+    '6. Hall Ticket must be preserved until completion of the entire examination process and result declaration.'
   ];
 
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(5);
-
-  let instY = curY + 6.5;
-  instructions.slice(0, 6).forEach((inst) => {
-    doc.text(inst, startX + 3, instY);
-    instY += 2.8;
+  doc.setFontSize(4.8);
+  let instY = curY + 6.2;
+  instructions.forEach(inst => {
+    doc.text(inst, startX + 2, instY);
+    instY += 2.6;
   });
 
-  curY += 26.5;
+  curY += instBoxH + 4;
 
-  // ─── 7. SIGNATURES & OFFICIAL SEALS (3 Equal Columns) ─────────────────
-  const sigColWidth = contentWidth / 3;
+  // ─── 6. AUTHORIZATION / SIGNATURES (REFERENCE DESIGN) ────────────────
+  const sigColW = contentWidth / 3;
 
-  // Col 1: Candidate Signature
-  doc.setDrawColor(51, 65, 85);
-  doc.setLineWidth(0.2);
-  doc.line(startX + 4, curY + 11, startX + sigColWidth - 4, curY + 11);
+  // Left: Controller of Examination
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.25);
+  doc.line(startX + 2, curY + 12, startX + 48, curY + 12);
 
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+  doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(5.8);
-  doc.text(ticket.studentSignLabel || "Candidate's Signature", startX + (sigColWidth / 2), curY + 14, { align: 'center' });
+  doc.setFontSize(6.8);
+  doc.text('Controller of Examination', startX + 25, curY + 15.5, { align: 'center' });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(4.8);
-  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.text('(In presence of Invigilator on Day 1)', startX + (sigColWidth / 2), curY + 16.8, { align: 'center' });
+  doc.text('Swarrnim Startup & Innovation University', startX + 25, curY + 18.5, { align: 'center' });
 
-  // Col 2: Centre Superintendent
-  doc.line(startX + sigColWidth + 4, curY + 11, startX + (sigColWidth * 2) - 4, curY + 11);
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+  // Center: Issue Date
+  doc.setFontSize(5.2);
+  doc.text(`Date of Issue: ${ticket.generatedDate || new Date().toLocaleDateString('en-IN')}`, startX + (contentWidth / 2), curY + 15, { align: 'center' });
+  doc.text(`Ref: ${ticket.hallTicketNo || 'HT-2026-001'}`, startX + (contentWidth / 2), curY + 18, { align: 'center' });
+
+  // Right: Centre Superintendent
+  doc.line(startX + contentWidth - 48, curY + 12, startX + contentWidth - 2, curY + 12);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(5.8);
-  doc.text(ticket.superintendentLabel || 'Centre Superintendent Signature', startX + sigColWidth + (sigColWidth / 2), curY + 14, { align: 'center' });
+  doc.setFontSize(6.8);
+  doc.text('Centre Superintendent', startX + contentWidth - 25, curY + 15.5, { align: 'center' });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(4.8);
-  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.text('& Examination Centre Seal', startX + sigColWidth + (sigColWidth / 2), curY + 16.8, { align: 'center' });
+  doc.text('Signature & Examination Seal', startX + contentWidth - 25, curY + 18.5, { align: 'center' });
 
-  // Col 3: Controller of Examinations
-  doc.line(startX + (sigColWidth * 2) + 4, curY + 11, startX + contentWidth - 4, curY + 11);
-  doc.setTextColor(4, 120, 87); // Green #047857
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(5);
-  doc.text('OFFICIALLY AUTHENTICATED', startX + (sigColWidth * 2) + (sigColWidth / 2), curY + 8.8, { align: 'center' });
+  curY += 22;
 
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  doc.setFontSize(5.8);
-  doc.text(ticket.coeLabel || 'Controller of Examinations • SSIU', startX + (sigColWidth * 2) + (sigColWidth / 2), curY + 14, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(4.8);
-  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.text('Swarrnim Startup & Innovation University', startX + (sigColWidth * 2) + (sigColWidth / 2), curY + 16.8, { align: 'center' });
-
-  curY += 19;
-
-  // ─── 8. BOTTOM VERIFICATION FOOTER ───────────────────────────────────
-  doc.setDrawColor(203, 213, 225);
-  doc.setLineWidth(0.18);
-  doc.line(startX, curY, startX + contentWidth, curY);
-
-  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(4.8);
-  doc.text(
-    `* ${ticket.officialDisclaimer || 'Official Computer-Generated University Hall Ticket. Valid with University ID Card.'} *`,
-    startX + (contentWidth / 2),
-    curY + 3,
-    { align: 'center' }
-  );
-
-  doc.setFontSize(4.5);
-  doc.text(
-    `Document ID: ${ticket.hallTicketNo} • Generated on: ${ticket.generatedDate || new Date().toLocaleString('en-IN')} • SSIU Examination Portal`,
-    startX + (contentWidth / 2),
-    curY + 5.5,
-    { align: 'center' }
-  );
-
-  // ─── 9. OUTER BORDER BOX ─────────────────────────────────────────────
-  const totalBoxHeight = (curY + 7.5) - startY;
-  doc.setDrawColor(brandNavy[0], brandNavy[1], brandNavy[2]);
-  doc.setLineWidth(0.4);
+  // ─── 7. THIN PROFESSIONAL OUTER BORDER AROUND COMPLETE DOCUMENT ─────
+  const totalBoxHeight = (curY + 2) - startY;
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.35);
   doc.rect(startX, startY, contentWidth, totalBoxHeight);
 }
 
 /**
- * 3. Open Hall Ticket PDF in a New Tab with Popup-Blocker Fallback
+ * 3. Open Hall Ticket PDF in a New Tab
  */
 export async function openHallTicketPDF(ticket: HallTicketData): Promise<string> {
-  console.log('Hall ticket data:', ticket);
-  console.log('Generating Hall Ticket PDF in A4 Portrait...');
-
   try {
     const pdfBlob = await generateHallTicketPDF(ticket);
     const pdfUrl = URL.createObjectURL(pdfBlob);
-    console.log('Hall Ticket PDF URL:', pdfUrl);
 
-    // Open in new browser tab
     const newTab = window.open(pdfUrl, '_blank');
-
     if (!newTab || newTab.closed || typeof newTab.closed === 'undefined') {
-      // Fallback 1: programmatic anchor click
       const link = document.createElement('a');
       link.href = pdfUrl;
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
-      // Fallback 2: show toast
-      showHallTicketPopupToast(pdfUrl, ticket.hallTicketNo, ticket.studentName);
     }
-
     return pdfUrl;
   } catch (error) {
     console.error('Hall Ticket PDF generation failed:', error);
-    showHallTicketErrorToast(error);
     throw error;
   }
 }
@@ -458,7 +362,6 @@ export async function downloadHallTicketPDF(ticket: HallTicketData, filename?: s
     URL.revokeObjectURL(pdfUrl);
   } catch (error) {
     console.error('Download Hall Ticket PDF failed:', error);
-    showHallTicketErrorToast(error);
   }
 }
 
@@ -480,77 +383,7 @@ export async function downloadBulkHallTicketsPDF(tickets: HallTicketData[], file
     URL.revokeObjectURL(pdfUrl);
   } catch (error) {
     console.error('Download Bulk Hall Tickets failed:', error);
-    showHallTicketErrorToast(error);
   }
-}
-
-/**
- * Toast UI Helper if popup blocker triggered
- */
-function showHallTicketPopupToast(pdfUrl: string, hallTicketNo: string, studentName: string): void {
-  const toastId = 'ssiu-hall-ticket-toast';
-  const existing = document.getElementById(toastId);
-  if (existing) existing.remove();
-
-  const toast = document.createElement('div');
-  toast.id = toastId;
-  toast.style.cssText = `
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    background: #0F2C59;
-    color: #FFFFFF;
-    padding: 12px 18px;
-    border-radius: 8px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-    z-index: 999999;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-family: system-ui, -apple-system, sans-serif;
-    font-size: 13px;
-    border: 1.5px solid #F37023;
-  `;
-
-  toast.innerHTML = `
-    <span>🎫 Hall Ticket <strong>${hallTicketNo}</strong> (${studentName}) generated.</span>
-    <a href="${pdfUrl}" target="_blank" style="color: #FDBA74; text-decoration: underline; font-weight: bold;">Open PDF</a>
-    <button style="background: none; border: none; color: #94A3B8; cursor: pointer; font-size: 16px; margin-left: 8px;">✕</button>
-  `;
-
-  document.body.appendChild(toast);
-  const closeBtn = toast.querySelector('button');
-  if (closeBtn) closeBtn.onclick = () => toast.remove();
-  setTimeout(() => toast.remove(), 10000);
-}
-
-/**
- * Toast UI Helper on error
- */
-function showHallTicketErrorToast(error: any): void {
-  const toastId = 'ssiu-ht-error-toast';
-  const existing = document.getElementById(toastId);
-  if (existing) existing.remove();
-
-  const toast = document.createElement('div');
-  toast.id = toastId;
-  toast.style.cssText = `
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    background: #7F1D1D;
-    color: #FFFFFF;
-    padding: 12px 18px;
-    border-radius: 8px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-    z-index: 999999;
-    font-family: system-ui, -apple-system, sans-serif;
-    font-size: 13px;
-    border: 1.5px solid #EF4444;
-  `;
-  toast.innerHTML = `⚠️ <strong>Error generating Hall Ticket PDF:</strong> ${error?.message || 'Unknown error'}`;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 6000);
 }
 
 export class HallTicketPdfService {

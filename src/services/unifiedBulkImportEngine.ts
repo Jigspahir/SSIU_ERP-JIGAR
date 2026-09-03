@@ -555,6 +555,128 @@ const FacultyHandler: IModuleImportHandler = {
   }
 };
 
+// ─── MODULE HANDLER 2B: NON-TEACHING STAFF MASTER ────────────────────────────
+const StaffHandler: IModuleImportHandler = {
+  type: 'STAFF',
+  name: 'Non-Teaching Staff Master',
+  fileName: 'Staff_Import_Template.xlsx',
+  description: 'Bulk register administrative, laboratory, and operational staff profiles.',
+  headers: [
+    'Employee Code', 'Staff Name', 'Email', 'Mobile Number', 'Department Code',
+    'Designation', 'Institute Code', 'Employment Type', 'Joining Date (YYYY-MM-DD)', 'Status'
+  ],
+  requiredHeaders: ['Employee Code', 'Staff Name', 'Email', 'Department Code'],
+  sampleRows: [
+    ['STF-1001', 'Ramesh Patel', 'ramesh.patel@swarrnim.edu.in', '9898011223', 'Office Superintendent', 'INST-ENG', 'DEP-ADMIN', 'FULL_TIME', '2023-04-01', 'ACTIVE'],
+    ['STF-1002', 'Bhavna Dave', 'bhavna.dave@swarrnim.edu.in', '9898022334', 'Senior Lab Technician', 'INST-ENG', 'DEP-CSE', 'FULL_TIME', '2023-06-15', 'ACTIVE']
+  ],
+  instructions: [
+    { field: 'Employee Code', required: 'YES', description: 'Unique staff identifier (Official ERP Login ID)', example: 'STF-1001' },
+    { field: 'Staff Name', required: 'YES', description: 'Full legal name', example: 'Ramesh Patel' },
+    { field: 'Email', required: 'YES', description: 'Official email address', example: 'ramesh.patel@swarrnim.edu.in' },
+    { field: 'Department Code', required: 'YES', description: 'Valid Department Code', example: 'DEP-ADMIN' }
+  ],
+
+  validateRow(raw, seenKeys, mode, user, role) {
+    const employeeCode = getVal(raw, ['Employee Code', 'employeeCode', 'EmployeeID', 'employeeId', 'Emp Code']);
+    const name = getVal(raw, ['Staff Name', 'name', 'Name', 'FullName']);
+    const email = getVal(raw, ['Email', 'email', 'Email Address']);
+    const phone = getVal(raw, ['Mobile Number', 'mobile', 'Mobile', 'Phone', 'phone']);
+    const instituteCode = getVal(raw, ['Institute Code', 'instituteCode', 'Institute']);
+    const departmentCode = getVal(raw, ['Department Code', 'departmentCode', 'Department']);
+    const designation = getVal(raw, ['Designation', 'designation']) || 'Staff';
+    const employmentType = (getVal(raw, ['Employment Type', 'employmentType']) || 'FULL_TIME').toUpperCase();
+    const joiningDate = getVal(raw, ['Joining Date (YYYY-MM-DD)', 'joiningDate']) || '2023-01-01';
+    const status = (getVal(raw, ['Status', 'status']) || 'ACTIVE').toUpperCase();
+
+    if (!employeeCode) return { status: 'INVALID', errorField: 'Employee Code', errorMessage: 'Employee Code is required.' };
+    if (!name) return { status: 'INVALID', errorField: 'Staff Name', errorMessage: 'Staff Name is required.' };
+    if (!email || !email.includes('@')) return { status: 'INVALID', errorField: 'Email', errorMessage: 'Valid Email is required.' };
+    if (!departmentCode) return { status: 'INVALID', errorField: 'Department Code', errorMessage: 'Department Code is required.' };
+
+    if (seenKeys.has(employeeCode)) {
+      return { status: 'DUPLICATE', errorField: 'Employee Code', errorMessage: `Duplicate Employee Code "${employeeCode}" in file.` };
+    }
+    seenKeys.add(employeeCode);
+
+    const departments = db.getDepartments();
+    const department = departments.find(d => d.code.toUpperCase() === departmentCode.toUpperCase() || d.id === departmentCode);
+    if (!department) {
+      return { status: 'INVALID', errorField: 'Department Code', errorMessage: `Department "${departmentCode}" not found in ERP.` };
+    }
+
+    const institutes = db.getInstitutes();
+    const institute = institutes.find(i => i.code.toUpperCase() === instituteCode.toUpperCase() || i.id === instituteCode) || institutes[0];
+
+    const users = db.getUsers();
+    const existing = users.find(u => u.username === employeeCode || u.employeeId === employeeCode || u.email === email);
+
+    if (existing && mode === 'INSERT_ONLY') {
+      return {
+        status: 'DUPLICATE',
+        errorField: 'Employee Code',
+        errorMessage: `Staff member "${employeeCode}" already exists in ERP.`,
+        isExisting: true,
+        targetId: existing.id
+      };
+    }
+
+    return {
+      status: 'VALID',
+      isExisting: !!existing,
+      targetId: existing?.id,
+      parsedData: {
+        employeeCode,
+        name,
+        email,
+        phone: phone || '9876543210',
+        designation,
+        employmentType,
+        instituteId: institute?.id || 'inst-1',
+        departmentId: department.id,
+        joiningDate,
+        status: ['ACTIVE', 'ON_LEAVE', 'INACTIVE'].includes(status) ? status : 'ACTIVE'
+      }
+    };
+  },
+
+  commitRecord(data, mode, user, role) {
+    const users = db.getUsers();
+    const existingIndex = users.findIndex(u => u.username === data.employeeCode || u.employeeId === data.employeeCode);
+
+    if (existingIndex >= 0 && (mode === 'UPSERT' || mode === 'UPDATE_ONLY')) {
+      const existing = users[existingIndex];
+      users[existingIndex] = {
+        ...existing,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        designation: data.designation,
+        instituteId: data.instituteId,
+        departmentId: data.departmentId
+      };
+      return { targetId: existing.id, action: 'UPDATED' };
+    } else {
+      const newId = `staff-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
+      users.push({
+        id: newId,
+        name: data.name,
+        email: data.email,
+        username: data.employeeCode,
+        employeeId: data.employeeCode,
+        role: 'STAFF',
+        phone: data.phone,
+        designation: data.designation,
+        instituteId: data.instituteId,
+        departmentId: data.departmentId,
+        status: 'ACTIVE',
+        createdAt: new Date().toISOString()
+      });
+      return { targetId: newId, action: 'CREATED' };
+    }
+  }
+};
+
 // ─── MODULE HANDLER 3: DEPARTMENT MASTER ─────────────────────────────────────
 const DepartmentHandler: IModuleImportHandler = {
   type: 'DEPARTMENT',
@@ -1533,6 +1655,7 @@ export const HANDLERS_REGISTRY: Record<string, IModuleImportHandler> = {
   INSTITUTE: InstituteHandler,
   STUDENT: StudentHandler,
   FACULTY: FacultyHandler,
+  STAFF: StaffHandler,
   DEPARTMENT: DepartmentHandler,
   PROGRAM: ProgramHandler,
   ACADEMIC_YEAR: AcademicYearHandler,

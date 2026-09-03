@@ -33,11 +33,15 @@ import { amountToWords, formatIndianNumber, formatIndianCurrency } from '../../u
 
 export const DOCUMENT_CATEGORIES = [
   'Quotation',
+  'Quotation 1',
+  'Quotation 2',
+  'Quotation 3',
+  'Bill',
   'Proposal',
   'Estimate',
-  'Bill',
-  'Approval Letter',
   'Comparative Statement',
+  'Supporting Evidence',
+  'Approval Letter',
   'Sanction Letter',
   'Purchase Document',
   'Official Letter',
@@ -244,6 +248,8 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
   // Preview Scale State & Document Print / PDF Handlers
   const [previewScale, setPreviewScale] = useState<number>(100);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [previewAttachmentModal, setPreviewAttachmentModal] = useState<NoteSheetAttachmentItem | null>(null);
+  const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [modalPreviewPdfUrl, setModalPreviewPdfUrl] = useState<string | null>(null);
   const [draftPreviewPdfUrl, setDraftPreviewPdfUrl] = useState<string | null>(null);
   const [isLoadingPdfPreview, setIsLoadingPdfPreview] = useState(false);
@@ -560,7 +566,66 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
     setFormItems(prev => prev.filter(i => i.id !== id));
   };
 
-  // Add attachment before submission
+  // Helper: Format raw file size in bytes to clean readable string
+  const formatFileSize = (bytes: number): string => {
+    if (!bytes || bytes <= 0) return '0 KB';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  // Dynamic Multiple Files Upload Handler (PDF, JPG, JPEG, PNG, DOC, XLS)
+  const handleMultiFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, forcedCategory?: string) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploadingAttachments(true);
+    const newItems: NoteSheetAttachmentItem[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const extension = (file.name.split('.').pop() || 'PDF').toUpperCase();
+      const categoryToUse = forcedCategory || newDocCategory || 'Supporting Evidence';
+
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        newItems.push({
+          id: `att-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 6)}`,
+          fileName: file.name,
+          fileType: extension,
+          fileSize: file.size,
+          fileSizeFormatted: formatFileSize(file.size),
+          fileUrl: dataUrl,
+          documentCategory: categoryToUse,
+          version: 1,
+          status: 'ACTIVE',
+          uploadedByUserId: user?.id,
+          uploadedByName: user?.name,
+          uploadedByRole: user?.role,
+          createdAt: new Date().toISOString()
+        });
+      } catch (readErr) {
+        console.warn('Failed reading file:', file.name, readErr);
+      }
+    }
+
+    if (newItems.length > 0) {
+      setFormAttachments(prev => [...prev, ...newItems]);
+      showFeedback(`Successfully attached ${newItems.length} file${newItems.length > 1 ? 's' : ''}.`);
+    }
+
+    // Reset input value so same files can be re-selected if needed
+    e.target.value = '';
+    setIsUploadingAttachments(false);
+  };
+
+  // Add attachment before submission (Manual URL or Title)
   const handleAddFormAttachment = () => {
     if (!newDocName.trim()) {
       showFeedback('Please provide a Document Name', true);
@@ -1097,6 +1162,117 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
       {/* ─── TAB 1: DASHBOARD & 13 KPI VIEWS ─────────────────────────────────── */}
       {activeTab === 'DASHBOARD' && (
         <div className="space-y-6">
+          {/* Smart Hero Highlight Summary Row (Role-Scoped Database Counts) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <button
+              type="button"
+              onClick={() => {
+                setDashboardStatusFilter(canAccessPendingWithMe ? 'PENDING_WITH_ME' : 'ALL');
+                setActiveTab('REGISTER');
+              }}
+              className="p-5 rounded-2xl border-2 border-amber-400/80 dark:border-amber-600/80 bg-linear-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 text-left shadow-sm hover:shadow-md transition relative overflow-hidden group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                  {canAccessPendingWithMe ? 'Pending Action With Me' : 'Total Pending Notesheets'}
+                </span>
+                <span className="p-2 rounded-xl bg-amber-200/60 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200">
+                  <Clock className="w-5 h-5 animate-pulse" />
+                </span>
+              </div>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="text-3xl font-black text-amber-950 dark:text-amber-100 font-mono">
+                  {canAccessPendingWithMe ? kpiStats.pendingWithMe : (kpiStats.submitted + kpiStats.forwarded)}
+                </span>
+                <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">Awaiting your review</span>
+              </div>
+              <div className="mt-2 text-[11px] text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                Click to view pending queue →
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setDashboardStatusFilter('APPROVED');
+                setActiveTab('REGISTER');
+              }}
+              className="p-5 rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-linear-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/20 text-left shadow-sm hover:shadow-md transition group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+                  Total Approved
+                </span>
+                <span className="p-2 rounded-xl bg-emerald-200/60 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200">
+                  <CheckCircle2 className="w-5 h-5" />
+                </span>
+              </div>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="text-3xl font-black text-emerald-950 dark:text-emerald-100 font-mono">
+                  {kpiStats.approved}
+                </span>
+                <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Sanctioned</span>
+              </div>
+              <div className="mt-2 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                View sanctioned notesheets →
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setDashboardStatusFilter('OVERDUE');
+                setActiveTab('REGISTER');
+              }}
+              className="p-5 rounded-2xl border border-rose-200 dark:border-rose-800 bg-linear-to-br from-rose-50 to-red-50 dark:from-rose-950/30 dark:to-red-950/20 text-left shadow-sm hover:shadow-md transition group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-rose-800 dark:text-rose-300">
+                  Overdue / Escalated (&gt;3 Days)
+                </span>
+                <span className="p-2 rounded-xl bg-rose-200/60 dark:bg-rose-900/60 text-rose-800 dark:text-rose-200">
+                  <AlertCircle className="w-5 h-5" />
+                </span>
+              </div>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="text-3xl font-black text-rose-950 dark:text-rose-100 font-mono">
+                  {kpiStats.overdue}
+                </span>
+                <span className="text-xs font-semibold text-rose-700 dark:text-rose-300">Auto Reminders active</span>
+              </div>
+              <div className="mt-2 text-[11px] text-rose-600 dark:text-rose-400 font-medium flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                Review overdue items →
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setDashboardStatusFilter('REJECTED');
+                setActiveTab('REGISTER');
+              }}
+              className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-linear-to-br from-slate-50 to-gray-50 dark:from-slate-800/40 dark:to-gray-800/30 text-left shadow-sm hover:shadow-md transition group"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  Rejected / Returned
+                </span>
+                <span className="p-2 rounded-xl bg-slate-200/60 dark:bg-slate-700 text-slate-700 dark:text-slate-200">
+                  <XCircle className="w-5 h-5" />
+                </span>
+              </div>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="text-3xl font-black text-slate-900 dark:text-white font-mono">
+                  {kpiStats.rejected + kpiStats.returned}
+                </span>
+                <span className="text-xs font-semibold text-slate-500">Needs rectification</span>
+              </div>
+              <div className="mt-2 text-[11px] text-slate-500 font-medium flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                View rejected records →
+              </div>
+            </button>
+          </div>
+
           {/* 13 KPI Cards Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
             {[
@@ -1543,16 +1719,88 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
             )}
           </div>
 
-          {/* ─── SUPPORTING DOCUMENTS SECTION ─────────────────────────────────── */}
-          <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 space-y-3.5">
-            <div className="flex items-center justify-between">
+          {/* ─── SUPPORTING DOCUMENTS & QUOTATIONS SECTION ──────────────────────── */}
+          <div className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2.5">
                 <Paperclip className="w-4 h-4 text-blue-600" />
-                <span className="text-base font-bold text-slate-900 dark:text-white">Supporting Documents &amp; Quotations</span>
+                <span className="text-base font-bold text-slate-900 dark:text-white">Dynamic Attachments, Bills &amp; Quotations</span>
               </div>
-              <span className="text-sm text-slate-500">{formAttachments.length} attached</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300">
+                  {formAttachments.length} Attached
+                </span>
+              </div>
             </div>
 
+            {/* Quick Upload Buttons for Procurement / Quotations 1-3 & Bill */}
+            <div className="p-3.5 rounded-xl border border-blue-100 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20 space-y-2.5">
+              <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
+                <span className="font-bold text-blue-950 dark:text-blue-200 uppercase tracking-wider flex items-center gap-1.5">
+                  <FilePlus className="w-3.5 h-3.5 text-blue-600" /> Quick Add Quotations &amp; Bills:
+                </span>
+                <span className="text-slate-500 italic">Upload PDF, JPG, PNG or DOCX (Max 25MB each)</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <label className="cursor-pointer px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-800 hover:bg-blue-50 text-blue-700 dark:text-blue-300 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>+ Quotation 1</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                    className="hidden"
+                    onChange={e => handleMultiFileUpload(e, 'Quotation 1')}
+                  />
+                </label>
+                <label className="cursor-pointer px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-800 hover:bg-blue-50 text-blue-700 dark:text-blue-300 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>+ Quotation 2</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                    className="hidden"
+                    onChange={e => handleMultiFileUpload(e, 'Quotation 2')}
+                  />
+                </label>
+                <label className="cursor-pointer px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-800 hover:bg-blue-50 text-blue-700 dark:text-blue-300 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>+ Quotation 3</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                    className="hidden"
+                    onChange={e => handleMultiFileUpload(e, 'Quotation 3')}
+                  />
+                </label>
+                <label className="cursor-pointer px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 text-emerald-700 dark:text-emerald-300 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs">
+                  <Receipt className="w-3.5 h-3.5" />
+                  <span>+ Vendor Bill / Invoice</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                    className="hidden"
+                    onChange={e => handleMultiFileUpload(e, 'Bill')}
+                  />
+                </label>
+                <label className="cursor-pointer px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm ml-auto">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload Multiple Files</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+                    className="hidden"
+                    onChange={e => handleMultiFileUpload(e)}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Custom Manual File / Cloud Link Entry */}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <input
                 type="text"
@@ -1580,30 +1828,57 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
               <button
                 type="button"
                 onClick={handleAddFormAttachment}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold flex items-center justify-center gap-2 transition shadow-sm"
+                className="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold flex items-center justify-center gap-2 transition shadow-sm"
               >
-                <Upload className="w-4 h-4" />
-                Attach File
+                <Plus className="w-4 h-4" />
+                Add Entry
               </button>
             </div>
 
+            {/* List of Form Attachments with Category, Size, Preview & Remove */}
             {formAttachments.length > 0 && (
-              <div className="flex flex-wrap gap-2.5 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 pt-2">
                 {formAttachments.map(att => (
                   <div
                     key={att.id}
-                    className="px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm flex items-center gap-2.5 shadow-xs"
+                    className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm flex items-center justify-between gap-2 shadow-xs"
                   >
-                    <Paperclip className="w-4 h-4 text-blue-500" />
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">{att.fileName}</span>
-                    <Badge variant="navy" className="text-xs font-bold px-2 py-0.5">{att.documentCategory}</Badge>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveFormAttachment(att.id)}
-                      className="text-slate-400 hover:text-rose-500"
-                    >
-                      <XSquare className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Paperclip className="w-4 h-4 text-blue-500 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-semibold text-slate-800 dark:text-slate-200 truncate text-xs sm:text-sm">
+                          {att.fileName}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 rounded">
+                            {att.documentCategory || 'Supporting Doc'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {att.fileSizeFormatted || formatFileSize(att.fileSize || 0)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {att.fileUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewAttachmentModal(att)}
+                          className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 transition"
+                          title="Preview Document"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFormAttachment(att.id)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                        title="Remove Attachment"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -2352,16 +2627,31 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
                             <span className="px-2 py-0.5 rounded text-xs bg-slate-200 text-slate-500 font-bold">OLD</span>
                           )}
                         </div>
-                        <div className="text-xs text-slate-400 mt-0.5">{att.documentCategory} • Uploaded by {att.uploadedByName || 'User'}</div>
+                        <div className="text-xs text-slate-400 mt-0.5">
+                          <span className="font-semibold text-blue-600 dark:text-blue-400">{att.documentCategory}</span>
+                          {att.fileSizeFormatted ? ` • ${att.fileSizeFormatted}` : ''}
+                          {att.uploadedByName ? ` • Uploaded by ${att.uploadedByName}` : ''}
+                        </div>
                       </div>
-                      <a
-                        href={att.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 text-sm font-bold border border-slate-200 dark:border-slate-600 hover:bg-slate-50"
-                      >
-                        View
-                      </a>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewAttachmentModal(att)}
+                          className="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 text-xs font-bold border border-slate-200 dark:border-slate-600 hover:bg-slate-50 flex items-center gap-1"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Preview
+                        </button>
+                        <a
+                          href={att.fileUrl}
+                          download={att.fileName}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 rounded-xl bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 transition"
+                          title="Download Document"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -2382,143 +2672,190 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
                 )}
               </div>
 
-              {/* Stepper Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                {(() => {
-                  const chainSteps = ['FACULTY', ...(selectedNote.organogramPath || ['HOD', 'HOI', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'VICE_PRESIDENT'])];
-                  const movements = selectedNote.movements || [];
+              {/* Amazon-Style Visual Workflow Movement Tracker */}
+              <div className="space-y-4">
+                {/* Stepper Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                  {(() => {
+                    const chainSteps = ['FACULTY', ...(selectedNote.organogramPath || ['HOD', 'HOI', 'DEPUTY_REGISTRAR', 'REGISTRAR', 'VICE_PRESIDENT'])];
+                    const movements = selectedNote.movements || [];
 
-                  return chainSteps.map((stepRole, idx) => {
-                    let isCompleted = false;
-                    let isCurrent = false;
-                    let stepTitle = '';
-                    let approverName = '';
-                    let approvalTimestamp = '';
-                    let approvalId = '';
+                    // Calculate pending days for current holder
+                    const calculatePendingDuration = () => {
+                      const nowTime = Date.now();
+                      let enteredTime = selectedNote.officerPendingSince ? new Date(selectedNote.officerPendingSince).getTime() : null;
+                      if (!enteredTime && movements.length > 0) {
+                        const lastMvt = [...movements].reverse().find(m => m.toOffice === selectedNote.currentOffice || ['SUBMIT', 'FORWARD', 'RETURN'].includes(m.action));
+                        if (lastMvt) {
+                          const parsed = new Date(lastMvt.timestamp || lastMvt.date || '').getTime();
+                          if (!isNaN(parsed)) enteredTime = parsed;
+                        }
+                      }
+                      if (!enteredTime) enteredTime = new Date(selectedNote.createdAt || selectedNote.date).getTime();
+                      const days = Math.floor((nowTime - (enteredTime || nowTime)) / 86400000);
+                      return Math.max(0, days);
+                    };
 
-                    if (stepRole === 'FACULTY') {
-                      stepTitle = '1. Faculty (Creator)';
-                      isCompleted = true;
-                      approverName = selectedNote.creatorName;
-                      approvalTimestamp = selectedNote.date;
-                    } else if (stepRole === 'HOD') {
-                      stepTitle = '2. HOD';
-                      const m = movements.find(mvt => (mvt.fromUserRole === 'HOD' || (mvt.fromUser && mvt.fromUser.includes('HOD'))) && (mvt.action === 'APPROVE' || mvt.action === 'FORWARD'));
-                      if (m) {
-                        isCompleted = true;
-                        approverName = m.actorName || m.fromUser.split(' (')[0];
-                        approvalTimestamp = m.timestamp || `${m.date} ${m.time}`;
-                        approvalId = m.approvalId || '';
-                      } else if (selectedNote.status === 'PENDING_HOD' || selectedNote.currentOffice === 'HOD') {
-                        isCurrent = true;
-                        approverName = selectedNote.currentAssigneeName || 'Head of Department';
-                      }
-                    } else if (stepRole === 'HOI' || stepRole === 'PRINCIPAL') {
-                      stepTitle = '3. HOI / Principal';
-                      const m = movements.find(mvt => (mvt.fromUserRole === 'PRINCIPAL' || (mvt.fromUser && (mvt.fromUser.includes('PRINCIPAL') || mvt.fromUser.includes('HOI')))) && (mvt.action === 'APPROVE' || mvt.action === 'FORWARD'));
-                      if (m) {
-                        isCompleted = true;
-                        approverName = m.actorName || m.fromUser.split(' (')[0];
-                        approvalTimestamp = m.timestamp || `${m.date} ${m.time}`;
-                        approvalId = m.approvalId || '';
-                      } else if (selectedNote.status === 'PENDING_HOI' || selectedNote.currentOffice === 'HOI' || selectedNote.currentOffice === 'PRINCIPAL') {
-                        isCurrent = true;
-                        approverName = selectedNote.currentAssigneeName || 'Principal / HOI';
-                      }
-                    } else if (stepRole === 'DEPUTY_REGISTRAR') {
-                      stepTitle = '4. Deputy Registrar';
-                      const m = movements.find(mvt => (mvt.fromUserRole === 'DEPUTY_REGISTRAR' || (mvt.fromUser && mvt.fromUser.includes('DEPUTY_REGISTRAR'))) && (mvt.action === 'APPROVE' || mvt.action === 'FORWARD'));
-                      if (m) {
-                        isCompleted = true;
-                        approverName = m.actorName || m.fromUser.split(' (')[0];
-                        approvalTimestamp = m.timestamp || `${m.date} ${m.time}`;
-                        approvalId = m.approvalId || '';
-                      } else if (selectedNote.status === 'PENDING_DEPUTY_REGISTRAR' || selectedNote.currentOffice === 'DEPUTY_REGISTRAR') {
-                        isCurrent = true;
-                        approverName = selectedNote.currentAssigneeName || 'Deputy Registrar';
-                      }
-                    } else if (stepRole === 'REGISTRAR') {
-                      stepTitle = '5. Registrar';
-                      const m = movements.find(mvt => (mvt.fromUserRole === 'REGISTRAR' || (mvt.fromUser && mvt.fromUser.includes('REGISTRAR'))) && (mvt.action === 'APPROVE' || mvt.action === 'FORWARD'));
-                      if (m) {
-                        isCompleted = true;
-                        approverName = m.actorName || m.fromUser.split(' (')[0];
-                        approvalTimestamp = m.timestamp || `${m.date} ${m.time}`;
-                        approvalId = m.approvalId || '';
-                      } else if (selectedNote.status === 'PENDING_REGISTRAR' || selectedNote.currentOffice === 'REGISTRAR') {
-                        isCurrent = true;
-                        approverName = selectedNote.currentAssigneeName || 'Registrar';
-                      }
-                    } else if (stepRole === 'VICE_PRESIDENT') {
-                      stepTitle = '6. Vice President (Final Sanction)';
-                      if (selectedNote.status === 'APPROVED' || selectedNote.decision === 'APPROVED') {
-                        isCompleted = true;
-                        approverName = selectedNote.approvedByName || 'Vice President';
-                        approvalTimestamp = selectedNote.approvedAt ? new Date(selectedNote.approvedAt).toLocaleString() : selectedNote.date;
-                        approvalId = selectedNote.finalApprovalId || '';
-                      } else if (selectedNote.status === 'PENDING_VICE_PRESIDENT' || selectedNote.currentOffice === 'VICE_PRESIDENT') {
-                        isCurrent = true;
-                        approverName = selectedNote.currentAssigneeName || 'Vice President';
-                      }
-                    } else {
-                      stepTitle = stepRole;
-                      const m = movements.find(mvt => (mvt.fromUserRole === stepRole || (mvt.fromUser && mvt.fromUser.includes(stepRole))) && (mvt.action === 'APPROVE' || mvt.action === 'FORWARD'));
-                      if (m) {
-                        isCompleted = true;
-                        approverName = m.actorName || m.fromUser.split(' (')[0];
-                        approvalTimestamp = m.timestamp || `${m.date} ${m.time}`;
-                      } else if (selectedNote.currentOffice === stepRole) {
-                        isCurrent = true;
-                        approverName = selectedNote.currentAssigneeName || stepRole;
-                      }
-                    }
+                    const pendingDaysCount = calculatePendingDuration();
 
-                    return (
-                      <div
-                        key={idx}
-                        className={`p-3.5 rounded-xl border flex flex-col justify-between transition ${
-                          isCompleted
-                            ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800/60 text-emerald-950 dark:text-emerald-200'
-                            : isCurrent
-                            ? 'bg-amber-50/70 dark:bg-amber-950/20 border-amber-300 dark:border-amber-800/60 text-amber-950 dark:text-amber-200 ring-2 ring-amber-400/40'
-                            : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500'
-                        }`}
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-xs font-bold">
-                            <span className="uppercase tracking-wider truncate">{stepTitle}</span>
-                            {isCompleted ? (
-                              <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold shrink-0 ml-1">
-                                <CheckCircle2 className="w-3.5 h-3.5" /> Done
-                              </span>
-                            ) : isCurrent ? (
-                              <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold animate-pulse shrink-0 ml-1">
-                                <Clock className="w-3.5 h-3.5" /> Pending
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 text-[11px] shrink-0 ml-1">○ Upcoming</span>
+                    return chainSteps.map((stepRole, idx) => {
+                      let isCompleted = false;
+                      let isCurrent = false;
+                      let stepTitle = '';
+                      let approverName = '';
+                      let approvalTimestamp = '';
+                      let approvalId = '';
+
+                      if (stepRole === 'FACULTY') {
+                        stepTitle = '1. Faculty (Creator)';
+                        isCompleted = true;
+                        approverName = selectedNote.creatorName;
+                        approvalTimestamp = selectedNote.date;
+                      } else if (stepRole === 'HOD') {
+                        stepTitle = '2. HOD Endorsement';
+                        const m = movements.find(mvt => (mvt.fromUserRole === 'HOD' || (mvt.fromUser && mvt.fromUser.includes('HOD'))) && (mvt.action === 'APPROVE' || mvt.action === 'FORWARD'));
+                        if (m) {
+                          isCompleted = true;
+                          approverName = m.actorName || m.fromUser.split(' (')[0];
+                          approvalTimestamp = m.timestamp || `${m.date} ${m.time}`;
+                          approvalId = m.approvalId || '';
+                        } else if (selectedNote.status === 'PENDING_HOD' || selectedNote.currentOffice === 'HOD') {
+                          isCurrent = true;
+                          approverName = selectedNote.currentAssigneeName || 'Head of Department';
+                        }
+                      } else if (stepRole === 'HOI' || stepRole === 'PRINCIPAL') {
+                        stepTitle = '3. HOI / Principal';
+                        const m = movements.find(mvt => (mvt.fromUserRole === 'PRINCIPAL' || (mvt.fromUser && (mvt.fromUser.includes('PRINCIPAL') || mvt.fromUser.includes('HOI')))) && (mvt.action === 'APPROVE' || mvt.action === 'FORWARD'));
+                        if (m) {
+                          isCompleted = true;
+                          approverName = m.actorName || m.fromUser.split(' (')[0];
+                          approvalTimestamp = m.timestamp || `${m.date} ${m.time}`;
+                          approvalId = m.approvalId || '';
+                        } else if (selectedNote.status === 'PENDING_HOI' || selectedNote.currentOffice === 'HOI' || selectedNote.currentOffice === 'PRINCIPAL') {
+                          isCurrent = true;
+                          approverName = selectedNote.currentAssigneeName || 'Principal / HOI';
+                        }
+                      } else if (stepRole === 'DEPUTY_REGISTRAR') {
+                        stepTitle = '4. Deputy Registrar';
+                        const m = movements.find(mvt => (mvt.fromUserRole === 'DEPUTY_REGISTRAR' || (mvt.fromUser && mvt.fromUser.includes('DEPUTY_REGISTRAR'))) && (mvt.action === 'APPROVE' || mvt.action === 'FORWARD'));
+                        if (m) {
+                          isCompleted = true;
+                          approverName = m.actorName || m.fromUser.split(' (')[0];
+                          approvalTimestamp = m.timestamp || `${m.date} ${m.time}`;
+                          approvalId = m.approvalId || '';
+                        } else if (selectedNote.status === 'PENDING_DEPUTY_REGISTRAR' || selectedNote.currentOffice === 'DEPUTY_REGISTRAR') {
+                          isCurrent = true;
+                          approverName = selectedNote.currentAssigneeName || 'Deputy Registrar';
+                        }
+                      } else if (stepRole === 'REGISTRAR') {
+                        stepTitle = '5. Registrar Review';
+                        const m = movements.find(mvt => (mvt.fromUserRole === 'REGISTRAR' || (mvt.fromUser && mvt.fromUser.includes('REGISTRAR'))) && (mvt.action === 'APPROVE' || mvt.action === 'FORWARD'));
+                        if (m) {
+                          isCompleted = true;
+                          approverName = m.actorName || m.fromUser.split(' (')[0];
+                          approvalTimestamp = m.timestamp || `${m.date} ${m.time}`;
+                          approvalId = m.approvalId || '';
+                        } else if (selectedNote.status === 'PENDING_REGISTRAR' || selectedNote.currentOffice === 'REGISTRAR') {
+                          isCurrent = true;
+                          approverName = selectedNote.currentAssigneeName || 'Registrar';
+                        }
+                      } else if (stepRole === 'VICE_PRESIDENT') {
+                        stepTitle = '6. Vice President (Sanction)';
+                        if (selectedNote.status === 'APPROVED' || selectedNote.decision === 'APPROVED') {
+                          isCompleted = true;
+                          approverName = selectedNote.approvedByName || 'Vice President';
+                          approvalTimestamp = selectedNote.approvedAt ? new Date(selectedNote.approvedAt).toLocaleString() : selectedNote.date;
+                          approvalId = selectedNote.finalApprovalId || '';
+                        } else if (selectedNote.status === 'PENDING_VICE_PRESIDENT' || selectedNote.currentOffice === 'VICE_PRESIDENT') {
+                          isCurrent = true;
+                          approverName = selectedNote.currentAssigneeName || 'Vice President';
+                        }
+                      } else {
+                        stepTitle = stepRole;
+                        const m = movements.find(mvt => (mvt.fromUserRole === stepRole || (mvt.fromUser && mvt.fromUser.includes(stepRole))) && (mvt.action === 'APPROVE' || mvt.action === 'FORWARD'));
+                        if (m) {
+                          isCompleted = true;
+                          approverName = m.actorName || m.fromUser.split(' (')[0];
+                          approvalTimestamp = m.timestamp || `${m.date} ${m.time}`;
+                        } else if (selectedNote.currentOffice === stepRole) {
+                          isCurrent = true;
+                          approverName = selectedNote.currentAssigneeName || stepRole;
+                        }
+                      }
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`p-3.5 rounded-xl border flex flex-col justify-between transition relative overflow-hidden ${
+                            isCompleted
+                              ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800/60 text-emerald-950 dark:text-emerald-200 shadow-2xs'
+                              : isCurrent
+                              ? 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-400 dark:border-amber-700/80 text-amber-950 dark:text-amber-100 ring-2 ring-amber-400/50 shadow-sm'
+                              : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 opacity-80'
+                          }`}
+                        >
+                          {/* Top progress accent stripe */}
+                          <div className={`absolute top-0 left-0 right-0 h-1 ${
+                            isCompleted ? 'bg-emerald-500' : isCurrent ? 'bg-amber-500 animate-pulse' : 'bg-slate-200 dark:bg-slate-700'
+                          }`} />
+
+                          <div className="space-y-1.5 pt-1">
+                            <div className="flex items-center justify-between text-xs font-bold">
+                              <span className="uppercase tracking-wider truncate text-[11px]">{stepTitle}</span>
+                              {isCompleted ? (
+                                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold shrink-0 ml-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> Done
+                                </span>
+                              ) : isCurrent ? (
+                                <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-bold animate-pulse shrink-0 ml-1">
+                                  <Clock className="w-3.5 h-3.5" /> Pending
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-[10px] shrink-0 ml-1">○ Upcoming</span>
+                              )}
+                            </div>
+
+                            <div className="text-xs font-semibold truncate">
+                              {approverName || (isCurrent ? 'Awaiting Action' : 'Upcoming Stage')}
+                            </div>
+
+                            {/* Pending duration badge if currently pending */}
+                            {isCurrent && (
+                              <div className="text-[11px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100/80 dark:bg-amber-900/40 px-2 py-0.5 rounded-md inline-block">
+                                ⏳ Pending for {pendingDaysCount} day{pendingDaysCount === 1 ? '' : 's'}
+                              </div>
                             )}
                           </div>
 
-                          <div className="text-xs font-medium truncate pt-1">
-                            {approverName || (isCurrent ? 'Awaiting Action' : 'Upcoming Stage')}
-                          </div>
+                          {approvalTimestamp && (
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400 pt-1.5 mt-1.5 border-t border-slate-200/60 dark:border-slate-700/60 truncate">
+                              {approvalTimestamp}
+                            </div>
+                          )}
+                          {approvalId && (
+                            <div className="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400 truncate">
+                              ID: {approvalId}
+                            </div>
+                          )}
                         </div>
+                      );
+                    });
+                  })()}
+                </div>
 
-                        {approvalTimestamp && (
-                          <div className="text-[10px] text-slate-500 dark:text-slate-400 pt-1.5 mt-1.5 border-t border-slate-200/60 dark:border-slate-700/60 truncate">
-                            {approvalTimestamp}
-                          </div>
-                        )}
-                        {approvalId && (
-                          <div className="text-[10px] font-mono font-bold text-blue-600 dark:text-blue-400 truncate">
-                            ID: {approvalId}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  });
-                })()}
+                {/* Tracking summary bar for creator */}
+                <div className="p-3 rounded-xl bg-slate-100/70 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between flex-wrap gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-700 dark:text-slate-300">Live Status:</span>
+                    <Badge variant={selectedNote.status === 'APPROVED' ? 'success' : selectedNote.status === 'REJECTED' ? 'danger' : 'warning'}>
+                      {selectedNote.status}
+                    </Badge>
+                    <span className="text-slate-500">• Current Holder: <strong className="text-slate-800 dark:text-slate-200">{selectedNote.currentOffice || 'Office'}</strong></span>
+                  </div>
+                  <div className="text-slate-500">
+                    Created on <strong className="text-slate-700 dark:text-slate-300">{selectedNote.date}</strong> by <strong className="text-slate-700 dark:text-slate-300">{selectedNote.creatorName}</strong>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -3672,6 +4009,69 @@ export const NoteSheetPage: React.FC<NoteSheetPageProps> = ({
               >
                 Confirm Bulk {bulkActionType}
               </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ─── MODAL 10: ATTACHMENT PREVIEW MODAL ──────────────────────────────── */}
+      {previewAttachmentModal && (
+        <Modal
+          isOpen={!!previewAttachmentModal}
+          onClose={() => setPreviewAttachmentModal(null)}
+          title={`Document Preview: ${previewAttachmentModal.fileName}`}
+          maxWidth="900px"
+        >
+          <div className="notesheet-modal-scope space-y-4">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-slate-800 dark:text-slate-200">{previewAttachmentModal.fileName}</span>
+                <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold dark:bg-blue-900/60 dark:text-blue-300">
+                  {previewAttachmentModal.documentCategory || 'Attachment'}
+                </span>
+                <span className="text-slate-500 font-mono">
+                  {previewAttachmentModal.fileSizeFormatted || formatFileSize(previewAttachmentModal.fileSize || 0)}
+                </span>
+              </div>
+              <a
+                href={previewAttachmentModal.fileUrl}
+                download={previewAttachmentModal.fileName}
+                target="_blank"
+                rel="noreferrer"
+                className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold flex items-center gap-1.5 transition"
+              >
+                <Download className="w-3.5 h-3.5" /> Download
+              </a>
+            </div>
+
+            <div className="max-h-[70vh] min-h-[350px] flex items-center justify-center bg-slate-100 dark:bg-slate-900 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
+              {['JPG', 'JPEG', 'PNG', 'WEBP', 'GIF', 'SVG'].includes(previewAttachmentModal.fileType?.toUpperCase()) ? (
+                <img
+                  src={previewAttachmentModal.fileUrl}
+                  alt={previewAttachmentModal.fileName}
+                  className="max-h-[68vh] max-w-full object-contain p-2"
+                />
+              ) : previewAttachmentModal.fileType?.toUpperCase() === 'PDF' ? (
+                <iframe
+                  src={`${previewAttachmentModal.fileUrl}#toolbar=0`}
+                  title={previewAttachmentModal.fileName}
+                  className="w-full h-[68vh] border-0"
+                />
+              ) : (
+                <div className="p-8 text-center space-y-3">
+                  <FileText className="w-12 h-12 text-slate-400 mx-auto" />
+                  <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                    Preview not available directly for {previewAttachmentModal.fileType} format.
+                  </div>
+                  <a
+                    href={previewAttachmentModal.fileUrl}
+                    download={previewAttachmentModal.fileName}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-xs"
+                  >
+                    <Download className="w-4 h-4" /> Download to View
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         </Modal>

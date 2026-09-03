@@ -1,5 +1,9 @@
 import { db } from './db';
-import { User, UserRole, AccountStatus, AccessStatusType, DataScopeType, AuditLog } from '../types';
+import { 
+  User, UserRole, AccountStatus, AccessStatusType, DataScopeType, AuditLog,
+  AdminModuleKey, PermissionActionType, ScopeLevel, UserPermissionOverride,
+  ADMIN_ERP_MODULES, ALL_PERMISSION_ACTIONS, UserHistoryRecord
+} from '../types';
 import ExcelJS from 'exceljs';
 
 export interface PermissionModuleDef {
@@ -11,23 +15,39 @@ export interface PermissionModuleDef {
 
 export const ERP_PERMISSION_MODULES: PermissionModuleDef[] = [
   { key: 'DASHBOARD', name: 'Dashboard & Analytics', category: 'Core', description: 'Institutional overview, analytics, and summary statistics' },
+  { key: 'USER_MANAGEMENT', name: 'User Management & Accounts', category: 'System', description: 'Central user accounts, credentials, statuses, and locks' },
   { key: 'ACADEMIC', name: 'Academic & Syllabus', category: 'Academics', description: 'Curriculum, subject allocations, and session planning' },
-  { key: 'SESSION_PLAN', name: 'Session Plan & Course Outline', category: 'Academics', description: 'Course outlines, lecture plans, and topic syllabus tracking' },
-  { key: 'STUDY_MATERIAL', name: 'Study Material & Notes Repository', category: 'Academics', description: 'Curriculum lecture notes, presentations, and reference material' },
-  { key: 'ATTENDANCE', name: 'Student Attendance', category: 'Academics', description: 'Daily session attendance and shortage alerts' },
-  { key: 'EXAM_ELIGIBILITY', name: 'Exam Eligibility & Endorsements', category: 'Academics', description: 'Subject attendance register, faculty & mentor endorsements, HOD approvals, and exam debarment' },
-  { key: 'EXAMINATION', name: 'Examination & Grading', category: 'Academics', description: 'Exam scheduling, marks entry, and result publishing' },
   { key: 'STUDENTS', name: 'Student Master & Admissions', category: 'Students', description: 'Student directory, GR numbers, and enrollment records' },
-  { key: 'PTM_MANAGEMENT', name: 'Parent Teacher Meetings (PTM)', category: 'Students', description: 'Meeting schedules, attendance, and mentor feedback' },
-  { key: 'WORKLOAD_TRANSFER', name: 'Workload & Faculty Transfer', category: 'Faculty', description: 'Academic load balancing and duty transfers' },
+  { key: 'FACULTY', name: 'Faculty Directory & Workload', category: 'Faculty', description: 'Faculty profiles, workload transfers, and allocations' },
+  { key: 'DEPARTMENTS', name: 'University Departments', category: 'Academic', description: 'Academic departments, HOD assignments, and resources' },
+  { key: 'PROGRAMS', name: 'Academic Programs & Degrees', category: 'Academic', description: 'Degree programs, intake capacities, and regulations' },
+  { key: 'SUBJECTS', name: 'Subject Masters & Courses', category: 'Academic', description: 'Course codes, credits, lecture/lab hour configurations' },
+  { key: 'ATTENDANCE', name: 'Student Attendance', category: 'Academics', description: 'Daily session attendance and shortage alerts' },
+  { key: 'TIMETABLE', name: 'Timetable & Scheduling', category: 'Academics', description: 'Classroom schedules, lab allocations, and faculty load' },
+  { key: 'ASSIGNMENTS', name: 'Assignments & LMS', category: 'Academics', description: 'Coursework assignments, submissions, and grading' },
+  { key: 'RESULTS', name: 'Results & Marksheets', category: 'Academics', description: 'Semester results, grade sheets, transcripts, and publishing' },
+  { key: 'EXAMINATION', name: 'Examination & Grading', category: 'Academics', description: 'Exam scheduling, marks entry, and result publishing' },
+  { key: 'EXAM_FORMS', name: 'Exam Forms & Enrollment', category: 'Academics', description: 'Student exam form registrations and verification' },
+  { key: 'EXAM_FEES', name: 'Exam Fee Collection', category: 'Academics', description: 'Exam fee payments, receipt generation, and reconciliations' },
+  { key: 'BACKLOG_REEXAM', name: 'Backlog & Remedial Exams', category: 'Academics', description: 'Remedial exam applications, eligibility, and fee processing' },
+  { key: 'REASSESSMENT', name: 'Reassessment / Rechecking', category: 'Academics', description: 'Answer sheet review applications, re-evaluations, and results' },
+  { key: 'HALL_TICKET', name: 'Hall Tickets & Admit Cards', category: 'Academics', description: 'Exam hall ticket generation, QR validation, and printing' },
+  { key: 'FEES_PAYMENTS', name: 'Fees & Finance', category: 'Finance', description: 'Tuition fees, receipts, refunds, ledgers, and settlements' },
+  { key: 'STUDENT_SECTION', name: 'Student Section & Documents', category: 'Administration', description: 'Bonafide, migration, transcripts, and verification requests' },
+  { key: 'HOSTEL', name: 'Hostel & Residential Life', category: 'Campus', description: 'Room allocations, occupancy, mess, and visitor register' },
+  { key: 'HOSTEL_GATE_PASS', name: 'Hostel Gate Pass', category: 'Campus', description: 'Student night out and weekend gate pass requests' },
+  { key: 'TRANSPORT', name: 'Transport & Buses', category: 'Campus', description: 'Bus routes, vehicle allocations, and driver rosters' },
+  { key: 'DIGILOCKER', name: 'DigiLocker & Documents', category: 'Academic', description: 'Official degree certificates, marksheet sync, and verifications' },
+  { key: 'ABC_CREDITS', name: 'Academic Credits / ABC', category: 'Academic', description: 'APAAR / ABC ID linking, credit accumulation, and transfers' },
   { key: 'REQUESTS', name: 'Student & Staff Requests', category: 'Administration', description: 'Bonafide, NOC, certificate, and grievance requests' },
-  { key: 'DOCUMENTS', name: 'Document Archive & Dispatch', category: 'Administration', description: 'Inward/outward registries and official documents' },
-  { key: 'NOTESHEET', name: 'University Notesheets', category: 'Governance', description: 'Administrative proposals, financial approvals, and memos' },
   { key: 'FEEDBACK', name: 'Student Feedback & IQAC', category: 'Governance', description: 'Teacher evaluations, suggestions, and quality audits' },
-  { key: 'NOTICES', name: 'Campus Notices & Circulars', category: 'Campus', description: 'University-wide and department announcements' },
-  { key: 'EVENTS', name: 'Events & Activities', category: 'Campus', description: 'Conferences, fests, workshops, and sports events' },
-  { key: 'INVENTORY_ASSETS', name: 'Inventory & Fixed Assets', category: 'Campus', description: 'Asset register, consumables, store, and maintenance' },
+  { key: 'PTM_MANAGEMENT', name: 'Parent Teacher Meetings (PTM)', category: 'Students', description: 'Meeting schedules, attendance, and mentor feedback' },
+  { key: 'RESEARCH', name: 'Research & Innovation', category: 'Governance', description: 'Publications, research grants, seed funding, and citations' },
+  { key: 'GRANTS_SSIP', name: 'Grants & SSIP Innovation', category: 'Governance', description: 'Student startup incubation, mentor sessions, and grants' },
+  { key: 'NOTESHEET', name: 'University Notesheets', category: 'Governance', description: 'Administrative proposals, financial approvals, and memos' },
   { key: 'NOTIFICATIONS', name: 'Notification Center', category: 'System', description: 'Automated triggers, broadcasts, and user alerts' },
+  { key: 'REPORTS', name: 'Reports & Analytics Center', category: 'Core', description: 'Regulatory reports, NAAC/NIRF snapshots, and custom BI' },
+  { key: 'AUDIT_LOGS', name: 'Security & Audit Logs', category: 'System', description: 'Immutable system audit trails and security monitoring' },
   { key: 'SETTINGS', name: 'Settings & User Administration', category: 'System', description: 'User account management, security, and master tables' },
 ];
 
@@ -275,12 +295,12 @@ export class UserAccountManagementService {
           break;
 
         case 'STUDENT':
-          if (['DASHBOARD', 'ACADEMIC', 'ATTENDANCE', 'EXAMINATION', 'NOTICES', 'EVENTS'].includes(mod.key)) {
+          if (['DASHBOARD', 'ACADEMIC', 'STUDENTS', 'ATTENDANCE', 'EXAMINATION', 'NOTICES', 'EVENTS', 'DIGILOCKER', 'ABC_CREDITS', 'TIMETABLE', 'ASSIGNMENTS', 'RESULTS', 'EXAM_FORMS', 'EXAM_FEES', 'HALL_TICKET', 'FEES_PAYMENTS', 'HOSTEL', 'TRANSPORT'].includes(mod.key)) {
             template[mod.key] = {
               canView: true, canCreate: false, canEdit: false, canDelete: false, canApprove: false, canReject: false,
               canExport: false, canImport: false, canPrint: true, canAssign: false, canTransfer: false, canVerify: false, canManage: false
             };
-          } else if (['REQUESTS', 'FEEDBACK'].includes(mod.key)) {
+          } else if (['REQUESTS', 'FEEDBACK', 'HOSTEL_GATE_PASS', 'PTM_MANAGEMENT'].includes(mod.key)) {
             template[mod.key] = {
               canView: true, canCreate: true, canEdit: false, canDelete: false, canApprove: false, canReject: false,
               canExport: false, canImport: false, canPrint: true, canAssign: false, canTransfer: false, canVerify: false, canManage: false
@@ -454,6 +474,88 @@ export class UserAccountManagementService {
   }
 
   /**
+   * 4B. GET USERS WITH SERVER-SIDE PAGINATION & SCOPING
+   * Supports 6,000+ user records with backend API and fallback.
+   */
+  public async getUsersServer(
+    query: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      role?: string;
+      status?: string;
+      instituteId?: string;
+      departmentId?: string;
+    }
+  ): Promise<{ data: User[]; total: number; page: number; totalPages: number }> {
+    const limit = Math.min(query.limit || 20, 100);
+    const page = Math.max(1, query.page || 1);
+
+    try {
+      const token = localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token');
+      const params = new URLSearchParams();
+      params.set('page', String(page));
+      params.set('limit', String(limit));
+      if (query.search?.trim()) params.set('search', query.search.trim());
+      if (query.role && query.role !== 'ALL') params.set('role', query.role);
+      if (query.status && query.status !== 'ALL') params.set('status', query.status);
+      if (query.instituteId && query.instituteId !== 'ALL') params.set('instituteId', query.instituteId);
+      if (query.departmentId && query.departmentId !== 'ALL') params.set('departmentId', query.departmentId);
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(`/api/v1/users?${params.toString()}`, {
+        headers,
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        const payload = json.data || json;
+        const data = Array.isArray(payload) ? payload : (payload.data || []);
+        const total = typeof payload.total === 'number' ? payload.total : data.length;
+        const totalPages = typeof payload.totalPages === 'number' ? payload.totalPages : Math.ceil(total / limit) || 1;
+
+        if (total > 0) {
+          return {
+            data: data as User[],
+            total,
+            page,
+            totalPages,
+          };
+        }
+      }
+    } catch (e) {
+      // Fallback to local db if backend is unreachable
+    }
+
+    const localUsers = this.getUsers(
+      {
+        role: (query.role as any) || 'ALL',
+        instituteId: query.instituteId,
+        departmentId: query.departmentId,
+        status: (query.status as any) || 'ALL',
+        searchQuery: query.search,
+      }
+    );
+
+    const total = localUsers.length;
+    const totalPages = Math.ceil(total / limit) || 1;
+    const start = (page - 1) * limit;
+
+    return {
+      data: localUsers.slice(start, start + limit),
+      total,
+      page,
+      totalPages,
+    };
+  }
+
+  /**
    * 5. CREATE USER ACCOUNT
    */
   public createUser(data: {
@@ -478,11 +580,32 @@ export class UserAccountManagementService {
 
     // Validation
     if (!data.username || data.username.trim().length < 3) {
-      throw new Error('Username must be at least 3 characters long.');
+      throw new Error('Username / Login ID must be at least 3 characters long.');
     }
     const cleanUsername = data.username.trim().toLowerCase();
     if (existingUsers.some(u => (u.username || '').toLowerCase() === cleanUsername)) {
-      throw new Error(`Username "${data.username}" is already assigned to another user account.`);
+      throw new Error(`Username / Login ID "${data.username}" is already assigned to another user account.`);
+    }
+
+    // Duplicate account protection for Enrollment Number
+    if (data.enrollmentNo && data.enrollmentNo.trim()) {
+      const cleanEnroll = data.enrollmentNo.trim().toLowerCase();
+      if (existingUsers.some(u => (u.enrollmentNo && u.enrollmentNo.toLowerCase() === cleanEnroll) || (u.username && u.username.toLowerCase() === cleanEnroll))) {
+        throw new Error(`ERP Login account already exists for this student (Enrollment No: ${data.enrollmentNo}).`);
+      }
+    }
+
+    // Duplicate account protection for Employee Code
+    if (data.employeeId && data.employeeId.trim()) {
+      const cleanEmp = data.employeeId.trim().toLowerCase();
+      if (existingUsers.some(u => (u.employeeId && u.employeeId.toLowerCase() === cleanEmp) || (u.username && u.username.toLowerCase() === cleanEmp))) {
+        throw new Error(`ERP Login account already exists for this staff/faculty member (Employee Code: ${data.employeeId}).`);
+      }
+    }
+
+    // Privilege Escalation Prevention: Only SUPER_ADMIN can create SUPER_ADMIN accounts
+    if (data.role === 'SUPER_ADMIN' && actorUser?.role !== 'SUPER_ADMIN') {
+      throw new Error('Privilege escalation denied: Only Super Administrators can provision SUPER_ADMIN accounts.');
     }
 
     if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) {
@@ -503,8 +626,9 @@ export class UserAccountManagementService {
     const dept = data.departmentId ? departments.find(d => d.id === data.departmentId) : undefined;
 
     const now = new Date().toISOString();
+    const uniqueSuffix = Math.random().toString(36).substring(2, 7);
     const newUser: User = {
-      id: `usr-${Date.now().toString().slice(-8)}`,
+      id: `usr-${Date.now().toString().slice(-6)}-${uniqueSuffix}`,
       username: cleanUsername,
       name: data.name.trim(),
       email: cleanEmail,
@@ -567,9 +691,62 @@ export class UserAccountManagementService {
       ...existing,
       ...updates,
       status: newStatus,
+      is_active: newStatus === 'ACTIVE',
       accountStatus: updates.accountStatus || existing.accountStatus || (newStatus === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE'),
       updatedAt: now
     };
+
+    // ─── AUTOMATED DATA VERSIONING & HISTORY TRACKING ────────────────────────
+    const trackedFields: (keyof User)[] = [
+      'name', 'email', 'phone', 'designation', 'departmentId', 'departmentName',
+      'instituteId', 'role', 'status', 'accountStatus', 'accessStatus', 'customPermissions', 'userScopes'
+    ];
+
+    const changedFields: string[] = [];
+    const oldSnapshot: Partial<User> = {};
+    const newSnapshot: Partial<User> = {};
+
+    trackedFields.forEach(f => {
+      if (updates[f] !== undefined) {
+        const oldVal = JSON.stringify(existing[f]);
+        const newVal = JSON.stringify(merged[f]);
+        if (oldVal !== newVal) {
+          changedFields.push(f);
+          oldSnapshot[f] = existing[f] as any;
+          newSnapshot[f] = merged[f] as any;
+        }
+      }
+    });
+
+    if (changedFields.length > 0) {
+      const state = db.getState() as any;
+      if (!state.userHistories) state.userHistories = [];
+      
+      const userHistoryList: UserHistoryRecord[] = state.userHistories.filter((h: UserHistoryRecord) => h.userId === id);
+      const nextVersion = userHistoryList.length + 1;
+
+      const historyRecord: UserHistoryRecord = {
+        id: `uhist-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        userId: id,
+        version: nextVersion,
+        action: updates.accountStatus === 'INACTIVE' ? 'ACCOUNT_DEACTIVATED' :
+                updates.accountStatus === 'ACTIVE' && existing.accountStatus !== 'ACTIVE' ? 'ACCOUNT_REACTIVATED' :
+                updates.role && updates.role !== existing.role ? 'ROLE_CHANGED' :
+                updates.customPermissions ? 'PERMISSION_CHANGED' :
+                updates.userScopes ? 'SCOPE_CHANGED' : 'USER_UPDATED',
+        changedBy: actorUser?.name || 'Administrator',
+        changedByUserId: actorUser?.id || 'admin',
+        changedByRole: actorUser?.role || 'SUPER_ADMIN',
+        changedAt: now,
+        changedFields,
+        oldData: oldSnapshot,
+        newData: newSnapshot,
+        reason: (updates as any).lockReason || (updates as any).reason || 'Administrative update'
+      };
+
+      state.userHistories.unshift(historyRecord);
+      db.saveState();
+    }
 
     db.updateEntity<User>('users', id, merged, `Updated user credentials and profile for: ${existing.username}`);
 
@@ -578,13 +755,22 @@ export class UserAccountManagementService {
       module: 'SETTINGS',
       entity: 'users',
       recordId: id,
-      details: `User profile for ${existing.username} updated by ${actorUser?.name || 'Administrator'}`,
-      previousValue: { name: existing.name, role: existing.role, status: existing.status, department: existing.departmentName },
-      newValue: { name: merged.name, role: merged.role, status: merged.status, department: merged.departmentName },
+      details: `User profile for ${existing.username} updated by ${actorUser?.name || 'Administrator'}. Modified fields: ${changedFields.join(', ') || 'None'}`,
+      previousValue: oldSnapshot,
+      newValue: newSnapshot,
       actorUser
     });
 
     return merged;
+  }
+
+  /**
+   * GET VERSIONED USER HISTORY (Immutable chronological changelog)
+   */
+  public getUserHistory(userId: string): UserHistoryRecord[] {
+    const state = db.getState() as any;
+    const all = (state.userHistories || []) as UserHistoryRecord[];
+    return all.filter(h => h.userId === userId).sort((a, b) => b.version - a.version);
   }
 
   /**
@@ -1042,7 +1228,7 @@ export class UserAccountManagementService {
     ws.getCell('F3').font = { bold: true, size: 9 };
 
     const headers = [
-      'USERNAME', 'FULL NAME', 'EMAIL ADDRESS', 'EMPLOYEE / STUDENT ID',
+      'USERNAME', 'FULL NAME', 'EMAIL ADDRESS', 'EMP ID / ENROLLMENT NO.',
       'DEPARTMENT', 'INSTITUTE', 'ASSIGNED ROLE', 'ACCOUNT STATUS',
       'LAST LOGIN', 'CREATED DATE'
     ];
@@ -1110,7 +1296,7 @@ export class UserAccountManagementService {
    */
   public exportUsersCsv(users: User[], filename: string = 'SSIU_User_Accounts.csv'): void {
     const headers = [
-      'Username', 'Full Name', 'Email Address', 'Employee / Student ID',
+      'Username', 'Full Name', 'Email Address', 'Emp ID / Enrollment No.',
       'Department', 'Role', 'Status', 'Last Login', 'Created Date'
     ];
 

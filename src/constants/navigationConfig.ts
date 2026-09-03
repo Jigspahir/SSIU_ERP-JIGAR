@@ -3,7 +3,7 @@ import {
   UserCheck, BookOpen, Clock, FileText, FileCheck, CalendarCheck,
   IndianRupee, FolderCheck, BarChart3, Settings, Award, MessageSquare, HelpCircle,
   Bell, Library, CheckSquare, Rocket, Wrench,
-  Grid, Activity, ShieldAlert, ShieldCheck, Users2, FileSpreadsheet, UploadCloud, User,
+  Grid, Activity, ShieldAlert, ShieldCheck, Shield, Users2, FileSpreadsheet, UploadCloud, User,
   RotateCcw, RefreshCw, LogOut, Boxes, Package, Layers, Archive,
   Mail, Send, Inbox, Briefcase, History, UserPlus, FileStack, KeyRound, Users, CheckCircle2,
   FileSignature, Landmark, FileBox, FileQuestion, DollarSign, FileDown, Search, ArrowLeftRight,
@@ -245,9 +245,16 @@ export const ALL_NAV_ITEMS: Record<string, NavItemConfig> = {
   },
   'attendance': {
     id: 'attendance',
-    label: 'Attendance',
+    label: 'Attendance Management',
     icon: UserCheck,
-    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'],
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'MENTOR'],
+    category: 'Academic'
+  },
+  'my-attendance': {
+    id: 'my-attendance',
+    label: 'My Attendance',
+    icon: UserCheck,
+    allowedRoles: ['STUDENT', 'PARENT'],
     category: 'Academic'
   },
   'subjects': {
@@ -548,6 +555,13 @@ export const ALL_NAV_ITEMS: Record<string, NavItemConfig> = {
     label: 'Events',
     icon: NAV_ICONS.events,
     allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'],
+    category: 'Campus'
+  },
+  'student-council': {
+    id: 'student-council',
+    label: 'Student Council Desk',
+    icon: Shield,
+    allowedRoles: ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 'REGISTRAR', 'PRINCIPAL', 'HOD', 'FACULTY', 'STUDENT'],
     category: 'Campus'
   },
   'mentor': {
@@ -1168,7 +1182,7 @@ export const STUDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
       { id: 'academic-subjects', label: 'My Subjects', targetTab: 'subjects' },
       { id: 'academic-abc-credits', label: 'ABC Credits Ledger', targetTab: 'abc-credits' },
       { id: 'academic-timetable', label: 'Time Table', targetTab: 'timetable' },
-      { id: 'academic-attendance', label: 'Attendance', targetTab: 'attendance' },
+      { id: 'academic-my-attendance', label: 'My Attendance', targetTab: 'my-attendance' },
       { id: 'academic-assignments', label: 'Assignments', targetTab: 'assignments' },
       { id: 'academic-materials', label: 'Digital Repository', targetTab: 'materials' },
       { id: 'academic-quiz', label: 'Quiz', targetTab: 'quiz' }
@@ -1214,12 +1228,7 @@ export const STUDENT_NAVIGATION_STRUCTURE: StudentNavGroup[] = [
     id: 'requests',
     label: 'Requests',
     icon: NAV_ICONS.requests,
-    defaultTab: 'requests-my-requests',
-    children: [
-      { id: 'requests-subject-query', label: 'Subject Query', targetTab: 'requests-subject-query' },
-      { id: 'requests-complaint', label: 'General Complaint', targetTab: 'requests-complaint' },
-      { id: 'requests-my-requests', label: 'My Requests', targetTab: 'requests-my-requests' }
-    ]
+    defaultTab: 'requests-my-requests'
   },
   STUDENT_RESEARCH_INNOVATION_NAV_GROUP,
   STUDENT_GRANTS_SSIP_NAV_GROUP,
@@ -2840,7 +2849,7 @@ export const ROLE_NAV_ORDER: Record<string, string[]> = {
 
   STUDENT: [
     'dashboard',
-    'academic', 'subjects', 'timetable', 'attendance', 'assignments', 'materials', 'quiz',
+    'academic', 'subjects', 'timetable', 'my-attendance', 'assignments', 'materials', 'quiz',
     'examination', 'exam-forms', 'exam-fees-student', 'exam-backlog', 'exam-reassessment', 'exam-hallticket', 'exam-results',
     'fees', 'fees-semester', 'fees-history', 'fees-receipts', 'fees-query',
     'student-section', 'student-section-services', 'student-section-requests', 'student-section-documents', 'certificates',
@@ -2934,7 +2943,7 @@ export const getRoleNavigationItems = (role?: UserRole | null): NavItemConfig[] 
 export const isTabPermittedForRole = (tab: string, role?: UserRole | null): boolean => {
   if (!role) return false;
   if (tab === 'dashboard') return true;
-  if (tab === 'settings') {
+  if (tab === 'settings' || tab === 'user-management' || tab === 'users-management' || tab === 'rbac-matrix' || tab === 'access-control') {
     return ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'ERP_COORDINATOR', 'REGISTRAR'].includes(role);
   }
   if (tab === 'inventory-assets' || tab === 'faculty-assets') {
@@ -2997,7 +3006,37 @@ export const isTabPermittedForRole = (tab: string, role?: UserRole | null): bool
     return ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 'PROVOST', 'PRESIDENT', 'PRINCIPAL', 'HOD', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'IQAC', 'FACULTY', 'STUDENT'].includes(role);
   }
   if (role === 'STUDENT') {
-    if (['settings', 'security-audit', 'student-search', 'students-search', 'students-directory', 'work-transfer', 'work-transfer-new', 'work-transfer-received', 'work-transfer-active', 'work-transfer-history', 'work-transfer-audit'].includes(tab)) {
+    // Attendance management/marking is strictly faculty/authorized staff only
+    if (
+      tab === 'attendance' ||
+      tab === 'academic-attendance' ||
+      tab === 'faculty-mark-attendance' ||
+      tab === 'attendance-history' ||
+      tab === 'faculty-attendance-history' ||
+      tab === 'subject-attendance' ||
+      tab === 'faculty-subject-attendance' ||
+      tab === 'attendance-reports' ||
+      tab === 'faculty-attendance-reports' ||
+      tab === 'attendance-import' ||
+      tab === 'faculty-attendance-import' ||
+      tab === 'attendance-templates' ||
+      tab === 'faculty-attendance-templates' ||
+      tab === 'attendance-applications' ||
+      tab === 'attendance-hub'
+    ) {
+      return false;
+    }
+    // Allow personal student attendance view
+    if (tab === 'my-attendance' || tab === 'academic-my-attendance') {
+      return true;
+    }
+    // Strict prohibition of administrative / staff management pages
+    if ([
+      'settings', 'security-audit', 'user-management', 'users-management', 'rbac-matrix', 'access-control',
+      'staff-hub', 'students-hub', 'faculty', 'hr', 'payroll', 'bulk-import',
+      'student-search', 'students-search', 'students-directory', 
+      'work-transfer', 'work-transfer-new', 'work-transfer-received', 'work-transfer-active', 'work-transfer-history', 'work-transfer-audit'
+    ].includes(tab) || tab.startsWith('notesheet-') || tab === 'note-sheets' || tab === 'reg-notesheets' || tab.startsWith('reg-')) {
       return false;
     }
   }

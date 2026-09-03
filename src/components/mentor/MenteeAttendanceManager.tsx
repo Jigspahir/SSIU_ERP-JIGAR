@@ -232,7 +232,7 @@ export const MenteeAttendanceManager: React.FC<MenteeAttendanceManagerProps> = (
       const exportData = sortedRows.map((r, idx) => ({
         'Sr No.': idx + 1,
         'Student Name': r.studentName,
-        'Enrollment / Student ID': r.enrollmentNo || r.universityId,
+        'Enrollment No.': r.enrollmentNo || r.universityId,
         'Department': r.departmentName,
         'Program': r.programCode,
         'Semester': `Semester ${r.semesterNumber}`,

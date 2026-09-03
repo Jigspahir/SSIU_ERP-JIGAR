@@ -4,6 +4,9 @@ import { HrService } from './hr.service';
 import { CreateEmployeeDto, ApplyLeaveDto, RecordAttendanceDto } from './dto/hr.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RbacGuard } from '../rbac/rbac.guard';
+import { RequirePermission } from '../rbac/require-permission.decorator';
+import { RequireRole } from '../rbac/require-role.decorator';
+import { RequireScope } from '../rbac/require-scope.decorator';
 
 @ApiTags('University HR, Employee & Payroll Management')
 @ApiBearerAuth()
@@ -20,6 +23,8 @@ export class HrController {
 
   // ── Employees
   @Post('employees')
+  @RequireRole('HR_ADMIN', 'HR_OFFICER', 'REGISTRAR', 'SUPER_ADMIN', 'UNIVERSITY_ADMIN')
+  @RequirePermission('HR', 'CREATE')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create Employee record' })
   createEmployee(@Body() dto: CreateEmployeeDto) {
@@ -27,6 +32,7 @@ export class HrController {
   }
 
   @Get('employees')
+  @RequirePermission('HR', 'VIEW')
   @ApiOperation({ summary: 'List Employees' })
   @ApiQuery({ name: 'departmentId', required: false })
   @ApiQuery({ name: 'status', required: false })
@@ -40,12 +46,15 @@ export class HrController {
   }
 
   @Get('employees/:id')
+  @RequirePermission('HR', 'VIEW')
   @ApiOperation({ summary: 'Get Employee detail with service history and leave balance' })
   getEmployeeById(@Param('id') id: string) {
     return this.hrService.getEmployeeById(id);
   }
 
   @Post('employees/:id/documents')
+  @RequireRole('HR_ADMIN', 'HR_OFFICER', 'REGISTRAR', 'SUPER_ADMIN', 'UNIVERSITY_ADMIN')
+  @RequirePermission('HR', 'EDIT')
   @ApiOperation({ summary: 'Upload and verify employee document' })
   uploadEmployeeDocument(@Param('id') id: string, @Body() body: any) {
     return this.hrService.uploadEmployeeDocument(id, body);
@@ -53,6 +62,7 @@ export class HrController {
 
   // ── Attendance
   @Post('attendance')
+  @RequirePermission('HR', 'CREATE')
   @ApiOperation({ summary: 'Record employee attendance (Check-in/Check-out)' })
   recordAttendance(@Body() dto: RecordAttendanceDto) {
     return this.hrService.recordAttendance(dto);

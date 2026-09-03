@@ -657,7 +657,7 @@ export const StudentExcelDashboard: React.FC<StudentExcelDashboardProps> = ({
                     {stats.presentClasses} Present / {stats.totalClasses} Total Lectures Recorded
                   </td>
                   <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right' }}>
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setActiveTab('attendance')} style={{ fontSize: '0.71875rem', padding: '2px 6px' }}>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setActiveTab('my-attendance')} style={{ fontSize: '0.71875rem', padding: '2px 6px' }}>
                       View Details
                     </button>
                   </td>

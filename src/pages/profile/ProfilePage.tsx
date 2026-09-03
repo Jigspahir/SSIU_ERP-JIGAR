@@ -734,7 +734,6 @@ const StudentProfileView: React.FC<{ user: User; role: UserRole; updateProfile: 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0 1.5rem' }}>
                 <div>
                   <ReadOnlyFieldRow label="University Enrollment No." value={studentRecord.enrollmentNo} isCode allowChange={false} />
-                  <ReadOnlyFieldRow label="Student ERP Master ID" value={studentRecord.id} isCode allowChange={false} />
                   <ReadOnlyFieldRow label="Admission Application No." value={studentRecord.applicationNumber || 'APP-2026-9042'} isCode allowChange={false} />
                 </div>
                 <div>

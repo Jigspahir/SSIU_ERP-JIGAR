@@ -1091,7 +1091,7 @@ export class StudentOnboardingService {
     db.logAudit(
       'STUDENT_ONBOARDING_COMPLETED',
       'Student',
-      `Student ${app.applicantName} successfully onboarded from application ${app.applicationNumber || app.id}. Temporary Enrollment: ${temporaryEnrollmentNumber}, Student ID: ${studentId}, Program: ${program?.name}, Department: ${department?.name}, Mentor: ${payload.mentorId || 'Unassigned'}.`,
+      `Student ${app.applicantName} successfully onboarded from application ${app.applicationNumber || app.id}. Enrollment No: ${temporaryEnrollmentNumber}, Program: ${program?.name}, Department: ${department?.name}, Mentor: ${payload.mentorId || 'Unassigned'}.`,
       actor.name,
       actor.role,
       {
@@ -1217,7 +1217,7 @@ export class StudentOnboardingService {
     db.logAudit(
       'FINAL_ENROLLMENT_ASSIGNED',
       'Student',
-      `Final Enrollment Number ${cleanFinalNo} assigned to student ${student.name} (Student ID: ${student.id}) by ${actor.name}. Previous Temporary Enrollment: ${prevTempNo}.${remarks ? ` Remarks: ${remarks}` : ''}`,
+      `Final Enrollment Number ${cleanFinalNo} assigned to student ${student.name} (Enrollment No: ${student.enrollmentNo || prevTempNo}) by ${actor.name}. Previous Temporary Enrollment: ${prevTempNo}.${remarks ? ` Remarks: ${remarks}` : ''}`,
       actor.name,
       actor.role,
       {

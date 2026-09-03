@@ -420,101 +420,115 @@ export const ResultManagementPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="table-responsive">
-          <table className="table">
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+          <table style={{ width: 'auto', borderCollapse: 'collapse', border: '1px solid #CBD5E1', fontSize: '0.84375rem', textAlign: 'left' }}>
             <thead>
-              <tr>
-                <th>Marksheet No</th>
-                <th>Enrollment No</th>
-                <th>Student Name</th>
-                <th>Total Marks</th>
-                <th>%</th>
-                <th>SGPA</th>
-                <th>CGPA</th>
-                <th>Status</th>
-                <th>Published</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
+              <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #CBD5E1' }}>
+                <th style={{ padding: '0.65rem 0.85rem', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>Marksheet No</th>
+                <th style={{ padding: '0.65rem 0.85rem', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>Enrollment No</th>
+                <th style={{ padding: '0.65rem 0.85rem', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>Student Name</th>
+                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>Total Marks</th>
+                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>%</th>
+                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>SGPA</th>
+                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>CGPA</th>
+                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>Status</th>
+                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'center', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', borderRight: '1px solid #CBD5E1', whiteSpace: 'nowrap' }}>Published</th>
+                <th style={{ padding: '0.65rem 0.85rem', textAlign: 'right', fontWeight: 800, color: '#0F2C59', textTransform: 'uppercase', fontSize: '0.6875rem', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredResults.length === 0 ? (
                 <tr>
-                  <td colSpan={10} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                    <AlertTriangle size={32} color="var(--brand-orange)" style={{ margin: '0 auto 0.5rem', opacity: 0.8 }} />
-                    <div style={{ fontWeight: 700 }}>No examination result records match the current filters.</div>
-                    <div style={{ fontSize: '0.8125rem', marginTop: '0.25rem' }}>Select an exam event and click "Process / Recalculate Results" to calculate student grades.</div>
+                  <td colSpan={10} style={{ textAlign: 'center', padding: '2.5rem 1.5rem', color: '#64748B', background: '#FFFFFF', borderBottom: '1px solid #E2E8F0' }}>
+                    <AlertTriangle size={32} color="var(--brand-orange, #F26B21)" style={{ margin: '0 auto 0.5rem', opacity: 0.8 }} />
+                    <div style={{ fontWeight: 700, color: '#0F2C59', fontSize: '0.9375rem' }}>No examination result records match the current filters.</div>
+                    <div style={{ fontSize: '0.8125rem', marginTop: '0.25rem', color: '#64748B' }}>Select an exam event and click "Process / Recalculate Results" to calculate student grades.</div>
                   </td>
                 </tr>
               ) : (
-                filteredResults.map(res => (
-                  <tr key={res.id}>
-                    <td>
-                      <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--brand-navy)' }}>
-                        {res.marksheetNo || <span style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>Pending Publication</span>}
-                      </span>
-                    </td>
-                    <td style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{res.enrollmentNo}</td>
-                    <td>
-                      <div style={{ fontWeight: 600 }}>{res.studentName}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{res.programName || 'B.Tech Engineering'}</div>
-                    </td>
-                    <td>
-                      <strong>{res.totalMarksObtained}</strong> <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/ {res.totalMaxMarks}</span>
-                    </td>
-                    <td style={{ fontWeight: 700 }}>{res.percentage ? `${res.percentage}%` : '-'}</td>
-                    <td style={{ fontWeight: 800, color: 'var(--brand-orange)' }}>{res.sgpa}</td>
-                    <td style={{ fontWeight: 800 }}>{res.cgpa}</td>
-                    <td>
-                      {res.status === 'PASS' && <Badge variant="active">PASS</Badge>}
-                      {res.status === 'ATKT' && <Badge variant="warning">ATKT ({res.backlogsCount || 1})</Badge>}
-                      {res.status === 'FAIL' && <Badge variant="inactive">FAIL</Badge>}
-                      {res.status === 'WITHHELD' && <Badge variant="navy">WITHHELD</Badge>}
-                      {res.status === 'REVISED' && <Badge variant="active">REVISED</Badge>}
-                    </td>
-                    <td>
-                      {res.isPublished ? (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#10B981', fontSize: '0.75rem', fontWeight: 700 }}>
-                          <CheckCircle2 size={13} /> {res.publishedDate || 'Published'}
+                filteredResults.map((res, idx) => {
+                  const isEven = idx % 2 === 0;
+                  return (
+                    <tr key={res.id} style={{ background: isEven ? '#FFFFFF' : '#F8FAFC', borderBottom: '1px solid #E2E8F0', transition: 'background-color 0.15s ease' }}>
+                      <td style={{ padding: '0.65rem 0.85rem', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--brand-navy, #0F2C59)', fontSize: '0.84375rem' }}>
+                          {res.marksheetNo || <span style={{ color: '#94A3B8', fontStyle: 'italic', fontWeight: 500 }}>Pending Publication</span>}
                         </span>
-                      ) : (
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Draft / Internal</span>
-                      )}
-                    </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '0.375rem', justifyContent: 'flex-end' }}>
-                        {/* Statement of Marks */}
-                        <button
-                          className="btn btn-outline btn-sm"
-                          title="View Official Statement of Marks"
-                          onClick={() => handleOpenMarksheet(res)}
-                        >
-                          <Eye size={13} /> View
-                        </button>
-
-                        {/* Controller Actions */}
-                        {isControllerOrAdmin && (
-                          <>
-                            <button
-                              className="btn btn-outline btn-sm"
-                              title="Withhold Result (Fees/Attendance/Malpractice)"
-                              onClick={() => handleOpenWithholdModal(res)}
-                            >
-                              <ShieldAlert size={13} color="#8B5CF6" /> Withhold
-                            </button>
-
-                            <button
-                              className="btn btn-outline btn-sm"
-                              title="Revise Published Result with Mandatory Audit Reason"
-                              onClick={() => handleOpenReviseModal(res)}
-                            >
-                              <Edit3 size={13} color="var(--brand-orange)" /> Revise
-                            </button>
-                          </>
+                      </td>
+                      <td style={{ padding: '0.65rem 0.85rem', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', fontWeight: 700, color: '#0F2C59', whiteSpace: 'nowrap' }}>
+                        {res.enrollmentNo}
+                      </td>
+                      <td style={{ padding: '0.65rem 0.85rem', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontWeight: 600, color: '#0F2C59', fontSize: '0.84375rem' }}>{res.studentName}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '1px' }}>{res.programName || 'B.Tech Engineering'}</div>
+                      </td>
+                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                        <strong style={{ color: '#0F2C59' }}>{res.totalMarksObtained}</strong> <span style={{ fontSize: '0.75rem', color: '#64748B' }}>/ {res.totalMaxMarks}</span>
+                      </td>
+                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', fontWeight: 700, color: '#334155', whiteSpace: 'nowrap' }}>
+                        {res.percentage ? `${res.percentage}%` : '-'}
+                      </td>
+                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', fontWeight: 800, color: 'var(--brand-orange, #F26B21)', whiteSpace: 'nowrap' }}>
+                        {res.sgpa}
+                      </td>
+                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', fontWeight: 800, color: '#0F2C59', whiteSpace: 'nowrap' }}>
+                        {res.cgpa}
+                      </td>
+                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                        {res.status === 'PASS' && <Badge variant="active">PASS</Badge>}
+                        {res.status === 'ATKT' && <Badge variant="warning">ATKT ({res.backlogsCount || 1})</Badge>}
+                        {res.status === 'FAIL' && <Badge variant="inactive">FAIL</Badge>}
+                        {res.status === 'WITHHELD' && <Badge variant="navy">WITHHELD</Badge>}
+                        {res.status === 'REVISED' && <Badge variant="active">REVISED</Badge>}
+                      </td>
+                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center', borderRight: '1px solid #E2E8F0', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                        {res.isPublished ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', color: '#10B981', fontSize: '0.75rem', fontWeight: 700 }}>
+                            <CheckCircle2 size={13} /> {res.publishedDate || 'Published'}
+                          </span>
+                        ) : (
+                          <span style={{ color: '#94A3B8', fontSize: '0.75rem', fontWeight: 600 }}>Draft / Internal</span>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'right', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'inline-flex', gap: '0.35rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          {/* Statement of Marks */}
+                          <button
+                            className="btn btn-outline btn-sm"
+                            title="View Official Statement of Marks"
+                            onClick={() => handleOpenMarksheet(res)}
+                            style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                          >
+                            <Eye size={13} /> View
+                          </button>
+
+                          {/* Controller Actions */}
+                          {isControllerOrAdmin && (
+                            <>
+                              <button
+                                className="btn btn-outline btn-sm"
+                                title="Withhold Result (Fees/Attendance/Malpractice)"
+                                onClick={() => handleOpenWithholdModal(res)}
+                                style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                              >
+                                <ShieldAlert size={13} color="#8B5CF6" /> Withhold
+                              </button>
+
+                              <button
+                                className="btn btn-outline btn-sm"
+                                title="Revise Published Result with Mandatory Audit Reason"
+                                onClick={() => handleOpenReviseModal(res)}
+                                style={{ padding: '0.25rem 0.55rem', fontSize: '0.75rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                              >
+                                <Edit3 size={13} color="var(--brand-orange, #F26B21)" /> Revise
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

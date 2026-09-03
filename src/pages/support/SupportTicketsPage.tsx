@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../../services/db';
 import { SupportTicket, SupportTicketMessage, TicketStatus, TicketPriority, TicketCategory, Faculty, Student } from '../../types';
 import { Badge } from '../../components/common/Badge';
@@ -7,10 +7,12 @@ import { PieChart } from '../../components/common/Charts';
 import { 
   HelpCircle, Plus, Search, MessageSquare, Send, Paperclip, 
   CheckCircle, Clock, AlertTriangle, Eye, ShieldCheck, UserCheck, 
-  FileText, Download, UserPlus, Filter, XCircle, ArrowRight
+  FileText, Download, UserPlus, Filter, XCircle, ArrowRight,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { fileStorage } from '../../services/fileStorage';
+import { helpdeskService } from '../../services/helpdeskService';
 
 export const SupportTicketsPage: React.FC = () => {
   const { user, role } = useAuth();
@@ -43,42 +45,102 @@ export const SupportTicketsPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [filterStatus, filterPriority, filterCategory]);
 
-  const loadData = () => {
-    setTickets(db.getSupportTickets());
+  const loadData = async () => {
+    try {
+      const serverResult = await helpdeskService.getTicketsServer({
+        page: 1,
+        limit: 100,
+        category: filterCategory,
+        status: filterStatus,
+        search: searchTerm,
+        my: role === 'STUDENT',
+      });
+      if (serverResult && Array.isArray(serverResult.data) && serverResult.data.length > 0) {
+        const mapped: SupportTicket[] = serverResult.data.map((t) => ({
+          id: t.id,
+          ticketNo: t.ticketNo,
+          studentId: t.userId,
+          studentName: t.user?.username || t.user?.erpId || 'User',
+          enrollmentNo: t.user?.erpId || '',
+          departmentId: 'dept-1',
+          category: t.category as any,
+          subject: t.title,
+          priority: (t.priority === 'NORMAL' ? 'MEDIUM' : t.priority) as any,
+          status: t.status as any,
+          messages: (t.messages || []).map((m) => ({
+            id: m.id,
+            senderId: m.authorId,
+            senderName: m.authorName,
+            senderRole: m.authorRole as any,
+            message: m.message,
+            fileUrl: m.attachmentUrl,
+            createdAt: m.createdAt ? m.createdAt.replace('T', ' ').substring(0, 16) : '',
+          })),
+          assignedFacultyId: t.assignedTo || undefined,
+          createdAt: t.createdAt ? t.createdAt.split('T')[0] : '',
+          updatedAt: t.updatedAt ? t.updatedAt.split('T')[0] : '',
+        }));
+        setTickets(mapped);
+      } else {
+        setTickets(db.getSupportTickets());
+      }
+    } catch (e) {
+      setTickets(db.getSupportTickets());
+    }
     setFacultyList(db.getFaculty());
     setStudents(db.getStudents());
   };
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const currentStudent = role === 'STUDENT' ? students.find(s => s.id === user?.id || s.email === user?.email) : null;
   const currentFaculty = role === 'FACULTY' ? facultyList.find(f => f.id === user?.id || f.email === user?.email) : null;
 
   // Filter Scoped Tickets
-  let displayedTickets = tickets;
+  const displayedTickets = useMemo(() => {
+    let result = tickets;
 
-  if (role === 'STUDENT') {
-    displayedTickets = tickets.filter(t => t.studentId === currentStudent?.id || t.studentId === 'stu-1');
-  } else if (role === 'FACULTY') {
-    displayedTickets = tickets.filter(t => t.assignedFacultyId === currentFaculty?.id || t.assignedFacultyId === 'fac-1');
-  }
+    if (role === 'STUDENT') {
+      result = result.filter(t => t.studentId === currentStudent?.id || t.studentId === 'stu-1');
+    } else if (role === 'FACULTY') {
+      result = result.filter(t => t.assignedFacultyId === currentFaculty?.id || t.assignedFacultyId === 'fac-1');
+    }
 
-  if (filterStatus !== 'ALL') {
-    displayedTickets = displayedTickets.filter(t => t.status === filterStatus);
-  }
-  if (filterPriority !== 'ALL') {
-    displayedTickets = displayedTickets.filter(t => t.priority === filterPriority);
-  }
-  if (filterCategory !== 'ALL') {
-    displayedTickets = displayedTickets.filter(t => t.category === filterCategory);
-  }
-  if (searchTerm) {
-    displayedTickets = displayedTickets.filter(t => 
-      t.ticketNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.studentName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }
+    if (filterStatus !== 'ALL') {
+      result = result.filter(t => t.status === filterStatus);
+    }
+    if (filterPriority !== 'ALL') {
+      result = result.filter(t => t.priority === filterPriority);
+    }
+    if (filterCategory !== 'ALL') {
+      result = result.filter(t => t.category === filterCategory);
+    }
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase();
+      result = result.filter(t => 
+        t.ticketNo.toLowerCase().includes(q) ||
+        t.subject.toLowerCase().includes(q) ||
+        t.studentName.toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [tickets, role, currentStudent, currentFaculty, filterStatus, filterPriority, filterCategory, searchTerm]);
+
+  const totalRecords = displayedTickets.length;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+  const paginatedTickets = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return displayedTickets.slice(start, start + pageSize);
+  }, [displayedTickets, currentPage, pageSize]);
+
+  // Reset pagination when search/filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterStatus, filterPriority, filterCategory, pageSize]);
 
   // File Upload Handler via fileStorage service
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, isReply: boolean = false) => {
@@ -100,8 +162,31 @@ export const SupportTicketsPage: React.FC = () => {
     }
   };
 
+  // Open Ticket Details with server thread fetch
+  const handleOpenTicketDetails = async (ticket: SupportTicket) => {
+    setActiveTicket(ticket);
+    try {
+      const detailed = await helpdeskService.getTicketByIdServer(ticket.id);
+      if (detailed) {
+        setActiveTicket({
+          ...ticket,
+          status: detailed.status as any,
+          messages: (detailed.messages || []).map((m) => ({
+            id: m.id,
+            senderId: m.authorId,
+            senderName: m.authorName,
+            senderRole: m.authorRole as any,
+            message: m.message,
+            fileUrl: m.attachmentUrl,
+            createdAt: m.createdAt ? m.createdAt.replace('T', ' ').substring(0, 16) : '',
+          })),
+        });
+      }
+    } catch (e) { }
+  };
+
   // Create Ticket Handler
-  const handleCreateTicket = (e: React.FormEvent) => {
+  const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSubject || !initialMessageText) return;
 
@@ -135,8 +220,20 @@ export const SupportTicketsPage: React.FC = () => {
       updatedAt: new Date().toISOString().split('T')[0]
     };
 
-    db.addEntity('supportTickets', newTicket as any, `Created Support Ticket ${ticketNo}`);
-    loadData();
+    try {
+      await helpdeskService.createTicketServer({
+        category: newCategory,
+        title: newSubject,
+        description: initialMessageText,
+        priority: newPriority === 'MEDIUM' ? 'NORMAL' : newPriority,
+        attachmentUrl: attachmentUrl || undefined,
+      });
+      await loadData();
+    } catch (err) {
+      db.addEntity('supportTickets', newTicket as any, `Created Support Ticket ${ticketNo}`);
+      loadData();
+    }
+
     setShowCreateModal(false);
     setNewSubject('');
     setInitialMessageText('');
@@ -144,7 +241,7 @@ export const SupportTicketsPage: React.FC = () => {
   };
 
   // Send Reply Message Handler
-  const handleSendReply = (e: React.FormEvent) => {
+  const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeTicket || !replyText.trim()) return;
 
@@ -161,26 +258,52 @@ export const SupportTicketsPage: React.FC = () => {
     const updatedMessages = [...activeTicket.messages, newMsg];
     const newStatus: TicketStatus = (role === 'FACULTY' && activeTicket.status === 'OPEN') ? 'IN_PROGRESS' : activeTicket.status;
 
-    db.updateEntity<SupportTicket>('supportTickets', activeTicket.id, {
-      messages: updatedMessages,
-      status: newStatus,
-      updatedAt: new Date().toISOString().split('T')[0]
-    }, `Added reply to Ticket ${activeTicket.ticketNo}`);
+    try {
+      await helpdeskService.addCommentServer(activeTicket.id, {
+        message: replyText,
+        messageType: role === 'STUDENT' ? 'USER_MESSAGE' : 'STAFF_RESPONSE',
+        attachmentUrl: replyAttachmentUrl || undefined,
+      });
+      const detailed = await helpdeskService.getTicketByIdServer(activeTicket.id);
+      setActiveTicket({
+        ...activeTicket,
+        status: detailed.status as any,
+        messages: (detailed.messages || []).map((m) => ({
+          id: m.id,
+          senderId: m.authorId,
+          senderName: m.authorName,
+          senderRole: m.authorRole as any,
+          message: m.message,
+          fileUrl: m.attachmentUrl,
+          createdAt: m.createdAt ? m.createdAt.replace('T', ' ').substring(0, 16) : '',
+        })),
+      });
+      loadData();
+    } catch (err) {
+      db.updateEntity<SupportTicket>('supportTickets', activeTicket.id, {
+        messages: updatedMessages,
+        status: newStatus,
+        updatedAt: new Date().toISOString().split('T')[0]
+      }, `Added reply to Ticket ${activeTicket.ticketNo}`);
 
-    const refreshedTicket = {
-      ...activeTicket,
-      messages: updatedMessages,
-      status: newStatus
-    };
+      setActiveTicket({
+        ...activeTicket,
+        messages: updatedMessages,
+        status: newStatus
+      });
+      loadData();
+    }
 
-    setActiveTicket(refreshedTicket);
     setReplyText('');
     setReplyAttachmentUrl('');
-    loadData();
   };
 
   // Update Status Handler
-  const handleUpdateStatus = (ticketId: string, status: TicketStatus) => {
+  const handleUpdateStatus = async (ticketId: string, status: TicketStatus) => {
+    try {
+      await helpdeskService.updateStatusServer(ticketId, status);
+    } catch (e) { }
+
     db.updateEntity<SupportTicket>('supportTickets', ticketId, { status, updatedAt: new Date().toISOString().split('T')[0] }, `Updated status to ${status}`);
     if (activeTicket && activeTicket.id === ticketId) {
       setActiveTicket({ ...activeTicket, status });
@@ -189,7 +312,11 @@ export const SupportTicketsPage: React.FC = () => {
   };
 
   // Admin Assign Faculty Handler
-  const handleAssignFaculty = (ticketId: string, facId: string) => {
+  const handleAssignFaculty = async (ticketId: string, facId: string) => {
+    try {
+      await helpdeskService.assignTicketServer(ticketId, facId);
+    } catch (e) { }
+
     const fac = facultyList.find(f => f.id === facId);
     db.updateEntity<SupportTicket>('supportTickets', ticketId, {
       assignedFacultyId: facId,
@@ -371,7 +498,7 @@ export const SupportTicketsPage: React.FC = () => {
                   </ExcelTd>
                 </tr>
               ) : (
-                displayedTickets.map(tkt => (
+                paginatedTickets.map(tkt => (
                   <tr key={tkt.id}>
                     <ExcelTd align="left" mono color="#1E40AF">
                       <span style={{ fontWeight: 800, whiteSpace: 'nowrap' }}>{tkt.ticketNo}</span>
@@ -438,7 +565,7 @@ export const SupportTicketsPage: React.FC = () => {
 
                     <ExcelTd align="center">
                       <button 
-                        onClick={() => setActiveTicket(tkt)} 
+                        onClick={() => handleOpenTicketDetails(tkt)} 
                         className="btn btn-secondary btn-sm" 
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap', padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
                       >
@@ -451,6 +578,56 @@ export const SupportTicketsPage: React.FC = () => {
             </tbody>
           </ExcelTable>
         </ExcelTableContainer>
+
+        {/* Server-Grade Controlled Pagination */}
+        {totalRecords > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              Showing <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{(currentPage - 1) * pageSize + 1}</span> to <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{Math.min(currentPage * pageSize, totalRecords)}</span> of <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{totalRecords}</span> tickets
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                <span>Rows per page:</span>
+                <select 
+                  className="form-select" 
+                  value={pageSize} 
+                  onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                  style={{ width: 'auto', padding: '0.2rem 0.6rem', fontSize: '0.85rem' }}
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  style={{ padding: '0.35rem 0.6rem' }}
+                >
+                  <ChevronLeft size={14} /> Previous
+                </button>
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, padding: '0 0.5rem' }}>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  style={{ padding: '0.35rem 0.6rem' }}
+                >
+                  Next <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* CREATE TICKET MODAL (STUDENT) */}

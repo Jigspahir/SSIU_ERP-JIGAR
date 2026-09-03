@@ -27,6 +27,10 @@ export class AddNoteSheetAttachmentDto {
   @Type(() => Number)
   fileSize?: number;
 
+  @IsOptional()
+  @IsString()
+  documentCategory?: string;
+
   @IsString()
   @IsNotEmpty()
   fileUrl!: string;

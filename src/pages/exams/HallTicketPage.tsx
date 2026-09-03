@@ -5,6 +5,7 @@ import { Badge } from '../../components/common/Badge';
 import { hallTicketDataService } from '../../services/hallTicketDataService';
 import { hallTicketPdfService } from '../../services/hallTicketPdfService';
 import { HallTicketData } from '../../types/hallTicket';
+import { HallTicketPrint, printIsolatedHallTicket } from '../../components/hall-ticket/HallTicketPrint';
 import {
   FileText,
   Download,
@@ -22,7 +23,8 @@ import {
   Users,
   Eye,
   RefreshCw,
-  QrCode
+  QrCode,
+  X
 } from 'lucide-react';
 import logoSvg from '../../assets/swarrnim-logo.svg';
 
@@ -49,6 +51,9 @@ export const HallTicketPage: React.FC<HallTicketPageProps> = ({ setActiveTab }) 
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [generatingBulk, setGeneratingBulk] = useState<boolean>(false);
+
+  // Modal Preview for Admin / Faculty
+  const [previewTicket, setPreviewTicket] = useState<HallTicketData | null>(null);
 
   // Current Exam Object
   const currentExam = useMemo(() => exams.find(e => e.id === selectedExamId) || exams[0], [exams, selectedExamId]);
@@ -92,9 +97,9 @@ export const HallTicketPage: React.FC<HallTicketPageProps> = ({ setActiveTab }) 
     hallTicketPdfService.downloadPdf(ticket);
   };
 
-  // Handler: Print Single PDF
+  // Handler: Print Single PDF / Open Preview
   const handlePrintPdf = (ticket: HallTicketData) => {
-    hallTicketPdfService.openInNewTab(ticket);
+    setPreviewTicket(ticket);
   };
 
   // Handler: Download Bulk PDFs
@@ -124,7 +129,7 @@ export const HallTicketPage: React.FC<HallTicketPageProps> = ({ setActiveTab }) 
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* ── 1. EXAMINATION MODULE NAVIGATION HEADER ──────────────────────── */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 no-print">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
@@ -171,7 +176,7 @@ export const HallTicketPage: React.FC<HallTicketPageProps> = ({ setActiveTab }) 
       </div>
 
       {/* ── 2. FILTER & SELECTION BAR ────────────────────────────────────── */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 no-print">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Exam Event */}
           <div>
@@ -248,11 +253,11 @@ export const HallTicketPage: React.FC<HallTicketPageProps> = ({ setActiveTab }) 
         </div>
       </div>
 
-      {/* ── 3. STUDENT VIEW: OFFICIAL LIVE HALL TICKET CARD ─────────────────── */}
+      {/* ── 3. STUDENT VIEW: OFFICIAL LIVE HALL TICKET DOCUMENT PREVIEW ───── */}
       {isStudent && (
         <div className="space-y-6">
           {!currentStudentForm ? (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center no-print">
               <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-3 opacity-80" />
               <h3 className="text-lg font-bold text-slate-900">No Exam Form Submitted</h3>
               <p className="text-sm text-slate-600 mt-1 max-w-md mx-auto">
@@ -268,7 +273,7 @@ export const HallTicketPage: React.FC<HallTicketPageProps> = ({ setActiveTab }) 
               )}
             </div>
           ) : !studentHallTicket ? (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center no-print">
               <Clock className="w-12 h-12 text-orange-500 mx-auto mb-3 opacity-80" />
               <h3 className="text-lg font-bold text-slate-900">Hall Ticket Under Verification</h3>
               <p className="text-sm text-slate-600 mt-1 max-w-md mx-auto">
@@ -277,130 +282,53 @@ export const HallTicketPage: React.FC<HallTicketPageProps> = ({ setActiveTab }) 
               </p>
             </div>
           ) : (
-            <div className="bg-white rounded-xl shadow-md border-2 border-blue-900 overflow-hidden">
-              {/* Top Banner with Actions */}
-              <div className="bg-gradient-to-r from-blue-950 via-blue-900 to-blue-950 text-white p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 border-orange-500">
+            <div className="space-y-4">
+              {/* Document Actions Bar */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-500 text-white">
-                      ✓ HALL TICKET ISSUED &amp; VERIFIED
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      ✓ OFFICIAL HALL TICKET READY
                     </span>
-                    <span className="text-xs text-blue-200">AY {studentHallTicket.academicYear}</span>
+                    <span className="text-xs text-slate-500 font-semibold">
+                      AY {studentHallTicket.academicYear} • {studentHallTicket.examSession}
+                    </span>
                   </div>
-                  <h2 className="text-xl font-black tracking-tight mt-1">
-                    {studentHallTicket.documentTitle}
+                  <h2 className="text-lg font-black text-slate-900 mt-1">
+                    {studentHallTicket.studentName} — Official Examination Admit Card
                   </h2>
-                  <p className="text-xs text-blue-200 mt-0.5">
-                    Hall Ticket No: <strong className="text-orange-400">{studentHallTicket.hallTicketNo}</strong> • Seat No: <strong className="text-emerald-300">{studentHallTicket.examSeatNo}</strong>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    Enrollment No: <strong className="text-slate-900 font-mono">{studentHallTicket.enrollmentNo}</strong> • Hall Ticket No: <strong className="text-blue-900 font-mono">{studentHallTicket.hallTicketNo}</strong> • Allocated Seat: <strong className="text-orange-600 font-mono">{studentHallTicket.examSeatNo}</strong>
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
-                    onClick={() => handleViewPdf(studentHallTicket)}
-                    className="flex items-center gap-1.5 px-3.5 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-lg shadow-sm transition"
+                    onClick={() => printIsolatedHallTicket('ssiu-ht-doc')}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white text-xs font-bold rounded-lg shadow-sm transition"
                   >
-                    <ExternalLink className="w-3.5 h-3.5" /> View Hall Ticket (PDF)
+                    <Printer className="w-3.5 h-3.5" /> Print Official Hall Ticket
                   </button>
 
                   <button
                     onClick={() => handleDownloadPdf(studentHallTicket)}
-                    className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-800 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition border border-blue-600"
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-lg shadow-sm transition"
                   >
                     <Download className="w-3.5 h-3.5" /> Download PDF
                   </button>
 
                   <button
-                    onClick={() => handlePrintPdf(studentHallTicket)}
-                    className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-lg shadow-sm transition"
+                    onClick={() => handleViewPdf(studentHallTicket)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-bold rounded-lg shadow-sm transition"
                   >
-                    <Printer className="w-3.5 h-3.5" /> Print
+                    <ExternalLink className="w-3.5 h-3.5" /> Open in PDF Viewer
                   </button>
                 </div>
               </div>
 
-              {/* Student Metadata Card Grid */}
-              <div className="p-6 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  <div>
-                    <span className="text-xs text-slate-500 font-semibold uppercase">Candidate Name</span>
-                    <div className="text-sm font-bold text-blue-950 mt-0.5">{studentHallTicket.studentName}</div>
-                  </div>
-                  <div>
-                    <span className="text-xs text-slate-500 font-semibold uppercase">Enrollment Number</span>
-                    <div className="text-sm font-bold text-slate-900 mt-0.5">{studentHallTicket.enrollmentNo}</div>
-                  </div>
-                  <div>
-                    <span className="text-xs text-slate-500 font-semibold uppercase">Program &amp; Branch</span>
-                    <div className="text-sm font-semibold text-slate-900 mt-0.5">{studentHallTicket.programName}</div>
-                  </div>
-                  <div>
-                    <span className="text-xs text-slate-500 font-semibold uppercase">Allocated Exam Centre</span>
-                    <div className="text-sm font-bold text-orange-600 mt-0.5">{studentHallTicket.centreName}</div>
-                  </div>
-                </div>
-
-                {/* Examination Subject Timetable Table */}
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-blue-900" /> Allocated Exam Sessions &amp; Seating Plan
-                    </h3>
-                    <span className="text-xs font-semibold text-slate-500">
-                      {studentHallTicket.subjects.length} Registered Subject(s)
-                    </span>
-                  </div>
-
-                  <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-blue-950 text-white uppercase text-[11px] tracking-wider">
-                        <tr>
-                          <th className="py-3 px-3 text-center">Sr.</th>
-                          <th className="py-3 px-3">Subject Code</th>
-                          <th className="py-3 px-4">Subject Title</th>
-                          <th className="py-3 px-3">Exam Date</th>
-                          <th className="py-3 px-3">Day</th>
-                          <th className="py-3 px-3">Timing</th>
-                          <th className="py-3 px-3 text-center">Room / Block</th>
-                          <th className="py-3 px-3 text-center">Seat No.</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200">
-                        {studentHallTicket.subjects.map((sub, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                            <td className="py-2.5 px-3 text-center text-slate-500 font-medium">{sub.sr}</td>
-                            <td className="py-2.5 px-3 font-bold text-blue-950">{sub.subjectCode}</td>
-                            <td className="py-2.5 px-4 font-semibold text-slate-800">{sub.subjectName}</td>
-                            <td className="py-2.5 px-3 font-semibold text-slate-700">{sub.examDate}</td>
-                            <td className="py-2.5 px-3 text-slate-600">{sub.examDay}</td>
-                            <td className="py-2.5 px-3 font-medium text-slate-700">{sub.examTime}</td>
-                            <td className="py-2.5 px-3 text-center">
-                              <span className="px-2 py-0.5 bg-blue-50 text-blue-800 rounded font-bold text-[11px] border border-blue-200">
-                                {sub.roomNo}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3 text-center">
-                              <span className="px-2 py-0.5 bg-orange-50 text-orange-800 rounded font-black text-[11px] border border-orange-200">
-                                {sub.seatNo}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Important Instructions Box */}
-                <div className="bg-amber-50/70 border border-amber-200 rounded-lg p-4 text-xs text-amber-900 space-y-1.5">
-                  <div className="font-bold flex items-center gap-1.5 text-amber-950 mb-1">
-                    <AlertTriangle className="w-4 h-4 text-amber-700" />
-                    IMPORTANT CANDIDATE INSTRUCTIONS:
-                  </div>
-                  <p>• Carry this printed Hall Ticket along with your Valid University ID Card to every exam session.</p>
-                  <p>• Report to the allocated exam centre at least 30 minutes before exam commencement ({studentHallTicket.reportingTime}).</p>
-                  <p>• Mobile phones, smart watches, digital watches, and unauthorized material are strictly prohibited.</p>
-                </div>
+              {/* On-Screen A4 Proportion Document Preview */}
+              <div className="rounded-xl overflow-hidden shadow-md border border-slate-300">
+                <HallTicketPrint ticket={studentHallTicket} />
               </div>
             </div>
           )}
@@ -411,7 +339,7 @@ export const HallTicketPage: React.FC<HallTicketPageProps> = ({ setActiveTab }) 
       {isAdminOrFaculty && (
         <div className="space-y-6">
           {/* KPI Metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 no-print">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -462,7 +390,7 @@ export const HallTicketPage: React.FC<HallTicketPageProps> = ({ setActiveTab }) 
           </div>
 
           {/* Directory Card */}
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden no-print">
             <div className="p-5 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h3 className="text-base font-bold text-slate-900">
@@ -528,11 +456,11 @@ export const HallTicketPage: React.FC<HallTicketPageProps> = ({ setActiveTab }) 
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
-                              onClick={() => handleViewPdf(ticket)}
-                              title="View Hall Ticket PDF"
-                              className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded transition border border-blue-200"
+                              onClick={() => setPreviewTicket(ticket)}
+                              title="Preview &amp; Print Official Hall Ticket"
+                              className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded transition border border-blue-200 flex items-center gap-1 font-bold text-[11px] px-2"
                             >
-                              <ExternalLink className="w-3.5 h-3.5" />
+                              <Eye className="w-3.5 h-3.5" /> Preview
                             </button>
                             <button
                               onClick={() => handleDownloadPdf(ticket)}
@@ -542,8 +470,13 @@ export const HallTicketPage: React.FC<HallTicketPageProps> = ({ setActiveTab }) 
                               <Download className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => handlePrintPdf(ticket)}
-                              title="Print Hall Ticket"
+                              onClick={() => {
+                                setPreviewTicket(ticket);
+                                setTimeout(() => {
+                                  printIsolatedHallTicket('ssiu-admin-ht-preview-inner');
+                                }, 200);
+                              }}
+                              title="Print Hall Ticket Document"
                               className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded transition border border-slate-300"
                             >
                               <Printer className="w-3.5 h-3.5" />
@@ -555,6 +488,62 @@ export const HallTicketPage: React.FC<HallTicketPageProps> = ({ setActiveTab }) 
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 5. ADMIN DOCUMENT PREVIEW MODAL ───────────────────────────────── */}
+      {previewTicket && (
+        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto no-print">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[95vh] flex flex-col overflow-hidden border border-slate-300">
+            {/* Modal Header */}
+            <div className="p-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-700">
+              <div className="flex items-center gap-3">
+                <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Official Examination Hall Ticket Preview — {previewTicket.studentName}
+                  </h3>
+                  <p className="text-xs text-slate-400 font-mono">
+                    Enrollment: {previewTicket.enrollmentNo} | Hall Ticket No: {previewTicket.hallTicketNo} | Seat: {previewTicket.examSeatNo}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => printIsolatedHallTicket('ssiu-admin-ht-preview-inner')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition shadow-sm"
+                >
+                  <Printer className="w-3.5 h-3.5" /> Print Hall Ticket
+                </button>
+                <button
+                  onClick={() => handleDownloadPdf(previewTicket)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded-lg transition"
+                >
+                  <Download className="w-3.5 h-3.5" /> Download PDF
+                </button>
+                <button
+                  onClick={() => handleViewPdf(previewTicket)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold rounded-lg transition"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" /> Open Tab
+                </button>
+                <button
+                  onClick={() => setPreviewTicket(null)}
+                  className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition ml-2"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body: A4 Document Preview */}
+            <div className="p-6 overflow-y-auto bg-slate-200 flex justify-center">
+              <div id="ssiu-admin-ht-preview-inner" className="w-full flex justify-center">
+                <HallTicketPrint ticket={previewTicket} />
+              </div>
             </div>
           </div>
         </div>

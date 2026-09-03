@@ -41,7 +41,7 @@ export const MarksheetCertificateViewer: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 text-xs text-slate-600">
-          <span>Student Identifier:</span>
+          <span>Enrollment No:</span>
           <input
             type="text"
             value={studentId}

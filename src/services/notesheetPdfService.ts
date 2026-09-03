@@ -13,6 +13,7 @@ import {
   UnauthorizedError, ForbiddenError, NotFoundError,
   ApiResponse, successResponse, errorResponse
 } from './apiResponse';
+import QRCode from 'qrcode';
 
 export interface NoteSheetPdfGenerationOptions {
   watermarkText?: string;
@@ -132,10 +133,14 @@ class NoteSheetPdfService {
     const items = note.items || [];
     const revisions = note.financialRevisionHistory || [];
     const movements = note.movements || [];
-    const attachments = note.attachments || [];
-
     const requestedAmt = note.originalRequestedAmount || note.requestedAmount || note.estimatedCost || 0;
     const approvedAmt = note.approvedAmount !== undefined ? note.approvedAmount : (note.finalApprovedAmount !== undefined ? note.finalApprovedAmount : undefined);
+
+    // Collect attachments from both attachmentObjects (rich meta) and attachments string array
+    const rawAttachments: any[] = (note.attachmentObjects && note.attachmentObjects.length > 0)
+      ? note.attachmentObjects
+      : (note.attachments || []);
+    const attachments = rawAttachments.filter(Boolean);
 
     // Initialize A4 Portrait Document
     const doc = new jsPDF({
@@ -177,6 +182,114 @@ class NoteSheetPdfService {
 
     drawWatermark();
 
+    // ──────────────────────────────────────────────────────────────────────────
+    // TYPOGRAPHY OVERFLOW & FIT PROTECTION HELPERS
+    // Ensures text never visually leaves its assigned bounding box or overlaps neighbors
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Draws single-line text within a max bounding width.
+     * If the text exceeds maxWidth, font size is dynamically reduced down to minFontSize.
+     * If it still exceeds, it is cleanly truncated with an ellipsis.
+     */
+    const drawFittedText = (
+      text: string,
+      x: number,
+      y: number,
+      maxWidth: number,
+      options: {
+        align?: 'left' | 'center' | 'right';
+        initialFontSize?: number;
+        minFontSize?: number;
+        fontStyle?: 'normal' | 'bold' | 'italic';
+        textColor?: [number, number, number];
+      } = {}
+    ): number => {
+      const {
+        align = 'left',
+        initialFontSize = 8.25,
+        minFontSize = 5.5,
+        fontStyle = 'normal',
+        textColor = colorBlack
+      } = options;
+
+      doc.setFont('times', fontStyle);
+      doc.setTextColor(...textColor);
+
+      let currentSize = initialFontSize;
+      doc.setFontSize(currentSize);
+      let textWidth = doc.getTextWidth(text);
+
+      while (textWidth > maxWidth && currentSize > minFontSize) {
+        currentSize = Math.max(minFontSize, currentSize - 0.4);
+        doc.setFontSize(currentSize);
+        textWidth = doc.getTextWidth(text);
+      }
+
+      let renderText = text;
+      if (textWidth > maxWidth) {
+        // Safe character-level truncation with ellipsis
+        let truncated = text;
+        while (truncated.length > 3 && doc.getTextWidth(truncated + '...') > maxWidth) {
+          truncated = truncated.slice(0, -1);
+        }
+        renderText = truncated + '...';
+      }
+
+      doc.text(renderText, x, y, { align });
+      return currentSize;
+    };
+
+    /**
+     * Draws multi-line wrapped text within maxWidth and maxHeight limits.
+     * Prevents text from running into lines below it or outside container boxes.
+     */
+    const drawBoundedWrappedText = (
+      text: string,
+      x: number,
+      startY: number,
+      maxWidth: number,
+      maxHeight: number,
+      options: {
+        lineSpacing?: number;
+        fontSize?: number;
+        fontStyle?: 'normal' | 'bold' | 'italic';
+        textColor?: [number, number, number];
+        maxLines?: number;
+      } = {}
+    ): number => {
+      const {
+        lineSpacing = 3.4,
+        fontSize = 8.25,
+        fontStyle = 'normal',
+        textColor = colorBlack,
+        maxLines = 99
+      } = options;
+
+      doc.setFont('times', fontStyle);
+      doc.setFontSize(fontSize);
+      doc.setTextColor(...textColor);
+
+      const rawLines: string[] = doc.splitTextToSize(text, maxWidth);
+      const allowedByHeight = Math.max(1, Math.floor(maxHeight / lineSpacing));
+      const limit = Math.min(rawLines.length, allowedByHeight, maxLines);
+
+      let currentLineY = startY;
+      for (let i = 0; i < limit; i++) {
+        let line = rawLines[i];
+        if (i === limit - 1 && rawLines.length > limit) {
+          while (line.length > 3 && doc.getTextWidth(line + '...') > maxWidth) {
+            line = line.slice(0, -1);
+          }
+          line += '...';
+        }
+        doc.text(line, x, currentLineY);
+        currentLineY += lineSpacing;
+      }
+
+      return currentLineY;
+    };
+
     // ─── 1. OFFICIAL UNIVERSITY LETTERHEAD HEADER (STRICT DOCUMENT FLOW) ───
     // A. Official University Logo (Center aligned, reserved layout box, 1:1 aspect ratio)
     const logoWidth = 22; // ~83px on A4 canvas
@@ -190,23 +303,66 @@ class NoteSheetPdfService {
       // Fallback if image fails
     }
 
+    // A2. Secure Official Verification QR Code (Top-Right, within page border)
+    try {
+      const verificationToken = note.verificationId || note.noteSheetNumber || note.id;
+      const baseUrl = typeof window !== 'undefined' && window.location?.origin
+        ? window.location.origin
+        : 'https://erp.swarrnim.edu.in';
+      const verifyUrl = `${baseUrl}/verify/notesheet/${encodeURIComponent(verificationToken)}`;
+
+      const qr = QRCode.create(verifyUrl, { errorCorrectionLevel: 'M' });
+      const qrBoxSize = 16.5; // 16.5mm x 16.5mm compact square
+      const qrX = pageWidth - margin - qrBoxSize; // right-aligned against content margin
+      const qrY = currentY;
+      const matrixSize = qr.modules.size;
+      const cellSize = qrBoxSize / matrixSize;
+
+      // Draw pure vector QR modules
+      doc.setFillColor(255, 255, 255);
+      doc.rect(qrX, qrY, qrBoxSize, qrBoxSize, 'F');
+      doc.setFillColor(0, 0, 0);
+
+      for (let r = 0; r < matrixSize; r++) {
+        for (let c = 0; c < matrixSize; c++) {
+          if (qr.modules.get(r, c)) {
+            doc.rect(qrX + c * cellSize, qrY + r * cellSize, cellSize, cellSize, 'F');
+          }
+        }
+      }
+
+      // Small subtitle under QR code
+      doc.setFont('times', 'normal');
+      doc.setFontSize(6);
+      doc.setTextColor(...colorBlack);
+      doc.text('Scan to Verify', qrX + (qrBoxSize / 2), qrY + qrBoxSize + 2.2, { align: 'center' });
+    } catch {
+      // Non-blocking fallback
+    }
+
     // Reserved vertical displacement past the logo + clean gap
     currentY += logoHeight + 4.5;
 
-    // B. University Name (14px / 10.5pt Bold, Centered, Black)
-    doc.setFont('times', 'bold');
-    doc.setFontSize(10.5);
-    doc.setTextColor(...colorBlack);
-    doc.text('SWARRNIM STARTUP & INNOVATION UNIVERSITY', pageWidth / 2, currentY, { align: 'center' });
+    // B. University Name (14px / 10.5pt Bold, Centered, Black, Overflow-Protected)
+    drawFittedText('SWARRNIM STARTUP & INNOVATION UNIVERSITY', pageWidth / 2, currentY, contentWidth - 4, {
+      align: 'center',
+      initialFontSize: 10.5,
+      minFontSize: 8.5,
+      fontStyle: 'bold',
+      textColor: colorBlack
+    });
     currentY += 4.5;
 
-    // C. Institute / Department Full Official Name (14px / 10.5pt Bold, Centered, Black)
+    // C. Institute / Department Full Official Name (14px / 10.5pt Bold, Centered, Black, Overflow-Protected)
     const instituteDisplayName = note.instituteName || note.instituteCode || 'Swarrnim Institute of Technology';
     const departmentDisplayName = note.department || note.departmentName || 'General Administration';
-    doc.setFont('times', 'bold');
-    doc.setFontSize(10.5);
-    doc.setTextColor(...colorBlack);
-    doc.text(instituteDisplayName.toUpperCase(), pageWidth / 2, currentY, { align: 'center' });
+    drawFittedText(instituteDisplayName.toUpperCase(), pageWidth / 2, currentY, contentWidth - 4, {
+      align: 'center',
+      initialFontSize: 10.5,
+      minFontSize: 8,
+      fontStyle: 'bold',
+      textColor: colorBlack
+    });
     currentY += 4.5;
 
     // D. Thin Horizontal Divider Line
@@ -301,43 +457,88 @@ class NoteSheetPdfService {
       doc.line(midX, currentY + 1.5, midX, currentY + regBoxH - 1.5);
 
       // LEFT COLUMN: ORIGINATING OFFICE / OUTWARD
-      doc.setFont('times', 'bold');
-      doc.setFontSize(8.25);
-      doc.setTextColor(0, 0, 0);
-      doc.text('ORIGINATING OFFICE DISPATCH', margin + 2.5, currentY + 3.8);
+      const colInnerW = colHalfW - 5;
+      drawFittedText('ORIGINATING OFFICE DISPATCH', margin + 2.5, currentY + 3.8, colInnerW, {
+        fontStyle: 'bold',
+        initialFontSize: 8.25,
+        minFontSize: 7,
+        textColor: [0, 0, 0]
+      });
 
-      doc.setFont('times', 'normal');
-      doc.setFontSize(8.25);
-      doc.text(`Institute / Dept: ${departmentDisplayName}`, margin + 2.5, currentY + 7.4);
+      drawFittedText(`Institute / Dept: ${departmentDisplayName}`, margin + 2.5, currentY + 7.4, colInnerW, {
+        fontStyle: 'normal',
+        initialFontSize: 8.25,
+        minFontSize: 6.5,
+        textColor: [0, 0, 0]
+      });
 
       if (note.outwardNumber) {
-        doc.setFont('times', 'bold');
-        doc.text(`Outward No.: ${note.outwardNumber}`, margin + 2.5, currentY + 11);
-        doc.setFont('times', 'normal');
-        doc.text(`Date: ${note.outwardDate || note.date}`, margin + 2.5, currentY + 14.6);
+        drawFittedText(`Outward No.: ${note.outwardNumber}`, margin + 2.5, currentY + 11, colInnerW, {
+          fontStyle: 'bold',
+          initialFontSize: 8.25,
+          minFontSize: 7,
+          textColor: [0, 0, 0]
+        });
+        drawFittedText(`Date: ${note.outwardDate || note.date}`, margin + 2.5, currentY + 14.6, colInnerW, {
+          fontStyle: 'normal',
+          initialFontSize: 8.25,
+          minFontSize: 7,
+          textColor: [0, 0, 0]
+        });
       } else {
-        doc.setFont('times', 'italic');
-        doc.text('Outward No.: Pending Registrar Dispatch', margin + 2.5, currentY + 11);
-        doc.setFont('times', 'normal');
-        doc.text(`Date: ${note.date || 'N/A'}`, margin + 2.5, currentY + 14.6);
+        drawFittedText('Outward No.: Pending Registrar Dispatch', margin + 2.5, currentY + 11, colInnerW, {
+          fontStyle: 'italic',
+          initialFontSize: 8.25,
+          minFontSize: 7,
+          textColor: [0, 0, 0]
+        });
+        drawFittedText(`Date: ${note.date || 'N/A'}`, margin + 2.5, currentY + 14.6, colInnerW, {
+          fontStyle: 'normal',
+          initialFontSize: 8.25,
+          minFontSize: 7,
+          textColor: [0, 0, 0]
+        });
       }
-      doc.text(`Person: ${note.creatorName || 'Faculty / Staff'} | Contact: ${note.contactNumber || 'N/A'}`, margin + 2.5, currentY + 18.2);
+      drawFittedText(`Person: ${note.creatorName || 'Faculty / Staff'} | Contact: ${note.contactNumber || 'N/A'}`, margin + 2.5, currentY + 18.2, colInnerW, {
+        fontStyle: 'normal',
+        initialFontSize: 8.25,
+        minFontSize: 6,
+        textColor: [0, 0, 0]
+      });
 
       // RIGHT COLUMN: REGISTRAR OFFICE INWARD
-      doc.setFont('times', 'bold');
-      doc.setFontSize(10.5);
-      doc.setTextColor(0, 0, 0);
-      doc.text('REGISTRAR OFFICE', midX + 2.5, currentY + 3.8);
+      drawFittedText('REGISTRAR OFFICE', midX + 2.5, currentY + 3.8, colInnerW, {
+        fontStyle: 'bold',
+        initialFontSize: 9.5,
+        minFontSize: 7.5,
+        textColor: [0, 0, 0]
+      });
 
-      doc.setFont('times', 'bold');
-      doc.setFontSize(8.25);
-      doc.text(`Inward No.: ${note.inwardNumber || 'N/A'}`, midX + 2.5, currentY + 7.4);
+      drawFittedText(`Inward No.: ${note.inwardNumber || 'N/A'}`, midX + 2.5, currentY + 7.4, colInnerW, {
+        fontStyle: 'bold',
+        initialFontSize: 8.25,
+        minFontSize: 7,
+        textColor: [0, 0, 0]
+      });
 
-      doc.setFont('times', 'normal');
-      doc.text(`Date: ${note.inwardDate || note.date}`, midX + 2.5, currentY + 11);
-      doc.text(`Receiver Name: ${note.inwardReceivedByName || 'Registrar Directorate'}`, midX + 2.5, currentY + 14.6);
-      doc.setFont('times', 'bold');
-      doc.text('Sign: [✓ Authenticated Administrative Record]', midX + 2.5, currentY + 18.2);
+      drawFittedText(`Date: ${note.inwardDate || note.date}`, midX + 2.5, currentY + 11, colInnerW, {
+        fontStyle: 'normal',
+        initialFontSize: 8.25,
+        minFontSize: 7,
+        textColor: [0, 0, 0]
+      });
+      drawFittedText(`Receiver Name: ${note.inwardReceivedByName || 'Registrar Directorate'}`, midX + 2.5, currentY + 14.6, colInnerW, {
+        fontStyle: 'normal',
+        initialFontSize: 8.25,
+        minFontSize: 6.5,
+        textColor: [0, 0, 0]
+      });
+      drawFittedText('Sign: [✓ Authenticated Administrative Record]', midX + 2.5, currentY + 18.2, colInnerW, {
+        fontStyle: 'bold',
+        initialFontSize: 8.25,
+        minFontSize: 6.5,
+        textColor: [0, 0, 0]
+      });
 
       currentY += regBoxH + 2.5;
     }
@@ -476,7 +677,7 @@ class NoteSheetPdfService {
         currentY = doc.lastAutoTable.finalY + 3;
       }
 
-      // Financial Summary Box (11px / 8.25pt Black on White)
+      // Financial Summary Box (11px / 8.25pt Black on White, Overflow-Protected)
       ensureVerticalSpace(25);
       const finBoxHeight = 22;
       doc.setDrawColor(0, 0, 0);
@@ -484,41 +685,69 @@ class NoteSheetPdfService {
       doc.setFillColor(255, 255, 255);
       doc.rect(margin, currentY, contentWidth, finBoxHeight, 'FD');
 
-      doc.setFont('times', 'bold');
-      doc.setFontSize(8.25);
-      doc.setTextColor(...colorBlack);
-      doc.text(`Requested Amount: Rs. ${formatIndianCurrency(requestedAmt)}`, margin + 3, currentY + 4.5);
+      const finLeftColW = 92; // Up to margin + 95mm
+      const finRightColX = margin + 96;
+      const finRightColW = contentWidth - 98; // 76mm
+
+      // Left Column: Requested & Approved Amounts with in-words
+      drawFittedText(`Requested Amount: Rs. ${formatIndianCurrency(requestedAmt)}`, margin + 3, currentY + 4.5, finLeftColW, {
+        fontStyle: 'bold',
+        initialFontSize: 8.25,
+        minFontSize: 7,
+        textColor: colorBlack
+      });
       
       const requestedWords = amountToWords(requestedAmt);
-      doc.setFont('times', 'normal');
-      doc.setFontSize(8.25);
-      doc.setTextColor(...colorBlack);
-      doc.text(`(Rupees ${requestedWords} Only)`, margin + 3, currentY + 8.5);
+      drawFittedText(`(Rupees ${requestedWords} Only)`, margin + 3, currentY + 8.5, finLeftColW, {
+        fontStyle: 'normal',
+        initialFontSize: 8.25,
+        minFontSize: 6.5,
+        textColor: colorBlack
+      });
 
       if (approvedAmt !== undefined) {
-        doc.setFont('times', 'bold');
-        doc.setFontSize(8.25);
-        doc.setTextColor(...colorBlack);
-        doc.text(`Final Sanctioned Amount: Rs. ${formatIndianCurrency(approvedAmt)}`, margin + 3, currentY + 13.5);
+        drawFittedText(`Final Sanctioned Amount: Rs. ${formatIndianCurrency(approvedAmt)}`, margin + 3, currentY + 13.5, finLeftColW, {
+          fontStyle: 'bold',
+          initialFontSize: 8.25,
+          minFontSize: 7,
+          textColor: colorBlack
+        });
 
         const approvedWords = amountToWords(approvedAmt);
-        doc.setFont('times', 'normal');
-        doc.setFontSize(8.25);
-        doc.text(`(Rupees ${approvedWords} Only)`, margin + 3, currentY + 17.5);
+        drawFittedText(`(Rupees ${approvedWords} Only)`, margin + 3, currentY + 17.5, finLeftColW, {
+          fontStyle: 'normal',
+          initialFontSize: 8.25,
+          minFontSize: 6.5,
+          textColor: colorBlack
+        });
       } else {
-        doc.setFont('times', 'normal');
-        doc.setFontSize(8.25);
-        doc.setTextColor(...colorBlack);
-        doc.text('Final Sanctioned Amount: Pending Competent Authority Approval', margin + 3, currentY + 14);
+        drawFittedText('Final Sanctioned Amount: Pending Competent Authority Approval', margin + 3, currentY + 14, finLeftColW, {
+          fontStyle: 'normal',
+          initialFontSize: 8.25,
+          minFontSize: 6.5,
+          textColor: colorBlack
+        });
       }
 
-      // Budget Head & Category on right side of fin box (11px / 8.25pt Black)
-      doc.setFont('times', 'normal');
-      doc.setFontSize(8.25);
-      doc.setTextColor(...colorBlack);
-      doc.text(`Budget Head: ${note.budgetHead || 'General Operational'}`, margin + 100, currentY + 4.5);
-      doc.text(`Expense Category: ${note.expenseCategory || 'Operating Expense'}`, margin + 100, currentY + 8.5);
-      doc.text(`Budget Status: ${note.budgetAvailable ? 'Funds Available & Allocated' : 'Subject to Executive Allocation'}`, margin + 100, currentY + 13.5);
+      // Right Column: Budget Head, Category & Status (11px / 8.25pt Black)
+      drawFittedText(`Budget Head: ${note.budgetHead || 'General Operational'}`, finRightColX, currentY + 4.5, finRightColW, {
+        fontStyle: 'normal',
+        initialFontSize: 8.25,
+        minFontSize: 6.5,
+        textColor: colorBlack
+      });
+      drawFittedText(`Expense Category: ${note.expenseCategory || 'Operating Expense'}`, finRightColX, currentY + 8.5, finRightColW, {
+        fontStyle: 'normal',
+        initialFontSize: 8.25,
+        minFontSize: 6.5,
+        textColor: colorBlack
+      });
+      drawFittedText(`Budget Status: ${note.budgetAvailable ? 'Funds Available & Allocated' : 'Subject to Executive Allocation'}`, finRightColX, currentY + 13.5, finRightColW, {
+        fontStyle: 'normal',
+        initialFontSize: 8.25,
+        minFontSize: 6.5,
+        textColor: colorBlack
+      });
 
       currentY += finBoxHeight + 4;
 
@@ -588,6 +817,49 @@ class NoteSheetPdfService {
       }
     }
 
+    /**
+     * Robust text wrapping helper that handles long words, tokens, and multi-line wrapping
+     * with exact font and font size matching.
+     */
+    const wrapRobustText = (
+      text: string,
+      font: string,
+      fontStyle: 'normal' | 'bold' | 'italic',
+      fontSize: number,
+      maxWidth: number
+    ): string[] => {
+      doc.setFont(font, fontStyle);
+      doc.setFontSize(fontSize);
+
+      if (!text || text.trim().length === 0) return [];
+
+      // Pre-process unbroken tokens that exceed maxWidth by breaking them
+      const words = text.split(' ');
+      const processedWords: string[] = [];
+
+      for (const w of words) {
+        if (doc.getTextWidth(w) <= maxWidth) {
+          processedWords.push(w);
+        } else {
+          // Break token into smaller chunks
+          let curChunk = '';
+          for (let c = 0; c < w.length; c++) {
+            const char = w[c];
+            if (doc.getTextWidth(curChunk + char) <= maxWidth - 2) {
+              curChunk += char;
+            } else {
+              if (curChunk) processedWords.push(curChunk);
+              curChunk = char;
+            }
+          }
+          if (curChunk) processedWords.push(curChunk);
+        }
+      }
+
+      const rebuiltText = processedWords.join(' ');
+      return doc.splitTextToSize(rebuiltText, maxWidth);
+    };
+
     // ─── 7. SECTION 4: APPROVAL HIERARCHY & SIGNATURE SNAPSHOTS ─────────
     // Keep-Together Pagination: Treat the COMPLETE Approval & Signature Section as ONE atomic block.
     const signatureLevels = [
@@ -600,10 +872,100 @@ class NoteSheetPdfService {
     ];
 
     const sigBoxWidth = (contentWidth - 6) / 2; // 2 column signature layout (84mm each)
-    const sigBoxHeight = 28;
-    const numSigRows = Math.ceil(signatureLevels.length / 2);
-    // Section Header (8mm) + All Signature Rows (3 * 31.5mm)
-    const totalSection4Height = 8 + (numSigRows * (sigBoxHeight + 3.5));
+    const cardPaddingX = 3.5; // 3.5mm inner horizontal padding from card edges
+    const innerW = sigBoxWidth - (cardPaddingX * 2); // 77mm usable text width inside card
+
+    // Measure card content to determine exact dynamic height for any card
+    const measureCardContent = (lvl: { role: string; label: string }) => {
+      let matchingMove = movements.find((m: any) => {
+        const moveRole = m.fromRole || m.fromUserRole || m.actorRole || '';
+        if (lvl.role === 'INITIATOR') return m.action === 'CREATE' || m.action === 'SUBMIT';
+        if (lvl.role === 'HOD') return (m.action === 'FORWARD' || m.action === 'APPROVE') && (moveRole === 'HOD' || moveRole.includes('HOD'));
+        if (lvl.role === 'HOI') return (m.action === 'FORWARD' || m.action === 'APPROVE') && (moveRole === 'HOI' || moveRole === 'PRINCIPAL' || moveRole.includes('Principal') || moveRole.includes('Director'));
+        if (lvl.role === 'DEPUTY_REGISTRAR') return (m.action === 'FORWARD' || m.action === 'APPROVE') && (moveRole === 'DEPUTY_REGISTRAR' || moveRole.includes('Deputy Registrar'));
+        if (lvl.role === 'REGISTRAR') return (m.action === 'FORWARD' || m.action === 'APPROVE') && (moveRole === 'REGISTRAR' || moveRole.includes('Registrar'));
+        if (lvl.role === 'VICE_PRESIDENT') return m.action === 'APPROVE' && (moveRole === 'VICE_PRESIDENT' || moveRole === 'PRESIDENT' || moveRole.includes('Vice President') || isApproved);
+        return false;
+      });
+
+      if (!matchingMove && lvl.role === 'INITIATOR' && note.creatorName) {
+        matchingMove = {
+          id: 'init-1',
+          action: 'SUBMIT',
+          fromRole: note.creatorRole || 'FACULTY',
+          fromUserName: note.creatorName,
+          timestamp: note.date,
+          remarks: 'Notesheet proposal initiated and submitted for endorsement.'
+        } as any;
+      }
+
+      if (!matchingMove) {
+        return { matchingMove: null, height: 28, lines: {} as any };
+      }
+
+      const signerName = (matchingMove as any).fromUserName || matchingMove.fromUser || (matchingMove as any).actorName || 'Authorized Official';
+      const signerRole = matchingMove.designation || (matchingMove as any).fromRole || matchingMove.fromUserRole || (matchingMove as any).actorRole || 'Administrative Authority';
+      const sigHash = matchingMove.id
+        ? `SIG-${matchingMove.id.substring(0, 8).toUpperCase()}`
+        : `SIG-${(note.noteSheetNumber || 'NS').substring(0, 6)}`;
+      const actionDate = matchingMove.timestamp
+        ? new Date(matchingMove.timestamp).toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })
+        : note.date;
+
+      const nameLines = wrapRobustText(signerName, 'times', 'bold', 8.25, innerW);
+      const desigLines = wrapRobustText(`Designation: ${signerRole}`, 'times', 'normal', 7.2, innerW);
+      const dateLines = wrapRobustText(`Action Date: ${actionDate}`, 'times', 'normal', 7.2, innerW);
+      const stampLines = wrapRobustText(`[✓ DIGITALLY SIGNED & VERIFIED] (${sigHash})`, 'times', 'bold', 6.8, innerW);
+
+      let remarkLines: string[] = [];
+      if (matchingMove.remarks && matchingMove.remarks.trim()) {
+        remarkLines = wrapRobustText(`Remarks: "${matchingMove.remarks.trim()}"`, 'times', 'italic', 7.0, innerW);
+      }
+
+      // Height breakdown:
+      // Top padding (3.8) + Header Title (3.8) + Divider (2.0)
+      // + Name (nameLines.length * 3.4)
+      // + Designation (desigLines.length * 3.0)
+      // + Date (dateLines.length * 2.9)
+      // + Stamp (stampLines.length * 2.8)
+      // + Remarks (remarkLines.length * 2.8)
+      // + Bottom padding (3.0)
+      let calcH = 3.8 + 2.0 + (nameLines.length * 3.4) + (desigLines.length * 3.0) + (dateLines.length * 2.9) + (stampLines.length * 2.8) + 3.0;
+      if (remarkLines.length > 0) {
+        calcH += (remarkLines.length * 2.8) + 1.2;
+      }
+
+      const totalH = Math.max(28, calcH);
+      return {
+        matchingMove,
+        height: totalH,
+        lines: {
+          nameLines,
+          desigLines,
+          dateLines,
+          stampLines,
+          remarkLines
+        }
+      };
+    };
+
+    // Calculate total height of all 3 rows
+    let totalSection4Height = 8;
+    const measuredRows: Array<[ReturnType<typeof measureCardContent>, ReturnType<typeof measureCardContent> | null, number]> = [];
+
+    for (let i = 0; i < signatureLevels.length; i += 2) {
+      const card0 = measureCardContent(signatureLevels[i]);
+      const card1 = (i + 1 < signatureLevels.length) ? measureCardContent(signatureLevels[i + 1]) : null;
+      const rowHeight = Math.max(card0.height, card1 ? card1.height : 0);
+      measuredRows.push([card0, card1, rowHeight]);
+      totalSection4Height += rowHeight + 3.5;
+    }
 
     // If the COMPLETE Approval & Signature Section cannot fit on the current page,
     // move the entire section together to the next page so no approval blocks are split.
@@ -615,105 +977,104 @@ class NoteSheetPdfService {
     doc.text('4. OFFICIAL APPROVAL & SIGNATURE BLOCKS', margin, currentY);
     currentY += 4.5;
 
-    for (let i = 0; i < signatureLevels.length; i += 2) {
-      // Each row renders in sequence without breaking individual blocks
-      for (let c = 0; c < 2; c++) {
-        const itemIdx = i + c;
-        if (itemIdx >= signatureLevels.length) break;
+    for (let r = 0; r < measuredRows.length; r++) {
+      const [card0, card1, rowHeight] = measuredRows[r];
+      const rowItems: Array<{ lvl: typeof signatureLevels[0]; cardData: typeof card0; col: number }> = [
+        { lvl: signatureLevels[r * 2], cardData: card0, col: 0 }
+      ];
+      if (card1 && (r * 2 + 1) < signatureLevels.length) {
+        rowItems.push({ lvl: signatureLevels[r * 2 + 1], cardData: card1, col: 1 });
+      }
 
-        const lvl = signatureLevels[itemIdx];
-        const boxX = margin + (c * (sigBoxWidth + 6));
+      for (const { lvl, cardData, col } of rowItems) {
+        const boxX = margin + (col * (sigBoxWidth + 6));
         const boxY = currentY;
-
-        let matchingMove = movements.find((m: any) => {
-          const moveRole = m.fromRole || m.fromUserRole || m.actorRole || '';
-          if (lvl.role === 'INITIATOR') return m.action === 'CREATE' || m.action === 'SUBMIT';
-          if (lvl.role === 'HOD') return (m.action === 'FORWARD' || m.action === 'APPROVE') && (moveRole === 'HOD' || moveRole.includes('HOD'));
-          if (lvl.role === 'HOI') return (m.action === 'FORWARD' || m.action === 'APPROVE') && (moveRole === 'HOI' || moveRole === 'PRINCIPAL' || moveRole.includes('Principal') || moveRole.includes('Director'));
-          if (lvl.role === 'DEPUTY_REGISTRAR') return (m.action === 'FORWARD' || m.action === 'APPROVE') && (moveRole === 'DEPUTY_REGISTRAR' || moveRole.includes('Deputy Registrar'));
-          if (lvl.role === 'REGISTRAR') return (m.action === 'FORWARD' || m.action === 'APPROVE') && (moveRole === 'REGISTRAR' || moveRole.includes('Registrar'));
-          if (lvl.role === 'VICE_PRESIDENT') return m.action === 'APPROVE' && (moveRole === 'VICE_PRESIDENT' || moveRole === 'PRESIDENT' || moveRole.includes('Vice President') || isApproved);
-          return false;
-        });
-
-        // If not found in movements, check if creator is the initiator
-        if (!matchingMove && lvl.role === 'INITIATOR' && note.creatorName) {
-          matchingMove = {
-            id: 'init-1',
-            action: 'SUBMIT',
-            fromRole: note.creatorRole || 'FACULTY',
-            fromUserName: note.creatorName,
-            timestamp: note.date,
-            remarks: 'Notesheet proposal initiated and submitted for endorsement.'
-          } as any;
-        }
+        const textStartX = boxX + cardPaddingX;
 
         // Draw Signature Cell (Pure White Background, Thin Black Border)
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.2);
         doc.setFillColor(255, 255, 255);
-        doc.rect(boxX, boxY, sigBoxWidth, sigBoxHeight, 'FD');
+        doc.rect(boxX, boxY, sigBoxWidth, rowHeight, 'FD');
 
-        // Header Title (11px / 8.25pt Bold Black)
+        // Header Title (11px / 8.25pt Bold Black, Overflow-Protected)
         doc.setFont('times', 'bold');
         doc.setFontSize(8.25);
         doc.setTextColor(...colorBlack);
-        doc.text(lvl.label, boxX + 2, boxY + 3.8);
+        doc.text(lvl.label, textStartX, boxY + 3.8);
 
         // Divider
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.15);
-        doc.line(boxX + 2, boxY + 5.2, boxX + sigBoxWidth - 2, boxY + 5.2);
+        doc.line(boxX + 2, boxY + 5.0, boxX + sigBoxWidth - 2, boxY + 5.0);
 
-        if (matchingMove) {
-          // Official Digital Signature Stamp (11px / 8.25pt Black)
-          const signerName = (matchingMove as any).fromUserName || matchingMove.fromUser || (matchingMove as any).actorName || 'Authorized Official';
-          const signerRole = matchingMove.designation || (matchingMove as any).fromRole || matchingMove.fromUserRole || (matchingMove as any).actorRole || 'Administrative Authority';
+        if (cardData.matchingMove) {
+          let innerY = boxY + 8.4;
 
+          // Signer Name
           doc.setFont('times', 'bold');
           doc.setFontSize(8.25);
           doc.setTextColor(...colorBlack);
-          doc.text(signerName, boxX + 2, boxY + 9);
+          for (const nl of cardData.lines.nameLines!) {
+            doc.text(nl, textStartX, innerY);
+            innerY += 3.4;
+          }
 
+          // Designation
           doc.setFont('times', 'normal');
-          doc.setFontSize(8.25);
+          doc.setFontSize(7.2);
           doc.setTextColor(...colorBlack);
-          doc.text(`Designation: ${signerRole}`, boxX + 2, boxY + 12.5);
+          for (const dl of cardData.lines.desigLines!) {
+            doc.text(dl, textStartX, innerY);
+            innerY += 3.0;
+          }
 
-          // Timestamp
-          const actionDate = matchingMove.timestamp ? new Date(matchingMove.timestamp).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : note.date;
-          doc.text(`Action Date: ${actionDate}`, boxX + 2, boxY + 16);
+          // Action Date & Time
+          doc.setFont('times', 'normal');
+          doc.setFontSize(7.2);
+          doc.setTextColor(...colorBlack);
+          for (const dtl of cardData.lines.dateLines!) {
+            doc.text(dtl, textStartX, innerY);
+            innerY += 2.9;
+          }
 
-          // Digital Signature Verified Tag
+          // Digital Signature Verified Tag & Signature ID (Wrapped & styled, NEVER overflows)
           doc.setFont('times', 'bold');
-          doc.setFontSize(8.25);
+          doc.setFontSize(6.8);
           doc.setTextColor(...colorBlack);
-          const sigHash = matchingMove.id ? `SIG-${matchingMove.id.substring(0, 8).toUpperCase()}` : `SIG-${(note.noteSheetNumber || 'NS').substring(0, 6)}`;
-          doc.text(`[✓ DIGITALLY SIGNED & VERIFIED] (${sigHash})`, boxX + 2, boxY + 19.5);
+          for (const sl of cardData.lines.stampLines!) {
+            doc.text(sl, textStartX, innerY);
+            innerY += 2.8;
+          }
 
-          // Remarks snippet if present
-          if (matchingMove.remarks) {
+          // Remarks if present
+          if (cardData.lines.remarkLines && cardData.lines.remarkLines.length > 0) {
             doc.setFont('times', 'italic');
-            doc.setFontSize(8.25);
+            doc.setFontSize(7.0);
             doc.setTextColor(...colorBlack);
-            const rmkLine = doc.splitTextToSize(`Remarks: "${matchingMove.remarks}"`, sigBoxWidth - 4)[0];
-            doc.text(rmkLine, boxX + 2, boxY + 23.5);
+            for (const rl of cardData.lines.remarkLines) {
+              doc.text(rl, textStartX, innerY);
+              innerY += 2.8;
+            }
           }
         } else {
           // Empty Signature Block / Pending
           doc.setFont('times', 'italic');
-          doc.setFontSize(8.25);
+          doc.setFontSize(8.0);
           doc.setTextColor(...colorBlack);
-          doc.text('[ PENDING SIGNATURE & ENDORSEMENT ]', boxX + 2, boxY + 12);
-          
+          doc.text('[ PENDING SIGNATURE & ENDORSEMENT ]', textStartX, boxY + 11.5);
+
           doc.setFont('times', 'normal');
-          doc.setFontSize(8.25);
-          doc.text('Signature / Stamp:', boxX + 2, boxY + 23);
-          doc.line(boxX + 25, boxY + 23, boxX + sigBoxWidth - 3, boxY + 23);
+          doc.setFontSize(7.5);
+          doc.setTextColor(...colorBlack);
+          doc.text('Signature / Stamp:', textStartX, boxY + rowHeight - 4);
+          doc.setDrawColor(0, 0, 0);
+          doc.setLineWidth(0.15);
+          doc.line(boxX + 26, boxY + rowHeight - 4, boxX + sigBoxWidth - 3, boxY + rowHeight - 4);
         }
       }
 
-      currentY += sigBoxHeight + 3.5;
+      currentY += rowHeight + 3.5;
     }
 
     // ─── 8. SECTION 5: OFFICIAL MANUAL REMARKS & AMENDMENT SPACE ─────────
@@ -754,14 +1115,31 @@ class NoteSheetPdfService {
       currentY += 4;
 
       const attRows = attachments.map((att: any, idx) => {
-        const attName = typeof att === 'string' ? att : (att.fileName || att.name || `Annexure ${idx + 1}`);
-        const attFormat = typeof att === 'string' ? 'Document' : (att.fileType || 'Document');
-        const attSize = typeof att === 'object' && att && att.fileSize ? `${Math.round(att.fileSize / 1024)} KB` : 'N/A';
-        const attDate = typeof att === 'object' && att && (att.uploadedAt || att.createdAt) ? (att.uploadedAt || att.createdAt).split('T')[0] : (note.date || 'N/A');
-        const attUploader = typeof att === 'object' && att && (att.uploadedByName || att.uploadedBy) ? (att.uploadedByName || att.uploadedBy) : (note.creatorName || 'Faculty');
+        let attName = typeof att === 'string' ? att : (att.fileName || att.name || `Attachment ${idx + 1}`);
+        // Strip potential long file path prefixes if present
+        if (attName.includes('/')) attName = attName.split('/').pop() || attName;
+        if (attName.includes('\\')) attName = attName.split('\\').pop() || attName;
+
+        const attCategory = typeof att === 'object' && att && att.documentCategory
+          ? att.documentCategory
+          : 'Supporting Document';
+        const attFormat = typeof att === 'string'
+          ? (att.split('.').pop()?.toUpperCase() || 'DOCUMENT')
+          : (att.fileType || (att.fileName ? att.fileName.split('.').pop()?.toUpperCase() : 'DOCUMENT') || 'DOCUMENT');
+        const attSize = typeof att === 'object' && att && att.fileSizeFormatted
+          ? att.fileSizeFormatted
+          : (typeof att === 'object' && att && att.fileSize ? `${Math.round(att.fileSize / 1024)} KB` : 'Attached');
+        const attDate = typeof att === 'object' && att && (att.uploadedAt || att.createdAt)
+          ? (att.uploadedAt || att.createdAt).split('T')[0]
+          : (note.date || 'N/A');
+        const attUploader = typeof att === 'object' && att && (att.uploadedByName || att.uploadedBy)
+          ? (att.uploadedByName || att.uploadedBy)
+          : (note.creatorName || 'Faculty / Staff');
+
         return [
           String(idx + 1),
           attName,
+          attCategory,
           attFormat,
           attSize,
           attDate,
@@ -772,7 +1150,7 @@ class NoteSheetPdfService {
       autoTable(doc, {
         startY: currentY,
         margin: { left: margin, right: margin },
-        head: [['#', 'Document Title / Filename', 'Format', 'File Size', 'Upload Date', 'Uploaded By']],
+        head: [['#', 'Document Title / Filename', 'Category / Reference', 'Format', 'Size', 'Date', 'Uploaded By']],
         body: attRows,
         theme: 'grid',
         headStyles: {
@@ -786,20 +1164,22 @@ class NoteSheetPdfService {
         },
         styles: {
           font: 'times',
-          fontSize: 8.25,
+          fontSize: 8,
           cellPadding: 1.5,
           lineColor: [0, 0, 0],
           lineWidth: 0.2,
           textColor: [0, 0, 0],
-          fillColor: [255, 255, 255]
+          fillColor: [255, 255, 255],
+          overflow: 'linebreak'
         },
         columnStyles: {
           0: { cellWidth: 8, halign: 'center' },
-          1: { cellWidth: 65 },
-          2: { cellWidth: 20 },
-          3: { cellWidth: 20, halign: 'right' },
-          4: { cellWidth: 25 },
-          5: { cellWidth: 36 }
+          1: { cellWidth: 50 },
+          2: { cellWidth: 34 },
+          3: { cellWidth: 18, halign: 'center' },
+          4: { cellWidth: 16, halign: 'right' },
+          5: { cellWidth: 20, halign: 'center' },
+          6: { cellWidth: 28 }
         }
       });
 
