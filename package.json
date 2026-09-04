@@ -19,6 +19,9 @@
     "test:phase5": "npx tsx scripts/test-phase5-production-data-rbac.ts",
     "test:backend-auth": "npx tsx scripts/test-firebase-backend-auth.ts",
     "test:bulk-users": "npx tsx scripts/test-bulk-user-generation-and-security.ts",
+    "test:demo-accounts": "npx tsx scripts/test-all-modal-demo-accounts.ts",
+    "test:user-creation": "npx tsx scripts/test-user-creation-handler.ts",
+    "test:live-dashboard": "npx tsx scripts/test-live-dashboard-profile-resolution.ts",
     "lint": "oxlint",
     "preview": "vite preview",
     "postinstall": "prisma skills sync || exit 0"

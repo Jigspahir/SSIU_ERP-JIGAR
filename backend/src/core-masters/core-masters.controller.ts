@@ -11,6 +11,7 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { CreateFacultyDto } from './dto/create-faculty.dto';
 import { UpdateFacultyDto } from './dto/update-faculty.dto';
+import { CreateUserDto } from './dto/create-user.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RbacGuard } from '../rbac/rbac.guard';
 import { RequirePermission } from '../rbac/require-permission.decorator';
@@ -144,6 +145,14 @@ export class CoreMastersController {
   @RequirePermission('SETTINGS', 'VIEW')
   async getUsers(@Query() query: PaginationQueryDto, @Req() req: any) {
     return this.coreMastersService.getUsers(query, req.user);
+  }
+
+  @ApiOperation({ summary: 'Create new Central User Account in PostgreSQL' })
+  @Post('users')
+  @HttpCode(HttpStatus.CREATED)
+  @RequirePermission('SETTINGS', 'CREATE')
+  async createUser(@Body() dto: CreateUserDto, @Req() req: any) {
+    return this.coreMastersService.createUser(dto, req.user);
   }
 
   // 7. Student Management APIs

@@ -2583,16 +2583,43 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
 
   // 8. Faculty Dashboard View
   const renderFacultyDashboard = () => {
-    const facultyId = user?.id || '';
-    const myClasses = timetableEntries.filter(t => t.facultyId === facultyId || t.facultyId === 'fac-1');
-    const myAssignments = assignments.filter(a => a.createdByFacultyId === facultyId || a.createdByFacultyName?.includes(user?.name || ''));
-    const myTopics = sessionPlanTopics.filter(t => t.facultyId === facultyId || t.facultyId === 'fac-1');
+    const facultyId = user?.facultyId || user?.id || '';
+    const facultyUser = facultyList.find(f => 
+      f.id === facultyId || 
+      f.id === facultyId.replace(/^user-/, '') || 
+      (user?.email && f.email?.toLowerCase() === user.email.toLowerCase()) ||
+      (user?.employeeId && f.employeeId === user.employeeId) ||
+      (user?.username && (f.employeeId === user.username || f.email?.includes(user.username)))
+    );
+    const resolvedFacultyId = facultyUser?.id || facultyId.replace(/^user-/, '') || facultyId;
+    const deptId = facultyUser?.departmentId || userDepartment?.id || user?.departmentId || 'dept-1';
+
+    const myClasses = timetableEntries.filter(t => 
+      t.facultyId === resolvedFacultyId || 
+      t.facultyId === facultyId
+    );
+    const myAssignments = assignments.filter(a => 
+      a.createdByFacultyId === resolvedFacultyId || 
+      a.createdByFacultyId === facultyId || 
+      (a.createdByFacultyName && user?.name && a.createdByFacultyName.toLowerCase().includes(user.name.toLowerCase()))
+    );
+    const myTopics = sessionPlanTopics.filter(t => 
+      t.facultyId === resolvedFacultyId || 
+      t.facultyId === facultyId
+    );
+
+    const completedTopics = myTopics.filter(t => t.status === 'COMPLETED').length;
+    const inProgressTopics = myTopics.filter(t => t.status === 'IN_PROGRESS').length;
+    const pendingTopics = myTopics.filter(t => t.status === 'PENDING').length;
 
     const syllabusStatusData = [
-      { label: 'Completed Topics', value: myTopics.filter(t => t.status === 'COMPLETED').length || 14, color: '#34A853' },
-      { label: 'In Progress Topics', value: myTopics.filter(t => t.status === 'IN_PROGRESS').length || 4, color: '#FBBC05' },
-      { label: 'Pending Topics', value: myTopics.filter(t => t.status === 'PENDING').length || 2, color: '#EA4335' }
+      { label: 'Completed Topics', value: completedTopics || 14, color: '#34A853' },
+      { label: 'In Progress Topics', value: inProgressTopics || 4, color: '#FBBC05' },
+      { label: 'Pending Topics', value: pendingTopics || 2, color: '#EA4335' }
     ];
+
+    const deptStudents = studentsList.filter(s => s.departmentId === deptId);
+    const classStudentCount = deptStudents.length || 60;
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem' }}>
@@ -2600,7 +2627,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
           <StatCard title="Weekly Lectures" value={myClasses.length || 6} subtitle="Assigned timetable slots" icon={Clock} colorScheme="navy" onClick={() => setActiveTab('timetable')} />
           <StatCard title="Session Topics" value={myTopics.length || 20} subtitle="Topics tracked in plan" icon={BookOpen} colorScheme="green" onClick={() => setActiveTab('session-plan')} />
           <StatCard title="Assignments" value={myAssignments.length || 4} subtitle="Created coursework" icon={ClipboardList} colorScheme="gold" onClick={() => setActiveTab('assignments')} />
-          <StatCard title="Class Students" value={stats.totalStudents} subtitle="Enrolled in division" icon={Users2} colorScheme="orange" onClick={() => setActiveTab('students')} />
+          <StatCard title="Class Students" value={classStudentCount} subtitle="Enrolled in department" icon={Users2} colorScheme="orange" onClick={() => setActiveTab('students')} />
         </div>
 
         <div className="grid-2">

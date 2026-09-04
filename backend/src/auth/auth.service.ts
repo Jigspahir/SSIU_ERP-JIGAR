@@ -43,10 +43,13 @@ export class AuthService {
         admin: ['superadmin', 'ADM000001', 'admin', 'demo.admin', 'jigarahir410@gmail.com'],
         superadmin: ['superadmin', 'ADM000001', 'demo.admin', 'jigarahir410@gmail.com'],
         'demo.admin': ['demo.admin', 'superadmin', 'ADM000001'],
-        'jigarahir410@gmail.com': ['superadmin', 'ADM000001', 'demo.admin', 'jigarahir410@gmail.com'],
+        erpcoordinator: ['erpcoordinator', 'ERP_COORD000001', 'superadmin', 'ADM000001'],
+        examcell: ['examcell', 'EXAM000001', 'superadmin', 'ADM000001'],
+        studentsection: ['studentsection', 'SEC000001', 'superadmin', 'ADM000001'],
+        studentadmin: ['studentadmin', 'ONB000001', 'superadmin', 'ADM000001'],
         iqac: ['superadmin', 'ADM000001', 'iqac'],
-        vp: ['vp_demo01', 'VP000001', 'vp'],
-        vicepresident: ['vp_demo01', 'VP000001'],
+        vp: ['vp_demo01', 'VP000001', 'vp', 'VP000002'],
+        vicepresident: ['vp_demo01', 'VP000001', 'vp'],
         provost: ['prov_demo01', 'PROV000001', 'provost'],
         president: ['pres_demo01', 'PRES000001', 'president'],
       };
@@ -76,105 +79,67 @@ export class AuthService {
           faculty: { select: { id: true, employeeCode: true, firstName: true, lastName: true, email: true, designation: true, instituteId: true, departmentId: true } },
         },
       });
-      if (!user && (lower === 'parent' || lower.startsWith('parent') || lower === 'rajesh.sharma')) {
-        let parentRole = await this.prisma.role.findFirst({ where: { code: 'PARENT' } });
-        if (!parentRole) {
-          parentRole = await this.prisma.role.create({
-            data: { code: 'PARENT', name: 'Parent / Guardian', authorityLevel: 5, status: 'ACTIVE' }
-          });
-        }
-        const saltRounds = 10;
-        const passHash = await bcrypt.hash('Parent@123', saltRounds);
-        const createdUser = await this.prisma.user.upsert({
-          where: { erpId: 'PAR000001' },
-          update: { accountStatus: 'ACTIVE' },
-          create: {
-            erpId: 'PAR000001',
-            username: 'parent',
-            passwordHash: passHash,
-            accountStatus: 'ACTIVE',
-          },
-        });
-        await this.prisma.userRole.upsert({
-          where: { userId_roleId: { userId: createdUser.id, roleId: parentRole.id } },
-          update: {},
-          create: { userId: createdUser.id, roleId: parentRole.id },
-        });
-        user = await this.prisma.user.findUnique({
-          where: { id: createdUser.id },
-          include: {
-            userRoles: { include: { role: true } },
-            student: { select: { id: true, enrollmentNo: true, temporaryEnrollmentNumber: true, finalEnrollmentNumber: true, enrollmentStatus: true, firstName: true, lastName: true, email: true, instituteId: true, departmentId: true } },
-            faculty: { select: { id: true, employeeCode: true, firstName: true, lastName: true, email: true, designation: true, instituteId: true, departmentId: true } },
-          },
-        });
-      }
+      if (!user) {
+        const demoDefaults: Record<string, { erpId: string; username: string; roleCode: string; roleName: string; pass: string; authorityLevel: number }> = {
+          student: { erpId: 'STU000001', username: 'student', roleCode: 'STUDENT', roleName: 'Student Candidate', pass: 'Student@123', authorityLevel: 10 },
+          parent: { erpId: 'PAR000001', username: 'parent', roleCode: 'PARENT', roleName: 'Parent / Guardian', pass: 'Parent@123', authorityLevel: 5 },
+          'rajesh.sharma': { erpId: 'PAR000001', username: 'parent', roleCode: 'PARENT', roleName: 'Parent / Guardian', pass: 'Parent@123', authorityLevel: 5 },
+          faculty: { erpId: 'FAC000001', username: 'faculty', roleCode: 'FACULTY', roleName: 'Faculty Member', pass: 'Faculty@123', authorityLevel: 30 },
+          hod: { erpId: 'HOD000001', username: 'hod', roleCode: 'HOD', roleName: 'Department HOD', pass: 'Faculty@123', authorityLevel: 50 },
+          principal: { erpId: 'HOI000001', username: 'principal', roleCode: 'PRINCIPAL', roleName: 'Principal / HOI', pass: 'Admin@123', authorityLevel: 70 },
+          hoi: { erpId: 'HOI000001', username: 'principal', roleCode: 'PRINCIPAL', roleName: 'Principal / HOI', pass: 'Admin@123', authorityLevel: 70 },
+          registrar: { erpId: 'REG000001', username: 'registrar', roleCode: 'REGISTRAR', roleName: 'Registrar Office', pass: 'Admin@123', authorityLevel: 80 },
+          deputyregistrar: { erpId: 'DREG000001', username: 'deputyregistrar', roleCode: 'DEPUTY_REGISTRAR', roleName: 'Deputy Registrar', pass: 'Admin@123', authorityLevel: 75 },
+          vp: { erpId: 'VP000001', username: 'vp', roleCode: 'VICE_PRESIDENT', roleName: 'Vice President', pass: 'Admin@123', authorityLevel: 95 },
+          vicepresident: { erpId: 'VP000001', username: 'vp', roleCode: 'VICE_PRESIDENT', roleName: 'Vice President', pass: 'Admin@123', authorityLevel: 95 },
+          'demo.admin': { erpId: 'DEMO_ADM000001', username: 'demo.admin', roleCode: 'SUPER_ADMIN', roleName: 'Super Administrator', pass: 'Admin@123', authorityLevel: 100 },
+          admin: { erpId: 'ADM000001', username: 'admin', roleCode: 'SUPER_ADMIN', roleName: 'Super Administrator', pass: 'Admin@123', authorityLevel: 100 },
+          superadmin: { erpId: 'ADM000001', username: 'superadmin', roleCode: 'SUPER_ADMIN', roleName: 'Super Administrator', pass: 'Admin@123', authorityLevel: 100 },
+          'jigarahir410@gmail.com': { erpId: 'MASTER_ADM000001', username: 'jigarahir', roleCode: 'SUPER_ADMIN', roleName: 'Super Administrator', pass: 'Jigar@2002', authorityLevel: 100 },
+          jigarahir: { erpId: 'MASTER_ADM000001', username: 'jigarahir', roleCode: 'SUPER_ADMIN', roleName: 'Super Administrator', pass: 'Jigar@2002', authorityLevel: 100 },
+          erpcoordinator: { erpId: 'ERP_COORD000001', username: 'erpcoordinator', roleCode: 'ERP_COORDINATOR', roleName: 'Central ERP Coordinator', pass: 'Admin@123', authorityLevel: 90 },
+          examcell: { erpId: 'EXAM000001', username: 'examcell', roleCode: 'EXAM_CELL', roleName: 'Exam Controller', pass: 'Admin@123', authorityLevel: 65 },
+          studentsection: { erpId: 'SEC000001', username: 'studentsection', roleCode: 'STUDENT_SECTION', roleName: 'Student Section Officer', pass: 'Admin@123', authorityLevel: 40 },
+          studentadmin: { erpId: 'ONB000001', username: 'studentadmin', roleCode: 'STUDENT_ADMIN', roleName: 'Student Administration Officer', pass: 'Admin@123', authorityLevel: 45 },
+          univadmin: { erpId: 'UNIV_ADM000001', username: 'univadmin', roleCode: 'UNIVERSITY_ADMIN', roleName: 'University Administrator', pass: 'Admin@123', authorityLevel: 98 },
+        };
 
-      if (!user && (lower === 'faculty' || lower === 'fac_amitshah' || lower === 'fac000001' || lower === 'fac-1')) {
-        let facRole = await this.prisma.role.findFirst({ where: { code: 'FACULTY' } });
-        if (!facRole) {
-          facRole = await this.prisma.role.create({
-            data: { code: 'FACULTY', name: 'Faculty Member', authorityLevel: 30, status: 'ACTIVE' }
+        const targetKey = Object.keys(demoDefaults).find(k => lower === k || lower.startsWith(k) || lower.includes(k));
+        if (targetKey) {
+          const cfg = demoDefaults[targetKey];
+          let roleRec = await this.prisma.role.findFirst({ where: { code: cfg.roleCode } });
+          if (!roleRec) {
+            roleRec = await this.prisma.role.create({
+              data: { code: cfg.roleCode, name: cfg.roleName, authorityLevel: cfg.authorityLevel, status: 'ACTIVE' }
+            });
+          }
+          const saltRounds = 10;
+          const passHash = await bcrypt.hash(cfg.pass, saltRounds);
+          const createdUser = await this.prisma.user.upsert({
+            where: { erpId: cfg.erpId },
+            update: { accountStatus: 'ACTIVE', passwordHash: passHash },
+            create: {
+              erpId: cfg.erpId,
+              username: cfg.username,
+              passwordHash: passHash,
+              accountStatus: 'ACTIVE',
+              isFirstLogin: false,
+            },
+          });
+          await this.prisma.userRole.upsert({
+            where: { userId_roleId: { userId: createdUser.id, roleId: roleRec.id } },
+            update: {},
+            create: { userId: createdUser.id, roleId: roleRec.id, scopeType: 'UNIVERSITY' },
+          });
+          user = await this.prisma.user.findUnique({
+            where: { id: createdUser.id },
+            include: {
+              userRoles: { include: { role: true } },
+              student: { select: { id: true, enrollmentNo: true, temporaryEnrollmentNumber: true, finalEnrollmentNumber: true, enrollmentStatus: true, firstName: true, lastName: true, email: true, instituteId: true, departmentId: true } },
+              faculty: { select: { id: true, employeeCode: true, firstName: true, lastName: true, email: true, designation: true, instituteId: true, departmentId: true } },
+            },
           });
         }
-        const saltRounds = 10;
-        const passHash = await bcrypt.hash('Faculty@123', saltRounds);
-        const createdUser = await this.prisma.user.upsert({
-          where: { erpId: 'FAC000001' },
-          update: { accountStatus: 'ACTIVE' },
-          create: {
-            erpId: 'FAC000001',
-            username: 'faculty',
-            passwordHash: passHash,
-            accountStatus: 'ACTIVE',
-          },
-        });
-        await this.prisma.userRole.upsert({
-          where: { userId_roleId: { userId: createdUser.id, roleId: facRole.id } },
-          update: {},
-          create: { userId: createdUser.id, roleId: facRole.id },
-        });
-        user = await this.prisma.user.findUnique({
-          where: { id: createdUser.id },
-          include: {
-            userRoles: { include: { role: true } },
-            student: { select: { id: true, enrollmentNo: true, temporaryEnrollmentNumber: true, finalEnrollmentNumber: true, enrollmentStatus: true, firstName: true, lastName: true, email: true, instituteId: true, departmentId: true } },
-            faculty: { select: { id: true, employeeCode: true, firstName: true, lastName: true, email: true, designation: true, instituteId: true, departmentId: true } },
-          },
-        });
-      }
-      if (!user && (lower === 'jigarahir410@gmail.com' || lower === 'jigar' || lower.includes('jigarahir'))) {
-        let adminRole = await this.prisma.role.findFirst({ where: { code: 'SUPER_ADMIN' } });
-        if (!adminRole) {
-          adminRole = await this.prisma.role.create({
-            data: { code: 'SUPER_ADMIN', name: 'Super Administrator', authorityLevel: 100, status: 'ACTIVE' }
-          });
-        }
-        const saltRounds = 10;
-        const passHash = await bcrypt.hash('Jigar@2002', saltRounds);
-        const createdUser = await this.prisma.user.upsert({
-          where: { erpId: 'ADM000001' },
-          update: { accountStatus: 'ACTIVE' },
-          create: {
-            erpId: 'ADM000001',
-            username: 'superadmin',
-            passwordHash: passHash,
-            accountStatus: 'ACTIVE',
-          },
-        });
-        await this.prisma.userRole.upsert({
-          where: { userId_roleId: { userId: createdUser.id, roleId: adminRole.id } },
-          update: {},
-          create: { userId: createdUser.id, roleId: adminRole.id },
-        });
-        user = await this.prisma.user.findUnique({
-          where: { id: createdUser.id },
-          include: {
-            userRoles: { include: { role: true } },
-            student: { select: { id: true, enrollmentNo: true, temporaryEnrollmentNumber: true, finalEnrollmentNumber: true, enrollmentStatus: true, firstName: true, lastName: true, email: true, instituteId: true, departmentId: true } },
-            faculty: { select: { id: true, employeeCode: true, firstName: true, lastName: true, email: true, designation: true, instituteId: true, departmentId: true } },
-          },
-        });
       }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);

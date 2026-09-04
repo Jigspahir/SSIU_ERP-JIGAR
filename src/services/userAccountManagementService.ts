@@ -5,6 +5,7 @@ import {
   ADMIN_ERP_MODULES, ALL_PERMISSION_ACTIONS, UserHistoryRecord
 } from '../types';
 import ExcelJS from 'exceljs';
+import { userService } from './userService';
 
 export interface PermissionModuleDef {
   key: string;
@@ -656,6 +657,11 @@ export class UserAccountManagementService {
     };
 
     db.addEntity<User>('users', newUser, `Provisioned new user account: ${newUser.username} (${newUser.name}, Role: ${newUser.role})`);
+
+    // Automatically synchronize newly generated user account to PostgreSQL (Data Connect & NestJS API) and Firestore
+    userService.syncUserToAllDatabases(newUser).catch(err => {
+      console.warn(`[UserAccountManagementService] Automated PostgreSQL sync notification for ${newUser.username}:`, err);
+    });
 
     this.logSecurityAudit({
       action: 'USER_CREATED',

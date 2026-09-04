@@ -22,8 +22,8 @@ import logoImg from '../../assets/SSIUlogo.png';
 
 export const AdminLoginPage: React.FC<{ onAdminLoginSuccess?: () => void }> = ({ onAdminLoginSuccess }) => {
   const { login } = useAuth();
-  const [identifier, setIdentifier] = useState('demo.admin');
-  const [password, setPassword] = useState('Admin@123');
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -143,17 +143,6 @@ export const AdminLoginPage: React.FC<{ onAdminLoginSuccess?: () => void }> = ({
             <p className="text-xs text-blue-200/80 mt-1 font-medium">
               Administrative Access &amp; Identity Control Center
             </p>
-          </div>
-
-          {/* Development Demo Quick-Fill Pill */}
-          <div className="mb-5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2.5 text-xs text-amber-200">
-            <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-bold text-amber-300 block">Development / Demo Account Available</span>
-              <p className="text-[11px] text-amber-200/80 mt-0.5">
-                Use <code className="bg-black/40 px-1.5 py-0.5 rounded font-mono font-bold text-white">demo.admin</code> with password <code className="bg-black/40 px-1.5 py-0.5 rounded font-mono font-bold text-white">Admin@123</code> to test all admin capabilities.
-              </p>
-            </div>
           </div>
 
           {/* Error Message */}

@@ -47,18 +47,17 @@ export const LoginPage: React.FC = () => {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
-  const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
 
-  // Loosened identifier validation: accepts standard email addresses (e.g. jigarahir410@gmail.com), custom admin emails, usernames, and enrollment numbers
+  // Institutional identifier validation: accepts standard email addresses, custom admin emails, usernames, and enrollment numbers
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
     const cleanId = identifier.trim();
     if (!cleanId) {
-      setError('Please enter your email address, username, or enrollment ID.');
+      setError('Please enter your institutional email address, username, or enrollment ID.');
       return;
     }
 
@@ -73,145 +72,12 @@ export const LoginPage: React.FC = () => {
       const res = await login(cleanId, password);
       setIsLoading(false);
       if (!res.success) {
-        setError(res.error || 'Invalid credentials. Please check your email/username and password.');
+        setError(res.error || 'Invalid credentials. Please verify your credentials and try again.');
       }
     } catch (err: any) {
       setIsLoading(false);
-      setError(err?.message || 'Login failed. Please check your credentials.');
+      setError(err?.message || 'Authentication failed. Please verify your credentials.');
     }
-  };
-
-  const demoAccounts: DemoRoleAccount[] = [
-    {
-      role: 'STUDENT',
-      title: 'Student Candidate',
-      userId: 'student',
-      pass: 'Student@123',
-      badge: 'Academic Portal',
-      icon: GraduationCap,
-      accentColor: '#F58220'
-    },
-    {
-      role: 'PARENT',
-      title: 'Parent / Guardian',
-      userId: 'parent',
-      pass: 'Parent@123',
-      badge: 'Ward Academic Portal',
-      icon: Users,
-      accentColor: '#0D9488'
-    },
-    {
-      role: 'FACULTY',
-      title: 'Faculty / Mentor',
-      userId: 'faculty',
-      pass: 'Faculty@123',
-      badge: 'Teaching & Mentorship',
-      icon: Users,
-      accentColor: '#12366B'
-    },
-    {
-      role: 'HOD',
-      title: 'Department HOD',
-      userId: 'hod',
-      pass: 'Faculty@123',
-      badge: 'Departmental Head',
-      icon: Building2,
-      accentColor: '#059669'
-    },
-    {
-      role: 'PRINCIPAL',
-      title: 'Principal / HOI',
-      userId: 'principal',
-      pass: 'Admin@123',
-      badge: 'Institute Leadership',
-      icon: Building2,
-      accentColor: '#DC2626'
-    },
-    {
-      role: 'REGISTRAR',
-      title: 'Registrar Office',
-      userId: 'registrar',
-      pass: 'Admin@123',
-      badge: 'University Secretariat',
-      icon: ShieldCheck,
-      accentColor: '#EA580C'
-    },
-    {
-      role: 'DEPUTY_REGISTRAR',
-      title: 'Deputy Registrar',
-      userId: 'deputyregistrar',
-      pass: 'Admin@123',
-      badge: 'Academic Administration',
-      icon: ShieldCheck,
-      accentColor: '#4F46E5'
-    },
-    {
-      role: 'VICE_PRESIDENT',
-      title: 'Vice President',
-      userId: 'vp',
-      pass: 'Admin@123',
-      badge: 'Executive Governance',
-      icon: Sparkles,
-      accentColor: '#7C3AED'
-    },
-    {
-      role: 'SUPER_ADMIN',
-      title: 'Demo ERP Administrator',
-      userId: 'demo.admin',
-      pass: 'Admin@123',
-      badge: 'Admin Control Center',
-      icon: KeyRound,
-      accentColor: '#F58220'
-    },
-    {
-      role: 'SUPER_ADMIN',
-      title: 'Super Admin',
-      userId: 'admin',
-      pass: 'Admin@123',
-      badge: 'System Controller',
-      icon: KeyRound,
-      accentColor: '#0F2C59'
-    },
-    {
-      role: 'ERP_COORDINATOR',
-      title: 'Central ERP Coordinator',
-      userId: 'erpcoordinator',
-      pass: 'Admin@123',
-      badge: 'Central ERP Coordinator',
-      icon: ShieldCheck,
-      accentColor: '#D97706'
-    },
-    {
-      role: 'EXAM_CELL',
-      title: 'Exam Controller',
-      userId: 'examcell',
-      pass: 'Admin@123',
-      badge: 'Examination Wing',
-      icon: Sliders,
-      accentColor: '#1E3A8A'
-    },
-    {
-      role: 'STUDENT_SECTION',
-      title: 'Student Section',
-      userId: 'studentsection',
-      pass: 'Admin@123',
-      badge: 'Student Services',
-      icon: Users,
-      accentColor: '#0284C7'
-    }
-  ];
-
-  const handleDemoLogin = async (userId: string, pass: string) => {
-    setIdentifier(userId);
-    setPassword(pass);
-    setError('');
-    setIsDemoModalOpen(false);
-    setIsLoading(true);
-
-    try {
-      await login(userId, pass);
-    } catch {}
-    setIsLoading(false);
   };
 
   const universityInstitutes: InstituteShowcase[] = [
@@ -1317,15 +1183,6 @@ export const LoginPage: React.FC = () => {
           <div className="swarrnim-topbar-actions">
             <button
               type="button"
-              className="swarrnim-topbar-demo-btn"
-              onClick={() => setIsDemoModalOpen(true)}
-              title="Quickly test with demo university roles"
-            >
-              <KeyRound size={14} />
-              <span>Demo Access</span>
-            </button>
-            <button
-              type="button"
               className="swarrnim-topbar-btn"
               onClick={() => setIsSupportModalOpen(true)}
             >
@@ -1517,16 +1374,8 @@ export const LoginPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Quick Demo Login Trigger & Admin Portal Link */}
+                  {/* Admin Portal Direct Link */}
                   <div className="swarrnim-demo-trigger-box" style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                    <button
-                      type="button"
-                      className="swarrnim-demo-trigger-btn"
-                      onClick={() => setIsDemoModalOpen(true)}
-                    >
-                      <KeyRound size={13} color="var(--swarrnim-orange)" />
-                      <span>Quick Demo Login (Faculty, Student, HOD...)</span>
-                    </button>
                     <a
                       href="/erp-admin/login"
                       style={{
@@ -1534,19 +1383,19 @@ export const LoginPage: React.FC = () => {
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '0.4rem',
-                        padding: '0.45rem',
+                        padding: '0.55rem',
                         borderRadius: '8px',
                         background: 'linear-gradient(135deg, #001F3F 0%, #001122 100%)',
                         color: '#FDBA74',
                         border: '1px solid rgba(251, 146, 60, 0.3)',
-                        fontSize: '0.75rem',
+                        fontSize: '0.78rem',
                         fontWeight: '700',
                         textDecoration: 'none',
                         transition: 'all 0.15s ease'
                       }}
                     >
                       <ShieldCheck size={14} color="#F58220" />
-                      <span>ERP Admin Portal Login →</span>
+                      <span>ERP Administrator Portal Access →</span>
                     </a>
                   </div>
                 </div>
@@ -1568,68 +1417,7 @@ export const LoginPage: React.FC = () => {
         </footer>
       </div>
 
-      {/* ═══ 4. Demo Accounts Selection Modal ═══ */}
-      {isDemoModalOpen && (
-        <div className="swarrnim-modal-overlay" onClick={() => setIsDemoModalOpen(false)}>
-          <div className="swarrnim-modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="swarrnim-modal-header">
-              <div className="swarrnim-modal-header-title">
-                <KeyRound size={20} color="#F58220" />
-                <span>Select Demo Account</span>
-              </div>
-              <button
-                type="button"
-                className="swarrnim-modal-close-btn"
-                onClick={() => setIsDemoModalOpen(false)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="swarrnim-modal-body">
-              <p style={{ fontSize: '0.84375rem', color: '#64748B', margin: '0 0 1.15rem 0', lineHeight: 1.5 }}>
-                Click any pre-configured institutional role to test the Swarrnim University ERP:
-              </p>
-
-              <div className="swarrnim-demo-grid">
-                {demoAccounts.map((account) => {
-                  const Icon = account.icon;
-                  return (
-                    <div
-                      key={account.role}
-                      className="swarrnim-demo-role-card"
-                      onClick={() => handleDemoLogin(account.userId, account.pass)}
-                    >
-                      <div className="swarrnim-demo-card-left">
-                        <div
-                          className="swarrnim-demo-card-icon"
-                          style={{
-                            background: `${account.accentColor}15`,
-                            color: account.accentColor
-                          }}
-                        >
-                          <Icon size={18} />
-                        </div>
-                        <div className="swarrnim-demo-card-info">
-                          <h4>{account.title}</h4>
-                          <span>{account.badge}</span>
-                        </div>
-                      </div>
-
-                      <div className="swarrnim-demo-quick-badge">
-                        <span>Sign In</span>
-                        <ChevronRight size={13} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ═══ 5. IT Support Modal ═══ */}
+      {/* ═══ 4. IT Support Modal ═══ */}
       {isSupportModalOpen && (
         <div className="swarrnim-modal-overlay" onClick={() => setIsSupportModalOpen(false)}>
           <div className="swarrnim-modal-dialog" style={{ maxWidth: '520px' }} onClick={(e) => e.stopPropagation()}>

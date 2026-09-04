@@ -86,6 +86,9 @@ export interface User {
   departmentId?: string;
   departmentName?: string;
   programId?: string;
+  semesterId?: string;
+  batchId?: string;
+  divisionId?: string;
   designation?: string;
   enrollmentNo?: string;
   temporaryEnrollmentNumber?: string;

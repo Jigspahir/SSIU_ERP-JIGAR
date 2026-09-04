@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { MasterDataCacheService } from '../common/cache/master-data-cache.service';
 import { CreateUniversityDto } from './dto/create-university.dto';
@@ -10,13 +11,16 @@ import { CreateSubjectDto } from './dto/create-subject.dto';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { CreateFacultyDto } from './dto/create-faculty.dto';
+import { CreateUserDto } from './dto/create-user.dto';
 import { PaginationQueryDto } from '../common/dto/pagination.dto';
+import { FirebaseAdminService } from '../firebase/firebase-admin.service';
 
 @Injectable()
 export class CoreMastersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cache: MasterDataCacheService,
+    private readonly firebaseAdmin: FirebaseAdminService,
   ) {}
 
   // 1. University Master
@@ -604,6 +608,213 @@ export class CoreMastersService {
       limit,
       total,
       totalPages: Math.ceil(total / limit) || 1,
+    };
+  }
+
+  // ── Central User Account Creation / Provisioning ──
+  async createUser(dto: CreateUserDto, currentUser?: any) {
+    const cleanUsername = dto.username.trim().toLowerCase();
+    const cleanEmail = dto.email.trim().toLowerCase();
+    const roleCode = (dto.role || 'USER').trim().toUpperCase();
+
+    // Privilege escalation prevention
+    if (roleCode === 'SUPER_ADMIN' && currentUser) {
+      const userRoles = currentUser.roles || (currentUser.role ? [currentUser.role] : []);
+      if (!userRoles.includes('SUPER_ADMIN')) {
+        throw new ForbiddenException('Only Super Administrators can create accounts with the SUPER_ADMIN role.');
+      }
+    }
+
+    // 1. Check if user already exists by username
+    const existingUser = await this.prisma.user.findUnique({
+      where: { username: cleanUsername },
+      include: { userRoles: { include: { role: true } } },
+    });
+
+    // 2. Resolve Role
+    let roleRecord = await this.prisma.role.findUnique({
+      where: { code: roleCode },
+    });
+    if (!roleRecord) {
+      roleRecord = await this.prisma.role.create({
+        data: {
+          code: roleCode,
+          name: roleCode.replace(/_/g, ' '),
+          description: `${roleCode} Role`,
+          isSystem: true,
+        },
+      });
+    }
+
+    const passwordHash = dto.password ? await bcrypt.hash(dto.password, 10) : await bcrypt.hash('User@123', 10);
+    const erpId = dto.employeeId || dto.enrollmentNo || `USR-${cleanUsername.toUpperCase()}`;
+
+    // Handle student or faculty/employee record linkage if available
+    let studentId: string | undefined = undefined;
+    let facultyId: string | undefined = undefined;
+
+    if (roleCode === 'STUDENT') {
+      const existingStudent = await this.prisma.student.findFirst({
+        where: {
+          OR: [
+            { email: cleanEmail },
+            ...(dto.enrollmentNo ? [{ enrollmentNo: dto.enrollmentNo.trim() }] : []),
+          ],
+        },
+      });
+      if (existingStudent) {
+        studentId = existingStudent.id;
+      }
+    } else if (['FACULTY', 'HOD', 'MENTOR'].includes(roleCode)) {
+      const existingFaculty = await this.prisma.faculty.findFirst({
+        where: {
+          OR: [
+            { email: cleanEmail },
+            ...(dto.employeeId ? [{ employeeCode: dto.employeeId.trim() }] : []),
+          ],
+        },
+      });
+      if (existingFaculty) {
+        facultyId = existingFaculty.id;
+      }
+    }
+
+    // 3. Provision or Update in Firebase Authentication
+    let firebaseUid: string | undefined = undefined;
+    try {
+      const auth = this.firebaseAdmin.getAuth();
+      if (auth) {
+        try {
+          const existingFbUser = await auth.getUserByEmail(cleanEmail);
+          firebaseUid = existingFbUser.uid;
+          await auth.updateUser(existingFbUser.uid, {
+            displayName: dto.name,
+            ...(dto.password ? { password: dto.password } : {}),
+            disabled: dto.accountStatus === 'INACTIVE' || dto.accountStatus === 'LOCKED' || dto.accountStatus === 'SUSPENDED',
+          });
+        } catch (getErr: any) {
+          if (getErr.code === 'auth/user-not-found' || getErr.message?.includes('no user record')) {
+            const newFbUser = await auth.createUser({
+              email: cleanEmail,
+              password: dto.password || 'User@123',
+              displayName: dto.name,
+              disabled: dto.accountStatus === 'INACTIVE' || dto.accountStatus === 'LOCKED' || dto.accountStatus === 'SUSPENDED',
+            });
+            firebaseUid = newFbUser.uid;
+          }
+        }
+
+        if (firebaseUid) {
+          await this.firebaseAdmin.setCustomUserClaims(firebaseUid, {
+            role: roleCode,
+            departmentId: dto.departmentId,
+            instituteId: dto.instituteId,
+            studentId,
+            employeeId: dto.employeeId || (roleCode !== 'STUDENT' ? dto.username : undefined),
+          });
+        }
+      }
+    } catch (fbErr) {
+      // Non-blocking fallback so user creation is not aborted if offline / credentials in test mode
+      console.warn(`[CoreMastersService] Firebase Auth provisioning notice for ${cleanEmail}:`, fbErr);
+    }
+
+    let user: any;
+    if (existingUser) {
+      user = await this.prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          accountStatus: dto.accountStatus || 'ACTIVE',
+          passwordHash: dto.password ? passwordHash : existingUser.passwordHash,
+          ...(studentId && !existingUser.studentId ? { studentId } : {}),
+          ...(facultyId && !existingUser.facultyId ? { facultyId } : {}),
+        },
+      });
+
+      await this.prisma.userRole.upsert({
+        where: {
+          userId_roleId: {
+            userId: user.id,
+            roleId: roleRecord.id,
+          },
+        },
+        update: {
+          scopeType: dto.instituteId ? 'INSTITUTE' : 'UNIVERSITY',
+          scopeId: dto.instituteId || null,
+        },
+        create: {
+          userId: user.id,
+          roleId: roleRecord.id,
+          scopeType: dto.instituteId ? 'INSTITUTE' : 'UNIVERSITY',
+          scopeId: dto.instituteId || null,
+          assignedBy: currentUser?.id || 'SYSTEM_ADMIN',
+        },
+      });
+    } else {
+      user = await this.prisma.user.create({
+        data: {
+          erpId,
+          username: cleanUsername,
+          passwordHash,
+          accountStatus: dto.accountStatus || 'ACTIVE',
+          studentId,
+          facultyId,
+          userRoles: {
+            create: {
+              roleId: roleRecord.id,
+              scopeType: dto.instituteId ? 'INSTITUTE' : 'UNIVERSITY',
+              scopeId: dto.instituteId || null,
+              assignedBy: currentUser?.id || 'SYSTEM_ADMIN',
+            },
+          },
+        },
+        include: {
+          userRoles: { include: { role: true } },
+        },
+      });
+    }
+
+    // 4. Save to Cloud Firestore users collection
+    try {
+      const firestore = this.firebaseAdmin.getFirestore();
+      if (firestore) {
+        await firestore.collection('users').doc(user.id).set({
+          id: user.id,
+          firebaseUid: firebaseUid || null,
+          username: user.username,
+          name: dto.name.trim(),
+          email: cleanEmail,
+          role: roleRecord.code,
+          departmentId: dto.departmentId || '',
+          departmentName: dto.departmentName || '',
+          instituteId: dto.instituteId || '',
+          designation: dto.designation || '',
+          enrollmentNo: dto.enrollmentNo || (roleCode === 'STUDENT' ? user.username : ''),
+          employeeId: dto.employeeId || (roleCode !== 'STUDENT' ? user.username : ''),
+          phone: dto.phone || '',
+          isActive: user.accountStatus === 'ACTIVE',
+          status: user.accountStatus,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        }, { merge: true });
+      }
+    } catch (fsErr) {
+      console.warn(`[CoreMastersService] Firestore user profile sync notice for ${cleanEmail}:`, fsErr);
+    }
+
+    this.cache.invalidate('users');
+
+    return {
+      id: user.id,
+      erpId: user.erpId,
+      username: user.username,
+      email: cleanEmail,
+      name: dto.name,
+      role: roleRecord.code,
+      accountStatus: user.accountStatus,
+      firebaseUid: firebaseUid || null,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
     };
   }
 

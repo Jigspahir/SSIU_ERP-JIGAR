@@ -1364,6 +1364,20 @@ export const initialUsers: User[] = [
     createdAt: '2024-01-01T00:00:00Z'
   },
   {
+    id: 'user-jigarahir410',
+    name: 'Jigar Ahir',
+    username: 'jigarahir',
+    email: 'jigarahir410@gmail.com',
+    password: 'Jigar@2002',
+    role: 'SUPER_ADMIN',
+    designation: 'Central Enterprise Architect & Super Administrator',
+    phone: '+91 99999 41000',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+    status: 'ACTIVE',
+    accountStatus: 'ACTIVE',
+    createdAt: '2024-01-01T00:00:00Z'
+  },
+  {
     id: 'user-univadmin',
     name: 'Demo Univ Admin 1',
     username: 'univadmin',

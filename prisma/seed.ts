@@ -421,8 +421,99 @@ async function main() {
     });
   }
 
+  // ─── 7. SEED ALL INSTITUTIONAL DEMO ROLES & USER ACCOUNTS ───────────────────
+  console.log('6️⃣ Seeding Master Roles & Modal Demo User Accounts...');
+
+  const rolesToSeed = [
+    { code: 'SUPER_ADMIN', name: 'Super Administrator', authorityLevel: 100, description: 'Master System Controller' },
+    { code: 'UNIVERSITY_ADMIN', name: 'University Administrator', authorityLevel: 98, description: 'University Executive VC' },
+    { code: 'VICE_PRESIDENT', name: 'Vice President', authorityLevel: 95, description: 'Executive Governance' },
+    { code: 'ERP_COORDINATOR', name: 'Central ERP Coordinator', authorityLevel: 90, description: 'Central ERP Coordination & System Audit' },
+    { code: 'REGISTRAR', name: 'Registrar Office', authorityLevel: 80, description: 'University Secretariat & Legal Administration' },
+    { code: 'DEPUTY_REGISTRAR', name: 'Deputy Registrar', authorityLevel: 75, description: 'Academic Administration & Records' },
+    { code: 'PRINCIPAL', name: 'Principal / HOI', authorityLevel: 70, description: 'Institute Leadership' },
+    { code: 'EXAM_CELL', name: 'Exam Controller', authorityLevel: 65, description: 'University Examination Wing' },
+    { code: 'HOD', name: 'Department HOD', authorityLevel: 50, description: 'Departmental Head' },
+    { code: 'STUDENT_ADMIN', name: 'Student Administration Officer', authorityLevel: 45, description: 'Student Onboarding & Records' },
+    { code: 'STUDENT_SECTION', name: 'Student Section Officer', authorityLevel: 40, description: 'Student Affairs & Services' },
+    { code: 'FACULTY', name: 'Faculty / Mentor', authorityLevel: 30, description: 'Teaching & Mentorship' },
+    { code: 'STUDENT', name: 'Student Candidate', authorityLevel: 10, description: 'Academic Student Portal' },
+    { code: 'PARENT', name: 'Parent / Guardian', authorityLevel: 5, description: 'Ward Academic & Fee Portal' },
+    { code: 'IQAC', name: 'IQAC Director', authorityLevel: 60, description: 'Quality Assurance Cell' },
+    { code: 'HOSTEL_ADMIN', name: 'Hostel Administrator', authorityLevel: 35, description: 'Hostel Management' },
+    { code: 'LIBRARY_ADMIN', name: 'Library Administrator', authorityLevel: 35, description: 'Central Library Management' },
+    { code: 'TRANSPORT_ADMIN', name: 'Transport Administrator', authorityLevel: 35, description: 'Fleet & Transport Services' },
+    { code: 'MAINTENANCE_ADMIN', name: 'Maintenance Administrator', authorityLevel: 35, description: 'Campus Estate & Maintenance' },
+    { code: 'ACCOUNTS_ADMIN', name: 'Accounts Administrator', authorityLevel: 55, description: 'Finance & Accounts Office' },
+  ];
+
+  const roleMap = new Map<string, any>();
+  for (const r of rolesToSeed) {
+    const roleRecord = await prisma.role.upsert({
+      where: { code: r.code },
+      update: { name: r.name, authorityLevel: r.authorityLevel, description: r.description, status: 'ACTIVE' },
+      create: { code: r.code, name: r.name, authorityLevel: r.authorityLevel, description: r.description, status: 'ACTIVE' },
+    });
+    roleMap.set(r.code, roleRecord);
+  }
+
+  const demoUsersToSeed = [
+    { erpId: 'STU000001', username: 'student', password: 'Student@123', roleCode: 'STUDENT', studentId: seededStudents[0]?.id },
+    { erpId: 'PAR000001', username: 'parent', password: 'Parent@123', roleCode: 'PARENT' },
+    { erpId: 'FAC000001', username: 'faculty', password: 'Faculty@123', roleCode: 'FACULTY', facultyId: faculty.id },
+    { erpId: 'HOD000001', username: 'hod', password: 'Faculty@123', roleCode: 'HOD' },
+    { erpId: 'HOI000001', username: 'principal', password: 'Admin@123', roleCode: 'PRINCIPAL' },
+    { erpId: 'REG000001', username: 'registrar', password: 'Admin@123', roleCode: 'REGISTRAR' },
+    { erpId: 'DREG000001', username: 'deputyregistrar', password: 'Admin@123', roleCode: 'DEPUTY_REGISTRAR' },
+    { erpId: 'VP000001', username: 'vp', password: 'Admin@123', roleCode: 'VICE_PRESIDENT' },
+    { erpId: 'DEMO_ADM000001', username: 'demo.admin', password: 'Admin@123', roleCode: 'SUPER_ADMIN' },
+    { erpId: 'ADM000001', username: 'admin', password: 'Admin@123', roleCode: 'SUPER_ADMIN' },
+    { erpId: 'MASTER_ADM000001', username: 'jigarahir', password: 'Jigar@2002', roleCode: 'SUPER_ADMIN' },
+    { erpId: 'ERP_COORD000001', username: 'erpcoordinator', password: 'Admin@123', roleCode: 'ERP_COORDINATOR' },
+    { erpId: 'EXAM000001', username: 'examcell', password: 'Admin@123', roleCode: 'EXAM_CELL' },
+    { erpId: 'SEC000001', username: 'studentsection', password: 'Admin@123', roleCode: 'STUDENT_SECTION' },
+    { erpId: 'ONB000001', username: 'studentadmin', password: 'Admin@123', roleCode: 'STUDENT_ADMIN' },
+  ];
+
+  for (const du of demoUsersToSeed) {
+    const userRecord = await prisma.user.upsert({
+      where: { username: du.username },
+      update: {
+        erpId: du.erpId,
+        passwordHash: du.password,
+        accountStatus: 'ACTIVE',
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        studentId: du.studentId || undefined,
+        facultyId: du.facultyId || undefined,
+      },
+      create: {
+        erpId: du.erpId,
+        username: du.username,
+        passwordHash: du.password,
+        accountStatus: 'ACTIVE',
+        isFirstLogin: false,
+        studentId: du.studentId || undefined,
+        facultyId: du.facultyId || undefined,
+      },
+    });
+
+    const role = roleMap.get(du.roleCode);
+    if (role) {
+      await prisma.userRole.upsert({
+        where: { userId_roleId: { userId: userRecord.id, roleId: role.id } },
+        update: {},
+        create: {
+          userId: userRecord.id,
+          roleId: role.id,
+          scopeType: 'UNIVERSITY',
+        },
+      });
+    }
+  }
+
   console.log('✅ Seeding completed successfully!');
-  console.log(`📊 Summary: 3 Courses, 5 Students, ${seededStudents.length} Attendance Records, ${seededStudents.length} Fee Invoices created.`);
+  console.log(`📊 Summary: 3 Courses, 5 Students, ${seededStudents.length} Attendance Records, ${seededStudents.length} Fee Invoices, ${demoUsersToSeed.length} Demo Accounts created.`);
 }
 
 main()

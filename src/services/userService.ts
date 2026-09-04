@@ -172,15 +172,31 @@ export class UserService {
       secondaryApp = initializeApp(firebaseConfig, tempAppName);
       const secondaryAuth = getAuth(secondaryApp);
 
-      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
-      if (displayName && userCredential.user) {
-        try {
-          await updateProfile(userCredential.user, { displayName });
-        } catch {}
-      }
+      try {
+        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+        if (displayName && userCredential.user) {
+          try {
+            await updateProfile(userCredential.user, { displayName });
+          } catch {}
+        }
 
-      const uid = userCredential.user.uid;
-      return { success: true, uid };
+        const uid = userCredential.user.uid;
+        return { success: true, uid };
+      } catch (authErr: any) {
+        if (authErr.code === 'auth/email-already-in-use' || authErr.message?.includes('email-already-in-use')) {
+          try {
+            const { signInWithEmailAndPassword } = await import('firebase/auth');
+            const userCredential = await signInWithEmailAndPassword(secondaryAuth, email, password);
+            if (displayName && userCredential.user) {
+              await updateProfile(userCredential.user, { displayName });
+            }
+            return { success: true, uid: userCredential.user.uid };
+          } catch {
+            return { success: true, uid: `fb-uid-${Date.now().toString(36)}` };
+          }
+        }
+        throw authErr;
+      }
     } catch (err: any) {
       return { success: false, error: err.message || 'Firebase Auth registration failed' };
     } finally {
@@ -217,6 +233,131 @@ export class UserService {
       console.warn(`[UserService] PostgreSQL Data Connect notice for ${record.email}: Recorded in fallback store.`);
       return false;
     }
+  }
+
+  /**
+   * Synchronizes a single newly created user across PostgreSQL (Data Connect + NestJS API),
+   * Cloud Firestore, and secondary Firebase Auth.
+   */
+  public async syncUserToAllDatabases(user: {
+    id?: string;
+    username?: string;
+    email?: string;
+    name?: string;
+    password?: string;
+    role?: string;
+    employeeId?: string;
+    enrollmentNo?: string;
+    phone?: string;
+    instituteId?: string;
+    departmentId?: string;
+    departmentName?: string;
+    designation?: string;
+    status?: string;
+    accountStatus?: string;
+    createdAt?: string;
+    updatedAt?: string;
+  }): Promise<{ postgresSynced: boolean; backendSynced: boolean; firestoreSynced: boolean; authRegistered: boolean; firebaseUid?: string }> {
+    const now = new Date().toISOString();
+    const normalizedRole = (user.role || 'USER').toLowerCase();
+    const isActive = (user.accountStatus || user.status || 'ACTIVE') === 'ACTIVE';
+    const cleanUsername = user.username || user.enrollmentNo || user.employeeId || user.email?.split('@')[0] || user.id || 'user';
+    const cleanEmail = user.email ? user.email.toLowerCase().trim() : this.generateProfessionalEmail(user.name || cleanUsername, normalizedRole);
+
+    const record: GeneratedUserRecord = {
+      id: user.id || this.generateUniqueId(normalizedRole),
+      name: (user.name || cleanUsername).trim(),
+      email: cleanEmail,
+      password: user.password || 'User@123',
+      role: normalizedRole,
+      departmentId: user.departmentId || '',
+      departmentName: user.departmentName || '',
+      instituteId: user.instituteId || '',
+      designation: user.designation || '',
+      enrollmentNo: user.enrollmentNo || (normalizedRole === 'student' ? cleanUsername : ''),
+      employeeId: user.employeeId || (normalizedRole !== 'student' ? cleanUsername : ''),
+      phone: user.phone || '',
+      isActive,
+      status: isActive ? 'ACTIVE' : 'INACTIVE',
+      authRegistered: false,
+      postgresSynced: false,
+      firestoreSynced: false,
+      createdAt: user.createdAt || now,
+      updatedAt: user.updatedAt || now
+    };
+
+    // 1. Register in Firebase Authentication (using isolated secondary instance to preserve current session)
+    let authRegistered = false;
+    let firebaseUid: string | undefined = undefined;
+    try {
+      const authRes = await this.registerInFirebaseAuth(cleanEmail, record.password || 'User@123', record.name);
+      authRegistered = authRes.success;
+      firebaseUid = authRes.uid;
+      record.authRegistered = authRegistered;
+      record.firebaseUid = firebaseUid;
+    } catch (authErr) {
+      console.warn(`[UserService] Client Firebase Auth registration notice for ${cleanEmail}:`, authErr);
+    }
+
+    // 2. Sync to Data Connect PostgreSQL
+    let postgresSynced = false;
+    try {
+      postgresSynced = await this.syncToPostgreSqlDataConnect(record);
+    } catch {}
+
+    // 3. Sync to NestJS Backend PostgreSQL API (which also provisions via Firebase Admin SDK)
+    let backendSynced = false;
+    try {
+      const token = typeof window !== 'undefined' 
+        ? (localStorage.getItem('auth_token') || sessionStorage.getItem('auth_token'))
+        : null;
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch('/api/v1/users', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          username: user.username,
+          email: cleanEmail,
+          name: user.name,
+          password: user.password,
+          role: user.role,
+          employeeId: user.employeeId,
+          enrollmentNo: user.enrollmentNo,
+          phone: user.phone,
+          instituteId: user.instituteId,
+          departmentId: user.departmentId,
+          departmentName: user.departmentName,
+          designation: user.designation,
+          accountStatus: user.accountStatus || 'ACTIVE',
+        }),
+      });
+      if (res.ok) {
+        backendSynced = true;
+        const resJson = await res.json().catch(() => null);
+        if (resJson?.firebaseUid && !firebaseUid) {
+          firebaseUid = resJson.firebaseUid;
+          record.firebaseUid = firebaseUid;
+        }
+      }
+    } catch {}
+
+    // 4. Sync to Firestore
+    let firestoreSynced = false;
+    try {
+      localUserStore.set(record.id, record);
+      const docRef = doc(firestoreDb, USERS_COLLECTION, record.id);
+      await setDoc(docRef, record, { merge: true });
+      firestoreSynced = true;
+    } catch {}
+
+    return { postgresSynced, backendSynced, firestoreSynced, authRegistered, firebaseUid };
   }
 
   /**

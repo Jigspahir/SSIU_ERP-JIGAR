@@ -17,13 +17,21 @@ export const PAGE_SIZE_OPTIONS = [8, 15, 25, 50, 100] as const;
 
 // ─── Demo Account Credentials ─────────────────────────────────────────────────
 export const DEMO_ACCOUNTS = {
-  admin: { identifier: 'admin', password: 'Admin@123', displayName: 'Demo Admin', email: 'demo.admin@university.edu' },
-  registrar: { identifier: 'registrar', password: 'Admin@123', displayName: 'Demo Registrar 1', email: 'demo.registrar1@ssiu-demo.ac.in' },
-  studentadmin: { identifier: 'studentadmin', password: 'Admin@123', displayName: 'Onboarding Officer', email: 'onboarding.officer@swarrnim.edu.in' },
-  deputyregistrar: { identifier: 'deputyregistrar', password: 'Admin@123', displayName: 'Demo Deputy Registrar 1', email: 'demo.deputyregistrar1@ssiu-demo.ac.in' },
-  faculty: { identifier: 'faculty', password: 'Faculty@123', displayName: 'Prof. Demo Faculty', email: 'demo.faculty@university.edu' },
-  student: { identifier: 'student', password: 'Student@123', displayName: 'Jigar Patel', email: 'jigar.patel@swarrnim.edu.in' },
-  parent: { identifier: 'parent', password: 'Parent@123', displayName: 'Rajesh Sharma', email: 'rajesh.sharma@parent.ssiu-demo.ac.in' },
+  admin: { identifier: 'admin', password: 'Admin@123', displayName: 'Super Admin', email: 'demo.admin1@ssiu-demo.ac.in', role: 'SUPER_ADMIN' },
+  demoadmin: { identifier: 'demo.admin', password: 'Admin@123', displayName: 'Demo ERP Administrator', email: 'demo.admin@ssiu-erp.local', role: 'SUPER_ADMIN' },
+  masteradmin: { identifier: 'jigarahir410@gmail.com', password: 'Jigar@2002', displayName: 'Jigar Ahir (Super Admin)', email: 'jigarahir410@gmail.com', role: 'SUPER_ADMIN' },
+  erpcoordinator: { identifier: 'erpcoordinator', password: 'Admin@123', displayName: 'Central ERP Coordinator', email: 'demo.erpcoordinator@ssiu-demo.ac.in', role: 'ERP_COORDINATOR' },
+  vp: { identifier: 'vp', password: 'Admin@123', displayName: 'Vice President SSIU', email: 'vp@swarrnim.edu.in', role: 'VICE_PRESIDENT' },
+  principal: { identifier: 'principal', password: 'Admin@123', displayName: 'Demo Principal', email: 'demo.principal1@ssiu-demo.ac.in', role: 'PRINCIPAL' },
+  registrar: { identifier: 'registrar', password: 'Admin@123', displayName: 'University Registrar', email: 'demo.registrar1@ssiu-demo.ac.in', role: 'REGISTRAR' },
+  deputyregistrar: { identifier: 'deputyregistrar', password: 'Admin@123', displayName: 'Deputy Registrar', email: 'demo.deputyregistrar1@ssiu-demo.ac.in', role: 'DEPUTY_REGISTRAR' },
+  hod: { identifier: 'hod', password: 'Faculty@123', displayName: 'Department HOD', email: 'demo.hod1@ssiu-demo.ac.in', role: 'HOD' },
+  faculty: { identifier: 'faculty', password: 'Faculty@123', displayName: 'Prof. Demo Faculty', email: 'demo.faculty1@ssiu-demo.ac.in', role: 'FACULTY' },
+  examcell: { identifier: 'examcell', password: 'Admin@123', displayName: 'Exam Controller', email: 'demo.examcontroller1@ssiu-demo.ac.in', role: 'EXAM_CELL' },
+  studentsection: { identifier: 'studentsection', password: 'Admin@123', displayName: 'Student Section Officer', email: 'demo.officer1@ssiu-demo.ac.in', role: 'STUDENT_SECTION' },
+  studentadmin: { identifier: 'studentadmin', password: 'Admin@123', displayName: 'Onboarding Officer', email: 'onboarding.officer@swarrnim.edu.in', role: 'STUDENT_ADMIN' },
+  student: { identifier: 'student', password: 'Student@123', displayName: 'Jigar Patel', email: 'jigar.patel@swarrnim.edu.in', role: 'STUDENT' },
+  parent: { identifier: 'parent', password: 'Parent@123', displayName: 'Rajesh Sharma', email: 'rajesh.sharma@parent.ssiu-demo.ac.in', role: 'PARENT' },
 } as const;
 
 // ─── Session Timeout ──────────────────────────────────────────────────────────

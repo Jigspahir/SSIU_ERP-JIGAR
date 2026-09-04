@@ -122,6 +122,8 @@ import {
   NoteSheetVerificationResult, 
   NoteSheetAnalyticsSummary 
 } from '../types';
+import { firestoreDb } from '../firebase/config';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 
 export interface DatabaseState {
   institutes: Institute[];
@@ -2009,6 +2011,15 @@ class ERPDatabaseService {
     }
     
     this.saveState();
+
+    // Async write-through to Cloud Firestore
+    try {
+      if (firestoreDb && newItem.id) {
+        const docRef = doc(firestoreDb, String(collectionKey), newItem.id);
+        setDoc(docRef, { ...newItem, updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+      }
+    } catch {}
+
     return newItem;
   }
 
@@ -2024,6 +2035,15 @@ class ERPDatabaseService {
     }
 
     this.saveState();
+
+    // Async write-through to Cloud Firestore
+    try {
+      if (firestoreDb && id) {
+        const docRef = doc(firestoreDb, String(collectionKey), id);
+        setDoc(docRef, { ...(list[idx] as any), updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+      }
+    } catch {}
+
     return list[idx];
   }
 
@@ -2038,6 +2058,15 @@ class ERPDatabaseService {
         this.logAudit('DELETE', String(collectionKey), auditMsg);
       }
       this.saveState();
+
+      // Async deletion write-through to Cloud Firestore
+      try {
+        if (firestoreDb && id) {
+          const docRef = doc(firestoreDb, String(collectionKey), id);
+          deleteDoc(docRef).catch(() => {});
+        }
+      } catch {}
+
       return true;
     }
     return false;

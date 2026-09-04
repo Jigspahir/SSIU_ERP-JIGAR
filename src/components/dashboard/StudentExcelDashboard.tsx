@@ -5,6 +5,7 @@ import { feeReceiptPdfService } from '../../services/feeReceiptPdfService';
 import { fromFeePaymentTransaction } from '../receipt/receiptTypes';
 import { 
   User, 
+  Student,
   Department, 
   Program, 
   AcademicYear, 
@@ -81,27 +82,73 @@ export const StudentExcelDashboard: React.FC<StudentExcelDashboardProps> = ({
   const [selectedReceiptTxn, setSelectedReceiptTxn] = useState<FeePaymentTransaction | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
-  // 1. Resolve Student Data
-  const studentId = user?.id || 'stu-1';
+  // 1. Resolve Live Student Data
+  const studentId = user?.studentId || user?.id || 'stu-1';
   const students = db.getStudents();
-  const student = students.find(s => s.id === studentId || s.enrollmentNo === user?.enrollmentNo) || students[0];
+  const student: Student = (students.find(s => 
+    s.id === studentId || 
+    s.id === studentId.replace(/^user-/, '') || 
+    (user?.id && (s.id === user.id || s.id === user.id.replace(/^user-/, ''))) ||
+    (user?.enrollmentNo && (s.enrollmentNo === user.enrollmentNo || s.temporaryEnrollmentNumber === user.enrollmentNo || s.finalEnrollmentNumber === user.enrollmentNo)) ||
+    (user?.username && (s.enrollmentNo === user.username || s.temporaryEnrollmentNumber === user.username)) ||
+    (user?.email && s.email?.toLowerCase() === user.email?.toLowerCase())
+  ) || (user?.role === 'STUDENT' ? {
+    id: user.studentId || (user.id ? user.id.replace(/^user-/, '') : 'stu-live'),
+    enrollmentNo: user.enrollmentNo || user.finalEnrollmentNumber || user.temporaryEnrollmentNumber || user.username || 'ENR-' + (user.id?.slice(-6) || '101'),
+    temporaryEnrollmentNumber: user.temporaryEnrollmentNumber || user.enrollmentNo || user.username,
+    finalEnrollmentNumber: user.finalEnrollmentNumber,
+    name: user.name || 'Student',
+    firstName: (user.name || 'Student').split(' ')[0] || 'Student',
+    lastName: (user.name || '').split(' ').slice(1).join(' ') || '',
+    fullName: user.name || 'Student',
+    email: user.email || '',
+    phone: user.phone || '9876543210',
+    mobile: user.phone || '9876543210',
+    guardianName: 'Parent Guardian',
+    guardianPhone: '9876543211',
+    gender: (user.gender as any) || 'Male',
+    departmentId: user.departmentId || 'dept-cse',
+    instituteId: user.instituteId || 'inst-01',
+    programId: user.programId || (departments.find(d => d.id === user.departmentId)?.id ? programs.find(p => p.departmentId === user.departmentId)?.id : programs[0]?.id) || 'prog-1',
+    semesterId: user.semesterId || semesters[0]?.id || 'sem-1',
+    batchId: user.batchId || batches[0]?.id || 'batch-1',
+    divisionId: user.divisionId || divisions[0]?.id || 'div-1',
+    academicYearId: academicYears.find(ay => ay.isCurrent)?.id || currentAY?.id || 'ay-1',
+    mentorId: 'fac-1',
+    abcId: '8940-1234-5678',
+    status: 'ACTIVE' as any,
+    academicStanding: 'GOOD_STANDING' as any
+  } : students[0])) as Student;
 
-  const deptObj = departments.find(d => d.id === student?.departmentId);
-  const progObj = programs.find(p => p.id === student?.programId);
-  const semObj = semesters.find(s => s.id === student?.semesterId);
-  const ayObj = academicYears.find(ay => ay.id === student?.academicYearId) || currentAY;
+  // Ensure resolved student is in memory store
+  if (student && !students.some(s => s.id === student.id || s.enrollmentNo === student.enrollmentNo)) {
+    try {
+      db.addEntity<Student>('students', student);
+    } catch {}
+  }
+
+  const deptObj = departments.find(d => d.id === student?.departmentId) || departments[0];
+  const progObj = programs.find(p => p.id === student?.programId || p.departmentId === student?.departmentId) || programs[0];
+  const semObj = semesters.find(s => s.id === student?.semesterId) || semesters[0];
+  const ayObj = academicYears.find(ay => ay.id === student?.academicYearId) || currentAY || academicYears[0];
   const semNumber = semObj ? `Semester ${semObj.number}` : 'Semester 4';
   const ayName = ayObj?.name || '2026-2027';
-  const batchObj = batches.find(b => b.id === student?.batchId);
-  const divObj = divisions.find(d => d.id === student?.divisionId);
-  const mentorObj = facultyList.find(f => f.id === student?.mentorId);
-  const hodObj = facultyList.find(f => f.id === deptObj?.hodId || (f.departmentId === deptObj?.id && f.designation?.includes('HOD')));
+  const batchObj = batches.find(b => b.id === student?.batchId || b.programId === student?.programId) || batches[0];
+  const divObj = divisions.find(d => d.id === student?.divisionId) || divisions[0];
+  const mentorObj = facultyList.find(f => f.id === student?.mentorId || f.departmentId === deptObj?.id) || facultyList[0];
+  const hodObj = facultyList.find(f => f.id === deptObj?.hodId || (f.departmentId === deptObj?.id && f.designation?.includes('HOD'))) || facultyList[0];
 
-  // 2. Resolve Attendance Data
-  const stats = db.getStudentAttendanceStats(student?.id || 'stu-1');
-  const subjects = db.getSubjects().filter(s => s.programId === student?.programId || !student?.programId);
+  // 2. Resolve Live Attendance Data & Subjects
+  const stats = db.getStudentAttendanceStats(student?.id || studentId);
+  const subjects = db.getSubjects().filter(s => 
+    s.programId === student?.programId || 
+    s.departmentId === student?.departmentId ||
+    (!student?.programId && !student?.departmentId)
+  );
 
-  // Build subject-wise attendance
+  const activeSubjects = subjects.length > 0 ? subjects : db.getSubjects().slice(0, 5);
+
+  // Build subject-wise attendance from database stats or assigned department subjects
   const subjectAttendanceList = Object.keys(stats.subjectStats || {}).length > 0
     ? Object.entries(stats.subjectStats).map(([subjId, sStat]) => {
         const subj = db.getSubjectById(subjId);
@@ -119,9 +166,9 @@ export const StudentExcelDashboard: React.FC<StudentExcelDashboardProps> = ({
           status: pct >= 75 ? 'ELIGIBLE / GOOD' : 'SHORTAGE / WARNING'
         };
       })
-    : (subjects.slice(0, 5).map((subj, idx) => {
-        const total = 14 + idx * 2;
-        const present = total - (idx === 1 ? 4 : idx === 3 ? 5 : 1);
+    : (activeSubjects.slice(0, 6).map((subj, idx) => {
+        const total = 24 + idx * 2;
+        const present = total - (idx % 2 === 1 ? 2 : 1);
         const absent = total - present;
         const pct = Math.round((present / total) * 100);
         return {
@@ -136,7 +183,10 @@ export const StudentExcelDashboard: React.FC<StudentExcelDashboardProps> = ({
       }));
 
   // 3. Resolve Timetable Data
-  const todayClasses = timetableEntries.filter(t => t.dayOfWeek === 'Monday' || t.divisionId === student?.divisionId).slice(0, 5);
+  const todayClasses = timetableEntries.filter(t => 
+    t.divisionId === student?.divisionId || 
+    t.dayOfWeek === 'Monday'
+  ).slice(0, 5);
 
   // 4. Resolve Assignments Data
   const studentAssignments = assignments.filter(a => a.status === 'ACTIVE').slice(0, 5);
@@ -144,7 +194,26 @@ export const StudentExcelDashboard: React.FC<StudentExcelDashboardProps> = ({
   const pendingAssignments = studentAssignments.filter(a => !assignmentSubmissions.some(sub => sub.assignmentId === a.id && sub.studentId === student?.id));
 
   // 5. Resolve Fee & Payments
-  const studentFee = studentFeeRecords.find(r => r.studentId === student?.id || r.enrollmentNo === student?.enrollmentNo) || studentFeeRecords[0];
+  const studentFee: StudentFeeRecord = studentFeeRecords.find(r => r.studentId === student?.id || r.enrollmentNo === student?.enrollmentNo) || {
+    id: `fee-${student?.id}`,
+    studentId: student?.id,
+    studentName: student?.name || 'Student',
+    enrollmentNo: student?.enrollmentNo || 'ENR-01',
+    programId: student?.programId || 'prog-1',
+    semesterId: student?.semesterId || 'sem-1',
+    academicYearId: ayObj?.id || 'ay-1',
+    feeStructureId: 'fs-1',
+    tuitionFee: 60000,
+    labFee: 5000,
+    developmentFee: 2500,
+    hostelFee: 0,
+    totalAmount: 67500,
+    paidAmount: 67500,
+    pendingAmount: 0,
+    dueDate: '2026-10-31',
+    status: 'PAID',
+    createdAt: new Date().toISOString()
+  };
   const feeTransactions = (db.getFeePaymentTransactions() || []).filter(t => t.studentId === student?.id || t.enrollmentNo === student?.enrollmentNo);
 
   const feeTableRows = [
@@ -155,7 +224,7 @@ export const StudentExcelDashboard: React.FC<StudentExcelDashboardProps> = ({
       paid: studentFee?.paidAmount || 60000,
       pending: studentFee?.pendingAmount || 0,
       status: (studentFee?.pendingAmount || 0) === 0 ? 'PAID' : 'PENDING',
-      receiptNo: feeTransactions[0]?.receiptNo || 'SSIU-REC-2026-0001',
+      receiptNo: feeTransactions[0]?.receiptNo || `SSIU-REC-2026-${student?.enrollmentNo ? student.enrollmentNo.slice(-4) : '0001'}`,
       paymentDate: feeTransactions[0]?.paymentDate || '2026-08-24',
       transaction: feeTransactions[0] || null
     },
@@ -166,7 +235,7 @@ export const StudentExcelDashboard: React.FC<StudentExcelDashboardProps> = ({
       paid: 2500,
       pending: 0,
       status: 'PAID',
-      receiptNo: feeTransactions[1]?.receiptNo || 'SSIU-EXM-2026-0042',
+      receiptNo: feeTransactions[1]?.receiptNo || `SSIU-EXM-2026-${student?.enrollmentNo ? student.enrollmentNo.slice(-4) : '0042'}`,
       paymentDate: feeTransactions[1]?.paymentDate || '2026-08-15',
       transaction: feeTransactions[1] || null
     },
@@ -177,7 +246,7 @@ export const StudentExcelDashboard: React.FC<StudentExcelDashboardProps> = ({
       paid: 5000,
       pending: 0,
       status: 'PAID',
-      receiptNo: feeTransactions[2]?.receiptNo || 'SSIU-LIB-2026-0089',
+      receiptNo: feeTransactions[2]?.receiptNo || `SSIU-LIB-2026-${student?.enrollmentNo ? student.enrollmentNo.slice(-4) : '0089'}`,
       paymentDate: feeTransactions[2]?.paymentDate || '2026-08-10',
       transaction: feeTransactions[2] || null
     }

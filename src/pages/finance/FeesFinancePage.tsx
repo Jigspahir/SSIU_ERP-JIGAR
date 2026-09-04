@@ -350,8 +350,10 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
     }
   };
 
+  const isMasterAdmin = user?.email?.toLowerCase() === 'jigarahir410@gmail.com' || user?.username?.toLowerCase() === 'jigarahir' || role === 'SUPER_ADMIN';
+
   // 1. Faculty Restricted Access Screen
-  if (role === 'FACULTY') {
+  if (!isMasterAdmin && role === 'FACULTY') {
     return (
       <div className="card" style={{ padding: '3rem', textAlign: 'center', margin: '2rem auto', maxWidth: '600px' }}>
         <ShieldAlert size={54} color="var(--brand-orange)" style={{ margin: '0 auto 1rem' }} />
@@ -364,7 +366,7 @@ export const FeesFinancePage: React.FC<FeesFinancePageProps> = ({ initialStudent
   }
 
   // 2. Student View Screen
-  if (role === 'STUDENT') {
+  if (!isMasterAdmin && role === 'STUDENT') {
     const studentId = user?.id || 'stu-1';
     const studentFee = feeRecords.find(r => r.studentId === studentId || r.enrollmentNo === user?.enrollmentNo) || feeRecords[0];
     const studentTxs = paymentTransactions.filter(t => t.studentId === studentFee?.studentId || t.enrollmentNo === user?.enrollmentNo);

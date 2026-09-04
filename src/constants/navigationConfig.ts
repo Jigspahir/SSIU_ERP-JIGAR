@@ -2987,6 +2987,9 @@ export const getRoleNavigationItems = (role?: UserRole | null): NavItemConfig[] 
 
 export const isTabPermittedForRole = (tab: string, role?: UserRole | null): boolean => {
   if (!role) return false;
+  if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'VICE_PRESIDENT' || role === 'PROVOST' || role === 'PRESIDENT' || role === 'ERP_COORDINATOR') {
+    return true;
+  }
   if (role === 'PARENT') {
     const parentAllowed = [
       'dashboard', 'parent-dashboard',
@@ -3113,7 +3116,6 @@ export const isTabPermittedForRole = (tab: string, role?: UserRole | null): bool
   if (tab.startsWith('ai-') || ['ai-control-center', 'ai-agents', 'ai-activity', 'ai-approvals', 'ai-policies', 'ai-audit-logs', 'ai-automation'].includes(tab)) {
     return ['SUPER_ADMIN', 'UNIVERSITY_ADMIN', 'VICE_PRESIDENT', 'PROVOST', 'PRESIDENT', 'PRINCIPAL', 'HOD', 'REGISTRAR', 'DEPUTY_REGISTRAR', 'STUDENT_SECTION', 'FINANCE_OFFICER', 'ACCOUNTS_ADMIN', 'IQAC', 'FACULTY'].includes(role);
   }
-  if (role === 'SUPER_ADMIN' || role === 'UNIVERSITY_ADMIN' || role === 'VICE_PRESIDENT' || role === 'PROVOST' || role === 'PRESIDENT') return true;
   const allowedList = ROLE_NAV_ORDER[role] || [];
   return allowedList.includes(tab);
 };

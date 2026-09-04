@@ -141,17 +141,24 @@ async function main() {
   // 8. Seed All 21 Roles
   const rolesData = [
     { code: 'STUDENT', name: 'Student', authorityLevel: 10 },
+    { code: 'PARENT', name: 'Parent / Guardian', authorityLevel: 5 },
     { code: 'MENTOR', name: 'Faculty Mentor', authorityLevel: 20 },
     { code: 'FACULTY', name: 'Faculty Member', authorityLevel: 30 },
     { code: 'HOD', name: 'Head of Department', authorityLevel: 40 },
     { code: 'HOI', name: 'Head of Institute / Principal', authorityLevel: 50 },
+    { code: 'PRINCIPAL', name: 'Principal / HOI', authorityLevel: 50 },
     { code: 'DEPUTY_REGISTRAR', name: 'Deputy Registrar', authorityLevel: 60 },
     { code: 'REGISTRAR', name: 'University Registrar', authorityLevel: 70 },
     { code: 'PROVOST', name: 'University Provost', authorityLevel: 80 },
     { code: 'VICE_PRESIDENT', name: 'Vice President', authorityLevel: 90 },
     { code: 'PRESIDENT', name: 'University President', authorityLevel: 100 },
+    { code: 'SUPER_ADMIN', name: 'Super Administrator', authorityLevel: 100 },
+    { code: 'ERP_COORDINATOR', name: 'Central ERP Coordinator', authorityLevel: 95 },
     { code: 'FINANCE_OFFICER', name: 'Chief Finance Officer', authorityLevel: 65 },
     { code: 'EXAM_SECTION', name: 'Exam Controller / Section', authorityLevel: 55 },
+    { code: 'EXAM_CELL', name: 'Exam Cell Controller', authorityLevel: 55 },
+    { code: 'STUDENT_SECTION', name: 'Student Section Officer', authorityLevel: 45 },
+    { code: 'STUDENT_ADMIN', name: 'Student Administration Officer', authorityLevel: 45 },
     { code: 'HR', name: 'Human Resources Officer', authorityLevel: 55 },
     { code: 'STORE_MANAGER', name: 'Central Store Manager', authorityLevel: 45 },
     { code: 'IT_ADMIN', name: 'IT Infrastructure Administrator', authorityLevel: 85 },
@@ -641,16 +648,30 @@ async function main() {
     return user;
   };
 
-  await createDemoUser('ADM000001', 'superadmin', adminPasswordHash, 'SYSTEM_ADMIN');
+  await createDemoUser('ADM000001', 'superadmin', adminPasswordHash, 'SUPER_ADMIN');
+  await createDemoUser('ADM000002', 'admin', adminPasswordHash, 'SUPER_ADMIN');
+  await createDemoUser('ADM000003', 'demo.admin', adminPasswordHash, 'SUPER_ADMIN');
+  await createDemoUser('COORD000001', 'erpcoordinator', adminPasswordHash, 'ERP_COORDINATOR');
   await createDemoUser('VP000001', 'vp_demo01', adminPasswordHash, 'VICE_PRESIDENT');
+  await createDemoUser('VP000002', 'vp', adminPasswordHash, 'VICE_PRESIDENT');
   await createDemoUser('PRES000001', 'pres_demo01', adminPasswordHash, 'PRESIDENT');
   await createDemoUser('PROV000001', 'prov_demo01', adminPasswordHash, 'PROVOST');
   await createDemoUser('REG000001', 'reg_demo01', regPasswordHash, 'REGISTRAR');
+  await createDemoUser('REG000002', 'registrar', regPasswordHash, 'REGISTRAR');
+  await createDemoUser('DREG000001', 'deputyregistrar', adminPasswordHash, 'DEPUTY_REGISTRAR');
   await createDemoUser('HOI000001', 'hoi_demo01', hoiPasswordHash, 'HOI');
+  await createDemoUser('HOI000002', 'principal', hoiPasswordHash, 'PRINCIPAL');
   await createDemoUser('HOD000001', 'hod_demo01', hodPasswordHash, 'HOD', { facultyId: faculty01.id });
+  await createDemoUser('HOD000002', 'hod', hodPasswordHash, 'HOD', { facultyId: faculty01.id });
   await createDemoUser('FAC000001', 'fac_amitshah', facPasswordHash, 'FACULTY', { facultyId: faculty02.id });
+  await createDemoUser('FAC000002', 'faculty', facPasswordHash, 'FACULTY', { facultyId: faculty02.id });
+  await createDemoUser('EXAM000001', 'examcell', adminPasswordHash, 'EXAM_CELL');
+  await createDemoUser('SEC000001', 'studentsection', adminPasswordHash, 'STUDENT_SECTION');
+  await createDemoUser('ONB000001', 'studentadmin', adminPasswordHash, 'STUDENT_ADMIN');
+  await createDemoUser('PAR000001', 'parent', await bcrypt.hash('Parent@123', saltRounds), 'PARENT');
   await createDemoUser('STU000001', 'stu_demo01', stuPasswordHash, 'STUDENT', { studentId: student01.id });
   await createDemoUser('STU000002', 'stu_demo02', stuPasswordHash, 'STUDENT', { studentId: student02.id });
+  await createDemoUser('STU000003', 'student', stuPasswordHash, 'STUDENT', { studentId: student01.id });
 
   console.log('✅ Seeded Demo Students, Faculty, Subjects, and Academic Mappings');
   console.log('🎉 SSIU ERP Backend Phase 6 Seeding Completed Successfully!');

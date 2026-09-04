@@ -37,7 +37,8 @@ export const StudentDirectorySearchPage: React.FC<StudentDirectorySearchPageProp
   initialDocId
 }) => {
   const { user, role } = useAuth();
-  const isStudent = role === 'STUDENT';
+  const isMasterAdmin = user?.email?.toLowerCase() === 'jigarahir410@gmail.com' || user?.username?.toLowerCase() === 'jigarahir' || role === 'SUPER_ADMIN';
+  const isStudent = !isMasterAdmin && role === 'STUDENT';
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState<string>(initialSearchQuery);

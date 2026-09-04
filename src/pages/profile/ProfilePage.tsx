@@ -57,15 +57,46 @@ const StudentProfileView: React.FC<{ user: User; role: UserRole; updateProfile: 
   const studentRecord = useMemo(() => {
     if (role !== 'STUDENT') return null;
     const students = db.getStudents();
-    if (!students || students.length === 0) return null;
-    return students.find(s => 
-      (user?.id && s.id === user.id) ||
-      (user?.enrollmentNo && s.enrollmentNo === user.enrollmentNo) ||
-      (user?.username && s.enrollmentNo === user.username) ||
-      (user?.email && s.email?.toLowerCase() === user.email?.toLowerCase()) ||
-      (user?.id && s.id.includes(user.id.replace('user-', ''))) ||
-      (user?.id && user.id.includes(s.id))
-    ) || students[0] || null;
+    const match = students.find(s => 
+      (user?.id && (s.id === user.id || s.id === user.id.replace('user-', ''))) ||
+      (user?.studentId && s.id === user.studentId) ||
+      (user?.enrollmentNo && (s.enrollmentNo === user.enrollmentNo || s.temporaryEnrollmentNumber === user.enrollmentNo || s.finalEnrollmentNumber === user.enrollmentNo)) ||
+      (user?.username && (s.enrollmentNo === user.username || s.temporaryEnrollmentNumber === user.username)) ||
+      (user?.email && s.email?.toLowerCase() === user.email?.toLowerCase())
+    );
+    if (match) return match;
+    if (user?.role === 'STUDENT') {
+      const dynamicStudent: Student = {
+        id: user.studentId || (user.id ? user.id.replace(/^user-/, '') : 'stu-live'),
+        enrollmentNo: user.enrollmentNo || user.finalEnrollmentNumber || user.temporaryEnrollmentNumber || user.username || 'ENR-' + (user.id?.slice(-6) || '101'),
+        temporaryEnrollmentNumber: user.temporaryEnrollmentNumber || user.enrollmentNo || user.username,
+        finalEnrollmentNumber: user.finalEnrollmentNumber,
+        name: user.name || 'Student',
+        firstName: (user.name || 'Student').split(' ')[0] || 'Student',
+        lastName: (user.name || '').split(' ').slice(1).join(' ') || '',
+        fullName: user.name || 'Student',
+        email: user.email || '',
+        phone: user.phone || '9876543210',
+        mobile: user.phone || '9876543210',
+        guardianName: 'Parent Guardian',
+        guardianPhone: '9876543211',
+        gender: (user.gender as any) || 'Male',
+        departmentId: user.departmentId || 'dept-cse',
+        instituteId: user.instituteId || 'inst-01',
+        programId: user.programId || (db.getPrograms().find(p => p.departmentId === user.departmentId)?.id || db.getPrograms()[0]?.id || 'prog-1'),
+        semesterId: db.getSemesters()[0]?.id || 'sem-1',
+        batchId: db.getBatches()[0]?.id || 'batch-1',
+        divisionId: db.getDivisions()[0]?.id || 'div-1',
+        academicYearId: db.getAcademicYears().find(ay => ay.isCurrent)?.id || 'ay-1',
+        status: 'ACTIVE' as any,
+        academicStanding: 'GOOD_STANDING' as any
+      };
+      try {
+        db.addEntity<Student>('students', dynamicStudent);
+      } catch {}
+      return dynamicStudent;
+    }
+    return students[0] || null;
   }, [role, user]);
 
   const [abcIdInput, setAbcIdInput] = useState(studentRecord?.abcId || '');
