@@ -134,6 +134,50 @@ export class FirebaseAuthService {
   }
 
   /**
+   * Register or provision new Firebase user with email and password
+   */
+  public async signUpWithEmailPassword(
+    email: string,
+    password: string,
+    profileData?: { role?: UserRole; displayName?: string; departmentId?: string; instituteId?: string }
+  ): Promise<{ firebaseUser: FirebaseUser; userProfile: FirebaseResolvedUserProfile | null }> {
+    const { createUserWithEmailAndPassword, updateProfile } = await import('firebase/auth');
+    const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+    if (profileData?.displayName) {
+      try {
+        await updateProfile(cred.user, { displayName: profileData.displayName });
+      } catch {}
+    }
+    const userProfile: FirebaseResolvedUserProfile = {
+      uid: cred.user.uid,
+      email: cred.user.email || email,
+      displayName: profileData?.displayName || email.split('@')[0],
+      role: profileData?.role || 'STUDENT',
+      active: true,
+      status: 'ACTIVE',
+      departmentId: profileData?.departmentId || 'dept-cse',
+      instituteId: profileData?.instituteId || 'inst-01',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    try {
+      await firebaseUserService.saveUser({
+        uid: cred.user.uid,
+        email: cred.user.email || email,
+        displayName: userProfile.displayName,
+        role: userProfile.role,
+        active: true,
+        status: 'ACTIVE',
+        departmentId: userProfile.departmentId,
+        instituteId: userProfile.instituteId,
+        createdAt: userProfile.createdAt,
+        updatedAt: userProfile.updatedAt
+      });
+    } catch {}
+    return { firebaseUser: cred.user, userProfile };
+  }
+
+  /**
    * Extract ERP role and claims from Firebase ID Token Result
    */
   public async getUserClaims(forceRefresh = false): Promise<ERPCustomClaims | null> {

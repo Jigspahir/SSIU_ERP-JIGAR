@@ -37,6 +37,7 @@ query GetUserByEmail($email: String!) @auth(level: USER) {
   users(where: { email: { eq: $email } }) {
     id
     email
+    passwordHash
     role
     isActive
     firstName

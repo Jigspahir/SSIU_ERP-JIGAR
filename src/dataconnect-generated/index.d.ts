@@ -66,6 +66,7 @@ export interface GetUserByEmailData {
   users: ({
     id: UUIDString;
     email: string;
+    passwordHash?: string | null;
     role: string;
     isActive: boolean;
     firstName?: string | null;

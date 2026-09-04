@@ -108,6 +108,7 @@ export function updateUser(dcOrVars: any, vars?: any): MutationPromise<UpdateUse
 export interface PostgreSQLUserRecord {
   id: string;
   email: string;
+  passwordHash?: string | null;
   role: string;
   isActive: boolean;
   firstName?: string | null;
